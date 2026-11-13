@@ -181,6 +181,29 @@ Inspected for Batch 8 but not committed (registered in docs/tag_registry.yaml):
 | `SHP_1737048_13102026050138_WEB.xml` (https://nsearchives.nseindia.com/corporate/xbrl/SHP_1737048_13102026050138_WEB.xml) | ITC 2026-09-30 (no promoter, DR in NPNP) | `7c40d58e00a5597c7250602fcdc561e9fafb499ad5c86f7860ab641335aea0b8` |
 | `SHP_1698632_21072026062045_WEB.xml` (https://nsearchives.nseindia.com/corporate/xbrl/SHP_1698632_21072026062045_WEB.xml) | JSWSTEEL 2026-06-30 | `d9a2f392f9221f2d1867f6fdd9ca4f6515f0f6213d1677b664afe9e648ea2b65` |
 
+## Batch 9 Reg. 34 annual report XBRL (fetched 2026-11-13 via `api/annual-reports-xbrl` [A8], one file per request)
+
+| File | Why it is here | Source URL | SHA-256 |
+|---|---|---|---|
+| `xbrl/AR_XBRL_TCS_09082026012216.xml` | B9: TCS FY26 consolidated. Screener parity FY26+FY25 comparative, PPE schedule, leases/ROU labels, PIT restatement test (X69-X76) | `https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_TCS_09082026012216.xml` | `282d14593b060513d85d5c3f37d33bdf0c191e1ffe8f75a283f72ada09bf49cc` |
+| `xbrl/AR_XBRL_TCS_14082025184751.xml` | B9: TCS FY25 consolidated. Cutoff (FY24 comparatives dropped), FY25-only NULL scores (C9, C23) | `https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_TCS_14082025184751.xml` | `007169a3260f9d11f0df20b206e5083f04dd348151d32659e07057b6a58fae57` |
+| `xbrl/AR_XBRL_ETERNAL_23092026175418.xml` | B9: Eternal FY26 consolidated. Screener parity FY26 + FY25, FX-in-investing divergence | `https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_ETERNAL_23092026175418.xml` | `c7c45d85413ffdf238a4484f0d7a8823b8dfddcb4941d6d9601bf7adea80b880` |
+| `annual/nse_annual-reports-xbrl_TCS_20261113.json` | B9: annual XBRL listing (symbol, type, broadcast time) | `https://www.nseindia.com/api/annual-reports-xbrl?index=equities&symbol=TCS` | `576b1db5338231ee1271b8df73318a674b56c5720271b5ed0c3ffaf4099c3bd0` |
+
+Inspected for Batch 9 but not committed (3-8 MB each; registered in docs/tag_registry.yaml):
+
+| File | Company / why | SHA-256 |
+|---|---|---|
+| `AR_XBRL_CUMMINSIND_04092026113506.xml` (https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_CUMMINSIND_04092026113506.xml) | CUMMINSIND annual XBRL | `5c3a9f08d842b59162ac20d3a26d32e90934b1a8f9716c7164b00752a384da53` |
+| `AR_XBRL_ITC_20082026185719.xml` (https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_ITC_20082026185719.xml) | ITC annual XBRL | `893b23f47cf1dbdec9be6aca849cf3493ea0ecb09d39d262dc0e6e59e04429ee` |
+| `AR_XBRL_LT_04072026100144.xml` (https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_LT_04072026100144.xml) | LT annual XBRL | `b32c686ccc3a43ee798c7502f8ec8b74bebba84b5deafc51136cb7d0d801942f` |
+| `AR_XBRL_MARUTI_08102026183654.xml` (https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_MARUTI_08102026183654.xml) | MARUTI annual XBRL | `d7c0ecdf8a97398572955150d5a7262b6b17f80533f9396b3e7e9103711dff11` |
+| `AR_XBRL_NAUKRI_23092026174127.xml` (https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_NAUKRI_23092026174127.xml) | NAUKRI annual XBRL | `d1a24dbdd7cfd3a310c3fe048119a4d40cdbd4ebb3dec0923bfbdc915923557a` |
+| `AR_XBRL_RELIANCE_16072026204945.xml` (https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_RELIANCE_16072026204945.xml) | RELIANCE annual XBRL | `2574f899e0385a6ed06e8244c0d20261672e653dbfed2a1e425e558b2fdfc22f` |
+| `AR_XBRL_SRF_09082026022508.xml` (https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_SRF_09082026022508.xml) | SRF annual XBRL | `9cd7592d33a6e62a4162ef662ad21c7e63c91133e406db78ea60e5a143965b98` |
+| `AR_XBRL_SUNPHARMA_30102026194751.xml` (https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_SUNPHARMA_30102026194751.xml) | SUNPHARMA annual XBRL | `2bc3400f673f83c4b721847fcf11146f1a92057b6cab7956c33b1b57801ee1e1` |
+| `AR_XBRL_TATAPOWER_06082025142114.xml` (https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_TATAPOWER_06082025142114.xml) | TATAPOWER annual XBRL | `ff29b910b96886f8fb675b67ab6259793d2e433916d78810e595ad47861f8379` |
+
 ## Screener goldens (local only, not committed)
 
 The repository is public, so the user-supplied Screener Excel exports (2026-11-13; 42 distinct files, some uploaded twice)

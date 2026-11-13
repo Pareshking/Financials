@@ -296,10 +296,14 @@ def _q4(name):
     return data, facts, fy_facts
 
 
-def _check_rows(name, st, golden, divergent, facts):
+def _check_rows(name, st, golden, divergent, facts, display_rounding=False):
+    """`display_rounding`: when the golden is shown without decimals (Screener's whole-crore display for large
+    companies), compare at that precision. Needed for rupee-precise annual XBRL; Q4 filings are crore-rounded."""
     for row, want in golden.items():
         ours = st.rows[row].value
         assert ours is not None, (name, row)
+        if display_rounding and "." not in want:
+            ours = (ours / CR).quantize(Decimal("1"), rounding="ROUND_HALF_UP") * CR
         gap = Decimal(want) - ours / CR
         if row in divergent:
             code, ref = divergent[row]
@@ -914,3 +918,93 @@ def test_star_health_ind_as_117_presentation_on_screener():
     assert v("other_income") == Decimal("6.16")  # Screener: -6.16
     expenses = Decimal("5341.34") - Decimal("6.16") - Decimal("351.64")  # Screener's 4,983.54 = Sales + OI - PBT
     assert expenses == Decimal("4983.54")
+
+
+# ---------------------------------------------------------------- Reg. 34 annual XBRL [X69-X76, Mandate 4]
+# The same Screener annual rows, rebuilt from the audited annual report XBRL instead of the Q4 Integrated Filing:
+# FY26 reuses ANNUAL_GOLDEN (same divergences); FY25 golden values come from the same Screener exports'
+# Mar-2025 column (ELIN: the standalone export). FY25 is read both from the FY25 filing and as the comparative
+# year of the FY26 filing.
+from financials.parsers.reg34_annual import parse_reg34_annual  # noqa: E402
+
+FY25 = (date(2024, 4, 1), date(2025, 3, 31))
+REG34_FILES = {
+    "TCS": "AR_XBRL_TCS_09082026012216.xml",
+    "TCS_FY25": "AR_XBRL_TCS_14082025184751.xml",
+    "ETERNAL": "AR_XBRL_ETERNAL_23092026175418.xml",
+    "ELIN_FY25": "AR_XBRL_ELIN_30092025131606.xml",
+}
+REG34_FY25_GOLDEN = {  # (statement, file key) -> (screener rows, divergences)
+    ("FY", "TCS_FY25"): ({"Sales": "255324", "Other Income": "3962", "Depreciation": "5242", "Interest": "796",
+                          "Profit before tax": "65331", "Tax": "16534", "Net Profit": "48553"}, {}),
+    ("BS", "TCS_FY25"): ({"Equity Capital": "362", "Reserves": "94394", "Borrowings": "9392",
+                          "Other Liabilities": "54501", "Total Liabilities": "158649", "Net Block": "23053",
+                          "Capital Work in Progress": "1546", "Investments": "30964", "Other Assets": "103086"}, {}),
+    ("CF", "TCS_FY25"): ({"Cash from Operating Activity": "48908", "Cash from Investing Activity": "-2144",
+                          "Cash from Financing Activity": "-47438", "Net Cash Flow": "-674"},
+                         {"Cash from Investing Activity": ("FX_IN_INVESTING", FX)}),
+    ("FY", "ETERNAL"): ({"Sales": "20243", "Other Income": "1077", "Depreciation": "863", "Interest": "154",
+                         "Profit before tax": "697", "Tax": "170", "Net Profit": "527"}, {}),
+    ("BS", "ETERNAL"): ({"Equity Capital": "907", "Reserves": "29410", "Borrowings": "2045",
+                         "Other Liabilities": "3261", "Total Liabilities": "35623", "Net Block": "9532",
+                         "Capital Work in Progress": "51", "Investments": "13192", "Other Assets": "12848"}, {}),
+    ("CF", "ETERNAL"): ({"Cash from Operating Activity": "308", "Cash from Investing Activity": "-7993",
+                         "Cash from Financing Activity": "8042", "Net Cash Flow": "357"}, {}),
+    ("FY", "ELIN_FY25"): ({"Sales": "944.95", "Other Income": "10.27", "Depreciation": "20.41", "Interest": "6.23",
+                           "Profit before tax": "27.29", "Tax": "7.11", "Net Profit": "20.17"}, {}),
+    # Screener's FY25 standalone balance sheet totals 591.75 against the filed 592.61: the 0.86 sits in
+    # Other Liabilities and Investments; no element of that size explains it (pinned residuals).
+    ("BS", "ELIN_FY25"): ({"Equity Capital": "24.83", "Reserves": "425.19", "Borrowings": "11.83",
+                           "Other Liabilities": "129.90", "Total Liabilities": "591.75", "Net Block": "206.25",
+                           "Capital Work in Progress": "3.32", "Investments": "69.21", "Other Assets": "312.97"},
+                          {"Other Liabilities": ("UNEXPLAINED", Decimal("-0.85")),
+                           "Total Liabilities": ("UNEXPLAINED", Decimal("-0.86")),
+                           "Investments": ("UNEXPLAINED", Decimal("-0.87"))}),
+    ("CF", "ELIN_FY25"): ({"Cash from Operating Activity": "20.08", "Cash from Investing Activity": "-24.58",
+                           "Cash from Financing Activity": "4.36", "Net Cash Flow": "-0.14"}, {}),
+}  # fmt: skip
+
+
+def _annual(key, period):
+    data = (XBRL_DIR / REG34_FILES[key]).read_bytes()
+    r = parse_reg34_annual(data, REG34_FILES[key])
+    assert r.ok, r.issues
+    inst = parse_instance(data)
+    facts = {}
+    for f in inst.facts:
+        c = inst.contexts[f.context_id]
+        if not c.dimensions and c.instant is None and f.is_numeric and (c.start, c.end) == period:
+            facts.setdefault(f.name, Decimal(f.value_text.strip()))
+    return r, facts
+
+
+def _annual_statement(kind, r, period):
+    return {"BS": lambda: balance_sheet(r, period[1]), "CF": lambda: cashflow(r, *period),
+            "FY": lambda: corp_quarter(r, *period)}[kind]()  # fmt: skip
+
+
+@pytest.mark.parametrize("key", sorted(k for k in ANNUAL_GOLDEN if k[1] in ("TCS", "ETERNAL")))
+def test_reg34_annual_fy26_matches_screener_like_the_q4_filing(key):
+    """Annual XBRL FY26 reproduces the same Screener rows, with the same divergences, as the Q4 Integrated Filing."""
+    kind, name = key
+    r, facts = _annual(name, FY)
+    st = _annual_statement(kind, r, FY)
+    assert tie_out(corp_quarter(r, *FY)) == 0
+    golden, divergent = ANNUAL_GOLDEN[key]
+    _check_rows(name, st, golden, divergent, facts, display_rounding=True)
+
+
+@pytest.mark.parametrize("key", sorted(REG34_FY25_GOLDEN))
+def test_reg34_annual_fy25_matches_screener(key):
+    kind, name = key
+    r, facts = _annual(name, FY25)
+    golden, divergent = REG34_FY25_GOLDEN[key]
+    _check_rows(name, _annual_statement(kind, r, FY25), golden, divergent, facts, display_rounding=True)
+
+
+@pytest.mark.parametrize("kind", ["FY", "BS", "CF"])
+def test_tcs_fy25_comparative_in_fy26_filing_matches_screener_too(kind):
+    """The FY26 filing's comparative year gives the same FY25 statements (no restatement for TCS)."""
+    r, facts = _annual("TCS", FY25)
+    golden, divergent = REG34_FY25_GOLDEN[(kind, "TCS_FY25")]
+    _check_rows("TCS", _annual_statement(kind, r, FY25), golden, divergent, facts, display_rounding=True)

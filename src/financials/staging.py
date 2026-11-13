@@ -36,7 +36,8 @@ CREATE TABLE stg_xbrl_filing (
     taxonomy_ns VARCHAR NOT NULL, scope VARCHAR NOT NULL, level_of_rounding VARCHAR NOT NULL,
     fy_start DATE NOT NULL, fy_end DATE NOT NULL, period_end DATE NOT NULL, reporting_quarter VARCHAR,
     audited BOOLEAN, board_meeting_end_ts TIMESTAMP, interest_paid_cfo_class VARCHAR,
-    interest_recd_cfo_class VARCHAR, stated_isin VARCHAR, stated_symbol VARCHAR, company_name VARCHAR
+    interest_recd_cfo_class VARCHAR, stated_isin VARCHAR, stated_symbol VARCHAR, company_name VARCHAR,
+    stated_cin VARCHAR, auditor_qualified BOOLEAN
 );
 CREATE TABLE stg_xbrl_facts (
     filing_id VARCHAR NOT NULL, parser_version VARCHAR NOT NULL, scope VARCHAR NOT NULL,
@@ -256,7 +257,7 @@ def stage_results_xbrl(
     tables["raw_xbrl_facts"] = _raw_fact_rows(fid, inst)
 
     try:
-        parsed = parse_integrated_results(data)
+        parsed = parse_integrated_results(data, source_url.rsplit("/", 1)[-1])
     except ParseError as exc:
         tables["stg_issues"] = [
             {
@@ -300,6 +301,8 @@ def stage_results_xbrl(
             "stated_isin": m["stated_isin"],
             "stated_symbol": m["stated_symbol"],
             "company_name": m["company_name"],
+            "stated_cin": m.get("stated_cin"),
+            "auditor_qualified": m.get("auditor_qualified"),
         }
     ]
     tables["stg_xbrl_facts"] = [

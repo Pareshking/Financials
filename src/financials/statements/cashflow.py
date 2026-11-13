@@ -63,6 +63,8 @@ def cashflow(result, start: date, end: date) -> QuarterStatement | None:
     inv_named = {
         "Fixed assets purchased": -(z("capex_ppe") + z("capex_intangibles")),
         "Fixed assets sold": z("ppe_disposals"),
+        "Investments purchased": -z("investments_purchased"),  # Reg. 34 annual only [X74]
+        "Investments sold": z("investments_sold"),
         "Interest received": z("interest_received_investing"),
         "Dividends received": z("dividends_received_investing"),
     }

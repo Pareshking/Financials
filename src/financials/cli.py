@@ -82,6 +82,8 @@ def build_parser() -> argparse.ArgumentParser:
     fs = sub.add_parser("fetch-shareholding")
     fs.add_argument("symbols", nargs="+")
     fs.add_argument("--all-history", action="store_true")
+    fa = sub.add_parser("fetch-annual", help="Reg. 34 annual report XBRL (FY ending 2025 onwards)")
+    fa.add_argument("symbols", nargs="+")
     fr = sub.add_parser("fetch-results", help="results XBRL by URL")
     fr.add_argument("url")
     fr.add_argument("--broadcast-utc", type=datetime.fromisoformat)
@@ -150,6 +152,9 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
         elif args.cmd == "fetch-shareholding":
             for sym in args.symbols:
                 staged += jobs.shareholding(sym, latest_only=not args.all_history)
+        elif args.cmd == "fetch-annual":
+            for sym in args.symbols:
+                staged += jobs.annual_reports(sym)
         elif args.cmd == "fetch-results":
             src = "API_FIELD" if args.broadcast_utc else "UNKNOWN"
             staged += jobs.results_xbrl(args.url, args.broadcast_utc, src)

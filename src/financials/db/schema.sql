@@ -180,6 +180,7 @@ CREATE TABLE IF NOT EXISTS filing_meta (
     visible_from_source     VARCHAR NOT NULL,   -- BROADCAST | BOARD_MEETING_RULE
     interest_paid_cfo_class VARCHAR,
     interest_recd_cfo_class VARCHAR,
+    auditor_qualified       BOOLEAN,            -- Reg. 34: WhetherAuditorsReportHasBeenQualified... [X76]
     PRIMARY KEY (filing_id, parser_version)
 );
 
@@ -329,8 +330,8 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     fcff_yield          DOUBLE,
     other_income_to_pbt DOUBLE,
     altman_z_dd         DOUBLE,              -- X2 uses OtherEquity as retained-earnings proxy
-    piotroski_f         INTEGER,             -- NULL until annual (Reg. 34) data exists
-    beneish_m           DOUBLE,              -- NULL until annual (Reg. 34) data exists
+    piotroski_f         INTEGER,             -- 0..9, year-end-assets variant; NULL without two FYs [C23]
+    beneish_m           DOUBLE,              -- 8-variable M-score; NULL without two FYs [C23]
     return_1m           DOUBLE,
     return_3m           DOUBLE,
     return_6m           DOUBLE,
@@ -422,6 +423,12 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     public_holding_pct  DOUBLE,
     non_promoter_non_public_pct DOUBLE,      -- DR custodian + employee trusts, of total issued shares
     fii_dii_qoq_change_pct DOUBLE,           -- (FII + DII) now minus previous quarter end; fraction points
+    capex_to_depreciation DOUBLE,            -- FY (PPE + intangibles capex) / D&A [C23]
+    cwip_to_gross_block DOUBLE,              -- CWIP / gross block (Reg. 34 PPE schedule) [X71]
+    rote                DOUBLE,              -- FY owners' PAT / (owners' equity - goodwill - other intangibles)
+    rnd_and_royalty_intensity DOUBLE,        -- (R&D + royalty) / revenue; NULL when neither is disclosed [X73]
+    contingent_liabilities_to_net_worth DOUBLE, -- contingent liabilities / owners' equity [X73]
+    annual_fy_end       DATE,                -- fiscal year the annual ratios (incl. Piotroski/Beneish) use
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -457,8 +464,8 @@ CREATE TABLE IF NOT EXISTS screener_features (
     fcff_yield          DOUBLE,
     other_income_to_pbt DOUBLE,
     altman_z_dd         DOUBLE,              -- X2 uses OtherEquity as retained-earnings proxy
-    piotroski_f         INTEGER,             -- NULL until annual (Reg. 34) data exists
-    beneish_m           DOUBLE,              -- NULL until annual (Reg. 34) data exists
+    piotroski_f         INTEGER,             -- 0..9, year-end-assets variant; NULL without two FYs [C23]
+    beneish_m           DOUBLE,              -- 8-variable M-score; NULL without two FYs [C23]
     return_1m           DOUBLE,
     return_3m           DOUBLE,
     return_6m           DOUBLE,
@@ -550,6 +557,12 @@ CREATE TABLE IF NOT EXISTS screener_features (
     public_holding_pct  DOUBLE,
     non_promoter_non_public_pct DOUBLE,      -- DR custodian + employee trusts, of total issued shares
     fii_dii_qoq_change_pct DOUBLE,           -- (FII + DII) now minus previous quarter end; fraction points
+    capex_to_depreciation DOUBLE,            -- FY (PPE + intangibles capex) / D&A [C23]
+    cwip_to_gross_block DOUBLE,              -- CWIP / gross block (Reg. 34 PPE schedule) [X71]
+    rote                DOUBLE,              -- FY owners' PAT / (owners' equity - goodwill - other intangibles)
+    rnd_and_royalty_intensity DOUBLE,        -- (R&D + royalty) / revenue; NULL when neither is disclosed [X73]
+    contingent_liabilities_to_net_worth DOUBLE, -- contingent liabilities / owners' equity [X73]
+    annual_fy_end       DATE,                -- fiscal year the annual ratios (incl. Piotroski/Beneish) use
     PRIMARY KEY (as_of_date, security_id)
 );
 

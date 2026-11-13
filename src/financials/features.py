@@ -21,6 +21,7 @@ from decimal import Decimal
 from financials.corp_actions import ACCEPTED_STATUSES
 from financials.db import insert_rows, table_columns
 from financials.fundamentals import (
+    ANNUAL_COLUMNS,
     BANK_COLUMNS,
     CASH_CONVERSION_COLUMNS,
     INSURER_COLUMNS,
@@ -28,6 +29,7 @@ from financials.fundamentals import (
     REVERSE_DCF_TERMINAL_G,
     REVERSE_DCF_WACC,
     altman_z_double_prime,
+    annual_ratios,
     bank_blocks,
     building_blocks,
     cash_conversion_blocks,
@@ -314,8 +316,7 @@ def compute_rows(con, as_of: date, exchange: str = "NSE") -> list[dict]:
         price_date, close = (b[-1][0], b[-1][1]) if b else (None, None)
         row: dict = {
             "as_of_date": as_of, "security_id": sec, "entity_id": ent, "symbol": symbol, "series": series,
-            "price_date": price_date, "close": close, "piotroski_f": None, "beneish_m": None,
-            "in_nifty500": sec in nifty,
+            "price_date": price_date, "close": close, "in_nifty500": sec in nifty,
         }  # fmt: skip
         row.update(_momentum(b, factors.get(sec, []), frozen.get(sec)))
         row.update(_delivery(b))
@@ -392,7 +393,7 @@ _EMPTY_FUNDAMENTALS: dict = {
     "default_annual_scope": None, "fundamentals_end": None, "bs_as_of": None, "cf_as_of": None,
     "_net_debt": None, "_fcff": None, "_pat_owners": None, "_pe_earnings": None, "_equity_owners": None,
     "_minority": None, "roe_continuing": None, "core_profit_ttm": None, "_pat_owners_total": None,
-    **dict.fromkeys(NBFC_COLUMNS + BANK_COLUMNS + INSURER_COLUMNS + CASH_CONVERSION_COLUMNS),
+    **dict.fromkeys(NBFC_COLUMNS + BANK_COLUMNS + INSURER_COLUMNS + CASH_CONVERSION_COLUMNS + ANNUAL_COLUMNS),
 }  # fmt: skip
 
 # Industrial ratios that do not apply to lenders (architecture §10): NULL for INDAS_NBFC books.
@@ -456,6 +457,9 @@ def _fundamentals(con, entity_id: str, as_of_ts: datetime, end: date) -> dict:
         regulatory = load_factbook(con, entity_id, "STANDALONE", as_of_ts)  # standalone disclosures [X60]
     cash = {k: _f(v) for k, v in cash_conversion_blocks(book, end, b).items()}
     scope_cols["_archetype"] = derived_archetype(book)
+    # Annual-statement ratios [C23]: industrial books only (Piotroski/Beneish are not defined for lenders/insurers).
+    annual = annual_ratios(book, end) if scope_cols["_archetype"] == "INDUSTRIAL_SERVICES" else {}
+    scope_cols |= {k: (v if k in ("annual_fy_end", "piotroski_f") else _f(v)) for k, v in annual.items()}
     scope_cols["_newgen"] = newgen_inputs(book, end, b)
     scope_cols["_gross_profit"] = b["gross_profit"]
     scope_cols["_cfo"] = b["cfo"]

@@ -780,3 +780,125 @@ def altman_z_double_prime(blocks: dict) -> Decimal | None:
         return None
     x1, x2, x3, x4 = (ca - cl) / ta, re_ / ta, ebit / ta, eq / tl
     return Decimal("3.25") + Decimal("6.56") * x1 + Decimal("3.26") * x2 + Decimal("6.72") * x3 + Decimal("1.05") * x4
+
+
+# ── Annual (Reg. 34 / FY) ratios [C23] ───────────────────────────────────────────────────────────────
+ANNUAL_COLUMNS = (
+    "piotroski_f", "beneish_m", "capex_to_depreciation", "cwip_to_gross_block", "rote",
+    "rnd_and_royalty_intensity", "contingent_liabilities_to_net_worth", "annual_fy_end",
+)  # fmt: skip
+BENEISH = {"const": Decimal("-4.84"), "DSRI": Decimal("0.920"), "GMI": Decimal("0.528"), "AQI": Decimal("0.404"),
+           "SGI": Decimal("0.892"), "DEPI": Decimal("0.115"), "SGAI": Decimal("-0.172"), "TATA": Decimal("4.679"),
+           "LVGI": Decimal("-0.327")}  # fmt: skip
+_COGS = ("cost_of_materials_consumed", "purchases_of_stock_in_trade", "changes_in_inventories")
+
+
+def latest_fiscal_year(book: FactBook, on_or_before: date) -> tuple[date, date] | None:
+    """Latest 12-month PAT period ending on or before `on_or_before`."""
+    fys = [p for p in book.durations.get("pat", {}) if period_months(*p) == 12 and p[1] <= on_or_before]
+    return max(fys, key=lambda p: p[1]) if fys else None
+
+
+def _fy(book: FactBook, tag: str, p: tuple[date, date]) -> Decimal | None:
+    return book.durations.get(tag, {}).get(p)
+
+
+def _at(book: FactBook, tag: str, d: date) -> Decimal | None:
+    return book.instants.get(tag, {}).get(d)
+
+
+def _year(book: FactBook, p: tuple[date, date]) -> dict[str, Decimal | None]:
+    """One fiscal year's inputs: flows for period `p`, balances at its end."""
+    end = p[1]
+    rev = _fy(book, "revenue_from_operations", p)
+    cogs_parts = [_fy(book, t, p) for t in _COGS]
+    cogs = sum((c or Decimal(0) for c in cogs_parts), Decimal(0))  # Schedule III omits nil lines [C23]
+    capex_ppe, capex_int = _fy(book, "capex_ppe", p), _fy(book, "capex_intangibles", p)
+    return {
+        "rev": rev, "pat": _fy(book, "pat", p), "cfo": _fy(book, "cfo", p),
+        "gross_margin": None if not rev else (rev - cogs) / rev,
+        "dep": _fy(book, "depreciation_amortisation", p), "sga": _fy(book, "other_expenses", p),
+        "capex": None if capex_ppe is None else capex_ppe + (capex_int or Decimal(0)),
+        "rnd": _fy(book, "rnd_expense", p), "royalty": _fy(book, "royalty_expense", p),
+        "ta": _at(book, "total_assets", end), "ca": _at(book, "current_assets", end),
+        "cl": _at(book, "current_liabilities", end), "ppe": _at(book, "ppe_net", end),
+        "ltd": _at(book, "borrowings_noncurrent", end), "rec": _at(book, "trade_receivables_current", end),
+        "share_capital": _at(book, "equity_share_capital", end),
+        "equity_owners": _at(book, "equity_attributable_to_owners", end) or _at(book, "total_equity", end),
+        "pat_owners": _fy(book, "pat_owners", p) or _fy(book, "pat", p),
+        "goodwill": _at(book, "goodwill", end), "intangibles": _at(book, "other_intangibles", end),
+        "cwip": _at(book, "cwip", end), "gross_block": _at(book, "ppe_gross_block", end),
+        "contingent": _at(book, "contingent_liabilities", end),
+    }  # fmt: skip
+
+
+def piotroski_f(t: dict, p: dict) -> int | None:
+    """Piotroski (2000) F-score, 0..9. Assets are year-end, not beginning-of-year: the original needs the balance
+    sheet two years back, which is before the data cutoff for FY26 [C9, C23]. Every one of the nine signals needs
+    its inputs; one missing input makes the score NULL, never a partial score. LTD = non-current borrowings."""
+    need = ("pat", "cfo", "ta", "ltd", "ca", "cl", "share_capital", "gross_margin", "rev")
+    if any(t[k] is None for k in need) or any(p[k] is None for k in need) or not t["ta"] or not p["ta"]:
+        return None
+    if not t["cl"] or not p["cl"]:
+        return None
+    roa_t, roa_p = t["pat"] / t["ta"], p["pat"] / p["ta"]
+    signals = (
+        roa_t > 0,
+        t["cfo"] > 0,
+        roa_t > roa_p,
+        t["cfo"] > t["pat"],
+        t["ltd"] / t["ta"] < p["ltd"] / p["ta"],
+        t["ca"] / t["cl"] > p["ca"] / p["cl"],
+        t["share_capital"] <= p["share_capital"],
+        t["gross_margin"] > p["gross_margin"],
+        t["rev"] / t["ta"] > p["rev"] / p["ta"],
+    )
+    return sum(int(s) for s in signals)
+
+
+def beneish_m(t: dict, p: dict) -> Decimal | None:
+    """Beneish (1999) 8-variable M-score. SG&A proxy = Ind AS `OtherExpenses` (no SG&A line exists) [C23].
+    NULL when any ratio's inputs are missing or a denominator is zero."""
+    try:
+        idx = {
+            "DSRI": (t["rec"] / t["rev"]) / (p["rec"] / p["rev"]),
+            "GMI": p["gross_margin"] / t["gross_margin"],
+            "AQI": (1 - (t["ca"] + t["ppe"]) / t["ta"]) / (1 - (p["ca"] + p["ppe"]) / p["ta"]),
+            "SGI": t["rev"] / p["rev"],
+            "DEPI": (p["dep"] / (p["dep"] + p["ppe"])) / (t["dep"] / (t["dep"] + t["ppe"])),
+            "SGAI": (t["sga"] / t["rev"]) / (p["sga"] / p["rev"]),
+            "TATA": (t["pat"] - t["cfo"]) / t["ta"],
+            "LVGI": ((t["cl"] + t["ltd"]) / t["ta"]) / ((p["cl"] + p["ltd"]) / p["ta"]),
+        }
+    except (TypeError, ZeroDivisionError, ArithmeticError):
+        return None
+    return BENEISH["const"] + sum(BENEISH[k] * v for k, v in idx.items())
+
+
+def annual_ratios(book: FactBook, on_or_before: date) -> dict:
+    """Annual-statement ratios for the latest fiscal year visible in `book` [C23]."""
+    out: dict = dict.fromkeys(ANNUAL_COLUMNS)
+    fy = latest_fiscal_year(book, on_or_before)
+    if fy is None:
+        return out
+    t = _year(book, fy)
+    prior = (_add_months(fy[0], -12), _add_months(fy[1], -12))
+    p = _year(book, prior) if latest_fiscal_year(book, prior[1]) == prior else None
+    tangible = None
+    if t["equity_owners"] is not None and t["ta"] is not None:
+        # Schedule III omits nil lines: no goodwill/intangibles line on a filed balance sheet means none [C23]
+        tangible = t["equity_owners"] - (t["goodwill"] or 0) - (t["intangibles"] or 0)
+    rnd_royalty = None if t["rnd"] is None and t["royalty"] is None else (t["rnd"] or 0) + (t["royalty"] or 0)
+    out.update(
+        annual_fy_end=fy[1],
+        piotroski_f=piotroski_f(t, p) if p else None,
+        beneish_m=beneish_m(t, p) if p else None,
+        capex_to_depreciation=safe_div(t["capex"], t["dep"]),
+        cwip_to_gross_block=safe_div(t["cwip"], t["gross_block"]),
+        rote=safe_div(t["pat_owners"], tangible) if tangible is not None and tangible > 0 else None,
+        rnd_and_royalty_intensity=safe_div(rnd_royalty, t["rev"]),
+        contingent_liabilities_to_net_worth=safe_div(t["contingent"], t["equity_owners"])
+        if t["equity_owners"] and t["equity_owners"] > 0
+        else None,
+    )
+    return out

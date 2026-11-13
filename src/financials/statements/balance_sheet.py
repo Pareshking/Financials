@@ -39,12 +39,14 @@ def balance_sheet(result, end: date) -> QuarterStatement | None:
     rows["Borrowings"] = Row("Borrowings", sum(borrow.values(), ZERO), borrow)
     eq = z("equity_share_capital") + z("other_equity")
     other_liab = total - eq - rows["Borrowings"].value
-    nci, tp = z("non_controlling_interest"), z("trade_payables_current")
+    nci, tp = z("non_controlling_interest"), z("trade_payables_current") + z("trade_payables_noncurrent")
+    adv = z("advance_from_customers")  # Reg. 34 note [X73]; 0 when not disclosed (stays in other items)
     rows["Other Liabilities"] = Row(
         "Other Liabilities",
         other_liab,
-        {"Non-controlling interest": nci, "Trade payables": tp, "Other liability items": other_liab - nci - tp},
-    )
+        {"Non-controlling interest": nci, "Trade payables": tp, "Advance from customers": adv,
+         "Other liability items": other_liab - nci - tp - adv},
+    )  # fmt: skip
     rows["Total Liabilities"] = Row("Total Liabilities", total, {"Deferred tax netted": -netting})
     nb = {
         "Property, plant & equipment": z("ppe_net"),
@@ -65,10 +67,12 @@ def balance_sheet(result, end: date) -> QuarterStatement | None:
     oa = total - rows["Net Block"].value - rows["Capital Work in Progress"].value - rows["Investments"].value
     recv, stock = z("trade_receivables_current"), z("inventories")
     cash = z("cash_and_equivalents") + z("bank_balances_other")
+    loans = z("loans_current")
     rows["Other Assets"] = Row(
         "Other Assets",
         oa,
-        {"Receivables": recv, "Inventory": stock, "Cash & Bank": cash, "Other asset items": oa - recv - stock - cash},
-    )
+        {"Receivables": recv, "Inventory": stock, "Cash & Bank": cash, "Short term loans": loans,
+         "Other asset items": oa - recv - stock - cash - loans},
+    )  # fmt: skip
     rows["Total Assets"] = Row("Total Assets", total, {"Deferred tax netted": -netting})
     return QuarterStatement("INDAS_CORP", (end, end), rows, scope_used=result.meta.get("scope"))

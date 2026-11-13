@@ -631,18 +631,34 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     ).fetchone()[0]:
         return PromotionResult("ALREADY_PROMOTED", "results_xbrl", message=fid)
 
-    ent = con.execute(
-        "SELECT DISTINCT s.entity_id FROM security_identifier_history h "
-        "JOIN securities s USING (security_id) WHERE h.exchange = ? AND h.isin = ?",
-        [filing["exchange"], meta["stated_isin"]],
-    ).fetchall()
+    if meta["stated_isin"] is None and meta["accounting_profile"] == "REG34_ANNUAL":
+        # Reg. 34 annual XBRL carries no ISIN: the symbol in the NSE file name, resolved on the broadcast date (the
+        # file is named when it is filed), plus the filed CIN when the entity has one on record [X70].
+        on = utc_to_ist_date(filing["broadcast_ts"]) if filing["broadcast_ts"] is not None else meta["fy_end"]
+        ent = con.execute(
+            "SELECT DISTINCT s.entity_id FROM security_identifier_history h JOIN securities s USING (security_id) "
+            "WHERE h.exchange = ? AND h.symbol = ? AND h.valid_from <= ? AND (h.valid_to IS NULL OR h.valid_to > ?)",
+            [filing["exchange"], meta["stated_symbol"], on, on],
+        ).fetchall()
+        reason = "UNKNOWN_SYMBOL" if not ent else "AMBIGUOUS_SYMBOL"
+        if len(ent) == 1 and meta.get("stated_cin"):
+            cin = con.execute("SELECT cin FROM entity_master WHERE entity_id = ?", [ent[0][0]]).fetchone()[0]
+            if cin is not None and cin != meta["stated_cin"]:
+                ent, reason = [], "CIN_MISMATCH"
+    else:
+        ent = con.execute(
+            "SELECT DISTINCT s.entity_id FROM security_identifier_history h "
+            "JOIN securities s USING (security_id) WHERE h.exchange = ? AND h.isin = ?",
+            [filing["exchange"], meta["stated_isin"]],
+        ).fetchall()
+        reason = "UNKNOWN_ISIN" if not ent else "AMBIGUOUS_ISIN"
     if len(ent) != 1:
         q = _quarantine(
             con,
             stage="IDENTITY",
-            reason_code="UNKNOWN_ISIN" if not ent else "AMBIGUOUS_ISIN",
+            reason_code=reason,
             filing_id=fid,
-            details={"isin": meta["stated_isin"], "symbol": meta["stated_symbol"]},
+            details={"isin": meta["stated_isin"], "symbol": meta["stated_symbol"], "cin": meta.get("stated_cin")},
         )
         return PromotionResult("QUARANTINED", "results_xbrl", message=fid, quarantined=[q])
     entity_id = ent[0][0]
@@ -683,6 +699,7 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
                 "visible_from_source": source,
                 "interest_paid_cfo_class": meta["interest_paid_cfo_class"],
                 "interest_recd_cfo_class": meta["interest_recd_cfo_class"],
+                "auditor_qualified": meta.get("auditor_qualified"),
             }
         ],
     )

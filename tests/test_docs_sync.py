@@ -89,3 +89,15 @@ def test_every_seen_numeric_element_is_mapped_or_excluded_with_a_reason():
                 problems.append((profile, name, e.get("status"), e.get("reason"), expected))
     assert problems == []
     assert "UNKNOWN" not in REGISTRY["profiles"]
+
+
+ANNUAL_FILES = sorted(XBRL_DIR.glob("AR_XBRL_*.xml"))
+
+
+@pytest.mark.parametrize("path", ANNUAL_FILES, ids=lambda p: p.stem)
+def test_registry_covers_every_element_of_committed_annual_filings(path):
+    """Reg. 34 annual XBRL [X69, X76]: every non-dimensional element is registered under REG34_ANNUAL."""
+    inst = parse_instance(path.read_bytes())
+    elements = {f.name for f in inst.facts if not inst.contexts[f.context_id].dimensions}
+    assert elements - set(REGISTRY["profiles"]["REG34_ANNUAL"]) == set()
+    assert path.name in REGISTRY["files"]

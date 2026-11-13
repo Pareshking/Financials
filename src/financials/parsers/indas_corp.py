@@ -194,7 +194,9 @@ EXPENSE_COMPONENTS = (
 
 SCOPES = {"standalone": "STANDALONE", "consolidated": "CONSOLIDATED"}
 
-IMPLEMENTED_PROFILES = ("INDAS_CORP", "INDAS_NBFC", "IGAAP_BANK", "IRDAI_LIFE", "IRDAI_GENERAL", "INDAS_INSURANCE")
+IMPLEMENTED_PROFILES = (
+    "INDAS_CORP", "INDAS_NBFC", "IGAAP_BANK", "IRDAI_LIFE", "IRDAI_GENERAL", "INDAS_INSURANCE", "REG34_ANNUAL",
+)  # fmt: skip
 
 # Named label rules [references X39, X40]: some lines exist only as a free-text label on a dimensional
 # "Others"/detail member (Description* fact) paired with an amount in contexts with the same member.

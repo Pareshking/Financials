@@ -7,6 +7,7 @@ from financials.parsers.indas_corp import ParsedResults, detect_profile, parse_i
 from financials.parsers.indas_nbfc import parse_indas_nbfc_results
 from financials.parsers.irdai_insurance import SPECS as INSURER_SPECS
 from financials.parsers.irdai_insurance import parse_insurer_results
+from financials.parsers.reg34_annual import is_reg34, parse_reg34_annual
 from financials.parsers.xbrl import parse_instance
 
 PARSERS = {
@@ -16,8 +17,12 @@ PARSERS = {
 }
 
 
-def parse_integrated_results(data: bytes) -> ParsedResults:
-    """INDAS_NBFC -> Division III parser; IGAAP_BANK -> RBI-format parser; everything else -> the INDAS_CORP
-    path, which routes (without parsing) profiles that are not implemented and reports unknown taxonomies."""
-    profile = detect_profile(parse_instance(data).entity_namespace)
+def parse_integrated_results(data: bytes, file_name: str | None = None) -> ParsedResults:
+    """INDAS_NBFC -> Division III parser; IGAAP_BANK -> RBI-format parser; Reg. 34 annual (ICAI 2017 Ind AS
+    taxonomy, no entity namespace) -> REG34_ANNUAL; everything else -> the INDAS_CORP path, which routes (without
+    parsing) profiles that are not implemented and reports unknown taxonomies."""
+    inst = parse_instance(data)
+    if is_reg34(inst):
+        return parse_reg34_annual(data, file_name)
+    profile = detect_profile(inst.entity_namespace)
     return PARSERS.get(profile, parse_indas_corp_results)(data)

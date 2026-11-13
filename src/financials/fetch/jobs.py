@@ -9,6 +9,7 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 
 from financials.fetch.http import PoliteFetcher
+from financials.parsers.reg34_annual import parse_annual_listing
 from financials.parsers.shareholding import parse_shp_master
 from financials.staging import (
     stage_corp_actions,
@@ -45,6 +46,10 @@ def holidays_url() -> str:
 
 def index_list_url(file_stub: str = "nifty500") -> str:
     return f"{ARCHIVE}/content/indices/ind_{file_stub}list.csv"
+
+
+def annual_listing_url(symbol: str) -> str:
+    return f"{API}/annual-reports-xbrl?index=equities&symbol={symbol}"
 
 
 def shp_master_url(symbol: str) -> str:
@@ -98,6 +103,26 @@ class Jobs:
             xbrl = self.f.get(e.xbrl_url)
             out.append(
                 stage_shareholding(
+                    self.vault, self.stage_root, data=xbrl, source_url=e.xbrl_url, fetched_at=utc_now(),
+                    broadcast_ts=e.broadcast_ts_ist.astimezone(UTC).replace(tzinfo=None),
+                    broadcast_ts_source="API_FIELD",
+                )
+            )  # fmt: skip
+        return out
+
+    def annual_reports(self, symbol: str, *, min_to_year: int = 2025) -> list[Path]:
+        """Reg. 34 annual XBRL [A8, X69]: listing JSON (vaulted) gives each file's URL and broadcast time.
+        Only fiscal years ending in or after `min_to_year` are downloaded (C9); one file per request."""
+        url = annual_listing_url(symbol)
+        listing = self.f.get(url, accept=JSON)
+        out = [stage_raw_only(self.vault, self.stage_root, data=listing, ext="json", media_type=JSON,
+                              category="ANNUAL_LISTING", source_url=url, fetched_at=utc_now())]  # fmt: skip
+        for e in parse_annual_listing(listing):
+            if e.to_year < min_to_year:
+                continue
+            xbrl = self.f.get(e.xbrl_url)
+            out.append(
+                stage_results_xbrl(
                     self.vault, self.stage_root, data=xbrl, source_url=e.xbrl_url, fetched_at=utc_now(),
                     broadcast_ts=e.broadcast_ts_ist.astimezone(UTC).replace(tzinfo=None),
                     broadcast_ts_source="API_FIELD",

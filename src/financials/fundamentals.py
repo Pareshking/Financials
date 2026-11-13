@@ -134,7 +134,10 @@ def _sum(*vals: Decimal | None) -> Decimal | None:
 def building_blocks(book: FactBook, end: date) -> dict[str, Decimal | date | None]:
     """Canonical blocks (§8) for the TTM window ending `end` and the latest balance sheet <= end."""
     t = lambda tag: book.ttm(tag, end)  # noqa: E731
-    rev = t("revenue_from_operations")
+    gross_rev = t("revenue_from_operations")
+    # Net of excise duty when the filing labels an excise line [X40]; absent label = no excise.
+    excise = t("excise_duty") if book.durations.get("excise_duty") else Decimal(0)
+    rev = None if gross_rev is None or excise is None else gross_rev - excise
     materials, purchases, inv_change = (
         t("cost_of_materials_consumed"),
         t("purchases_of_stock_in_trade"),
@@ -165,7 +168,10 @@ def building_blocks(book: FactBook, end: date) -> dict[str, Decimal | date | Non
             return None
         return book.instants.get(tag, {}).get(bs_as_of)
 
-    debt = _sum(stock("borrowings_noncurrent"), stock("borrowings_current"))
+    borrowings = _sum(stock("borrowings_noncurrent"), stock("borrowings_current"))
+    # Lease liabilities from labelled "Others" lines [X39], added exactly once; absent label = none reported.
+    leases = (stock("lease_liabilities_noncurrent") or Decimal(0)) + (stock("lease_liabilities_current") or Decimal(0))
+    debt = None if borrowings is None else borrowings + leases
     cash = _sum(stock("cash_and_equivalents"), stock("bank_balances_other"), stock("current_investments"))
     equity = stock("total_equity")
     net_debt = None if debt is None or cash is None else debt - cash
@@ -188,6 +194,9 @@ def building_blocks(book: FactBook, end: date) -> dict[str, Decimal | date | Non
 
     return {
         "rev_ops": rev,
+        "gross_revenue": gross_rev,
+        "excise_duty": excise,
+        "lease_liabilities": leases if bs_as_of is not None else None,
         "gross_profit": gross_profit,
         "ebitda": ebitda,
         "ebit": ebit,

@@ -13,6 +13,7 @@ Rules implemented (docs/architecture.md §6-7; evidence in docs/references.md):
 from __future__ import annotations
 
 import calendar
+import re
 from dataclasses import dataclass, field
 from datetime import date, time
 from decimal import Decimal
@@ -134,6 +135,19 @@ EXPENSE_COMPONENTS = (
 )
 
 SCOPES = {"standalone": "STANDALONE", "consolidated": "CONSOLIDATED"}
+
+# Named label rules [references X39, X40]: some lines exist only as a free-text label on a dimensional
+# "Others"/detail member (Description* fact) paired with an amount in contexts with the same member.
+# Each rule fixes the axis, the amount element and an anchored label pattern; nothing is fuzzy-matched.
+LABEL_RULES: tuple[tuple[str, str, str, str, str, re.Pattern[str]], ...] = (
+    # (rule name, axis local name, amount element, canonical tag, period type, label pattern)
+    ("LEASE_LIAB_NONCURRENT", "OtherNoncurrentFinancialLiabilitiesAxis", "OtherNoncurrentFinancialLiabilities",
+     "lease_liabilities_noncurrent", "INSTANT", re.compile(r"^\s*lease\s+liab", re.I)),
+    ("LEASE_LIAB_CURRENT", "OtherCurrentFinancialLiabilitiesAxis", "OtherCurrentFinancialLiabilities",
+     "lease_liabilities_current", "INSTANT", re.compile(r"^\s*lease\s+liab", re.I)),
+    ("EXCISE_DUTY", "DetailsOfOtherExpensesAxis", "OtherExpenses", "excise_duty", "DURATION",
+     re.compile(r"^\s*excise\s+dut", re.I)),
+)  # fmt: skip
 
 
 @dataclass(frozen=True)
@@ -363,6 +377,8 @@ def _map_facts(inst: Instance, result: ParsedResults) -> None:
         seen[key] = cf
         result.facts.append(cf)
 
+    _apply_label_rules(inst, result, declared, period_end)
+
     # Derived per-filing facts.
     q_start, q_end = result.meta["quarter_period"]
     paid_up = result.value("paid_up_equity_capital", q_start, q_end)
@@ -452,3 +468,46 @@ def _check_identities(result: ParsedResults) -> None:
     )
     if None not in (assets, eq_liab):
         _check(result, "BALANCE_SHEET", assets, eq_liab, 2, (end,))
+
+
+def _apply_label_rules(inst: Instance, result: ParsedResults, declared: dict, period_end: date) -> None:
+    """Sum amounts of members whose Description* label matches a rule; same period checks as other facts."""
+    labelled: dict[str, set[tuple]] = {}  # rule -> set of dimension tuples whose label matched
+    for f in inst.facts:
+        if f.is_numeric or not f.name.startswith("Description"):
+            continue
+        dims = inst.contexts[f.context_id].dimensions
+        if len(dims) != 1:
+            continue
+        axis = dims[0][0].split(":")[-1]
+        for rule, rule_axis, _, _, _, rx in LABEL_RULES:
+            if axis == rule_axis and rx.match(f.value_text):
+                labelled.setdefault(rule, set()).add(dims)
+    for rule, _, element, tag, ptype, _ in LABEL_RULES:
+        dims_set = labelled.get(rule)
+        if not dims_set:
+            continue
+        totals: dict[tuple[date, date], Decimal] = {}
+        for f in inst.facts:
+            ctx = inst.contexts[f.context_id]
+            if f.name != element or not f.is_numeric or ctx.dimensions not in dims_set:
+                continue
+            if ptype == "INSTANT":
+                if ctx.instant != period_end:
+                    continue
+                key = (period_end, period_end)
+            else:
+                if ctx.instant is not None or (ctx.start, ctx.end) not in (declared["One"], declared["Four"]):
+                    result.issues.append(
+                        Issue(
+                            "PERIOD",
+                            "CONTEXT_CONFLICT",
+                            {"rule": rule, "context_id": ctx.id, "context_dates": [str(ctx.start), str(ctx.end)]},
+                        )
+                    )
+                    continue
+                key = (ctx.start, ctx.end)
+            totals[key] = totals.get(key, Decimal(0)) + f.decimal()
+        for (start, end), value in totals.items():
+            months = None if ptype == "INSTANT" else period_months(start, end)
+            result.facts.append(CanonicalFact(tag, ptype, start, end, months, "INR", value, f"LABEL:{rule}"))

@@ -152,6 +152,9 @@ Balance sheet and cash flow come only from H1/FY filings [X12, X13, X22]. In Q2/
 7. **Unknown elements** are kept in `raw_xbrl_facts` and simply not mapped. If a **mapped critical tag** is missing where the profile requires it → quarantine `PARSE/MISSING_CRITICAL`.
 8. **Revisions:** a revised filing for the same (entity, scope, period) is a new filing linked by `supersedes_filing_id`. Both stay. PIT picks by `visible_from_ts`.
 
+### 7.5 Named label rules
+Some lines exist only as a free-text `Description*` label on a dimensional "Others" or detail member, with the amount in contexts carrying the same member. `indas_corp.LABEL_RULES` fixes, per rule, the axis, the amount element and an anchored label pattern: `LEASE_LIAB_NONCURRENT`, `LEASE_LIAB_CURRENT` [X39] and `EXCISE_DUTY` [X40]. Duration amounts go through the same period reconciliation as every other fact. Canonical facts record `source_element = LABEL:<rule>`. New rules need a real fixture and a test (`tests/test_label_rules.py`); every rule is listed in `docs/tag_registry.yaml`.
+
 ### 7.6 Restatement policy (v1)
 Flag `restatement_suspected` for an entity-period when any of these hold:
 - `ProfitLossFromDiscontinuedOperations* ≠ 0`;
@@ -166,14 +169,14 @@ Element names are VERIFIED in the INDAS_CORP fixture unless marked otherwise.
 
 | Block | Definition |
 |---|---|
-| `rev_ops` | `RevenueFromOperations − ExciseDuty` (excise tag UNVERIFIED [X31]; if absent, `RevenueFromOperations`) |
+| `rev_ops` | `RevenueFromOperations − excise_duty`, where `excise_duty` comes from the `EXCISE_DUTY` label rule (there is no `ExciseDuty` element [X40]); no excise label = 0 |
 | `cogs` | `CostOfMaterialsConsumed + PurchasesOfStockInTrade + ChangesInInventoriesOfFinishedGoodsWorkInProgressAndStockInTrade` (inventory change is expense-signed [X11]) |
 | `gross_profit` | `rev_ops − cogs`, only for `INDAS_CORP` with `(CostOfMaterialsConsumed + PurchasesOfStockInTrade) ≥ 0.10 × rev_ops`; otherwise NULL [C6] |
 | `ebitda` | `ProfitBeforeExceptionalItemsAndTax + FinanceCosts + DepreciationDepletionAndAmortisationExpense − OtherIncome`. Avoids the exceptional-items sign [X9, X10]. For consolidated filings, where share of associates sits relative to PBEIT is UNVERIFIED [X29]. |
 | `ebit` | `ebitda − DepreciationDepletionAndAmortisationExpense` |
 | `etr` | `clamp(TaxExpense / ProfitBeforeTax, 0, 0.50)` if PBT > 0 and tax ≥ 0; else 0 [C5] |
 | `nopat` | `ebit × (1 − etr)` |
-| `total_debt` | `BorrowingsNoncurrent + BorrowingsCurrent` (+ `lease_liabilities` only once annual notes provide them; quarterly has no lease tag [X16]) |
+| `total_debt` | `BorrowingsNoncurrent + BorrowingsCurrent + lease_liabilities_noncurrent + lease_liabilities_current`; leases come from the `LEASE_LIAB_*` label rules [X39] and are added exactly once (no label = 0) |
 | `cash_liquid` | `CashAndCashEquivalents + BankBalanceOtherThanCashAndCashEquivalents + CurrentInvestments` (+ non-current treasury investments only once annual notes split them [X17]) |
 | `net_debt` | `total_debt − cash_liquid` |
 | `invested_capital` | `Equity` (incl. NCI on consolidated; tag UNVERIFIED [X29]) `+ total_debt − cash_liquid` |

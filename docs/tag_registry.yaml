@@ -1,0 +1,2192 @@
+# Every XBRL element seen in non-dimensional contexts, per profile. Generated and merged by
+# scripts/inspect_xbrl_exhaustive.py; mapped_to = canonical tag in the production parser (null = unmapped).
+files:
+- INTEGRATED_FILING_INDAS_1734606_08102026100748_WEB.xml
+- INTEGRATED_FILING_INDAS_1745057_23102026082111_WEB.xml
+- INTEGRATED_FILING_INDAS_1747191_27102026072947_WEB.xml
+- INTEGRATED_FILING_INDAS_1748218_28102026075349_WEB.xml
+- INTEGRATED_FILING_INDAS_1748387_28102026111155_WEB.xml
+- INTEGRATED_FILING_INDAS_1750389_30102026073348_WEB.xml
+- INTEGRATED_FILING_INDAS_1750535_30102026093155_WEB.xml
+- INTEGRATED_FILING_INDAS_1750537_30102026093254_WEB.xml
+- INTEGRATED_FILING_INDAS_1751354_02112026065539_WEB.xml
+- INTEGRATED_FILING_INDAS_1753613_05112026052243_WEB.xml
+- INTEGRATED_FILING_INDAS_1753867_05112026061857_WEB.xml
+- INTEGRATED_FILING_INDAS_1753920_05112026063545_WEB.xml
+label_rules:
+  EXCISE_DUTY:
+    amount_element: OtherExpenses
+    axis: DetailsOfOtherExpensesAxis
+    canonical: excise_duty
+    evidence: X40
+    label_pattern: ^\s*excise\s+dut (case-insensitive)
+    seen: ITC, UNITDSPR, RELIANCE (Batch 1); no ExciseDuty element exists
+  LEASE_LIAB_CURRENT:
+    amount_element: OtherCurrentFinancialLiabilities
+    axis: OtherCurrentFinancialLiabilitiesAxis
+    canonical: lease_liabilities_current
+    evidence: X39
+    label_pattern: ^\s*lease\s+liab (case-insensitive)
+    seen: as above; "Net investment in lease" (asset axes) must not match
+  LEASE_LIAB_NONCURRENT:
+    amount_element: OtherNoncurrentFinancialLiabilities
+    axis: OtherNoncurrentFinancialLiabilitiesAxis
+    canonical: lease_liabilities_noncurrent
+    evidence: X39
+    label_pattern: ^\s*lease\s+liab (case-insensitive)
+    seen: 12/12 Batch 1 INDAS_CORP filings incl. ONGC typo "Lease Liabilties"
+profiles:
+  INDAS_CORP:
+    AdjustmentsForDecreaseIncreaseInInventories:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    AdjustmentsForDecreaseIncreaseInOtherCurrentAssets:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    AdjustmentsForDecreaseIncreaseInOtherNoncurrentAssets:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    AdjustmentsForDecreaseIncreaseInTradeReceivablesCurrent:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    AdjustmentsForDecreaseIncreaseInTradeReceivablesNoncurrent:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    AdjustmentsForDepreciationAndAmortisationExpense:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    AdjustmentsForDividendIncome:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    AdjustmentsForFairValueGainsLosses:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    AdjustmentsForFinanceCosts:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    AdjustmentsForImpairmentLossReversalOfImpairmentLossRecognisedInProfitOrLoss:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    AdjustmentsForIncreaseDecreaseInOtherCurrentLiabilities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    AdjustmentsForIncreaseDecreaseInOtherNoncurrentLiabilities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    AdjustmentsForIncreaseDecreaseInTradePayablesCurrent:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    AdjustmentsForIncreaseDecreaseInTradePayablesNoncurrent:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    AdjustmentsForInterestIncome:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    AdjustmentsForOtherBankBalances:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    AdjustmentsForOtherFinancialAssetsCurrent:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    AdjustmentsForOtherFinancialAssetsNoncurrent:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    AdjustmentsForOtherFinancialLiabilitiesCurrent:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    AdjustmentsForOtherFinancialLiabilitiesNoncurrent:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    AdjustmentsForProvisionsCurrent:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    AdjustmentsForProvisionsNoncurrent:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    AdjustmentsForReconcileProfitLoss:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    AdjustmentsForSharebasedPayments:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: share_based_payments_addback
+      numeric: true
+      seen_negative: false
+    AdjustmentsForUndistributedProfitsOfAssociates:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    AdjustmentsForUnrealisedForeignExchangeLossesGains:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    AmountOfDefaultOutOfTotalOutstandingAmountOfLoansOrRevolvingFacilitiesAtTheEndOfPeriod:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    AmountOfDefaultOutOfTotalOutstandingAmountOfUnlistedDebtSecuritiesAtTheEndOfPeriod:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    AmountOfItemThatWillBeReclassifiedToProfitAndLoss:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 9
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    AmountOfItemThatWillNotBeReclassifiedToProfitAndLoss:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 10
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    AmountOfRelatedPartyTransactionDuringTheReportingPeriod:
+      context_kinds:
+      - duration_3m
+      filings: 11
+      first_batch: B1
+      mapped_to: rpt_total_amount
+      numeric: true
+      seen_negative: false
+    AmountOfTotalFinancialIndebtednessOfTheListedEntityIncludingShortTermAndLongTermDebtAtTheEndOfPeriod:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    Assets:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: total_assets
+      numeric: true
+      seen_negative: false
+    BankBalanceOtherThanCashAndCashEquivalents:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: bank_balances_other
+      numeric: true
+      seen_negative: false
+    BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: eps_basic
+      numeric: true
+      seen_negative: true
+    BasicEarningsLossPerShareFromContinuingOperations:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    BasicEarningsLossPerShareFromDiscontinuedOperations:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    BiologicalAssetsOtherThanBearerPlants:
+      context_kinds:
+      - instant
+      filings: 11
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    BorrowingsCurrent:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: borrowings_current
+      numeric: true
+      seen_negative: false
+    BorrowingsNoncurrent:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: borrowings_noncurrent
+      numeric: true
+      seen_negative: false
+    CapitalWorkInProgress:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: cwip
+      numeric: true
+      seen_negative: false
+    CashAdvancesAndLoansMadeToOtherPartiesClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    CashAndCashEquivalents:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: cash_and_equivalents
+      numeric: true
+      seen_negative: false
+    CashAndCashEquivalentsCashFlowStatement:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    CashFlowsFromLosingControlOfSubsidiariesOrOtherBusinessesClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    CashFlowsFromUsedInFinancingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: cff
+      numeric: true
+      seen_negative: true
+    CashFlowsFromUsedInInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: cfi
+      numeric: true
+      seen_negative: true
+    CashFlowsFromUsedInOperatingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: cfo
+      numeric: true
+      seen_negative: true
+    CashFlowsFromUsedInOperations:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: cash_generated_from_operations
+      numeric: true
+      seen_negative: true
+    CashFlowsUsedInObtainingControlOfSubsidiariesOrOtherBusinessesClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    CashPaymentForInvestmentInPartnershipFirmOrAssociationOfPersonsOrLimitedLiabilityPartnerships:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    CashPaymentsForFutureContractsForwardContractsOptionContractsAndSwapContractsClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    CashReceiptsFromFutureContractsForwardContractsOptionContractsAndSwapContractsClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    CashReceiptsFromRepaymentOfAdvancesAndLoansMadeToOtherPartiesClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    CashReceiptsFromShareOfProfitsOfPartnershipFirmOrAssociationOfPersonsOrLimitedLiabilityPartnerships:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    ChangesInInventoriesOfFinishedGoodsWorkInProgressAndStockInTrade:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: changes_in_inventories
+      numeric: true
+      seen_negative: true
+    ClassOfSecurity:
+      context_kinds:
+      - duration_3m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    ComprehensiveIncomeForThePeriod:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: total_comprehensive_income
+      numeric: true
+      seen_negative: true
+    ComprehensiveIncomeForThePeriodAttributableToOwnersOfParent:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 1
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    ComprehensiveIncomeForThePeriodAttributableToOwnersOfParentNonControllingInterests:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 1
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    CostOfMaterialsConsumed:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: cost_of_materials_consumed
+      numeric: true
+      seen_negative: false
+    CurrentAssets:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: current_assets
+      numeric: true
+      seen_negative: false
+    CurrentFinancialAssets:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    CurrentFinancialLiabilities:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    CurrentInvestments:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: current_investments
+      numeric: true
+      seen_negative: false
+    CurrentLiabilities:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: current_liabilities
+      numeric: true
+      seen_negative: false
+    CurrentTax:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: current_tax
+      numeric: true
+      seen_negative: false
+    CurrentTaxAssets:
+      context_kinds:
+      - instant
+      filings: 10
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    CurrentTaxLiabilities:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    DateOfBoardMeetingWhenFinancialResultsWereApproved:
+      context_kinds:
+      - duration_3m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfEndOfBoardMeeting:
+      context_kinds:
+      - duration_3m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfEndOfFinancialYear:
+      context_kinds:
+      - duration_3m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfEndOfReportingPeriod:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfStartOfBoardMeeting:
+      context_kinds:
+      - duration_3m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfStartOfFinancialYear:
+      context_kinds:
+      - duration_3m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfStartOfReportingPeriod:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOnWhichPriorIntimationOfTheMeetingForConsideringFinancialResultsWasInformedToTheExchange:
+      context_kinds:
+      - duration_3m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DebtEquityRatio:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 5
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    DebtServiceCoverageRatio:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    DeclarationOfUnmodifiedOpinionOrStatementOnImpactOfAuditQualification:
+      context_kinds:
+      - duration_3m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DeclarationPursuantToClauseDOfSubRegulation3OfRegulation33OfSEBILODRRegulation2015:
+      context_kinds:
+      - duration_3m
+      filings: 6
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DeferredGovernmentGrantsCurrent:
+      context_kinds:
+      - instant
+      filings: 11
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    DeferredGovernmentGrantsNoncurrent:
+      context_kinds:
+      - instant
+      filings: 10
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    DeferredTax:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: deferred_tax
+      numeric: true
+      seen_negative: true
+    DeferredTaxAssetsNet:
+      context_kinds:
+      - instant
+      filings: 11
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    DeferredTaxLiabilitiesNet:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    DepreciationDepletionAndAmortisationExpense:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: depreciation_amortisation
+      numeric: true
+      seen_negative: false
+    DescriptionOfPresentationCurrency:
+      context_kinds:
+      - duration_3m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DescriptionOfSingleSegment:
+      context_kinds:
+      - duration_3m
+      filings: 6
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DilutedEarningsLossPerShareFromContinuingAndDiscontinuedOperations:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: eps_diluted
+      numeric: true
+      seen_negative: true
+    DilutedEarningsLossPerShareFromContinuingOperations:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    DilutedEarningsLossPerShareFromDiscontinuedOperations:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    DisclosureOfNotesOnAssetsAndLiabilitiesExplanatoryTextBlock:
+      context_kinds:
+      - duration_3m
+      filings: 4
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DisclosureOfNotesOnFinancialResultsExplanatoryTextBlock:
+      context_kinds:
+      - duration_3m
+      filings: 6
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DisclosureOfNotesOnSegmentsExplanatoryTextBlock:
+      context_kinds:
+      - duration_3m
+      filings: 4
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DividendsPaidClassifiedAsFinancingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: dividends_paid
+      numeric: true
+      seen_negative: false
+    DividendsReceivedClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    DividendsReceivedClassifiedAsOperatingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    EffectOfExchangeRateChangesOnCashAndCashEquivalents:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    EmployeeBenefitExpense:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: employee_benefit_expense
+      numeric: true
+      seen_negative: false
+    EndTimeOfBoardMeeting:
+      context_kinds:
+      - duration_3m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    Equity:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: total_equity
+      numeric: true
+      seen_negative: false
+    EquityAndLiabilities:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: total_equity_and_liabilities
+      numeric: true
+      seen_negative: false
+    EquityAttributableToOwnersOfParent:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: equity_attributable_to_owners
+      numeric: true
+      seen_negative: false
+    EquityShareCapital:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: equity_share_capital
+      numeric: true
+      seen_negative: false
+    ExceptionalItemsBeforeTax:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: exceptional_items
+      numeric: true
+      seen_negative: true
+    Expenses:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: total_expenses
+      numeric: true
+      seen_negative: false
+    FaceValueOfEquityShareCapital:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: face_value_per_share
+      numeric: true
+      seen_negative: false
+    FinanceCosts:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: finance_costs
+      numeric: true
+      seen_negative: false
+    Goodwill:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: goodwill
+      numeric: true
+      seen_negative: false
+    ISIN:
+      context_kinds:
+      - duration_3m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    Income:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: total_income
+      numeric: true
+      seen_negative: false
+    IncomeTaxRelatingToItemsThatWillBeReclassifiedToProfitOrLoss:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    IncomeTaxRelatingToItemsThatWillNotBeReclassifiedToProfitOrLoss:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 11
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    IncomeTaxesPaidRefundClassifiedAsFinancingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    IncomeTaxesPaidRefundClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    IncomeTaxesPaidRefundClassifiedAsOperatingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: income_taxes_paid
+      numeric: true
+      seen_negative: true
+    IncreaseDecreaseInCashAndCashEquivalents:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    IncreaseDecreaseInCashAndCashEquivalentsBeforeEffectOfExchangeRateChanges:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    IntangibleAssetsUnderDevelopment:
+      context_kinds:
+      - instant
+      filings: 11
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    InterSegmentRevenue:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    InterestPaidClassifiedAsFinancingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: interest_paid_financing
+      numeric: true
+      seen_negative: false
+    InterestPaidClassifiedAsOperatingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: interest_paid_operating
+      numeric: true
+      seen_negative: false
+    InterestReceivedClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: interest_received_investing
+      numeric: true
+      seen_negative: false
+    InterestReceivedClassifiedAsOperatingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: interest_received_operating
+      numeric: true
+      seen_negative: true
+    InterestServiceCoverageRatio:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    Inventories:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: inventories
+      numeric: true
+      seen_negative: false
+    InvestmentProperty:
+      context_kinds:
+      - instant
+      filings: 11
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    InvestmentsAccountedForUsingEquityMethod:
+      context_kinds:
+      - instant
+      filings: 11
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    IsCompanyReportingMultisegmentOrSingleSegment:
+      context_kinds:
+      - duration_3m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    LatestDateOnWhichRelatedPartyTransactionsPolicyIsUpdated:
+      context_kinds:
+      - duration_3m
+      filings: 11
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    LevelOfRounding:
+      context_kinds:
+      - duration_3m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    Liabilities:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: total_liabilities
+      numeric: true
+      seen_negative: false
+    LiabilitiesDirectlyAssociatedWithAssetsInDisposalGroupClassifiedAsHeldForSale:
+      context_kinds:
+      - instant
+      filings: 10
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    LoansCurrent:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    LoansNoncurrent:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    MSEISymbol:
+      context_kinds:
+      - duration_3m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NameOfTheCompany:
+      context_kinds:
+      - duration_3m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NatureOfReportStandaloneConsolidated:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NetMovementInRegulatoryDeferralAccountBalancesRelatedToProfitOrLossAndTheRelatedDeferredTaxMovement:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    NetSegmentAssets:
+      context_kinds:
+      - instant
+      filings: 6
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    NetSegmentLiabilities:
+      context_kinds:
+      - instant
+      filings: 6
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    NonControllingInterest:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    NoncurrentAssets:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: noncurrent_assets
+      numeric: true
+      seen_negative: false
+    NoncurrentAssetsClassifiedAsHeldForSale:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    NoncurrentFinancialAssets:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    NoncurrentFinancialLiabilities:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    NoncurrentInvestments:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: noncurrent_investments
+      numeric: true
+      seen_negative: false
+    NoncurrentLiabilities:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: noncurrent_liabilities
+      numeric: true
+      seen_negative: false
+    NoteForNonApplicabilityOfTheDisclosureForTheDefaultOnLoansAndDebtSecuritiesToTheEntity:
+      context_kinds:
+      - duration_3m
+      filings: 10
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    OtherAdjustmentsForNoncashItems:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    OtherAdjustmentsForWhichCashEffectsAreInvestingOrFinancingCashFlow:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    OtherAdjustmentsToReconcileProfitLoss:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    OtherCashPaymentsToAcquireEquityOrDebtInstrumentsOfOtherEntitiesClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    OtherCashPaymentsToAcquireInterestsInJointVenturesClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    OtherCashReceiptsFromSalesOfEquityOrDebtInstrumentsOfOtherEntitiesClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    OtherCashReceiptsFromSalesOfInterestsInJointVenturesClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    OtherComprehensiveIncome:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    OtherComprehensiveIncomeNetOfTaxes:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: oci_net
+      numeric: true
+      seen_negative: true
+    OtherCurrentAssets:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    OtherCurrentFinancialAssets:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    OtherCurrentFinancialLiabilities:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    OtherCurrentLiabilities:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    OtherEquity:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: other_equity
+      numeric: true
+      seen_negative: false
+    OtherExpenses:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: other_expenses
+      numeric: true
+      seen_negative: false
+    OtherIncome:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: other_income
+      numeric: true
+      seen_negative: false
+    OtherInflowsOutflowsOfCashClassifiedAsFinancingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    OtherInflowsOutflowsOfCashClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    OtherInflowsOutflowsOfCashClassifiedAsOperatingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    OtherIntangibleAssets:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: other_intangibles
+      numeric: true
+      seen_negative: false
+    OtherNoncurrentAssets:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    OtherNoncurrentFinancialAssets:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    OtherNoncurrentFinancialLiabilities:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    OtherNoncurrentLiabilities:
+      context_kinds:
+      - instant
+      filings: 10
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    OtherUnallocableExpenditureNetOffUnAllocableIncome:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: true
+    PaidUpValueOfEquityShareCapital:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: paid_up_equity_capital
+      numeric: true
+      seen_negative: false
+    PaymentsFromChangesInOwnershipInterestsInSubsidiaries:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    PaymentsOfLeaseLiabilitiesClassifiedAsFinancingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    PaymentsOfOtherEquityInstruments:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    PaymentsToAcquireOrRedeemEntitysShares:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    ProceedsFromBiologicalAssetsOtherThanBearerPlantsClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    ProceedsFromBorrowingsClassifiedAsFinancingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    ProceedsFromChangesInOwnershipInterestsInSubsidiaries:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    ProceedsFromExerciseOfStockOptions:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    ProceedsFromGovernmentGrantsClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    ProceedsFromIssuingDebenturesNotesBondsEtc:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    ProceedsFromIssuingOtherEquityInstruments:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    ProceedsFromIssuingSharesClassifiedAsFinancingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    ProceedsFromSalesOfGoodwillClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    ProceedsFromSalesOfIntangibleAssetsClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    ProceedsFromSalesOfIntangibleAssetsUnderDevelopment:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    ProceedsFromSalesOfInvestmentPropertyClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    ProceedsFromSalesOfOtherLongTermAssetsClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    ProceedsFromSalesOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: ppe_disposals
+      numeric: true
+      seen_negative: false
+    ProfitBeforeExceptionalItemsAndTax:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: profit_before_exceptional_and_tax
+      numeric: true
+      seen_negative: false
+    ProfitBeforeTax:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: pbt
+      numeric: true
+      seen_negative: true
+    ProfitLossForPeriod:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: pat
+      numeric: true
+      seen_negative: true
+    ProfitLossForPeriodFromContinuingOperations:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: pat_continuing
+      numeric: true
+      seen_negative: true
+    ProfitLossFromDiscontinuedOperationsAfterTax:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: pat_discontinued
+      numeric: true
+      seen_negative: false
+    ProfitLossFromDiscontinuedOperationsBeforeTax:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: discontinued_pbt
+      numeric: true
+      seen_negative: false
+    ProfitOrLossAttributableToNonControllingInterests:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 1
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    ProfitOrLossAttributableToOwnersOfParent:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 1
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    PropertyPlantAndEquipment:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: ppe_net
+      numeric: true
+      seen_negative: false
+    ProvisionsCurrent:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    ProvisionsNoncurrent:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    PurchaseOfBiologicalAssetsOtherThanBearerPlantsClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    PurchaseOfGoodwillClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    PurchaseOfIntangibleAssetsClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: capex_intangibles
+      numeric: true
+      seen_negative: false
+    PurchaseOfIntangibleAssetsUnderDevelopment:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    PurchaseOfInvestmentPropertyClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    PurchaseOfOtherLongTermAssetsClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: capex_ppe
+      numeric: true
+      seen_negative: false
+    PurchasesOfStockInTrade:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: purchases_of_stock_in_trade
+      numeric: true
+      seen_negative: false
+    RegulatoryDeferralAccountCreditBalancesAndRelatedDeferredTaxLiability:
+      context_kinds:
+      - instant
+      filings: 10
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    RegulatoryDeferralAccountDebitBalancesAndRelatedDeferredTaxAssets:
+      context_kinds:
+      - instant
+      filings: 11
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    RemarksForDebtEquityRatio:
+      context_kinds:
+      - duration_3m
+      filings: 1
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    RemarksForDebtServiceCoverageRatio:
+      context_kinds:
+      - duration_3m
+      filings: 2
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    RemarksForInterestServiceCoverageRatio:
+      context_kinds:
+      - duration_3m
+      filings: 2
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    RepaymentsOfBorrowingsClassifiedAsFinancingActivities:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    ReportingQuarter:
+      context_kinds:
+      - duration_3m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    RevenueFromOperations:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: revenue_from_operations
+      numeric: true
+      seen_negative: false
+    ScripCode:
+      context_kinds:
+      - duration_3m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    SegmentAssets:
+      context_kinds:
+      - instant
+      filings: 6
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    SegmentFinanceCosts:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    SegmentLiabilities:
+      context_kinds:
+      - instant
+      filings: 6
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    SegmentProfitBeforeTax:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    SegmentProfitLossBeforeTaxAndFinanceCosts:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    SegmentRevenue:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    SegmentRevenueFromOperations:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    ShareOfProfitAndLossFromPartnershipFirmOrAssociationOfPersonsOrLimitedLiabilityPartnerships:
+      context_kinds:
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    ShareOfProfitLossOfAssociatesAndJointVenturesAccountedForUsingEquityMethod:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: share_of_associates_jv
+      numeric: true
+      seen_negative: false
+    StartTimeOfBoardMeeting:
+      context_kinds:
+      - duration_3m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    Symbol:
+      context_kinds:
+      - duration_3m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    TaxExpense:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: tax_expense
+      numeric: true
+      seen_negative: true
+    TaxExpenseOfDiscontinuedOperations:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    TotalOutstandingAmountOfLoansOrRevolvingFacilitiesAtTheEndOfPeriod:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    TotalOutstandingAmountOfUnlistedDebtSecuritiesAtTheEndOfPeriod:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    TotalOutstandingDuesOfCreditorsOtherThanMicroEnterpriseAndSmallEnterpriseCurrent:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    TotalOutstandingDuesOfCreditorsOtherThanMicroEnterpriseAndSmallEnterpriseNoncurrent:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    TotalOutstandingDuesOfMicroEnterpriseAndSmallEnterpriseCurrent:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    TotalOutstandingDuesOfMicroEnterpriseAndSmallEnterpriseNoncurrent:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    TradePayablesCurrent:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: trade_payables_current
+      numeric: true
+      seen_negative: false
+    TradePayablesNoncurrent:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    TradeReceivablesCurrent:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: trade_receivables_current
+      numeric: true
+      seen_negative: false
+    TradeReceivablesNoncurrent:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B1
+      mapped_to: trade_receivables_noncurrent
+      numeric: true
+      seen_negative: false
+    TypeOfCashFlowStatement:
+      context_kinds:
+      - duration_3m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    TypeOfCompany:
+      context_kinds:
+      - duration_3m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    TypeOfReportingPeriod:
+      context_kinds:
+      - duration_3m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    UnAllocableAssets:
+      context_kinds:
+      - instant
+      filings: 6
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    UnAllocableLiabilities:
+      context_kinds:
+      - instant
+      filings: 6
+      first_batch: B1
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    ? WeDeclareThatTheAcceptanceOfFixedDepositsByTheBanksOrNonBankingFinanceCompanyAreAtTheTermsUniformlyApplicableOrOfferedToAllShareholdersOrPublic
+    : context_kinds:
+      - duration_3m
+      filings: 11
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    ? WeDeclareThatTheScheduledCommercialBankAsPerRBICircularRBIDBR20151619Dated03March2016HasAllowedAdditionalInterestOfOnePerCentPerAnnumOverAndAboveTheRateOfInterestMentionedInTheScheduleOfInterestRatesOnSavings
+    : context_kinds:
+      - duration_3m
+      filings: 11
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WebsiteLinkForUpdatedRelatedPartyTransactionsPolicyOfTheCompany:
+      context_kinds:
+      - duration_3m
+      filings: 11
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherCashFlowStatementIsApplicableOnCompany:
+      context_kinds:
+      - duration_3m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherResultsAreAuditedOrUnaudited:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 12
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherResultsAreAuditedOrUnauditedForImpactOfAuditQualification:
+      context_kinds:
+      - duration_3m
+      filings: 6
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    ? WhetherStatementOnDeviationOrVariationForProceedsOfPublicIssueOrRightIssueOrPreferentialIssueOrQIPEtcIsApplicableToTheCompanyForTheCurrentQuarter
+    : context_kinds:
+      - duration_3m
+      filings: 11
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheCompanyHasAnyRelatedParty:
+      context_kinds:
+      - duration_3m
+      filings: 11
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheCompanyHasEnteredIntoAnyRelatedPartyTransactionDuringThePeriod:
+      context_kinds:
+      - duration_3m
+      filings: 11
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheCompanyIsAHighValueDebtListedEntityAccordingTo1AOfRegulation15:
+      context_kinds:
+      - instant
+      filings: 11
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheDisclosureForTheDefaultOnLoansAndDebtSecuritiesIsApplicableToTheEntity:
+      context_kinds:
+      - duration_3m
+      filings: 11
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheUpdatedRelatedPartyTransactionsPolicyHasBeenUploadedOnTheWebsiteOfTheCompanyInComplianceWithRegulation23:
+      context_kinds:
+      - duration_3m
+      filings: 11
+      first_batch: B1
+      mapped_to: null
+      numeric: false
+      seen_negative: false

@@ -48,7 +48,10 @@ def main(argv: list[str] | None = None) -> int:
     args.out.mkdir(parents=True, exist_ok=True)
     for f in args.files:
         d = extract(f)
-        name = "".join(c if c.isalnum() else "_" for c in d["company"]).strip("_")
+        # Named by the export's file name (minus any upload prefix), not the company: one company can have a
+        # standalone and a consolidated export.
+        stem = f.stem.split("-", 1)[1] if "-" in f.stem and len(f.stem.split("-", 1)[0]) == 8 else f.stem
+        name = "".join(c if c.isalnum() else "_" for c in stem).strip("_")
         target = args.out / f"{name}.json"
         target.write_text(json.dumps(d, indent=1, sort_keys=True, default=str), encoding="utf-8")
         print(f"{d['source_sha256']}  {hashlib.sha256(target.read_bytes()).hexdigest()}  {target.name}")

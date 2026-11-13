@@ -11,20 +11,24 @@ files:
 - INTEGRATED_FILING_BANKING_1654391_18042026073048_WEB.xml
 - INTEGRATED_FILING_BANKING_1659017_25042026065222_WEB.xml
 - INTEGRATED_FILING_BANKING_1696125_18072026040136_WEB.xml
+- INTEGRATED_FILING_BANKING_1699401_22072026052845_WEB.xml
 - INTEGRATED_FILING_BANKING_1699404_22072026053243_WEB.xml
 - INTEGRATED_FILING_BANKING_1699494_22072026061940_WEB.xml
 - INTEGRATED_FILING_BANKING_1740409_16102026072531_WEB.xml
 - INTEGRATED_FILING_BANKING_1740465_16102026082727_WEB.xml
+- INTEGRATED_FILING_BANKING_1740466_16102026082756_WEB.xml
 - INTEGRATED_FILING_BANKING_1740814_17102026042011_WEB.xml
 - INTEGRATED_FILING_BANKING_1740886_17102026052751_WEB.xml
 - INTEGRATED_FILING_BANKING_1740912_17102026054806_WEB.xml
 - INTEGRATED_FILING_BANKING_1740913_17102026054812_WEB.xml
 - INTEGRATED_FILING_BANKING_1745379_24102026050751_WEB.xml
+- INTEGRATED_FILING_BANKING_1745380_24102026050818_WEB.xml
 - INTEGRATED_FILING_BANKING_1750415_30102026074739_WEB.xml
 - INTEGRATED_FILING_BANKING_1751754_03112026032317_WEB.xml
 - INTEGRATED_FILING_GI_1738196_14102026103636_WEB.xml
 - INTEGRATED_FILING_GI_1740432_16102026073544_WEB.xml
 - INTEGRATED_FILING_GI_1750325_30102026070447_WEB.xml
+- INTEGRATED_FILING_GI_1750334_30102026070831_WEB.xml
 - INTEGRATED_FILING_GI_1750474_30102026082326_WEB.xml
 - INTEGRATED_FILING_INDAS_1574016_13112025070452_WEB.xml
 - INTEGRATED_FILING_INDAS_1574923_14112025041850_WEB.xml
@@ -116,7 +120,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: at1_ratio
       numeric: true
@@ -125,7 +129,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -134,7 +138,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -143,7 +147,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -152,7 +156,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -161,7 +165,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -170,7 +174,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -179,7 +183,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -188,7 +192,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -197,7 +201,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -206,7 +210,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -215,7 +219,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -224,7 +228,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -233,7 +237,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -242,7 +246,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -251,7 +255,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -259,7 +263,7 @@ profiles:
     Advances:
       context_kinds:
       - instant
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: advances
       numeric: true
@@ -299,7 +303,7 @@ profiles:
     Assets:
       context_kinds:
       - instant
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: total_assets
       numeric: true
@@ -307,7 +311,7 @@ profiles:
     BalancesWithBanksAndMoneyAtCallAndShortNotice:
       context_kinds:
       - instant
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: balances_with_banks
       numeric: true
@@ -317,7 +321,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: eps_basic
       numeric: true
@@ -327,7 +331,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: eps_basic_before_extraordinary
       numeric: true
@@ -335,7 +339,7 @@ profiles:
     Borrowings:
       context_kinds:
       - instant
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: borrowings_bank
       numeric: true
@@ -345,7 +349,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: cet1_ratio
       numeric: true
@@ -353,7 +357,7 @@ profiles:
     Capital:
       context_kinds:
       - instant
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: equity_share_capital
       numeric: true
@@ -361,7 +365,7 @@ profiles:
     CapitalAndLiabilities:
       context_kinds:
       - instant
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: total_equity_and_liabilities
       numeric: true
@@ -370,7 +374,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -378,7 +382,7 @@ profiles:
     CashAndBalancesWithReserveBankOfIndia:
       context_kinds:
       - instant
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: cash_and_rbi_balances
       numeric: true
@@ -386,7 +390,7 @@ profiles:
     CashAndCashEquivalentsCashFlowStatement:
       context_kinds:
       - instant
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -395,7 +399,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -404,7 +408,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: cff
       numeric: true
@@ -413,7 +417,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -422,7 +426,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: cfi
       numeric: true
@@ -431,7 +435,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -440,7 +444,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: cfo
       numeric: true
@@ -449,7 +453,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -458,7 +462,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: cash_generated_from_operations
       numeric: true
@@ -467,7 +471,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -476,7 +480,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -485,7 +489,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -494,7 +498,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -503,7 +507,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -512,7 +516,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -520,7 +524,7 @@ profiles:
     ClassOfSecurity:
       context_kinds:
       - duration_3m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -528,7 +532,7 @@ profiles:
     DateOfBoardMeetingWhenFinancialResultsWereApproved:
       context_kinds:
       - duration_3m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -536,7 +540,7 @@ profiles:
     DateOfEndOfBoardMeeting:
       context_kinds:
       - duration_3m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -544,7 +548,7 @@ profiles:
     DateOfEndOfFinancialYear:
       context_kinds:
       - duration_3m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -554,7 +558,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -562,7 +566,7 @@ profiles:
     DateOfStartOfBoardMeeting:
       context_kinds:
       - duration_3m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -570,7 +574,7 @@ profiles:
     DateOfStartOfFinancialYear:
       context_kinds:
       - duration_3m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -580,7 +584,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -588,7 +592,7 @@ profiles:
     DateOnWhichPriorIntimationOfTheMeetingForConsideringFinancialResultsWasInformedToTheExchange:
       context_kinds:
       - duration_3m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -596,7 +600,7 @@ profiles:
     DeclarationOfUnmodifiedOpinionOrStatementOnImpactOfAuditQualification:
       context_kinds:
       - duration_3m
-      filings: 13
+      filings: 16
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -604,7 +608,7 @@ profiles:
     DeclarationPursuantToClauseDOfSubRegulation3OfRegulation33OfSEBILODRRegulation2015:
       context_kinds:
       - duration_3m
-      filings: 8
+      filings: 11
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -612,7 +616,7 @@ profiles:
     Deposits:
       context_kinds:
       - instant
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: deposits
       numeric: true
@@ -620,7 +624,7 @@ profiles:
     DescriptionOfPresentationCurrency:
       context_kinds:
       - duration_3m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -630,7 +634,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -640,7 +644,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -648,7 +652,7 @@ profiles:
     DisclosureOfNotesOnAssetsAndLiabilitiesExplanatoryTextBlock:
       context_kinds:
       - duration_3m
-      filings: 5
+      filings: 6
       first_batch: q4
       mapped_to: null
       numeric: false
@@ -656,7 +660,7 @@ profiles:
     DisclosureOfNotesOnFinancialResultsExplanatoryTextBlock:
       context_kinds:
       - duration_3m
-      filings: 10
+      filings: 12
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -664,7 +668,7 @@ profiles:
     DisclosureOfNotesOnSegmentsExplanatoryTextBlock:
       context_kinds:
       - duration_3m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -673,7 +677,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: dividends_paid
       numeric: true
@@ -682,7 +686,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: dividends_received_investing
       numeric: true
@@ -691,7 +695,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: dividends_received_operating
       numeric: true
@@ -700,7 +704,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: fx_effect_on_cash
       numeric: true
@@ -710,7 +714,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: employee_benefit_expense
       numeric: true
@@ -718,7 +722,7 @@ profiles:
     EndTimeOfBoardMeeting:
       context_kinds:
       - duration_3m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -728,7 +732,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: exceptional_items
       numeric: true
@@ -738,7 +742,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: expenditure_excl_provisions
       numeric: true
@@ -748,7 +752,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: extraordinary_items
       numeric: true
@@ -758,7 +762,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: face_value_per_share
       numeric: true
@@ -766,7 +770,7 @@ profiles:
     FixedAssets:
       context_kinds:
       - instant
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: fixed_assets
       numeric: true
@@ -776,7 +780,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: gross_npa
       numeric: true
@@ -784,7 +788,7 @@ profiles:
     ISIN:
       context_kinds:
       - duration_3m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -802,7 +806,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: total_income
       numeric: true
@@ -811,7 +815,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -820,7 +824,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -829,7 +833,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: income_taxes_paid
       numeric: true
@@ -838,7 +842,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: net_cash_flow_after_fx
       numeric: true
@@ -847,7 +851,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: net_cash_flow
       numeric: true
@@ -857,7 +861,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 12
+      filings: 15
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -867,7 +871,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: interest_earned
       numeric: true
@@ -877,7 +881,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: interest_expended
       numeric: true
@@ -887,7 +891,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: interest_on_rbi_interbank
       numeric: true
@@ -897,7 +901,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: interest_on_advances
       numeric: true
@@ -906,7 +910,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: interest_paid_financing
       numeric: true
@@ -915,7 +919,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: interest_paid_operating
       numeric: true
@@ -924,7 +928,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: interest_received_investing
       numeric: true
@@ -933,7 +937,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: interest_received_operating
       numeric: true
@@ -941,7 +945,7 @@ profiles:
     Investments:
       context_kinds:
       - instant
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: investments_total
       numeric: true
@@ -949,7 +953,7 @@ profiles:
     IsCompanyReportingMultisegmentOrSingleSegment:
       context_kinds:
       - duration_3m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -965,7 +969,7 @@ profiles:
     LevelOfRounding:
       context_kinds:
       - duration_3m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -973,7 +977,7 @@ profiles:
     MSEISymbol:
       context_kinds:
       - duration_3m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -981,7 +985,7 @@ profiles:
     NameOfBank:
       context_kinds:
       - duration_3m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -991,7 +995,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -999,7 +1003,7 @@ profiles:
     NetSegmentAssets:
       context_kinds:
       - instant
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1007,7 +1011,7 @@ profiles:
     NetSegmentLiabilities:
       context_kinds:
       - instant
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1017,7 +1021,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: net_npa
       numeric: true
@@ -1035,7 +1039,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: operating_expenses
       numeric: true
@@ -1045,7 +1049,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: ppop
       numeric: true
@@ -1054,7 +1058,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1063,7 +1067,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1072,7 +1076,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1080,7 +1084,7 @@ profiles:
     OtherAssets:
       context_kinds:
       - instant
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: other_assets
       numeric: true
@@ -1089,7 +1093,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1098,7 +1102,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1107,7 +1111,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1116,7 +1120,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1126,7 +1130,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: other_income
       numeric: true
@@ -1135,7 +1139,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1144,7 +1148,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1153,7 +1157,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1163,7 +1167,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: other_interest
       numeric: true
@@ -1171,7 +1175,7 @@ profiles:
     OtherLiabilitiesAndProvisions:
       context_kinds:
       - instant
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: other_liabilities_and_provisions
       numeric: true
@@ -1181,7 +1185,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: other_operating_expenses
       numeric: true
@@ -1191,7 +1195,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 13
+      filings: 16
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1201,7 +1205,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: paid_up_equity_capital
       numeric: true
@@ -1210,7 +1214,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1219,7 +1223,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1228,7 +1232,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1238,7 +1242,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: gnpa_pct
       numeric: true
@@ -1248,7 +1252,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: nnpa_pct
       numeric: true
@@ -1258,7 +1262,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: govt_holding_pct
       numeric: true
@@ -1267,7 +1271,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1276,7 +1280,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1285,7 +1289,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1294,7 +1298,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1303,7 +1307,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1312,7 +1316,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1321,7 +1325,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1330,7 +1334,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1339,7 +1343,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1348,7 +1352,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1357,7 +1361,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1367,7 +1371,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: pat_owners
       numeric: true
@@ -1377,7 +1381,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: pat
       numeric: true
@@ -1387,7 +1391,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: pat_ordinary
       numeric: true
@@ -1397,7 +1401,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: pbt
       numeric: true
@@ -1407,7 +1411,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 6
       first_batch: sc
       mapped_to: pat_nci
       numeric: true
@@ -1417,7 +1421,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: provisions
       numeric: true
@@ -1426,7 +1430,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1435,7 +1439,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1444,7 +1448,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1452,7 +1456,7 @@ profiles:
     ReportingQuarter:
       context_kinds:
       - duration_3m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -1468,7 +1472,7 @@ profiles:
     ReservesAndSurplus:
       context_kinds:
       - instant
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: reserves_and_surplus
       numeric: true
@@ -1478,7 +1482,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: roa_filed
       numeric: true
@@ -1488,7 +1492,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: income_on_investments
       numeric: true
@@ -1496,7 +1500,7 @@ profiles:
     ScripCode:
       context_kinds:
       - duration_3m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -1504,7 +1508,7 @@ profiles:
     SegmentAssets:
       context_kinds:
       - instant
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1514,7 +1518,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 11
+      filings: 14
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1522,7 +1526,7 @@ profiles:
     SegmentLiabilities:
       context_kinds:
       - instant
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1532,7 +1536,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1542,7 +1546,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1552,7 +1556,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1562,7 +1566,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1571,7 +1575,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1581,7 +1585,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 6
       first_batch: sc
       mapped_to: share_of_associates_jv
       numeric: true
@@ -1589,7 +1593,7 @@ profiles:
     StartTimeOfBoardMeeting:
       context_kinds:
       - duration_3m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -1597,7 +1601,7 @@ profiles:
     Symbol:
       context_kinds:
       - duration_3m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -1607,7 +1611,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: tax_expense
       numeric: true
@@ -1631,7 +1635,7 @@ profiles:
     TypeOfCashFlowStatement:
       context_kinds:
       - duration_3m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -1639,7 +1643,7 @@ profiles:
     TypeOfReportingPeriod:
       context_kinds:
       - duration_3m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -1647,7 +1651,7 @@ profiles:
     UnAllocableAssets:
       context_kinds:
       - instant
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1655,7 +1659,7 @@ profiles:
     UnAllocableLiabilities:
       context_kinds:
       - instant
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: true
@@ -1687,7 +1691,7 @@ profiles:
     WhetherCashFlowStatementIsApplicableOnCompany:
       context_kinds:
       - duration_3m
-      filings: 11
+      filings: 13
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -1697,7 +1701,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 17
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -1705,7 +1709,7 @@ profiles:
     WhetherResultsAreAuditedOrUnauditedForImpactOfAuditQualification:
       context_kinds:
       - duration_3m
-      filings: 8
+      filings: 11
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -8176,7 +8180,7 @@ profiles:
     AdvancesAndOtherAssets:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8192,7 +8196,7 @@ profiles:
     ApplicationOfFunds:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: total_assets
       numeric: true
@@ -8200,7 +8204,7 @@ profiles:
     Assets:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8209,7 +8213,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: eps_basic
       numeric: true
@@ -8218,7 +8222,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8226,7 +8230,7 @@ profiles:
     Borrowings:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: borrowings_insurer
       numeric: true
@@ -8234,7 +8238,7 @@ profiles:
     CashAdvancesAndLoansMadeToOtherPartiesClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8242,7 +8246,7 @@ profiles:
     CashAndBankBalances:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: cash_and_bank
       numeric: true
@@ -8250,7 +8254,7 @@ profiles:
     CashAndCashEquivalentsCashFlowStatement:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8258,7 +8262,7 @@ profiles:
     CashFlowsFromLosingControlOfSubsidiariesOrOtherBusinessesClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8266,7 +8270,7 @@ profiles:
     CashFlowsFromUsedInFinancingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: cff
       numeric: true
@@ -8274,7 +8278,7 @@ profiles:
     CashFlowsFromUsedInInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: cfi
       numeric: true
@@ -8282,7 +8286,7 @@ profiles:
     CashFlowsFromUsedInOperatingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: cfo
       numeric: true
@@ -8290,7 +8294,7 @@ profiles:
     CashFlowsFromUsedInOperations:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8298,7 +8302,7 @@ profiles:
     CashFlowsUsedInObtainingControlOfSubsidiariesOrOtherBusinessesClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8306,7 +8310,7 @@ profiles:
     CashPaymentsForFutureContractsForwardContractsOptionContractsAndSwapContractsClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8314,7 +8318,7 @@ profiles:
     CashReceiptsFromFutureContractsForwardContractsOptionContractsAndSwapContractsClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8322,7 +8326,7 @@ profiles:
     CashReceiptsFromRepaymentOfAdvancesAndLoansMadeToOtherPartiesClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8331,7 +8335,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: change_in_outstanding_claims
       numeric: true
@@ -8340,7 +8344,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: claims_paid
       numeric: true
@@ -8348,7 +8352,7 @@ profiles:
     ClassOfSecurity:
       context_kinds:
       - duration_3m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -8357,7 +8361,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: combined_ratio_filed
       numeric: true
@@ -8366,7 +8370,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8374,7 +8378,7 @@ profiles:
     ContigentLiabilities:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8382,7 +8386,7 @@ profiles:
     CurrentAssets:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: current_assets
       numeric: true
@@ -8390,7 +8394,7 @@ profiles:
     CurrentLiabilities:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8398,7 +8402,7 @@ profiles:
     CurrentLiabilitiesAndProvisions:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: current_liabilities_and_provisions
       numeric: true
@@ -8406,7 +8410,7 @@ profiles:
     DateOfBoardMeetingWhenFinancialResultsWereApproved:
       context_kinds:
       - duration_3m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -8414,7 +8418,7 @@ profiles:
     DateOfEndOfBoardMeeting:
       context_kinds:
       - duration_3m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -8422,7 +8426,7 @@ profiles:
     DateOfEndOfFinancialYear:
       context_kinds:
       - duration_3m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -8431,7 +8435,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -8439,7 +8443,7 @@ profiles:
     DateOfStartOfBoardMeeting:
       context_kinds:
       - duration_3m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -8447,7 +8451,7 @@ profiles:
     DateOfStartOfFinancialYear:
       context_kinds:
       - duration_3m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -8456,7 +8460,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -8464,7 +8468,7 @@ profiles:
     DateOnWhichPriorIntimationOfTheMeetingForConsideringFinancialResultsWasInformedToTheExchange:
       context_kinds:
       - duration_3m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -8472,7 +8476,7 @@ profiles:
     DebitBalanceInProfitAndLossAccountShareholdersAccount:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8480,7 +8484,7 @@ profiles:
     DeclarationOfUnmodifiedOpinionOrStatementOnImpactOfAuditQualification:
       context_kinds:
       - duration_3m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -8488,7 +8492,7 @@ profiles:
     DeferredTaxAsset:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8496,7 +8500,7 @@ profiles:
     DescriptionOfPresentationCurrency:
       context_kinds:
       - duration_3m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -8504,7 +8508,7 @@ profiles:
     DisclosureOfNotesOnFinancialResultsExplanatoryTextBlock:
       context_kinds:
       - duration_3m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -8512,7 +8516,7 @@ profiles:
     DisclosureOfNotesOnSegmentIncomeExplanatoryTextBlock:
       context_kinds:
       - instant
-      filings: 1
+      filings: 2
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -8520,7 +8524,7 @@ profiles:
     DisclosureOfNotesOnSegmentOperatingProfitOrLossExplanatoryTextBlock:
       context_kinds:
       - instant
-      filings: 1
+      filings: 2
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -8528,7 +8532,7 @@ profiles:
     DisclosureOfNotesOnSegmentPremiumDeficiencyExplanatoryTextBlock:
       context_kinds:
       - instant
-      filings: 1
+      filings: 2
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -8536,7 +8540,7 @@ profiles:
     DisclosureOfNotesOnSegmentTechnicalLiabilitiesUnexpiredClaimsReservesIncludingIBNRAndIBNERExplanatoryTextBlock:
       context_kinds:
       - instant
-      filings: 1
+      filings: 2
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -8544,7 +8548,7 @@ profiles:
     DisclosureOfNotesOnSegmentTechnicalLiabilitiesUnexpiredRiskReserveNetExplanatoryTextBlock:
       context_kinds:
       - instant
-      filings: 1
+      filings: 2
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -8552,7 +8556,7 @@ profiles:
     DisclosureOfNotesOnSegmentUnderwritingProfitOrLossExplanatoryTextBlock:
       context_kinds:
       - instant
-      filings: 1
+      filings: 2
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -8568,7 +8572,7 @@ profiles:
     DividendsPaidClassifiedAsFinancingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8576,7 +8580,7 @@ profiles:
     DividendsReceivedClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8584,7 +8588,7 @@ profiles:
     DividendsReceivedClassifiedAsOperatingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8592,7 +8596,7 @@ profiles:
     EffectOfExchangeRateChangesOnCashAndCashEquivalents:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8601,7 +8605,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: employee_benefit_expense
       numeric: true
@@ -8609,7 +8613,7 @@ profiles:
     EndTimeOfBoardMeeting:
       context_kinds:
       - duration_3m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -8618,7 +8622,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: expenses_of_management_ratio
       numeric: true
@@ -8627,7 +8631,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: extraordinary_items
       numeric: true
@@ -8635,7 +8639,7 @@ profiles:
     FairValueChangeAccountAndRevaluationReserve:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8644,7 +8648,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8652,7 +8656,7 @@ profiles:
     FixedAssets:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: fixed_assets
       numeric: true
@@ -8661,7 +8665,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8670,7 +8674,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: gross_premium
       numeric: true
@@ -8678,7 +8682,7 @@ profiles:
     ISIN:
       context_kinds:
       - duration_3m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -8687,7 +8691,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: investment_income_policyholders
       numeric: true
@@ -8696,7 +8700,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: shareholders_income
       numeric: true
@@ -8704,7 +8708,7 @@ profiles:
     IncomeTaxesPaidRefundClassifiedAsFinancingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8712,7 +8716,7 @@ profiles:
     IncomeTaxesPaidRefundClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8720,7 +8724,7 @@ profiles:
     IncomeTaxesPaidRefundClassifiedAsOperatingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8728,7 +8732,7 @@ profiles:
     IncreaseDecreaseInCashAndCashEquivalents:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: net_cash_flow_after_fx
       numeric: true
@@ -8736,7 +8740,7 @@ profiles:
     IncreaseDecreaseInCashAndCashEquivalentsBeforeEffectOfExchangeRateChanges:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: net_cash_flow
       numeric: true
@@ -8745,7 +8749,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: claims_ratio_filed
       numeric: true
@@ -8754,7 +8758,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: claims_incurred
       numeric: true
@@ -8762,7 +8766,7 @@ profiles:
     InterestPaidClassifiedAsFinancingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8770,7 +8774,7 @@ profiles:
     InterestPaidClassifiedAsOperatingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8778,7 +8782,7 @@ profiles:
     InterestReceivedClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8786,7 +8790,7 @@ profiles:
     InterestReceivedClassifiedAsOperatingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8795,7 +8799,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8803,7 +8807,7 @@ profiles:
     Investments:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8811,7 +8815,7 @@ profiles:
     InvestmentsPolicyholders:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: investments_policyholders
       numeric: true
@@ -8819,7 +8823,7 @@ profiles:
     InvestmentsPolicyholdersFund:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8827,7 +8831,7 @@ profiles:
     InvestmentsShareholderFund:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8835,7 +8839,7 @@ profiles:
     InvestmentsShareholders:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: investments_shareholders
       numeric: true
@@ -8851,7 +8855,7 @@ profiles:
     LevelOfRounding:
       context_kinds:
       - duration_3m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -8859,7 +8863,7 @@ profiles:
     Loans:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: loans
       numeric: true
@@ -8867,7 +8871,7 @@ profiles:
     MSEISymbol:
       context_kinds:
       - duration_3m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -8875,7 +8879,7 @@ profiles:
     MinorityInterest:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: non_controlling_interest
       numeric: true
@@ -8883,7 +8887,7 @@ profiles:
     MiscellaneousExpenditureToTheExtentNotWrittenOffOrAdjusted:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8891,7 +8895,7 @@ profiles:
     NameOfTheCompany:
       context_kinds:
       - duration_3m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -8900,7 +8904,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -8909,7 +8913,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: net_commission
       numeric: true
@@ -8917,7 +8921,7 @@ profiles:
     NetCurrentAssets:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: net_current_assets
       numeric: true
@@ -8926,7 +8930,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8935,7 +8939,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: net_premium_written
       numeric: true
@@ -8944,7 +8948,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: net_retention_ratio
       numeric: true
@@ -8952,7 +8956,7 @@ profiles:
     NoOfInvestorComplaints:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8961,7 +8965,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8970,7 +8974,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8979,7 +8983,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -8988,7 +8992,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: shareholders_expenses
       numeric: true
@@ -8997,7 +9001,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9006,7 +9010,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9015,7 +9019,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9031,7 +9035,7 @@ profiles:
     NumberOfShares:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9039,7 +9043,7 @@ profiles:
     OpeningBalanceAndApproproationsFromPATNet:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9048,7 +9052,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: operating_expenses
       numeric: true
@@ -9057,7 +9061,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: operating_expenses_insurance
       numeric: true
@@ -9066,7 +9070,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: operating_income
       numeric: true
@@ -9075,7 +9079,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: operating_profit_insurance
       numeric: true
@@ -9083,7 +9087,7 @@ profiles:
     OtherAssetsNetOfCurrentLiabilitiesAndProvisions:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9091,7 +9095,7 @@ profiles:
     OtherCashPaymentsFromOperatingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9099,7 +9103,7 @@ profiles:
     OtherCashPaymentsToAcquireEquityOrDebtInstrumentsOfOtherEntitiesClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9107,7 +9111,7 @@ profiles:
     OtherCashPaymentsToAcquireInterestsInJointVenturesClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9115,7 +9119,7 @@ profiles:
     OtherCashReceiptsFromOperatingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9123,7 +9127,7 @@ profiles:
     OtherCashReceiptsFromSalesOfEquityOrDebtInstrumentsOfOtherEntitiesClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9131,7 +9135,7 @@ profiles:
     OtherCashReceiptsFromSalesOfInterestsInJointVenturesClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9140,7 +9144,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: other_income_policyholders
       numeric: true
@@ -9148,7 +9152,7 @@ profiles:
     OtherInflowsOutflowsOfCashClassifiedAsFinancingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9156,7 +9160,7 @@ profiles:
     OtherInflowsOutflowsOfCashClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9164,7 +9168,7 @@ profiles:
     OtherInflowsOutflowsOfCashClassifiedAsOperatingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9173,7 +9177,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9181,7 +9185,7 @@ profiles:
     PaidUpEquityCapital:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9189,7 +9193,7 @@ profiles:
     PaymentsForPremiumsAndClaimsAnnuitiesAndOtherPolicyBenefits:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9197,7 +9201,7 @@ profiles:
     PaymentsFromChangesInOwnershipInterestsInSubsidiaries:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9205,7 +9209,7 @@ profiles:
     PaymentsFromContractsHeldForDealingOrTradingPurpose:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9213,7 +9217,7 @@ profiles:
     PaymentsOfLeaseLiabilitiesClassifiedAsFinancingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9221,7 +9225,7 @@ profiles:
     PaymentsOfOtherEquityInstruments:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9229,7 +9233,7 @@ profiles:
     PaymentsToAcquireOrRedeemEntitysShares:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9237,7 +9241,7 @@ profiles:
     PaymentsToAndOnBehalfOfEmployees:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9245,7 +9249,7 @@ profiles:
     PaymentsToManufactureOrAcquireAssetsHeldForRentalToOthersAndSubsequentlyHeldForSale:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9253,7 +9257,7 @@ profiles:
     PaymentsToSuppliersForGoodsAndServices:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9262,7 +9266,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: govt_holding_pct
       numeric: true
@@ -9271,7 +9275,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9280,7 +9284,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9289,7 +9293,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9297,7 +9301,7 @@ profiles:
     PolicyholdersFunds:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: fair_value_change_policyholders
       numeric: true
@@ -9306,7 +9310,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: premium_deficiency
       numeric: true
@@ -9315,7 +9319,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: net_premium_earned
       numeric: true
@@ -9323,7 +9327,7 @@ profiles:
     ProceedsFromBiologicalAssetsOtherThanBearerPlantsClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9331,7 +9335,7 @@ profiles:
     ProceedsFromBorrowingsClassifiedAsFinancingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9339,7 +9343,7 @@ profiles:
     ProceedsFromChangesInOwnershipInterestsInSubsidiaries:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9347,7 +9351,7 @@ profiles:
     ProceedsFromExerciseOfStockOptions:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9355,7 +9359,7 @@ profiles:
     ProceedsFromGovernmentGrantsClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9363,7 +9367,7 @@ profiles:
     ProceedsFromIssuingDebenturesNotesBondsEtc:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9371,7 +9375,7 @@ profiles:
     ProceedsFromIssuingOtherEquityInstruments:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9379,7 +9383,7 @@ profiles:
     ProceedsFromIssuingSharesClassifiedAsFinancingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9387,7 +9391,7 @@ profiles:
     ProceedsFromSalesOfGoodwillClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9395,7 +9399,7 @@ profiles:
     ProceedsFromSalesOfIntangibleAssetsClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9403,7 +9407,7 @@ profiles:
     ProceedsFromSalesOfInvestmentPropertyClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9411,7 +9415,7 @@ profiles:
     ProceedsFromSalesOfOtherLongTermAssetsClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9419,7 +9423,7 @@ profiles:
     ProceedsFromSalesOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9428,7 +9432,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: pat
       numeric: true
@@ -9437,7 +9441,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9446,7 +9450,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: pat_before_extraordinary_pretax
       numeric: true
@@ -9455,7 +9459,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: pbt
       numeric: true
@@ -9464,7 +9468,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: tax_expense
       numeric: true
@@ -9472,7 +9476,7 @@ profiles:
     Provisions:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9481,7 +9485,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9490,7 +9494,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9498,7 +9502,7 @@ profiles:
     PurchaseOfBiologicalAssetsOtherThanBearerPlantsClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9506,7 +9510,7 @@ profiles:
     PurchaseOfGoodwillClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9514,7 +9518,7 @@ profiles:
     PurchaseOfIntangibleAssetsClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9522,7 +9526,7 @@ profiles:
     PurchaseOfInvestmentPropertyClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9530,7 +9534,7 @@ profiles:
     PurchaseOfOtherLongTermAssetsClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9538,7 +9542,7 @@ profiles:
     PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9546,7 +9550,7 @@ profiles:
     ReceiptsFromContractsHeldForDealingOrTradingPurpose:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9554,7 +9558,7 @@ profiles:
     ReceiptsFromPremiumsAndClaimsAnnuitiesAndOtherPolicyBenefits:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9562,7 +9566,7 @@ profiles:
     ReceiptsFromRentsAndSubsequentSalesOfAssetsHeldForRentalToOthersAndSubsequentlyHeldForSale:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9570,7 +9574,7 @@ profiles:
     ReceiptsFromRoyaltiesFeesCommissionsAndOtherRevenue:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9578,7 +9582,7 @@ profiles:
     ReceiptsFromSalesOfGoodsAndRenderingOfServices:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9586,7 +9590,7 @@ profiles:
     RepaymentsOfBorrowingsClassifiedAsFinancingActivities:
       context_kinds:
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9594,7 +9598,7 @@ profiles:
     ReportingQuarter:
       context_kinds:
       - duration_3m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -9602,7 +9606,7 @@ profiles:
     ReservesAndSurplus:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: reserves_and_surplus
       numeric: true
@@ -9610,7 +9614,7 @@ profiles:
     ReservesAndSurplusExcludingRevaluationReserve:
       context_kinds:
       - duration_3m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9618,7 +9622,7 @@ profiles:
     ScripCode:
       context_kinds:
       - duration_3m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -9626,7 +9630,7 @@ profiles:
     ShareApplicationMoneyReceivedPendingAllotmentOfShares:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: share_application_money
       numeric: true
@@ -9634,7 +9638,7 @@ profiles:
     ShareCapital:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: equity_share_capital
       numeric: true
@@ -9643,7 +9647,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: investment_income_shareholders
       numeric: true
@@ -9652,7 +9656,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: other_income
       numeric: true
@@ -9661,7 +9665,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: transfer_from_policyholders
       numeric: true
@@ -9669,7 +9673,7 @@ profiles:
     ShareholdersFunds:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: fair_value_change_shareholders
       numeric: true
@@ -9678,7 +9682,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: solvency_ratio
       numeric: true
@@ -9686,7 +9690,7 @@ profiles:
     SourcesOfFunds:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: total_equity_and_liabilities
       numeric: true
@@ -9694,7 +9698,7 @@ profiles:
     StartTimeOfBoardMeeting:
       context_kinds:
       - duration_3m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -9702,7 +9706,7 @@ profiles:
     Symbol:
       context_kinds:
       - duration_3m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -9711,7 +9715,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: transfer_to_pl
       numeric: true
@@ -9720,7 +9724,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9728,7 +9732,7 @@ profiles:
     TypeOfCashFlowStatement:
       context_kinds:
       - duration_3m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -9736,7 +9740,7 @@ profiles:
     TypeOfCompany:
       context_kinds:
       - duration_3m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -9744,7 +9748,7 @@ profiles:
     TypeOfInsurance:
       context_kinds:
       - instant
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -9752,7 +9756,7 @@ profiles:
     TypeOfReportingPeriod:
       context_kinds:
       - duration_3m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -9761,7 +9765,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: underwriting_result
       numeric: true
@@ -9793,7 +9797,7 @@ profiles:
     WhetherCashFlowStatementIsApplicableOnCompany:
       context_kinds:
       - duration_3m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -9802,7 +9806,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -9859,7 +9863,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true
@@ -9868,7 +9872,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 3
+      filings: 4
       first_batch: B6
       mapped_to: null
       numeric: true

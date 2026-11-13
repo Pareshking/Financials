@@ -119,6 +119,16 @@ def corp_quarter(result, start: date, end: date) -> QuarterStatement:
             "ASSOCIATES_PLACEMENT: share of associates/JVs is after PBT here; Screener adds it to Other Income "
             "and PBT when the company's PDF shows it above PBT [S3]"
         )
+    if v("regulatory_deferral_movement"):
+        st.divergences.append(
+            "REGULATORY_DEFERRAL_PLACEMENT: the regulatory deferral movement is after tax here; Screener adds it to "
+            "Other Income and PBT (Tata Power) [S16]"
+        )
+    if v("pat_discontinued"):
+        st.divergences.append(
+            "DISCONTINUED_PLACEMENT: discontinued operations are after continuing PAT here; Screener adds them to "
+            "Other Income and PBT (TMPV demerger gain 82,616 Cr) [S16]"
+        )
     return st
 
 

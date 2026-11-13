@@ -137,26 +137,54 @@ output); `tests/test_index_backfill.py::test_derived_text_matches_pdf` regenerat
 | `xbrl/IF_INS_COM_IND_AS_19799_WebXMLFile_20261027_212749295.xml` | B6: Star Health Q2 FY27 standalone, Ind AS 117 (one of 5 byte-identical broadcasts) (X64) | `903eb86889821e81daa7c432ec46b6a129d30e35a109e8ecafe8b198fd961210` |
 | `xbrl/INTEGRATED_FILING_LI_1747186_27102026072642_WEB.xml` | B6: SBI Life Q2 FY27 standalone (solvency in times; persistency) (X62, X65) | `54156e0c102988a9b1ad4546c27e5efd2621e3e25c919150b4d97418f834ba6f` |
 | `xbrl/INTEGRATED_FILING_GI_1750325_30102026070447_WEB.xml` | B6: New India Assurance Q2 FY27 standalone (PSU; memo provisions; solvency /100) (X63, X65) | `d7efe24db84a2121a1b2f8426e024363719bcd71f1eaae30499a65ac5122d03a` |
+| `xbrl/INTEGRATED_FILING_BANKING_1740466_16102026082756_WEB.xml` | S19: Punjab National Bank Q2 FY27 consolidated (Screener parity) | `70f3870720a0ccc6740ad1bdf31db02018a0f5b2df9d9524c00dabc9a69f4bd9` |
+| `xbrl/INTEGRATED_FILING_BANKING_1745380_24102026050818_WEB.xml` | S19: Kotak Mahindra Bank Q2 FY27 consolidated (Screener parity) | `e5f8dd57cfadb16f256c66e1b18042c4a17de3a49367c7b33638d64bee55918e` |
+| `xbrl/INTEGRATED_FILING_GI_1750334_30102026070831_WEB.xml` | S18: New India Assurance Q2 FY27 consolidated (NP residual) | `5f91d2500070f665aadb838eb6c51fe4473329422a16ab9af65a0cd31f5150fb` |
+| `xbrl/INTEGRATED_FILING_BANKING_1699401_22072026052845_WEB.xml` | S19: IndusInd Bank Q1 FY27 consolidated (Screener parity) | `f06b27fbb453b90c297854563c56cfe7eba232ed9a9f88fbf50c175481ef4030` |
+| `xbrl/INTEGRATED_FILING_INDAS_1750535_30102026093155_WEB.xml` | S19: Reliance Q2 FY27 standalone (Screener standalone view) | `9c426dd82ce4a59cb55bcb25f0f19799e1d1250a80aa6b07efd0562a3e897a27` |
 
-Source URL pattern for all thirty-four: `https://nsearchives.nseindia.com/corporate/xbrl/<file>`.
+Source URL pattern for all thirty-nine: `https://nsearchives.nseindia.com/corporate/xbrl/<file>`.
 
 ## Screener goldens (local only, not committed)
 
-The repository is public, so the user-supplied Screener Excel exports (2026-11-13) and their extracted Data Sheets are
-**not** committed. Re-create them with `python scripts/extract_screener_golden.py EXPORT.xlsx ... --out data/screener_golden`
-(`data/` is gitignored). The parity harness carries only the specific figures it asserts. Hashes:
+The repository is public, so the user-supplied Screener Excel exports (2026-11-13; 34 distinct files, some uploaded twice)
+and their extracted Data Sheets are **not** committed. Re-create them with
+`python scripts/extract_screener_golden.py EXPORT.xlsx ... --out data/screener_golden` (`data/` is gitignored). The
+parity harness carries only the specific figures it asserts. Hashes:
 
 | Export sha256 | Extracted JSON sha256 | File |
 |---|---|---|
-| `1ecda3744f11079c2fad5b00f458efc576da42a1f7a2c3259e133d5715cc686b` | `bdd7e4b2d370ef6f1183dee5c3ddb397ed3b5ee405824ee47ef5e90adc4b7dc3` | `TATA_CONSULTANCY_SERVICES_LTD.json` |
-| `08a48ee253914da355241b8022a7cc8db98a3725f4339575862421d1dc19182b` | `b5c833ba3a63f737a14a867c930b6985604de88e07db53456116ae05f4ec3d2e` | `ELIN_ELECTRONICS_LTD.json` |
-| `99ef74f02f51cc2c40218d824b9dfc6a668e836e931364a70b4a46a4a0d8ca79` | `bac1d0d7702d34e1d6af37f3ef181a0c60f29defb802c9304dfefdebfb596bc5` | `ITC_LTD.json` |
-| `05b25df6981044b0d7fb556aac4f68c77da1b62247e74d6bbe18f59fd9dedbda` | `4eaad51e02e1657170df89a820ca49af1950668274bdaacff23236e57d366ae1` | `BAJAJ_FINANCE_LTD.json` |
-| `14163f4d412e18c51d3f45cf169701effd596f7da62dbb7f6df4e06ef086ed05` | `0d5f39c0d92834c4c5f37ed2f9e476fe1b676d289ba198b8b5dd8f482de02b45` | `TATA_MOTORS_PASSENGER_VEHICLES_LTD.json` |
-| `a3987966d0824c6b96439e0daefe75d114d9947fd12750082268763d8824bc21` | `97c07878e56b14d32d210016c30892684196c5aa949c397b64ec1184dafbf839` | `ETERNAL_LTD.json` |
-| `67d37e45fa0c5daf478f4a868ac7055df8303e0d1906bd9c79eae458f1c8a829` | `e2737a83e14713ac99ffef3e08d6ce56e7aaa015ba4ebfad6bc65c1e63e7cf12` | `HDFC_LIFE_INSURANCE_COMPANY_LTD.json` |
-| `c4bac255a4bda4f329da9006503be15d9108da123a3a8a9457e3a99fad20446c` | `785856a89daffa802ef36c08371c58f479a0267d06872cc92a5f87b78b0685d0` | `TATA_MOTORS_LTD.json` |
-| `e047fb373a15866a2e5541228275c2142c5f2c42046d7094fe953f1ec49f8230` | `2e36ebf3a8eabefd54f3852240e09a0972cbf26d36ad02960f8a9dcc39026597` | `HDFC_BANK_LTD.json` |
-| `042a2d466e5c83a1e37afa3ef87cdfd9628d129b935f616f0aeda0d7b93e56aa` | `a4506402ac2543848c020db3f82e066dc46272d492a369e17352f5a588fb5b2a` | `RELIANCE_INDUSTRIES_LTD.json` |
-| `75e82a7bb887382e94d44dcb9609fce829b17da55680f7d7adae6861d151eeeb` | `5efd6240d6d4d9e8128be1bf03634d67a0043f239bc1a9e0c8738c1bc3407dd3` | `STAR_HEALTH___ALLIED_INSURANCE_COMPANY_LTD.json` |
-| `30f81d594b343e2a295d39530680d7abb619d94a4217680a784ea63b4d148335` | `0c8360fa1de536885cacbc34ab699611f72f937ef65d5f61737bfa29cd22b4e9` | `ICICI_LOMBARD_GENERAL_INSURANCE_COMPANY_LTD.json` |
+| `9f876141bbb6c9eaacf87b6b7fdcdf73e15a7027e5fb210d0f02b38a9441b986` | `218960af70b9ac0eaf4a1719dd020106c79e8fad21a089b9a3b62270bbf2f953` | `AIA_Engineering.json` |
+| `3eff9d1b9122afe189c0b75a2416ef1f9b91cb3bd90b12d39dd2abb37677722f` | `947e95fd42f4b0b97f4810f3af720dcf321573c7bca740fe48c25a1f8604e71d` | `APL_Apollo_Tubes.json` |
+| `05b25df6981044b0d7fb556aac4f68c77da1b62247e74d6bbe18f59fd9dedbda` | `4eaad51e02e1657170df89a820ca49af1950668274bdaacff23236e57d366ae1` | `Bajaj_Finance_1.json` |
+| `900eda586df60fedc895b3336081a597a387673a479f499dd28dea06be986ce6` | `31d7c70760658e97553e83273f288389180ed56ef32c783694cd61524bc6605e` | `Bajaj_Finance_2.json` |
+| `3298a53759b988a442fc3f876f215e592b55ce66484fbd7817ebb0d9141c19ac` | `4503c96403ee248da64372739b9078c6db41346b72bbc618650dfccab6f3fe69` | `Cholaman_Inv_Fn.json` |
+| `2a8181ec598b0f113d96f6ce911b14ce98a4ec9c787d85ce817f7ba8bbc7392a` | `687d82317b0ac359ecfc7f4b1d39d172d0e9d4c1684ac6156d7f87d2edb973f5` | `Cummins_India.json` |
+| `08a48ee253914da355241b8022a7cc8db98a3725f4339575862421d1dc19182b` | `b5c833ba3a63f737a14a867c930b6985604de88e07db53456116ae05f4ec3d2e` | `Elin_Electronics.json` |
+| `dfecc6734e311f2304969d516169e203be11d83b70358774478ce8627189a40f` | `9e93caa38f3ff3133059544bfde31374cb882048cbf7216d48878549a6fecdb8` | `Elin_Electronics_1.json` |
+| `a3987966d0824c6b96439e0daefe75d114d9947fd12750082268763d8824bc21` | `97c07878e56b14d32d210016c30892684196c5aa949c397b64ec1184dafbf839` | `Eternal.json` |
+| `e047fb373a15866a2e5541228275c2142c5f2c42046d7094fe953f1ec49f8230` | `2e36ebf3a8eabefd54f3852240e09a0972cbf26d36ad02960f8a9dcc39026597` | `HDFC_Bank_1.json` |
+| `6a08a43037234a7db10ac8b9ab50d6b8d44b1e63b3cdeb711f09bfcf0e9389d2` | `dd165ddb04cbff08569dba0ae32979dc202928cbff0b9da082c959d2d7b0e1fe` | `HDFC_Bank_2.json` |
+| `67d37e45fa0c5daf478f4a868ac7055df8303e0d1906bd9c79eae458f1c8a829` | `e2737a83e14713ac99ffef3e08d6ce56e7aaa015ba4ebfad6bc65c1e63e7cf12` | `HDFC_Life_Insur.json` |
+| `30f81d594b343e2a295d39530680d7abb619d94a4217680a784ea63b4d148335` | `0c8360fa1de536885cacbc34ab699611f72f937ef65d5f61737bfa29cd22b4e9` | `ICICI_Lombard.json` |
+| `99ef74f02f51cc2c40218d824b9dfc6a668e836e931364a70b4a46a4a0d8ca79` | `bac1d0d7702d34e1d6af37f3ef181a0c60f29defb802c9304dfefdebfb596bc5` | `ITC_1_1.json` |
+| `bdb7a4bd9da67e0769765a989cac0f3eb5f66fb23af5b3dbcea0302a938ef765` | `4106892d90dec9f5dfb4d9259e5f3a7016a4c0882e50b4deadd79adcbfc311db` | `ITC_1_2.json` |
+| `ccc560c4c6ef4c89058d68bf9ec5807c566ece52135da84910ce6a1e574eb0cd` | `23d62376ced6348ccae63f94554ceefbe0126a250d4692ba7b0846c42b21a240` | `IndusInd_Bank.json` |
+| `37dc13b4ed610031f85cdb37b4afa08fc21419711398dd4f3738b214a0d1ba88` | `3b54aa578c4bb80a0881aea183757aa27579854847232ca14294213661c9078a` | `Kotak_Mah__Bank.json` |
+| `35f025cd7524d03d72a9113b2e6d1b7134c58062dda378c3053862cdcb5aa717` | `a9441cc6a4d30c73e932b8fd5eec7317e32ddb6fa3692cb04d08697c3da2ec23` | `Kotak_Mah__Bank_1.json` |
+| `dc230881529f462543d22a69e63d8ca96c4cdf869619574d21c80ddac7da9f41` | `a4e98bbb5ce78a618b3b0740bc84dfed189b4ea52ea894bee1a392c88b621787` | `Muthoot_Finance.json` |
+| `01292620bb31f9fe63b28ae30f57c0954fd833a5513aec7a43d49470c8c4d8ab` | `23a5512c3ad0404c788f9d7d55017a1d6f20fd1064cae8b7d2b756b1f1638d8e` | `New_India_Assura.json` |
+| `6b235aec6651b9f1b3208217f784960d955a1b68eff0c4d00ffade0bf32ceef1` | `defd3abc95d50d7f01cad8302fe7168096ca26657503657c1a40d2249c03668d` | `New_India_Assura_1.json` |
+| `996005ef6d9dcd5603fd94a523cd9e4d8bc4d32dd6738684533967e76b8949da` | `5606d224261d1493bc455ef667bb13572d59607531d46b8964a878d44ccefa8c` | `PNB_Housing.json` |
+| `7918de5163a0e99a0ed0b389e25c2eb25563554c0894a853076241424b53b9f6` | `894b0084b5d271d88af22fe2b0dc995d9287ddb3aeff5a69a56382945f5373c6` | `Punjab_Natl_Bank.json` |
+| `1a99912e5271dd687b6f26e7eee7614cb4ea9a6a412098d0e4a34fcd9dd93d9f` | `d57ef167c9f2b491ab70fef2b00f67c94b0ecfaa5dbf6994796fab19f89ae115` | `Punjab_Natl_Bank_1.json` |
+| `042a2d466e5c83a1e37afa3ef87cdfd9628d129b935f616f0aeda0d7b93e56aa` | `a4506402ac2543848c020db3f82e066dc46272d492a369e17352f5a588fb5b2a` | `Reliance_Industries_1.json` |
+| `3f33c2492c94e16b1fa0deac987152b7a92904cadd23fe29530c4794144c1414` | `f8ad94d3393d6e61cbafc3f9cc114661babe0d241cae53abff1e8d78ab10225f` | `Reliance_Industries_2.json` |
+| `73a0e2fb27c3c52871219fa33d0299bc7c11b766a4047a3a6a6bc06c5c6b27fe` | `a5e4ac05f7e7a86a77043c5a608503f48e9ea7a69fcc5b0a711d7b531685fafe` | `SBI_Life_Insuran.json` |
+| `216a5c26c25dfa28b5a269a03171203414b20e0d4f7d2db5b27b1f24a265f978` | `cf70b14a9e92eca42ae0446e7da35a95e95a05e202b8b4b071486051a98b0321` | `SRF.json` |
+| `75e82a7bb887382e94d44dcb9609fce829b17da55680f7d7adae6861d151eeeb` | `5efd6240d6d4d9e8128be1bf03634d67a0043f239bc1a9e0c8738c1bc3407dd3` | `Star_Health_Insu.json` |
+| `1ecda3744f11079c2fad5b00f458efc576da42a1f7a2c3259e133d5715cc686b` | `bdd7e4b2d370ef6f1183dee5c3ddb397ed3b5ee405824ee47ef5e90adc4b7dc3` | `TCS_1_1.json` |
+| `c4bac255a4bda4f329da9006503be15d9108da123a3a8a9457e3a99fad20446c` | `785856a89daffa802ef36c08371c58f479a0267d06872cc92a5f87b78b0685d0` | `Tata_Motors_1.json` |
+| `14163f4d412e18c51d3f45cf169701effd596f7da62dbb7f6df4e06ef086ed05` | `0d5f39c0d92834c4c5f37ed2f9e476fe1b676d289ba198b8b5dd8f482de02b45` | `Tata_Motors_PVeh_1.json` |
+| `d0d6e407f711e50ffdd86f09fc187bf7b62569b62d294534ca5a8c5d136c19a1` | `73184ad11d1033e424440f78839cf5eaa2aba92da8f7b11728c0b590253471c8` | `Tata_Power_Co_2.json` |
+| `aecc51521426e24c5a613f380c1019b7645e630614bc6956416a287f75fb20ff` | `74308e0ad3d60a4d396e799547024ccb6ae569f15d5e81cf5bdd3fd122849b9d` | `United_Spirits.json` |

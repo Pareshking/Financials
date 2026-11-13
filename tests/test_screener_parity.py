@@ -358,3 +358,419 @@ def test_audit_status_is_per_context():
     """[X46] Eternal Q4 FY26 marks the quarter Unaudited and the FY Audited; this used to raise ParseError."""
     r = parse_indas_corp_results((XBRL_DIR / Q4_FILES["ETERNAL"]).read_bytes())
     assert (r.meta["audited"], r.meta["audited_ytd"]) == (False, True)
+
+
+# ------------------------------------------------------- second wave of exports (2026-11-13 afternoon) [S16-S19]
+# Each Screener export matched to the filing of the same view; the view of every export was established by which
+# filing it ties to (S19). Divergence values as above: an element tuple (gap = their sum) or a pinned Decimal residual.
+REGDEF = "NetMovementInRegulatoryDeferralAccountBalancesRelatedToProfitOrLossAndTheRelatedDeferredTaxMovement"
+DISC = "ProfitLossFromDiscontinuedOperationsAfterTax"
+
+WAVE2 = {  # name: (fixture, kind, quarter end, Screener rows in Rs crore)
+    "AIA_ENG": (
+        "INTEGRATED_FILING_INDAS_1751861_03112026045154_WEB.xml",
+        "corp",
+        "2026-09-30",
+        {
+            "Sales": "1112.78",
+            "Expenses": "829.73",
+            "Operating Profit": "283.05",
+            "Other Income": "78.60",
+            "Depreciation": "30.54",
+            "Interest": "1.61",
+            "Profit before tax": "329.50",
+            "Tax": "80.08",
+            "Net Profit": "249.73",
+        },
+    ),
+    "APL_APOLLO": (
+        "INTEGRATED_FILING_INDAS_1746046_26102026055540_WEB.xml",
+        "corp",
+        "2026-09-30",
+        {
+            "Sales": "7001.70",
+            "Expenses": "6423.89",
+            "Operating Profit": "577.81",
+            "Other Income": "40.16",
+            "Depreciation": "65.87",
+            "Interest": "52.40",
+            "Profit before tax": "499.70",
+            "Tax": "117.28",
+            "Net Profit": "382.42",
+        },
+    ),
+    "BAJFINANCE_STANDALONE": (
+        "INTEGRATED_FILING_NBFC_INDAS_1742038_19102026075842_WEB.xml",
+        "nbfc",
+        "2026-09-30",
+        {
+            "Revenue": "20890.66",
+            "Expenses": "6796.74",
+            "Other Income": "28.74",
+            "Depreciation": "303.01",
+            "Interest": "6398.84",
+            "Profit before tax": "7420.81",
+            "Tax": "1884.71",
+            "Net Profit": "5536.10",
+        },
+    ),
+    "CHOLAFIN": (
+        "INTEGRATED_FILING_NBFC_INDAS_1748395_28102026112856_WEB.xml",
+        "nbfc",
+        "2026-09-30",
+        {
+            "Revenue": "9270.92",
+            "Expenses": "2789.86",
+            "Other Income": "124.92",
+            "Depreciation": "83.17",
+            "Interest": "4334.43",
+            "Profit before tax": "2188.38",
+            "Tax": "558.04",
+            "Net Profit": "1630.34",
+        },
+    ),
+    "CUMMINS": (
+        "INTEGRATED_FILING_INDAS_1753292_04112026105837_WEB.xml",
+        "corp",
+        "2026-09-30",
+        {
+            "Sales": "3301.21",
+            "Expenses": "2794.94",
+            "Operating Profit": "506.27",
+            "Other Income": "191.89",
+            "Depreciation": "53.93",
+            "Interest": "3.00",
+            "Profit before tax": "641.23",
+            "Tax": "134.06",
+            "Net Profit": "507.17",
+        },
+    ),
+    "ELIN_STANDALONE": (
+        "INTEGRATED_FILING_INDAS_1753867_05112026061857_WEB.xml",
+        "corp",
+        "2026-09-30",
+        {
+            "Sales": "289.55",
+            "Expenses": "279.87",
+            "Operating Profit": "9.68",
+            "Other Income": "0.63",
+            "Depreciation": "6.31",
+            "Interest": "1.92",
+            "Profit before tax": "2.08",
+            "Tax": "0.67",
+            "Net Profit": "1.41",
+        },
+    ),
+    "HDFCBANK_STANDALONE": (
+        "INTEGRATED_FILING_BANKING_1740912_17102026054806_WEB.xml",
+        "bank",
+        "2026-09-30",
+        {
+            "Revenue": "83426.60",
+            "Expenses": "22540.40",
+            "Other Income": "13831.02",
+            "Interest": "48807.42",
+            "Profit before tax": "25909.80",
+            "Tax": "6399.84",
+            "Net Profit": "19509.96",
+        },
+    ),
+    "INDUSINDBK_Q1": (
+        "INTEGRATED_FILING_BANKING_1699401_22072026052845_WEB.xml",
+        "bank",
+        "2026-06-30",
+        {
+            "Revenue": "11309.94",
+            "Expenses": "5082.10",
+            "Other Income": "1786.53",
+            "Interest": "6625.22",
+            "Profit before tax": "1389.15",
+            "Tax": "352.13",
+            "Net Profit": "1037.05",
+        },
+    ),
+    "ITC_STANDALONE": (
+        "INTEGRATED_FILING_INDAS_1751354_02112026065539_WEB.xml",
+        "corp",
+        "2026-09-30",
+        {
+            "Sales": "18401.02",
+            "Expenses": "13241.52",
+            "Operating Profit": "5159.50",
+            "Other Income": "781.86",
+            "Depreciation": "427.85",
+            "Interest": "31.76",
+            "Profit before tax": "5481.75",
+            "Tax": "1344.63",
+            "Net Profit": "4137.12",
+        },
+    ),
+    "KOTAKBANK": (
+        "INTEGRATED_FILING_BANKING_1745380_24102026050818_WEB.xml",
+        "bank",
+        "2026-09-30",
+        {
+            "Revenue": "19855.87",
+            "Expenses": "13215.98",
+            "Other Income": "9571.01",
+            "Interest": "8680.60",
+            "Profit before tax": "7530.30",
+            "Tax": "1896.23",
+            "Net Profit": "5645.38",
+        },
+    ),
+    "MUTHOOTFIN": (
+        "INTEGRATED_FILING_NBFC_INDAS_1750814_31102026080404_WEB.xml",
+        "nbfc",
+        "2026-09-30",
+        {
+            "Revenue": "9997.77",
+            "Expenses": "1856.93",
+            "Other Income": "13.01",
+            "Depreciation": "38.22",
+            "Interest": "3716.59",
+            "Profit before tax": "4399.04",
+            "Tax": "1121.04",
+            "Net Profit": "3246.53",
+        },
+    ),
+    "NIACL": (
+        "INTEGRATED_FILING_GI_1750334_30102026070831_WEB.xml",
+        "general",
+        "2026-09-30",
+        {
+            "Revenue": "13720.93",
+            "Expenses": "14990.79",
+            "Other Income": "63.93",
+            "Profit before tax": "-1205.93",
+            "Tax": "54.08",
+            "Net Profit": "-1250.75",
+        },
+    ),
+    "PNBHOUSING": (
+        "INTEGRATED_FILING_NBFC_INDAS_1748226_28102026075925_WEB.xml",
+        "nbfc",
+        "2026-09-30",
+        {
+            "Revenue": "2423.15",
+            "Expenses": "195.90",
+            "Other Income": "0.80",
+            "Depreciation": "16.78",
+            "Interest": "1414.66",
+            "Profit before tax": "796.61",
+            "Tax": "180.06",
+            "Net Profit": "616.55",
+        },
+    ),
+    "PNB": (
+        "INTEGRATED_FILING_BANKING_1740466_16102026082756_WEB.xml",
+        "bank",
+        "2026-09-30",
+        {
+            "Revenue": "35267.24",
+            "Expenses": "7838.79",
+            "Other Income": "3523.86",
+            "Interest": "23464.05",
+            "Profit before tax": "7488.26",
+            "Tax": "1927.12",
+            "Net Profit": "5898.37",
+        },
+    ),
+    "RELIANCE_STANDALONE": (
+        "INTEGRATED_FILING_INDAS_1750535_30102026093155_WEB.xml",
+        "corp",
+        "2026-09-30",
+        {
+            "Sales": "172408.00",
+            "Expenses": "150021.00",
+            "Operating Profit": "22387.00",
+            "Other Income": "3899.00",
+            "Depreciation": "3994.00",
+            "Interest": "1953.00",
+            "Profit before tax": "20339.00",
+            "Tax": "4985.00",
+            "Net Profit": "15354.00",
+        },
+    ),
+    "SBILIFE": (
+        "INTEGRATED_FILING_LI_1747186_27102026072642_WEB.xml",
+        "life",
+        "2026-09-30",
+        {
+            "Revenue": "24619.70",
+            "Expenses": "24057.87",
+            "Other Income": "28.04",
+            "Profit before tax": "589.87",
+            "Tax": "40.64",
+            "Net Profit": "549.23",
+        },
+    ),
+    "SRF": (
+        "INTEGRATED_FILING_INDAS_1743533_21102026080703_WEB.xml",
+        "corp",
+        "2026-09-30",
+        {
+            "Sales": "4904.20",
+            "Expenses": "3958.32",
+            "Operating Profit": "945.88",
+            "Other Income": "24.94",
+            "Depreciation": "228.84",
+            "Interest": "70.94",
+            "Profit before tax": "671.04",
+            "Tax": "161.92",
+            "Net Profit": "509.12",
+        },
+    ),
+    "TATAPOWER": (
+        "INTEGRATED_FILING_INDAS_1756234_11112026070341_WEB.xml",
+        "corp",
+        "2026-09-30",
+        {
+            "Sales": "19635.94",
+            "Expenses": "15969.09",
+            "Operating Profit": "3666.85",
+            "Other Income": "1184.48",
+            "Depreciation": "1286.55",
+            "Interest": "1384.93",
+            "Profit before tax": "2179.85",
+            "Tax": "527.81",
+            "Net Profit": "1366.11",
+        },
+    ),
+    "TMPV_Q2FY26": (
+        "INTEGRATED_FILING_INDAS_1574923_14112025041850_WEB.xml",
+        "corp",
+        "2025-09-30",
+        {
+            "Sales": "72349.00",
+            "Expenses": "73753.00",
+            "Operating Profit": "-1404.00",
+            "Other Income": "81507.00",
+            "Depreciation": "4871.00",
+            "Interest": "686.00",
+            "Profit before tax": "74546.00",
+            "Tax": "-1702.00",
+            "Net Profit": "76170.00",
+        },
+    ),
+    "TMCV_Q2FY26": (
+        "INTEGRATED_FILING_INDAS_1574016_13112025070452_WEB.xml",
+        "corp",
+        "2025-09-30",
+        {
+            "Sales": "18585.00",
+            "Expenses": "16553.00",
+            "Operating Profit": "2032.00",
+            "Other Income": "-1865.00",
+            "Depreciation": "472.00",
+            "Interest": "256.00",
+            "Profit before tax": "-561.00",
+            "Tax": "306.00",
+            "Net Profit": "-867.00",
+        },
+    ),
+    "UNITDSPR": (
+        "INTEGRATED_FILING_INDAS_1748218_28102026075349_WEB.xml",
+        "corp",
+        "2026-09-30",
+        {
+            "Sales": "3258.00",
+            "Expenses": "2615.00",
+            "Operating Profit": "643.00",
+            "Other Income": "75.00",
+            "Depreciation": "74.00",
+            "Interest": "24.00",
+            "Profit before tax": "620.00",
+            "Tax": "158.00",
+            "Net Profit": "462.00",
+        },
+    ),
+}
+
+
+WAVE2_DIVERGENT = {
+    "AIA_ENG": {"Other Income": ("ASSOCIATES_PLACEMENT", (ASSOC,)),
+                "Profit before tax": ("ASSOCIATES_PLACEMENT", (ASSOC,))},
+    "CUMMINS": {"Other Income": ("ASSOCIATES_PLACEMENT", (ASSOC,)),
+                "Profit before tax": ("ASSOCIATES_PLACEMENT", (ASSOC,))},
+    "TATAPOWER": {"Other Income": ("REGULATORY_DEFERRAL_PLACEMENT", (ASSOC, REGDEF)),
+                  "Profit before tax": ("REGULATORY_DEFERRAL_PLACEMENT", (ASSOC, REGDEF))},
+    "TMPV_Q2FY26": {"Other Income": ("DISCONTINUED_PLACEMENT", (DISC, ASSOC)),
+                    "Profit before tax": ("DISCONTINUED_PLACEMENT", (DISC, ASSOC))},
+    # Screener moves the labelled "Fair value loss on equity investments" (2,027 Cr) from Expenses to Other Income
+    # and books associates (-12 Cr) in Expenses [S17]
+    "TMCV_Q2FY26": {"Expenses": ("LABEL_RECLASS", Decimal("-2015")),
+                    "Other Income": ("LABEL_RECLASS", Decimal("-2027")),
+                    "Operating Profit": ("LABEL_RECLASS", Decimal("2015")),
+                    "Profit before tax": ("ASSOCIATES_PLACEMENT", (ASSOC,))},
+    # Screener moves the labelled "Other Income" member (123.59 Cr) out of revenue, adds associates, and shows PAT
+    # (1,630.34) where Chola mis-tagged TCI as owners' profit (X56) [S17]
+    "CHOLAFIN": {"Revenue": ("LABEL_RECLASS", Decimal("-123.59")), "Other Income": ("LABEL_RECLASS", Decimal("124.92")),
+                 "Profit before tax": ("ASSOCIATES_PLACEMENT", (ASSOC,)),
+                 "Net Profit": ("OWNERS_TAGGED_AS_TCI", Decimal("-133.27"))},
+    "NIACL": {"Net Profit": ("UNEXPLAINED", Decimal("9.26"))},  # = ProfitLossCarriedToBalanceSheet - PAT [S18]
+}  # fmt: skip
+
+WAVE2_PARSERS = {
+    "corp": parse_indas_corp_results, "nbfc": parse_indas_nbfc_results, "bank": parse_igaap_bank_results,
+    "life": lambda d: parse_insurer_results(d, "IRDAI_LIFE"),
+    "general": lambda d: parse_insurer_results(d, "IRDAI_GENERAL"),
+}  # fmt: skip
+WAVE2_BUILDERS = {"corp": corp_quarter, "nbfc": nbfc_quarter, "bank": bank_quarter, "life": life_quarter,
+                  "general": general_quarter}  # fmt: skip
+
+
+def _period(qe: str) -> tuple[date, date]:
+    end = date.fromisoformat(qe)
+    return date(end.year if end.month > 2 else end.year - 1, (end.month - 3) % 12 + 1, 1), end
+
+
+@pytest.mark.parametrize("name", sorted(WAVE2))
+def test_second_wave_exports_match_or_documented_divergence(name):
+    fixture, kind, qe, golden = WAVE2[name]
+    data = (XBRL_DIR / fixture).read_bytes()
+    start, end = _period(qe)
+    r = WAVE2_PARSERS[kind](data)
+    st = WAVE2_BUILDERS[kind](r, start, end)
+    facts = quarter_facts(parse_instance(data), end)
+    divergent = WAVE2_DIVERGENT.get(name, {})
+    for row, want in golden.items():
+        ours = st.rows[row].value
+        assert ours is not None, (name, row)
+        gap = Decimal(want) - ours / CR
+        if row not in divergent:
+            assert abs(gap) <= TOL, (name, row, ours / CR, want)
+            continue
+        code, ref = divergent[row]
+        if isinstance(ref, Decimal):
+            assert abs(gap - ref) <= TOL, (name, row, gap, ref)
+        else:
+            assert any(d.startswith(code) for d in st.divergences), (name, code, st.divergences)
+            expected = sum((facts.get(e, Decimal(0)) for e in ref), Decimal(0)) / CR
+            assert abs(gap - expected) <= TOL, (name, row, gap, expected)
+
+
+def test_screener_export_follows_the_view_switch():
+    """[S19] ITC and Reliance standalone exports tie to the standalone filings and not to the consolidated ones."""
+    for name, other in (("ITC_STANDALONE", "INTEGRATED_FILING_INDAS_1751357_02112026065559_WEB.xml"),
+                        ("RELIANCE_STANDALONE", "INTEGRATED_FILING_INDAS_1750537_30102026093254_WEB.xml")):  # fmt: skip
+        golden = WAVE2[name][3]
+        cons = corp_quarter(parse_indas_corp_results((XBRL_DIR / other).read_bytes()), *Q)
+        assert abs(Decimal(golden["Sales"]) - cons.rows["Sales"].value / CR) > 1000
+
+
+def test_star_health_ind_as_117_presentation_on_screener():
+    """[S18] Screener: Sales = insurance revenue + investment income (5,341.34); Tax = current + deferred; PBT and net
+    profit as filed; Other Income shown as -6.16 against a filed +6.16 (sign flipped, compensated in Expenses)."""
+    r = parse_insurer_results((XBRL_DIR / "IF_INS_COM_IND_AS_19799_WebXMLFile_20261027_212749295.xml").read_bytes(),
+                              "INDAS_INSURANCE")  # fmt: skip
+
+    def v(t: str) -> Decimal:  # Star Health files in Rs thousand: compare at Screener's 2 dp
+        return (r.value(t, *Q) / CR).quantize(Decimal("0.01"))
+
+    assert v("insurance_revenue") + v("investment_income_total_indas") == Decimal("5341.34")
+    assert v("current_tax") + v("deferred_tax") == Decimal("86.83")
+    assert (v("pbt"), v("pat")) == (Decimal("351.64"), Decimal("264.81"))
+    assert v("other_income") == Decimal("6.16")  # Screener: -6.16
+    expenses = Decimal("5341.34") - Decimal("6.16") - Decimal("351.64")  # Screener's 4,983.54 = Sales + OI - PBT
+    assert expenses == Decimal("4983.54")

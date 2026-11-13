@@ -112,6 +112,7 @@ CREATE TABLE IF NOT EXISTS trading_calendar (
     cal_date    DATE    NOT NULL,
     is_trading  BOOLEAN NOT NULL,
     note        VARCHAR,
+    source      VARCHAR,                         -- BHAVCOPY | HOLIDAY_MASTER | INFERRED_PREV_CLOSE [CAL3]
     PRIMARY KEY (exchange, cal_date)
 );
 
@@ -321,7 +322,9 @@ CREATE TABLE IF NOT EXISTS corp_actions (
     status            VARCHAR NOT NULL DEFAULT 'PENDING',
     related_entity_id VARCHAR REFERENCES entity_master(entity_id),
     coa_pct           DOUBLE,
-    source_filing_id  VARCHAR NOT NULL REFERENCES filings(filing_id)
+    source_filing_id  VARCHAR NOT NULL REFERENCES filings(filing_id),
+    recorded_at       TIMESTAMP,                 -- when the ledger first held the action (system time)
+    decided_at        TIMESTAMP                  -- when status last changed (verification / manual resolution)
 );
 
 CREATE TABLE IF NOT EXISTS quarantine_queue (
@@ -650,6 +653,27 @@ CREATE TABLE IF NOT EXISTS user_custom_ratios (
     name        VARCHAR PRIMARY KEY,            -- alias usable in screens
     expression  VARCHAR NOT NULL,               -- DSL arithmetic over aliases / other custom ratios
     created_at  TIMESTAMP NOT NULL
+);
+
+-- Audited administrative operations (rebuild-market, reprocess): one row per run, never updated.
+CREATE TABLE IF NOT EXISTS admin_log (
+    admin_id    VARCHAR PRIMARY KEY,
+    action      VARCHAR NOT NULL,
+    params      JSON NOT NULL,
+    result      JSON,
+    note        VARCHAR,
+    created_at  TIMESTAMP NOT NULL
+);
+
+-- Filing-level overrides from `quarantine resolve --action OVERRIDE` (whitelisted fields, read by the promoter).
+CREATE TABLE IF NOT EXISTS filing_overrides (
+    override_id    VARCHAR PRIMARY KEY,
+    filing_id      VARCHAR NOT NULL,
+    field          VARCHAR NOT NULL,              -- broadcast_ts | security_id
+    value          VARCHAR NOT NULL,
+    quarantine_id  VARCHAR,
+    reason         VARCHAR NOT NULL,
+    created_at     TIMESTAMP NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS promotion_log (

@@ -47,18 +47,32 @@ def pending_stages(con, stage_root: Path) -> list[Path]:
 
 
 def promote_pending(con, stage_root: Path, out=sys.stdout) -> int:
-    """Returns the number of batches that aborted (left pending for retry)."""
-    aborted = 0
+    """Returns the number of batches that aborted or wait (left pending for retry).
+
+    Market days are promoted strictly in date order. When one aborts (e.g. G1 on a half-published file), every
+    later market day waits instead of promoting: promoting it would put the failed day permanently behind the
+    ORDER gate. Batches for the same date are still tried (a complete re-fetch can replace a trimmed one)."""
+    pending = 0
+    blocked_after: str | None = None
     for d in pending_stages(con, stage_root):
-        r = promote(con, d)
         rel = d.relative_to(stage_root).as_posix()
+        m = read_manifest(d)
+        if m["job"] == "market_day" and blocked_after is not None and m["trade_date"] > blocked_after:
+            print(f"{'WAITING':16s} {'market_day':14s} {rel} behind aborted {blocked_after}", file=out)
+            pending += 1
+            continue
+        r = promote(con, d)
         print(f"{r.status:16s} {r.job:14s} {rel} {r.gate or ''} {r.message}", file=out)
         if r.status == "ABORTED":
-            aborted += 1
+            pending += 1
+            if m["job"] == "market_day" and blocked_after is None:
+                blocked_after = m["trade_date"]
             continue
+        if m["job"] == "market_day" and m["trade_date"] == blocked_after:
+            blocked_after = None  # a complete batch for the blocked date went through
         con.execute("INSERT OR REPLACE INTO promotion_log VALUES (?, ?, ?, ?, ?)",
                     [rel, r.job, r.status, r.message, utc_now()])  # fmt: skip
-    return aborted
+    return pending
 
 
 def _date(s: str) -> date:
@@ -90,6 +104,9 @@ def build_parser() -> argparse.ArgumentParser:
     fr.add_argument("url")
     fr.add_argument("--broadcast-utc", type=datetime.fromisoformat)
     sub.add_parser("promote", help="apply all pending staged batches (single writer)")
+    rb = sub.add_parser("rebuild-market", help="roll market-derived state back to a date and replay it (audited)")
+    rb.add_argument("--from", dest="from_date", type=_date, required=True)
+    rb.add_argument("--note", default="rebuild-market")
     mt = sub.add_parser("materialize")
     mt.add_argument("as_of", type=_date)
     q = sub.add_parser("quarantine", help="list or resolve quarantined items (audited)")
@@ -187,6 +204,16 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
             return 0
         if args.cmd == "promote":
             return 1 if promote_pending(con, stage_root, out) else 0
+        if args.cmd == "rebuild-market":
+            from financials.admin import rebuild_market
+
+            r = rebuild_market(con, args.from_date, note=args.note)
+            print(json.dumps(r, default=str), file=out)
+            waiting = promote_pending(con, stage_root, out)
+            for d in r["features_dates"]:
+                fr = materialize(con, d)
+                print(f"{fr.status} {fr.as_of_date} rows={fr.rows} {fr.gate or ''} {fr.message}", file=out)
+            return 1 if waiting else 0
         if args.cmd == "materialize":
             r = materialize(con, args.as_of)
             print(f"{r.status} {r.as_of_date} rows={r.rows} {r.gate or ''} {r.message}", file=out)

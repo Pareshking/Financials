@@ -86,7 +86,22 @@ def _universe(con, exchange: str, as_of: date) -> list[tuple[str, str, str, str]
     ).fetchall()
 
 
-def _price_inputs(con, exchange: str, as_of: date):
+KNOWLEDGE_MODES = ("valid", "system")
+
+
+def _price_inputs(con, exchange: str, as_of: date, knowledge: str = "valid", as_of_ts: datetime | None = None):
+    """Bars, accepted price factors and the first unresolved gap per security, as of `as_of` [P0-4].
+
+    knowledge="valid" (default, backtests): what the market knew on `as_of`. A corporate action counts from its
+    ex-date (it is public by then), and a GAP finding freezes the series until it is resolved, whenever that
+    happened: fixing our pipeline (an unparsed split, a missed action) is a correction, not new information.
+    knowledge="system": what this system had decided by `as_of_ts` (audit of past live output). An action counts
+    only once `decided_at <= as_of_ts`; a GAP finding freezes if created by then and not resolved by then."""
+    if knowledge not in KNOWLEDGE_MODES:
+        raise ValueError(f"knowledge must be one of {KNOWLEDGE_MODES}")
+    system = knowledge == "system"
+    if system and as_of_ts is None:
+        raise ValueError("knowledge='system' needs as_of_ts")
     bars: dict[str, list[tuple[date, Decimal, int | None]]] = defaultdict(list)
     for sec, d, close, deliv in con.execute(
         "SELECT security_id, trade_date, close, deliv_qty FROM ohlcv WHERE exchange = ? AND trade_date <= ? "
@@ -96,14 +111,19 @@ def _price_inputs(con, exchange: str, as_of: date):
         bars[sec].append((d, close, deliv))
     factors: dict[str, list[tuple[date, Decimal, Decimal]]] = defaultdict(list)
     for sec, ex, pf, ef, status in con.execute(
-        "SELECT security_id, ex_date, price_factor, eps_factor, status FROM corp_actions WHERE ex_date <= ?", [as_of]
+        "SELECT security_id, ex_date, price_factor, eps_factor, status FROM corp_actions WHERE ex_date <= ?"
+        + (" AND decided_at <= ?" if system else ""),
+        [as_of, as_of_ts] if system else [as_of],
     ).fetchall():
         if status in ACCEPTED_STATUSES and pf is not None:
             factors[sec].append((ex, Decimal(str(pf)), Decimal(str(ef if ef is not None else 1))))
     frozen = dict(
         con.execute(
             "SELECT security_id, min(CAST(json_extract_string(details, '$.trade_date') AS DATE)) FROM quarantine_queue "
-            "WHERE stage = 'GAP' AND resolved_at IS NULL GROUP BY security_id"
+            "WHERE stage = 'GAP' AND "
+            + ("created_at <= ? AND (resolved_at IS NULL OR resolved_at > ?)" if system else "resolved_at IS NULL")
+            + " GROUP BY security_id",
+            [as_of_ts, as_of_ts] if system else [],
         ).fetchall()
     )
     return bars, factors, frozen
@@ -327,10 +347,12 @@ def _valuation_history(con, as_of: date) -> dict[str, dict[str, list[float]]]:
     return out
 
 
-def compute_rows(con, as_of: date, exchange: str = "NSE") -> list[dict]:
+def compute_rows(con, as_of: date, exchange: str = "NSE", *, knowledge: str = "valid") -> list[dict]:
+    """Feature rows for `as_of`. `knowledge` selects how price adjustments and gap freezes are read (see
+    `_price_inputs`); materialised history always uses the default "valid" knowledge."""
     as_of_ts = ist_to_utc(as_of + timedelta(days=1), time(0, 0))  # end of as_of day, IST
     universe = _universe(con, exchange, as_of)
-    bars, factors, frozen = _price_inputs(con, exchange, as_of)
+    bars, factors, frozen = _price_inputs(con, exchange, as_of, knowledge, as_of_ts)
     nifty = {
         s
         for (s,) in con.execute(

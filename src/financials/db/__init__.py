@@ -85,6 +85,7 @@ def insert_rows(
     rows: Iterable[Mapping[str, Any]],
     *,
     or_ignore: bool = False,
+    on_conflict: str | None = None,
 ) -> int:
     """Bulk-insert dict rows (all with the same keys) through Arrow; columns matched by name.
 
@@ -104,7 +105,7 @@ def insert_rows(
     con.register(name, src)
     try:
         verb = "INSERT OR IGNORE INTO" if or_ignore else "INSERT INTO"
-        con.execute(f"{verb} {table} BY NAME SELECT * FROM {name}")
+        con.execute(f"{verb} {table} BY NAME SELECT * FROM {name}" + (f" {on_conflict}" if on_conflict else ""))
     finally:
         con.unregister(name)
     return len(rows)

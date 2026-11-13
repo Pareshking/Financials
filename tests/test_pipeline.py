@@ -216,7 +216,8 @@ def test_results_filing_without_broadcast_or_calendar_is_quarantined(market):
 def test_results_filing_board_meeting_rule(market):
     promote_day(market, "20251014")
     market.con.execute(
-        "INSERT INTO trading_calendar VALUES ('NSE', DATE '2026-11-06', TRUE, 'test'), "
+        "INSERT INTO trading_calendar (exchange, cal_date, is_trading, note) "
+        "VALUES ('NSE', DATE '2026-11-06', TRUE, 'test'), "
         "('NSE', DATE '2026-11-09', TRUE, 'test')"
     )
     result = promote(market.con, stage_corp(market))

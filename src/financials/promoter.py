@@ -115,9 +115,16 @@ def _quarantine_row(
     }
 
 
+REBUILD_SUPERSEDED = "SUPERSEDED_BY_REBUILD"
+
+
 def _quarantine_many(con, rows: list[dict[str, Any]]) -> list[str]:
-    """One bulk insert for many findings (a gap-heavy day can raise thousands)."""
-    insert_rows(con, "quarantine_queue", rows, or_ignore=True)
+    """One bulk insert for many findings (a gap-heavy day can raise thousands). IDs are deterministic, so a
+    replayed finding hits its old row: kept as is (a human decision stands), except a row that rebuild-market
+    superseded, which is reopened because the replay found the same problem again."""
+    insert_rows(con, "quarantine_queue", rows, on_conflict=(
+        "ON CONFLICT (quarantine_id) DO UPDATE SET resolved_at = NULL, resolution = NULL, resolution_note = NULL "
+        f"WHERE quarantine_queue.resolution = '{REBUILD_SUPERSEDED}'"))  # fmt: skip
     return [r["quarantine_id"] for r in rows]
 
 
@@ -159,6 +166,8 @@ def _promote_market_day(con, stage_dir: Path, manifest: dict[str, Any]) -> Promo
         "SELECT count(*) FROM ohlcv WHERE exchange = ? AND trade_date = ?", [exchange, trade_date]
     ).fetchone()[0]
     if already:
+        if deliv:
+            return _attach_delivery(con, stage_dir, exchange, trade_date)
         return PromotionResult("ALREADY_PROMOTED", "market_day", message=str(trade_date))
     later = con.execute("SELECT max(trade_date) FROM ohlcv WHERE exchange = ?", [exchange]).fetchone()[0]
     if later is not None and later > trade_date:
@@ -266,12 +275,46 @@ def _promote_market_day(con, stage_dir: Path, manifest: dict[str, Any]) -> Promo
     insert_rows(con, "ohlcv", ohlcv_rows)
     # A bhavcopy is ground truth: it overrides a holiday row (e.g. a special/Muhurat session).
     con.execute(
-        "INSERT OR REPLACE INTO trading_calendar VALUES (?, ?, TRUE, 'bhavcopy present')", [exchange, trade_date]
+        "INSERT OR REPLACE INTO trading_calendar (exchange, cal_date, is_trading, note, source) "
+        "VALUES (?, ?, TRUE, 'bhavcopy present', 'BHAVCOPY')",
+        [exchange, trade_date],
     )
 
+    quarantined += _stage_issue_quarantines(con, stage_dir)
     verify_pending_actions(con, exchange)
     quarantined += _audit_gaps(con, exchange, trade_date, obs)
     return PromotionResult("PROMOTED", "market_day", message=str(trade_date), quarantined=quarantined)
+
+
+def _stage_issue_quarantines(con, stage_dir: Path) -> list[str]:
+    rows = [
+        _quarantine_row(
+            stage=i["stage"], reason_code=i["reason_code"], filing_id=i["filing_id"], details=json.loads(i["details"])
+        )
+        for i in read_table(con, stage_dir, "stg_issues")
+    ]
+    return _quarantine_many(con, rows) if rows else []
+
+
+def _attach_delivery(con, stage_dir: Path, exchange: str, trade_date: date) -> PromotionResult:
+    """A delivery file fetched after its bhavcopy was promoted [P0-2]: raw rows are appended, and bars of that
+    day whose delivery is still NULL get it, matched on (symbol, series) through the identifier interval valid on
+    the day. Bars that already carry delivery are never changed."""
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_delivery"))
+    path = (Path(stage_dir) / "raw_delivery.parquet").as_posix()
+    updated = con.execute(
+        """UPDATE ohlcv o SET deliv_qty = d.deliv_qty, delivery_filing_id = d.filing_id
+           FROM read_parquet(?) d JOIN security_identifier_history h
+             ON h.exchange = d.exchange AND h.symbol = d.symbol AND h.series = d.series
+            AND h.valid_from <= d.trade_date AND (h.valid_to IS NULL OR h.valid_to > d.trade_date)
+           WHERE o.security_id = h.security_id AND o.exchange = d.exchange AND o.series = d.series
+             AND o.trade_date = d.trade_date AND o.trade_date = ? AND o.deliv_qty IS NULL AND d.deliv_qty IS NOT NULL
+           RETURNING 1""",
+        [path, trade_date],
+    ).fetchall()
+    if not updated:  # a replay, or every bar already has delivery
+        return PromotionResult("ALREADY_PROMOTED", "market_day", message=str(trade_date))
+    return PromotionResult("PROMOTED", "market_day", message=f"{trade_date}: delivery attached to {len(updated)} bars")
 
 
 def _prev_closes(con, exchange: str, trade_date: date) -> dict[str, Decimal]:
@@ -360,6 +403,8 @@ def record_corp_action(
                 "cash_per_share": action.cash_per_share,
                 "status": status,
                 "source_filing_id": source_filing_id,
+                "recorded_at": utc_now(),
+                "decided_at": None,
             }
         ],
         or_ignore=True,
@@ -391,9 +436,9 @@ def verify_pending_actions(con, exchange: str) -> int:
         results = verify_group(group, bar[0], prev[0])
         for a, v in zip(group, results, strict=True):
             con.execute(
-                "UPDATE corp_actions SET status = ?, price_factor = ?, eps_factor = ?, observed_gap = ? "
-                "WHERE action_id = ?",
-                [v.status, _f(v.price_factor), _f(v.eps_factor), _f(v.observed_gap), a.action_id],
+                "UPDATE corp_actions SET status = ?, price_factor = ?, eps_factor = ?, observed_gap = ?, "
+                "decided_at = ? WHERE action_id = ?",
+                [v.status, _f(v.price_factor), _f(v.eps_factor), _f(v.observed_gap), utc_now(), a.action_id],
             )
             if v.status == "QUARANTINED" and a.status == "PENDING":
                 _quarantine(
@@ -537,7 +582,12 @@ def _promote_corp_actions(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
                     security_id=sec,
                     entity_id=entity,
                     filing_id=r["filing_id"],
-                    details={"subject": r["subject"], "reason": r["parse_reason"], "ex_date": r["ex_date"]},
+                    details={
+                        "subject": r["subject"],
+                        "reason": r["parse_reason"],
+                        "ex_date": r["ex_date"],
+                        "action_id": action.action_id,
+                    },
                 )
             )
         recorded += 1
@@ -758,7 +808,8 @@ def _promote_holidays(con, stage_dir: Path, manifest: dict[str, Any]) -> Promoti
     for r in rows:
         # Never overwrite a day a bhavcopy proved to be a trading day.
         con.execute(
-            "INSERT OR IGNORE INTO trading_calendar VALUES (?, ?, FALSE, ?)",
+            "INSERT OR IGNORE INTO trading_calendar (exchange, cal_date, is_trading, note, source) "
+            "VALUES (?, ?, FALSE, ?, 'HOLIDAY_MASTER')",
             [r["exchange"], r["cal_date"], "holiday: " + r["description"]],
         )
     years = sorted({r["cal_date"].year for r in rows})

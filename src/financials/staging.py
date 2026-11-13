@@ -199,13 +199,14 @@ def stage_market_day(
     raw_bhav = [{"filing_id": b_fil.filing_id, **asdict(r)} for r in bhav_rows]
 
     raw_deliv: list[dict[str, Any]] = []
+    issues: list[dict[str, Any]] = []
+    d_sha = "nodeliv"
     if delivery is not None:
         if not delivery_url:
             raise ValueError("delivery_url required with delivery bytes")
         d_rows = parse_sec_bhavdata_full(delivery)
-        if d_rows[0].trade_date != trade_date:
-            raise ParseError(f"delivery date {d_rows[0].trade_date} != bhavcopy date {trade_date}")
         d_blob = vault.put(delivery, ext="csv", media_type="text/csv", fetched_at=fetched_at)
+        d_sha = d_blob.sha256[:12]
         d_fil = make_filing(
             d_blob,
             exchange="NSE",
@@ -217,15 +218,28 @@ def stage_market_day(
         )
         blobs.append(_blob_row(d_blob))
         filings.append(_filing_row(d_fil))
-        raw_deliv = [{"filing_id": d_fil.filing_id, **asdict(r)} for r in d_rows]
+        if d_rows[0].trade_date != trade_date:
+            # Kept as evidence (blob + filing), never joined: quarantined by the promoter [P1-8].
+            issues.append({"filing_id": d_fil.filing_id, "stage": "DELIVERY", "reason_code": "DELIVERY_DATE_MISMATCH",
+                           "details": json.dumps({"delivery_date": str(d_rows[0].trade_date),
+                                                  "trade_date": str(trade_date), "url": delivery_url})})  # fmt: skip
+        else:
+            raw_deliv = [{"filing_id": d_fil.filing_id, **asdict(r)} for r in d_rows]
 
-    run_id = f"{trade_date:%Y%m%d}-{b_blob.sha256[:12]}"
+    # The delivery file is part of the batch identity: a later fetch that adds it is a new batch [P0-2].
+    run_id = f"{trade_date:%Y%m%d}-{b_blob.sha256[:12]}-{d_sha}"
     return write_stage(
         stage_root,
         "market_day",
         run_id,
-        {"blobs": blobs, "filings": filings, "raw_cm_bhavcopy": raw_bhav, "raw_delivery": raw_deliv},
-        extra={"trade_date": trade_date.isoformat(), "exchange": "NSE"},
+        {
+            "blobs": blobs,
+            "filings": filings,
+            "raw_cm_bhavcopy": raw_bhav,
+            "raw_delivery": raw_deliv,
+            "stg_issues": issues,
+        },
+        extra={"trade_date": trade_date.isoformat(), "exchange": "NSE", "has_delivery": bool(raw_deliv)},
     )
 
 

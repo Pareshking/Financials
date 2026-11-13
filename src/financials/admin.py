@@ -89,6 +89,71 @@ def backfill_index(
     return _transaction(con, run)
 
 
+# ── rebuild-market [P0-1] ──────────────────────────────────────────────────
+
+AUTO_DECIDED = ("VERIFIED", "UNOBSERVABLE", "QUARANTINED")  # verification outcomes recomputed on replay
+
+
+def rebuild_market(con, from_date: date, *, note: str = "rebuild-market") -> dict[str, Any]:
+    """Roll market-derived state back to `from_date` so the staged market days from that date replay in order.
+
+    Raw tables, vault rows and filings are append-only and untouched. Removed: bars, bhavcopy/inferred calendar
+    rows, identifier intervals opened on/after the date (intervals closed on/after it reopen), feature history.
+    Reset: automatically decided corporate actions with ex-date on/after it go back to PENDING (manual decisions
+    VERIFIED_MANUAL / REJECTED / SUPERSEDED stand). Open GAP / IDENTIFIER / CALENDAR findings on/after it are
+    marked SUPERSEDED_BY_REBUILD; a replay that finds the same problem reopens the same row. Market-day entries
+    of `promotion_log` on/after the date are removed so `promote` replays them. Audited in `admin_log`."""
+
+    def run(con):
+        from financials.promoter import REBUILD_SUPERSEDED
+
+        now = utc_now()
+        counts: dict[str, int] = {}
+
+        def n(key: str, sql: str, params: list) -> None:
+            counts[key] = len(con.execute(sql + " RETURNING 1", params).fetchall())
+
+        features_dates = [r[0] for r in con.execute(
+            "SELECT DISTINCT as_of_date FROM screener_features_history WHERE as_of_date >= ? ORDER BY 1", [from_date]
+        ).fetchall()]  # fmt: skip
+        n("ohlcv", "DELETE FROM ohlcv WHERE trade_date >= ?", [from_date])
+        n("calendar", "DELETE FROM trading_calendar WHERE cal_date >= ? "
+          "AND source IN ('BHAVCOPY', 'INFERRED_PREV_CLOSE')", [from_date])  # fmt: skip
+        n("intervals_removed", "DELETE FROM security_identifier_history WHERE valid_from >= ?", [from_date])
+        n(
+            "intervals_reopened",
+            "UPDATE security_identifier_history SET valid_to = NULL WHERE valid_to >= ?",
+            [from_date],
+        )
+        n("corp_actions_reset", "UPDATE corp_actions SET status = 'PENDING', price_factor = NULL, eps_factor = NULL, "
+          "observed_gap = NULL, decided_at = NULL WHERE ex_date >= ? AND status IN ('VERIFIED', 'UNOBSERVABLE') "
+          "OR (ex_date >= ? AND status = 'QUARANTINED' AND action_type <> 'UNKNOWN')",
+          [from_date, from_date])  # fmt: skip
+        n("quarantines_superseded",
+          "UPDATE quarantine_queue SET resolved_at = ?, resolution = ?, resolution_note = ? "
+          "WHERE (resolved_at IS NULL OR resolution = 'FIXED_BY_RULE') AND stage IN ('GAP', 'IDENTIFIER', 'CALENDAR') "
+          "AND CAST(json_extract_string(details, '$.trade_date') AS DATE) >= ?",
+          [now, REBUILD_SUPERSEDED, f"rebuild-market --from {from_date}: {note}", from_date])  # fmt: skip
+        n("features", "DELETE FROM screener_features_history WHERE as_of_date >= ?", [from_date])
+        con.execute("DELETE FROM screener_features")
+        con.execute("INSERT INTO screener_features SELECT * FROM screener_features_history WHERE as_of_date = "
+                    "(SELECT max(as_of_date) FROM screener_features_history)")  # fmt: skip
+        logged = [r[0] for r in con.execute("SELECT stage_path FROM promotion_log WHERE job = 'market_day'").fetchall()]
+        replay = [p for p in logged if p.split("/", 1)[-1][:8] >= f"{from_date:%Y%m%d}"]  # run id = YYYYMMDD-...
+        if replay:
+            con.execute("DELETE FROM promotion_log WHERE stage_path IN (SELECT unnest(?))", [replay])
+        counts["market_days_to_replay"] = len(replay)
+        result = {"from": from_date, **counts, "features_dates": features_dates}
+        con.execute(
+            "INSERT INTO admin_log VALUES (?, 'REBUILD_MARKET', ?, ?, ?, ?)",
+            [stable_id("adm", "rebuild", from_date, now), json.dumps({"from": str(from_date)}),
+             json.dumps(result, default=str), note, now],
+        )  # fmt: skip
+        return result
+
+    return _transaction(con, run)
+
+
 # ── quarantine ─────────────────────────────────────────────────────────────
 
 RESOLUTIONS = {"ACCEPT": "ACCEPTED", "REJECT": "REJECTED", "OVERRIDE": "OVERRIDDEN", "CORP_ACTION": "OVERRIDDEN",
@@ -165,6 +230,14 @@ def _resolve(con, qid: str, action: str, note: str, payload: dict) -> dict:
             raise AdminError("CORP_ACTION resolves GAP quarantines")
         effects.update(_add_corp_action(con, q, details, payload, entity, note))
 
+    elif action == "REJECT" and q["stage"] == "CORP_ACTION" and details.get("action_id"):
+        n = con.execute(
+            "UPDATE corp_actions SET status = 'REJECTED', decided_at = ? WHERE action_id = ? "
+            "AND status IN ('PENDING', 'QUARANTINED') RETURNING action_id",
+            [utc_now(), details["action_id"]],
+        ).fetchall()
+        effects["rejected_action"] = details["action_id"] if n else None
+
     elif action == "MERGE_SECURITIES":
         if q["reason_code"] != "ISIN_COLLISION":
             raise AdminError("MERGE_SECURITIES resolves IDENTIFIER/ISIN_COLLISION quarantines")
@@ -193,18 +266,42 @@ def _add_corp_action(con, q: dict, details: dict, payload: dict, entity: str, no
         action_type=payload["action_type"], ex_date=ex, ratio_num=dec("ratio_num"), ratio_den=dec("ratio_den"),
         issue_price=dec("issue_price"), cash_per_share=dec("cash_per_share"),
     )  # fmt: skip
+    # Records the parser could not factor (UNKNOWN purpose) or that failed verification would poison the
+    # verification group of this date [P0-3]: they are retired as SUPERSEDED by the manual action (audit kept).
+    superseded = [r[0] for r in con.execute(
+        "SELECT action_id FROM corp_actions WHERE security_id = ? AND ex_date = ? AND status = 'QUARANTINED'",
+        [sec, ex]).fetchall()]  # fmt: skip
+    now = utc_now()
+    if superseded:
+        con.execute(
+            "UPDATE corp_actions SET status = 'SUPERSEDED', decided_at = ? WHERE security_id = ? AND ex_date = ? "
+            "AND status = 'QUARANTINED'",
+            [now, sec, ex],
+        )
     record_corp_action(con, action, source_filing_id=filing[0], entity_id=entity)
     verify_pending_actions(con, "NSE")
     status = con.execute("SELECT status FROM corp_actions WHERE action_id = ?", [action.action_id]).fetchone()[0]
     if status not in ("VERIFIED", "UNOBSERVABLE"):
         raise AdminError(f"recorded {payload['action_type']} does not explain the gap (status {status}); not applied")
+    con.execute("UPDATE corp_actions SET status = 'VERIFIED_MANUAL', decided_at = ? WHERE action_id = ?",
+                [now, action.action_id])  # fmt: skip
+    # The corporate-action quarantines of the retired records are closed by this resolution.
+    if superseded:
+        con.execute(
+            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'OVERRIDDEN', resolution_note = ? "
+            "WHERE stage = 'CORP_ACTION' AND resolved_at IS NULL AND security_id = ? "
+            "AND (json_extract_string(details, '$.action_id') IN (SELECT unnest(?)) "
+            "OR CAST(json_extract_string(details, '$.ex_date') AS DATE) = ?)",
+            [now, f"superseded by {action.action_id}: {note}", sec, superseded, ex],
+        )
     _override(con, entity, "manual_corp_action", {"action_id": action.action_id, **payload}, ex, note)
     still_open = con.execute(
         "SELECT count(*) FROM quarantine_queue WHERE stage = 'GAP' AND security_id = ? AND resolved_at IS NULL "
         "AND CAST(json_extract_string(details, '$.trade_date') AS DATE) = ? AND quarantine_id <> ?",
         [sec, ex, q["quarantine_id"]],
     ).fetchone()[0]
-    return {"corp_action": action.action_id, "status": status, "other_gaps_open_same_day": still_open}
+    return {"corp_action": action.action_id, "status": "VERIFIED_MANUAL", "superseded": superseded,
+            "other_gaps_open_same_day": still_open}  # fmt: skip
 
 
 def _merge_securities(con, q: dict, details: dict, note: str) -> dict:

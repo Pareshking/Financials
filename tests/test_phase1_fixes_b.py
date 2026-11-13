@@ -213,7 +213,7 @@ def test_reprocess_loads_a_bar_that_arrived_without_fin_instrm_id(market):
     from test_phase1_fixes_a import stage
 
     assert promote(m.con, stage(m, buf.getvalue(), "20251014")).status == "PROMOTED"
-    (q,) = list_quarantine(m.con, reason_code="MISSING_FIN_INSTRM_ID")
+    assert len(list_quarantine(m.con, reason_code="MISSING_FIN_INSTRM_ID")) == 1
     pid = m.security_id("PIDILITIND")
     assert m.con.execute("SELECT count(*) FROM ohlcv WHERE security_id = ? AND trade_date = '2025-10-14'",
                          [pid]).fetchone()[0] == 0  # fmt: skip

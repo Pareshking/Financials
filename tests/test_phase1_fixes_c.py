@@ -122,7 +122,7 @@ def test_override_security_id_maps_a_filing_whose_isin_is_unknown(tmp_path):
 def test_override_only_takes_fields_the_promoter_reads(tmp_path):
     m = Market(tmp_path)
     qid = _no_visibility(m)
-    with pytest.raises(AdminError, match="payload.field in"):
+    with pytest.raises(AdminError, match=r"payload\.field in"):
         resolve_quarantine(m.con, qid, action="OVERRIDE", note="x", payload={"field": "pat", "value": 1})
     with pytest.raises(AdminError, match="resolve"):
         resolve_quarantine(m.con, qid, action="OVERRIDE", note="x", payload={"field": "security_id", "value": "s"})

@@ -178,3 +178,25 @@ def test_market_data_layers_coexist(unified):
     assert date(2025, 9, 22) in tri and tri[date(2025, 9, 19)] == 100  # through its 1:5 split [CA2]
     assert con.execute("SELECT status FROM corp_actions WHERE security_id = ? AND action_type = 'SPLIT'",
                        [adani]).fetchone()[0] == "VERIFIED"  # fmt: skip
+
+
+def test_bundle_round_trip_reproduces_every_table(unified, tmp_path):
+    """export-bundle -> import-bundle into a new database: identical row counts and checksums for every table;
+    a tiny per-file cap forces sharding; the total budget is enforced."""
+    from financials.bundle import BundleError, export_bundle, import_bundle, table_checksum
+
+    m = export_bundle(unified.con, tmp_path / "b", max_file_mb=0.5)
+    assert "raw_xbrl_facts" not in m["tables"] and m["tables"]["ohlcv"]["files"] > 1
+    assert all(v["max_file_bytes"] < 0.5 * 2**20 for v in m["tables"].values())
+    rows = import_bundle(tmp_path / "b", tmp_path / "copy.duckdb")
+    assert rows["fact_observations"] == unified.con.execute("SELECT count(*) FROM fact_observations").fetchone()[0]
+    from financials.db import connect
+
+    copy = connect(tmp_path / "copy.duckdb", read_only=True)
+    try:
+        for t in ("ohlcv", "fact_observations", "screener_features_history", "quarantine_queue", "corp_actions"):
+            assert table_checksum(copy, t) == table_checksum(unified.con, t), t
+    finally:
+        copy.close()
+    with pytest.raises(BundleError, match="budget"):
+        export_bundle(unified.con, tmp_path / "small", max_total_mb=0.1)

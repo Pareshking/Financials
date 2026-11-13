@@ -305,3 +305,33 @@ def test_inactive_closure_on_a_year_gap(market, monkeypatch, n):
     assert m.con.execute("SELECT valid_to FROM security_identifier_history WHERE symbol = 'GSPL'").fetchone()[
         0
     ] == date(2025, 10, 15)
+
+
+# ── Step 1: parallel workers never break per-host spacing ───────────────────
+
+
+def test_parallel_workers_keep_one_request_per_host_interval(tmp_path):
+    """Threads overlap hosts but never two requests to one host closer than min_interval."""
+    import threading
+    import time
+
+    calls: list[tuple[str, float]] = []
+    lock = threading.Lock()
+
+    class SlowTransport:
+        def get(self, url, headers, timeout):
+            with lock:
+                calls.append((url.split("/")[2], time.monotonic()))
+            time.sleep(0.02)
+            return Response(404, b"")
+
+    f = PoliteFetcher(SlowTransport(), min_interval=0.05, max_attempts=1)
+    jobs = Jobs(f, Vault(tmp_path / "vault"), tmp_path / "staging")
+    staged, errors = jobs.discover(["AAA", "BBB", "CCC", "DDD"], ["results", "annual"], events=False, workers=4)
+    assert staged == [] and len(errors) == 8  # every listing 404s: reported per symbol and kind
+    per_host: dict[str, list[float]] = {}
+    for host, t in calls:
+        per_host.setdefault(host, []).append(t)
+    assert set(per_host) == {"www.nseindia.com"}
+    ts = sorted(per_host["www.nseindia.com"])
+    assert len(ts) == 8 and all(b - a >= 0.049 for a, b in pairwise(ts))

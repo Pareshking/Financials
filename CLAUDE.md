@@ -31,6 +31,8 @@ python -m financials --data-dir data discover-filings --universe nifty500      #
 python -m financials --data-dir data run-day --date 2026-11-13                  # daily: fetch, discover (RSS hint), promote, materialize
 python -m financials --data-dir data rebuild-market --from 2025-09-23           # roll market state back to a date and replay (audited)
 python -m financials --data-dir data materialize --from 2024-10-01 --to 2026-11-13
+python -m financials --data-dir data load-kpis kpis.csv                        # supplemental KPIs (then promote)
+python -m financials --data-dir data export-bundle --out data/bundle           # zstd Parquet shards; never commit them
 python -m financials --data-dir data backfill-index --manifest reference/nifty500_changes.csv
 python -m financials.bench --out docs/benchmarks.md                # after performance-relevant changes
 ```
@@ -106,7 +108,8 @@ data/                  local only, gitignored: vault/, staging/, market.duckdb
 
 - `nsearchives.nseindia.com`: archives (bhavcopy, delivery, XBRL files, RSS). `www.nseindia.com`
   needs session cookies and runs only locally.
-- At least 1 s between requests per host, backoff with jitter on 403/429/5xx, never re-download a vaulted blob.
+- At least 1 s between requests per host (also with `--workers`: threads only overlap different hosts), backoff with
+  jitter on 403/429/5xx, never re-download a vaulted blob (vault `url_index.jsonl` is the fetch checkpoint ledger).
 - Exchange terms prohibit automated access. Keep volume minimal and never redistribute data.
 
 ## Don'ts

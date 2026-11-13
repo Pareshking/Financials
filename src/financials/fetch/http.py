@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import http.cookiejar
 import random
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -75,6 +76,14 @@ class PoliteFetcher:
         self._last: dict[str, float] = {}
         self._warmed: set[str] = set()
         self.requests: list[str] = []
+        # Thread safety: one lock per host serialises that host's requests, so the >= min_interval spacing holds with
+        # any number of worker threads; different hosts proceed in parallel (the only gain parallel workers give).
+        self._host_locks: dict[str, threading.Lock] = {}
+        self._locks_guard = threading.Lock()
+
+    def _host_lock(self, host: str) -> threading.Lock:
+        with self._locks_guard:
+            return self._host_locks.setdefault(host, threading.Lock())
 
     def _space(self, host: str) -> None:
         last = self._last.get(host)
@@ -86,16 +95,22 @@ class PoliteFetcher:
 
     def _raw(self, url: str, accept: str) -> Response:
         host = urlsplit(url).netloc
-        self._space(host)
-        self.requests.append(url)
         headers = {"User-Agent": self.user_agent, "Accept": accept, "Accept-Language": "en-US,en;q=0.9"}
-        return self.transport.get(url, headers, self.timeout)
+        with self._host_lock(host):  # spacing + request under the host lock: never two in flight per host
+            self._space(host)
+            self.requests.append(url)
+            r = self.transport.get(url, headers, self.timeout)
+            self._last[host] = self.clock()
+            return r
 
     def get(self, url: str, *, accept: str = "*/*", allow_404: bool = False) -> bytes | None:
         host = urlsplit(url).netloc
-        if host in self.warmup and host not in self._warmed:
+        with self._locks_guard:
+            warm = host in self.warmup and host not in self._warmed
+            if warm:
+                self._warmed.add(host)
+        if warm:
             self._raw(self.warmup[host], "text/html")
-            self._warmed.add(host)
         last_status: int | None = None
         for attempt in range(1, self.max_attempts + 1):
             try:

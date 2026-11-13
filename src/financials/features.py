@@ -86,6 +86,32 @@ def _universe(con, exchange: str, as_of: date) -> list[tuple[str, str, str, str]
     ).fetchall()
 
 
+def market_cap_shares(
+    reg31: tuple[Decimal, date] | None,
+    paid_up: tuple[Decimal, date] | None,
+    factors: list[tuple[date, Decimal, Decimal]],
+    as_of: date,
+) -> tuple[Decimal | None, date | None, str | None]:
+    """Share count for market cap, in order [X18, X53, X61]:
+    1. the Reg. 31 total of the latest visible shareholding pattern (REG31);
+    2. else the results filing's paid-up capital / face value (PAID_UP). The parser withholds it when no filed EPS
+       implies a share count within 10x (Kotak Q2 FY27 tags FaceValue = 994.79: SHARES_FROM_PAID_UP_WITHHELD), so a
+       withheld count never reaches here; promotion cross-checks it against Reg. 31 (> 0.5% -> quarantine);
+    3. then divided by the EPS factor of every accepted share-count action with ex-date in (count date, as_of]
+       (a 1:5 split after the count multiplies shares by 5).
+    Returns (shares, count date, source), all None when neither count exists."""
+    if reg31 is not None:
+        (shares, counted), source = reg31, "REG31"
+    elif paid_up is not None:
+        (shares, counted), source = paid_up, "PAID_UP"
+    else:
+        return None, None, None
+    for ex, _, eps_factor in factors:
+        if counted < ex <= as_of:
+            shares = shares / eps_factor
+    return shares, counted, source
+
+
 KPI_COLUMNS = ("vnb_margin", "embedded_value", "ape_growth", "gov", "take_rate", "contribution_margin", "nrr",
                "cac_payback")  # fmt: skip
 _KPI_RUPEES = ("embedded_value", "gov")
@@ -416,16 +442,8 @@ def compute_rows(con, as_of: date, exchange: str = "NSE", *, knowledge: str = "v
                 row[k] = kp[k]
 
         shp = shp_all.get(ent, {})
-        if "TOTAL" in shp:
-            shares, shares_as_of, source = Decimal(shp["TOTAL"][1]), shp["_as_of"], "REG31"
-        elif ent in paid_up:
-            (shares, shares_as_of), source = paid_up[ent], "PAID_UP"
-        else:
-            shares = shares_as_of = source = None
-        if shares is not None:
-            for ex, _, ef in factors.get(sec, []):
-                if shares_as_of < ex <= as_of:
-                    shares = shares / ef
+        reg31 = (Decimal(shp["TOTAL"][1]), shp["_as_of"]) if "TOTAL" in shp else None
+        shares, _counted, source = market_cap_shares(reg31, paid_up.get(ent), factors.get(sec, []), as_of)
         mcap = close * shares if close is not None and shares is not None else None
         ev = (
             mcap + fund["_net_debt"] + (fund["_minority"] or 0)

@@ -40,14 +40,26 @@ Last reviewed: 2026-11-13.
 | X21 | Bank tags: `InterestEarned`, `InterestExpended`, `OperatingExpenses`, `OperatingProfitBeforeProvisionAndContingencies`, `ProvisionsOtherThanTaxAndContingencies`, `GrossNonPerformingAssets`, `NonPerformingAssets`, `PercentageOfGrossNpa`, `PercentageOfNpa`, `ReturnOnAssets`, `CET1Ratio`, `AdditionalTier1Ratio`. Ratios are **fractions** (0.0175 = 1.75%). | VERIFIED | CSB Bank Q1 |
 | X22 | Bank Q1 filing has **no balance sheet** (no advances/deposits) and no `FourD`. | VERIFIED | CSB Bank Q1 |
 | X23 | CASA is **not tagged** in bank quarterly XBRL. | VERIFIED (one Q1 filing) | → `supplemental_kpis` |
-| X24 | Total CRAR tag | UNVERIFIED | Only CET1 and AT1 seen |
+| X24 | Total CRAR tag | VERIFIED absent in Q1 and H1 bank filings [X35] | Only CET1 and AT1 |
 | X25 | Whether bank `ReturnOnAssets` is annualised | UNVERIFIED | |
 | X26 | **Filer defect**: Star Health Q3 FY25 `FourD` context dates say 2024-10-01..2024-12-31 (same as `OneD`), but `DateOfStartOfReportingPeriod@FourI = 2024-04-01` and values are 9-month YTD. | VERIFIED | GI fixture. Context dates cannot be trusted blindly. |
 | X27 | Insurers have moved to the Integrated Filing taxonomy | UNVERIFIED | Fixture is legacy (Jan 2025) |
-| X28 | Life-insurer taxonomy and tags | UNVERIFIED | No fixture |
-| X29 | Consolidated-filing tags (NCI, share of associates placement) | UNVERIFIED | No fixture |
+| X28 | Life-insurer taxonomy and tags | VERIFIED [X33] | |
+| X29 | Consolidated-filing tags (NCI, share of associates placement) | NCI VERIFIED [X34]; placement of share of associates relative to PBEIT still UNVERIFIED | |
 | X30 | Q1/Q3 corp filings omit the balance sheet and cash flow (SEBI Reg. 33 half-yearly requirement) | UNVERIFIED for corp | Bank Q1 consistent |
 | X31 | `ExciseDuty` tag name in corp taxonomy | UNVERIFIED | Not in ELIN fixture |
+
+## 1b. Phase 2 evidence XBRL (tests: `tests/test_phase2_fixture_facts.py`)
+
+| # | Claim | Status | Evidence / scope |
+|---|---|---|---|
+| X32 | Lending NBFC (Bajaj Finance Q2 FY27, `IntegratedFinance_NBFC/2026-01-31`): `InterestEarned`, `FinanceCosts`, `ImpairmentOnFinancialInstruments` non-zero in `OneD`/`FourD`; `Loans` in `OneI`; rounding Crores. | VERIFIED | one standalone filing |
+| X33 | Life insurer (HDFC Life Q2 FY27): namespace `IntegratedFinance_LI/2025-01-31` (not routed by any parser yet). Tags include `GrossPremiumIncome`, `NetPremiumIncome`, `ChangeInActuarialLiability`, `BenefitsPaidNet`, `NetSurplusDeficit`, `InvestmentsPolicyholders`, plus fund-level NPA ratios. Context dates **match** declared periods (unlike legacy GI [X26]). Extra instant contexts `OcurI` (quarter start) and `OprevI` (FY start). Rounding Lakhs. | VERIFIED | one standalone filing |
+| X34 | Consolidated corporate (Reliance Q2 FY27): `NonControllingInterest` (OneI); `Equity = EquityAttributableToOwnersOfParent + NonControllingInterest`; `ProfitLossForPeriod = ProfitOrLossAttributableToOwnersOfParent + ProfitOrLossAttributableToNonControllingInterests`; `ComprehensiveIncomeForThePeriodAttributableToOwnersOfParentNonControllingInterests`; `ShareOfProfitLossOfAssociatesAndJointVenturesAccountedForUsingEquityMethod`. Resolves X29 for NCI. | VERIFIED | one consolidated filing |
+| X35 | H1 bank (HDFC Bank Q2 FY27): `OneI` balance sheet with `Advances`, `Deposits`, `Borrowings`, `Capital`, `ReservesAndSurplus`, `Investments`, `Assets = CapitalAndLiabilities`. Pure ratios: `CET1Ratio`, `AdditionalTier1Ratio`, `PercentageOfGrossNpa`, `PercentageOfNpa`, `ReturnOnAssets` only, so **CASA and total CRAR are not tagged** (strengthens X23/X24). | VERIFIED | one H1 standalone filing |
+| X36 | Reg. 34 annual report XBRL (ELIN FY2024-25): ICAI taxonomy `…/2017-03-31/ind-as` (+ `in-ca`); both current FY (2024-04-01..2025-03-31) and previous FY durations, instants for 2025/2024/2023-03-31; `CostOfMaterialsConsumed`, `CapitalWorkInProgress`, `ContingentLiabilities`, `ContingentLiabilitiesAndCommitments` for both years. Resolves R2. | VERIFIED | one standalone filing |
+| X37 | Annual XBRL has **no `LeaseLiabilities` element** (the 2017 taxonomy predates Ind AS 116). Lease liabilities appear as `Other(Non)currentFinancialLiabilitiesOthers` lines: a free-text label "Lease Liabilities" in a duration context and the amount in the instant context of the same typed member. ELIN: ₹60,000 current; Reliance FY26 (not committed): ₹2,557 Cr non-current, ₹70 Cr current. Extraction needs a named label rule. | VERIFIED (ELIN); OBSERVED (Reliance) | |
+| X38 | Integrated Filing (Financials) for Bajaj Finance starts with the quarter ended **2025-03-31**; its Dec-2024 results are legacy `NBFC_INDAS_*.xml` (`…/NBFC_INDAS_118070_1365151_29012025074729.xml`). | OBSERVED | `integrated-filing-results` + `corporates-financial-results` listings |
 
 ## 2. Prices, delivery, identifiers (fixtures: `tests/fixtures/bhavcopy/`, tests: `tests/test_bhavcopy_fixture_facts.py`)
 
@@ -105,7 +117,8 @@ Last reviewed: 2026-11-13.
 | SHP2 | Category totals are instant contexts with one `CategoryOfShareholdersAxis` member (`ShareholdingPatternMember` total, `ShareholdingOfPromoterAndPromoterGroupMember`, `PublicShareholdingMember`, `InstitutionsDomesticMember`, `InstitutionsForeignMember`, `MutualFundsOrUTIMember`, `NonInstitutionsMember`); measures `NumberOfShares`, `NumberOfShareholders`, `ShareholdingAsAPercentageOfTotalNumberOfShares` (fraction), `NumberOfEquitySharesHeldInDematerializedForm`, `NumberOfVotingRights`. | VERIFIED | test |
 | SHP3 | Promoter + public = total exactly (16,388,405 + 33,320,815 = 49,709,220). A filing with non-promoter non-public (employee trust) shares would break this; member name UNVERIFIED. | VERIFIED (one filing) | test |
 | SHP4 | Reg. 31 total (49,709,220) vs results paid-up / face value (49,710,000): 0.0016%, within the 0.5% cross-check. The gap is rounding of paid-up capital to 0.01 M. | VERIFIED | test |
-| SHP5 | Pledged-share **quantity** tag: not present when nothing is pledged. | UNVERIFIED | Need a fixture with pledges |
+| SHP5 | Pledged-share **quantity** tag | VERIFIED [SHP7] | |
+| SHP7 | Pledges (Afcons 2026-09-30): `NumberOfSharesEncumberedUnderPledged`, `NumberOfSharesEncumbered`, `EncumberedShareUnderPledgedAsPercentageOfTotalNumberOfShares` and `EncumberedSharesHeldAsPercentageOfTotalNumberOfShares` per category member. The "percentage of total" is relative to that row's own shares (1.0 for promoters, 0.5017 for the total row). Pledged 184,500,996 of 184,506,596 promoter shares. The NSE pledge-data API reported 195,740,493 for the same company (different disclosure date and basis): do not mix the two sources. Resolves SHP5. | VERIFIED | `tests/test_phase2_fixture_facts.py` |
 | SHP6 | `www.nseindia.com/api/corporate-share-holdings-master?index=equities&symbol=X` lists filings with `date`, `broadcastDate` (IST, second precision), `xbrl` URL, `revisedData`. | VERIFIED | test |
 
 ## 2a. Implementation facts (DuckDB 1.3.2, pyarrow 26)
@@ -130,14 +143,15 @@ Last reviewed: 2026-11-13.
 | A4 | RSS `pubDate` has second precision (`13-Nov-2026 00:25:25`), IST. IST is assumed, not stated in the feed. | OBSERVED | 2026-11-13 |
 | A5 | Late filings exist: results RSS item published 2026-11-03 for period ended 2024-06-30. | OBSERVED | 2026-11-13 |
 | A6 | `content/indices/ind_nifty500list.csv` gives **current** constituents only (`Company Name, Industry, Symbol, Series, ISIN Code`, 501 rows). No machine-readable history found. | OBSERVED | 2026-11-13 |
-| A7 | Results-XBRL discovery needs the `www.nseindia.com` API with browser session cookies. | UNVERIFIED | Inferred from A1/A2 |
+| A7 | Results-XBRL discovery: `www.nseindia.com/api/integrated-filing-results?index=equities&symbol=X` lists Integrated Filing rows (`qe_Date`, `consolidated`, `type`, `broadcast_Date`, `xbrl`, `ixbrl`), newest 20; `corporates-financial-results?index=equities\|insurance&period=Quarterly&symbol=X` lists legacy results up to Dec 2024 only. Answered without cookie warm-up from a cloud container. | OBSERVED | 2026-11-13 |
+| A8 | Other discovery endpoints: `api/annual-reports-xbrl?index=equities&symbol=X` (Reg. 34 XBRL: `AR_XBRL_<SYM>_<ts>.xml`, standalone + consolidated); `api/annual-reports?index=equities&symbol=X` (PDF only); `api/corporate-pledgedata?index=equities` (1,558 companies with pledge figures). | OBSERVED | 2026-11-13 |
 
 ## 4. Regulatory and corporate facts (all UNVERIFIED unless noted)
 
 | # | Claim | Status | Note |
 |---|---|---|---|
 | R1 | Single Filing System extended to Reg. 34 Annual Report XBRL (20 Apr 2026) and BRSR (31 Mar 2026); cited as "NSE/CML/2026/08" and "BSE Notice 20260529-28". | UNVERIFIED | The BSE notice date is later than the dates it is cited for. Neither circular has been seen. |
-| R2 | Reg. 34 annual XBRL on exchanges uses the MCA Ind AS taxonomy with Notes and prior-FY comparatives. | UNVERIFIED | Needs Reg. 34 fixture |
+| R2 | Reg. 34 annual XBRL on exchanges uses the MCA Ind AS taxonomy with Notes and prior-FY comparatives. | VERIFIED [X36] | ICAI 2017-03-31 taxonomy; no lease element [X37] |
 | R3 | Banks and insurers are not on Ind AS. | UNVERIFIED (consistent with X21 tags) | |
 | R4 | SME-listed companies are exempt from Ind AS. | UNVERIFIED | SME out of v1 scope anyway |
 | R5 | Schedule III (FY22+) shows current maturities of long-term debt inside current borrowings. | UNVERIFIED | |
@@ -146,7 +160,7 @@ Last reviewed: 2026-11-13.
 | R8 | AMFI publishes no consolidated scheme-wise ISIN file; ~45 AMCs publish separately. | UNVERIFIED | Phase 3 only |
 | R9 | Financial results must be disclosed within 30 minutes of the board meeting ending. | UNVERIFIED | Used only as a conservative-visibility rule (architecture §6.3) |
 | R10 | DVR shares use `INE` ISINs; partly-paid use `IN9`. | UNVERIFIED | |
-| R12 | SEBI Integrated Filing (Financials) applies from the quarter ended 2024-12-31, giving uniform `INTEGRATED_FILING_*` XBRL from then on. | UNVERIFIED, and **partly contradicted**: the Star Health Q3 FY25 (Dec 2024) fixture uses the legacy `GeneralInsurance/2020-03-31` taxonomy [X26, X27]. The C9 cutoff does not rely on it; parsers still route by namespace and quarantine unknown taxonomies. |
+| R12 | SEBI Integrated Filing (Financials) applies from the quarter ended 2024-12-31, giving uniform `INTEGRATED_FILING_*` XBRL from then on. | **Contradicted** for Q3 FY25: Bajaj Finance's Dec-2024 results are legacy and Integrated Filing starts at Mar-2025 [X38]. Also: the Star Health Q3 FY25 (Dec 2024) fixture uses the legacy `GeneralInsurance/2020-03-31` taxonomy [X26, X27]. The C9 cutoff does not rely on it; parsers still route by namespace and quarantine unknown taxonomies. |
 | R11 | Under Ind AS 7, Indian companies may classify interest paid as operating or financing. | VERIFIED as tagged choice (X14) | |
 
 ## 5. Known data limitations (affect results, must be disclosed in any backtest output)

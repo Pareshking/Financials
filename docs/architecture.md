@@ -192,7 +192,7 @@ Element names are VERIFIED in the INDAS_CORP fixture unless marked otherwise.
 | `INDAS_NBFC` | `IntegratedFinance_NBFC` | `InterestEarned`, `FeesAndCommissionIncome`, `NetGainOnFairValueChanges`, `FinanceCosts`, `ImpairmentOnFinancialInstruments` (tags VERIFIED [X20]) | Fixture is an investment company; lending behaviour UNVERIFIED |
 | `IGAAP_BANK` | `IntegratedFinance_Banking` | [X21] (VERIFIED, Q1) | No BS in Q1 [X22]; CASA not tagged [X23]; CRAR UNVERIFIED [X24] |
 | `IRDAI_GENERAL` | `GeneralInsurance` namespace | `GrossPremiumsWritten`, `NetPremiumWritten`, `PremiumEarned`, `NetCommission`, `OperatingExpensesRelatedToInsuranceBusiness` (VERIFIED, legacy) | Context-date defect [X26] |
-| `IRDAI_LIFE` | UNVERIFIED | UNVERIFIED [X28] | No fixture |
+| `IRDAI_LIFE` | `IntegratedFinance_LI` (2025-01-31) [X33] | premium, actuarial, benefits, surplus, policyholder investments (VERIFIED) | Parser not built; extra `OcurI`/`OprevI` instants |
 
 Financial profiles are archetype `FINANCIAL_LENDING` or `INSURANCE`. For those archetypes, industrial ratios (EBITDA, gross profit, working capital, EV-based) are NULL.
 
@@ -427,7 +427,7 @@ Status (2026-11-13): **built and tested end to end** on real fixtures, all liste
 |---|---|---|
 | D-1 | Where fetchers run | **Decided**: local only; CI = offline lint + tests |
 | D-2 | Which known-defect rules (§7.4) to allow | None yet; quarantine |
-| D-3 | Fixtures still needed: lending NBFC, life insurer, H1 bank, consolidated corp, Q1/Q3 corp, loss-valued exceptional items, Reg. 34 annual, Reg. 31 with pledges / employee trusts | Owner supplies URLs after Phase 1; block the related parser until present |
+| D-3 | Phase 2 fixtures | **Done** (2026-11-13): lending NBFC, life insurer, consolidated corporate with NCI, H1 bank, Reg. 34 annual and pledged Reg. 31 committed with evidence tests [X32-X38, SHP7]. Still useful later: Q1/Q3 corp, a loss-valued exceptional item, an employee-trust shareholding |
 | D-4 | Corporate-actions source | **Decided**: NSE API adapter (+ RSS for discovery); unparseable purposes → QUARANTINED. BSE fallback not built (`api.bseindia.com` returned 403 [A1]) |
 | D-6 | How a human resolves a quarantine | **Built**: `financials quarantine list` / `resolve --action ACCEPT\|REJECT\|OVERRIDE\|CORP_ACTION\|MERGE_SECURITIES --note …` (`financials.admin`). One transaction; rows are never deleted; every change is logged in `company_overrides`. `CORP_ACTION` must verify against the observed gap, which then unfreezes the adjusted series. `MERGE_SECURITIES` repoints identity, prices, actions, index rows and quarantine links to the `FinInstrmId` owner, tombstones the duplicate entity as `MERGED`, and loads the colliding bar from raw (SIGMA case [P14]). Known-defect rules (D-2) are still not built |
 | D-5 | Historical index-membership backfill source | Snapshot-forward only [L1] |

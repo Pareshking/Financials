@@ -16,14 +16,20 @@ from financials.db import (
 
 
 def _old_schema() -> str:
-    """schema.sql as it was before Batch 4: screener_features without the lender / EPS / bank columns. New columns
-    are always appended before the PRIMARY KEY line, so an old database lacks only trailing columns and the
-    positional copy from screener_features_history keeps working after an upgrade."""
-    new = ("eps_ttm", "eps_continuing_ttm", "roe_continuing", "core_profit_ttm", "is_lending_nbfc", "nii_ttm",
-           "ppop_ttm", "cost_to_income", "credit_cost", "nim_asset_proxy", "roa", "loans", "loans_as_of",
-           "loans_avg_from", "gnpa_pct", "nnpa_pct", "pcr", "credit_to_deposit", "cet1_pct", "at1_pct", "roa_filed",
-           "govt_holding_pct")  # fmt: skip
-    return "\n".join(line for line in SCHEMA_SQL.splitlines() if not re.match(rf"\s+({'|'.join(new)})\s", line))
+    """schema.sql as it was before Batch 4: every screener_features(_history) column after in_nifty500 removed, and
+    no supplemental_kpis table. New columns are always appended before the PRIMARY KEY line, so an old database lacks
+    only trailing columns and the positional copy from screener_features_history keeps working after an upgrade."""
+    out, skipping = [], False
+    for line in SCHEMA_SQL.split("CREATE TABLE IF NOT EXISTS supplemental_kpis")[0].splitlines():
+        if re.match(r"\s+in_nifty500\s", line):
+            out.append(line)
+            skipping = True
+            continue
+        if skipping and line.strip().startswith("PRIMARY KEY"):
+            skipping = False
+        if not skipping:
+            out.append(line)
+    return "\n".join(out)
 
 
 def test_existing_database_gains_new_columns_and_keeps_rows(tmp_path):
@@ -37,6 +43,7 @@ def test_existing_database_gains_new_columns_and_keeps_rows(tmp_path):
     assert table_columns(con, "screener_features") == table_columns(con, "screener_features_history")
     assert [c for c, _ in declared_columns()["screener_features"]] == table_columns(con, "screener_features")
     assert con.execute("SELECT legal_name FROM entity_master").fetchall() == [("Kept",)]
+    assert "kpi" in table_columns(con, "supplemental_kpis")  # new table created by the same init-db run
     assert apply_schema(con) == []  # idempotent
     con.close()
 

@@ -134,8 +134,11 @@ output); `tests/test_index_backfill.py::test_derived_text_matches_pdf` regenerat
 | `xbrl/INTEGRATED_FILING_BANKING_1740465_16102026082727_WEB.xml` | B5: Punjab National Bank Q2 FY27 standalone (PSU; H1 balance sheet; AT1; GoI 70%) (X58, X59) | `96970acc7a4cd1bcffc5d46d8c10858291c925bfc9370b5434c36cc4a8e29330` |
 | `xbrl/INTEGRATED_FILING_BANKING_1699404_22072026053243_WEB.xml` | B5: IndusInd Bank Q1 FY27 standalone (no balance sheet; AT1 = 0 real) (X58, X59) | `8bbfb8ececb45a687d182deca64f7dfba95312079200feb0c4ee74a86515283d` |
 | `xbrl/INTEGRATED_FILING_BANKING_1745379_24102026050751_WEB.xml` | B5: Kotak Mahindra Bank Q2 FY27 standalone (face value mis-tagged 994.79) (X61) | `a40e30c3ba7d7bd97900783ca4424e57696b4d1dc5601675b6f5a29b81e424b1` |
+| `xbrl/IF_INS_COM_IND_AS_19799_WebXMLFile_20261027_212749295.xml` | B6: Star Health Q2 FY27 standalone, Ind AS 117 (one of 5 byte-identical broadcasts) (X64) | `903eb86889821e81daa7c432ec46b6a129d30e35a109e8ecafe8b198fd961210` |
+| `xbrl/INTEGRATED_FILING_LI_1747186_27102026072642_WEB.xml` | B6: SBI Life Q2 FY27 standalone (solvency in times; persistency) (X62, X65) | `54156e0c102988a9b1ad4546c27e5efd2621e3e25c919150b4d97418f834ba6f` |
+| `xbrl/INTEGRATED_FILING_GI_1750325_30102026070447_WEB.xml` | B6: New India Assurance Q2 FY27 standalone (PSU; memo provisions; solvency /100) (X63, X65) | `d7efe24db84a2121a1b2f8426e024363719bcd71f1eaae30499a65ac5122d03a` |
 
-Source URL pattern for all thirty-one: `https://nsearchives.nseindia.com/corporate/xbrl/<file>`.
+Source URL pattern for all thirty-four: `https://nsearchives.nseindia.com/corporate/xbrl/<file>`.
 
 ## Screener goldens (local only, not committed)
 

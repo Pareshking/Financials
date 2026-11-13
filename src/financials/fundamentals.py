@@ -410,6 +410,59 @@ def _latest_period_value(book: FactBook, tag: str, end: date) -> Decimal | None:
     return cands[0][2] if cands else None
 
 
+INSURER_COLUMNS = (
+    "insurer_basis", "net_premium_earned_ttm", "insurance_revenue_ttm", "claims_ratio", "expense_ratio",
+    "combined_ratio", "solvency_ratio", "investment_income_ttm", "persistency_13m", "persistency_61m",
+)  # fmt: skip
+
+
+def insurer_basis(book: FactBook) -> str | None:
+    if "insurance_revenue" in book.durations:
+        return "INDAS117"
+    if "net_premium_earned" in book.durations:
+        return "IRDAI_GENERAL"
+    if "net_surplus" in book.durations:
+        return "IRDAI_LIFE"
+    return None
+
+
+def insurer_blocks(book: FactBook, end: date) -> dict:
+    """Insurer ratios (architecture §10.6) [X62-X66]. TTM flows; regulatory ratios as filed for the latest period.
+    IRDAI general: claims = incurred / NPE, expense = (net commission + opex) / NPW, combined = sum (matches the
+    filed CombinedRatio exactly, X66). Ind AS 117: claims = incurred claims / insurance revenue (gross of
+    reinsurance), combined = (service expenses - net reinsurance result) / insurance revenue: a different basis,
+    flagged by `insurer_basis`, never compared with IRDAI ratios. Life insurers have no claims / combined ratio."""
+    out = dict.fromkeys(INSURER_COLUMNS)
+    basis = insurer_basis(book)
+    if basis is None:
+        return out
+    t = lambda tag: book.ttm(tag, end)  # noqa: E731
+    latest = lambda tag: _latest_period_value(book, tag, end)  # noqa: E731
+    out["insurer_basis"] = basis
+    if basis == "IRDAI_GENERAL":
+        npe, npw, claims = t("net_premium_earned"), t("net_premium_written"), t("claims_incurred")
+        comm, opex = t("net_commission"), t("operating_expenses_insurance")
+        cr = safe_div(claims, npe)
+        er = safe_div(None if None in (comm, opex) else comm + opex, npw)
+        out.update(net_premium_earned_ttm=npe, claims_ratio=cr, expense_ratio=er,
+                   combined_ratio=None if None in (cr, er) else cr + er)  # fmt: skip
+        inv = (t("investment_income_policyholders"), t("investment_income_shareholders"))
+    elif basis == "IRDAI_LIFE":
+        out["net_premium_earned_ttm"] = t("net_premium")
+        out["expense_ratio"] = safe_div(t("expenses_of_management"), t("gross_premium"))
+        out["persistency_13m"], out["persistency_61m"] = latest("persistency_13m"), latest("persistency_61m")
+        inv = (t("investment_income_policyholders"), t("investment_income_shareholders"))
+    else:
+        rev, claims = t("insurance_revenue"), t("claims_incurred")
+        ise, re = t("insurance_service_expenses"), t("net_reinsurance_result")
+        out.update(insurance_revenue_ttm=rev, claims_ratio=safe_div(claims, rev),
+                   combined_ratio=safe_div(None if None in (ise, re) else ise - re, rev))  # fmt: skip
+        inv = (t("investment_income_total_indas"),)
+    out["investment_income_ttm"] = None if None in inv else sum(inv, Decimal(0))
+    out["solvency_ratio"] = latest("solvency_ratio_times")
+    return out
+
+
 BANK_COLUMNS = ("credit_to_deposit", "cet1_pct", "at1_pct", "roa_filed", "govt_holding_pct")
 
 NBFC_COLUMNS = (

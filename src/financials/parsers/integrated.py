@@ -5,9 +5,15 @@ from __future__ import annotations
 from financials.parsers.igaap_bank import parse_igaap_bank_results
 from financials.parsers.indas_corp import ParsedResults, detect_profile, parse_indas_corp_results
 from financials.parsers.indas_nbfc import parse_indas_nbfc_results
+from financials.parsers.irdai_insurance import SPECS as INSURER_SPECS
+from financials.parsers.irdai_insurance import parse_insurer_results
 from financials.parsers.xbrl import parse_instance
 
-PARSERS = {"INDAS_NBFC": parse_indas_nbfc_results, "IGAAP_BANK": parse_igaap_bank_results}
+PARSERS = {
+    "INDAS_NBFC": parse_indas_nbfc_results,
+    "IGAAP_BANK": parse_igaap_bank_results,
+    **{p: (lambda data, p=p: parse_insurer_results(data, p)) for p in INSURER_SPECS},
+}
 
 
 def parse_integrated_results(data: bytes) -> ParsedResults:

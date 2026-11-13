@@ -26,6 +26,7 @@ from financials.parsers.igaap_bank import BANK_DURATION_TAGS, BANK_INSTANT_TAGS
 from financials.parsers.indas_corp import DURATION_TAGS, IMPLEMENTED_PROFILES, INSTANT_TAGS, detect_profile
 from financials.parsers.indas_nbfc import NBFC_DURATION_TAGS, NBFC_INSTANT_TAGS
 from financials.parsers.integrated import parse_integrated_results
+from financials.parsers.irdai_insurance import SPECS as INSURER_SPECS
 from financials.parsers.xbrl import parse_instance
 
 
@@ -37,6 +38,7 @@ MAPPED_BY_PROFILE = {
     "INDAS_CORP": _mapped(DURATION_TAGS, INSTANT_TAGS),
     "INDAS_NBFC": _mapped(NBFC_DURATION_TAGS, NBFC_INSTANT_TAGS),
     "IGAAP_BANK": _mapped(BANK_DURATION_TAGS, BANK_INSTANT_TAGS),
+    **{p: _mapped(spec.duration_tags, spec.instant_tags) for p, spec in INSURER_SPECS.items()},
 }
 MAPPED = MAPPED_BY_PROFILE["INDAS_CORP"]
 

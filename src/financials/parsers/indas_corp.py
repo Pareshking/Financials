@@ -28,11 +28,11 @@ PROFILE_BY_NAMESPACE = (
     ("/IntegratedFinance_IndAS/", "INDAS_CORP"),
     ("/IntegratedFinance_NBFC/", "INDAS_NBFC"),
     ("/IntegratedFinance_Banking/", "IGAAP_BANK"),
-    ("/GeneralInsurance/", "IRDAI_GENERAL"),
-    # Integrated Filing insurer namespaces, seen in committed fixtures (HDFC Life, ICICI Lombard) [S6, S7];
-    # routed as known profiles, parsed from Batch 6.
+    # Pre-Integrated-Filing GI format (out of scope, context dates do not match declared dates [X26]): never parsed
+    ("/GeneralInsurance/", "IRDAI_GENERAL_LEGACY"),
     ("/IntegratedFinance_LI/", "IRDAI_LIFE"),
     ("/IntegratedFinance_GI/", "IRDAI_GENERAL"),
+    ("/IntegratedFinance_InsuranceCompaniesIndAS/", "INDAS_INSURANCE"),  # Ind AS 117 (Star Health, Go Digit) [X64]
 )
 
 # Element → canonical tag. Only elements seen in a committed fixture are mapped.
@@ -189,7 +189,7 @@ EXPENSE_COMPONENTS = (
 
 SCOPES = {"standalone": "STANDALONE", "consolidated": "CONSOLIDATED"}
 
-IMPLEMENTED_PROFILES = ("INDAS_CORP", "INDAS_NBFC", "IGAAP_BANK")
+IMPLEMENTED_PROFILES = ("INDAS_CORP", "INDAS_NBFC", "IGAAP_BANK", "IRDAI_LIFE", "IRDAI_GENERAL", "INDAS_INSURANCE")
 
 # Named label rules [references X39, X40]: some lines exist only as a free-text label on a dimensional
 # "Others"/detail member (Description* fact) paired with an amount in contexts with the same member.

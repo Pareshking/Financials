@@ -36,15 +36,14 @@ def test_every_registry_quirk_cites_existing_evidence():
             assert ref.strip() in KNOWN, (name, ref)
 
 
-INTEGRATED = sorted(XBRL_DIR.glob("INTEGRATED_FILING_*.xml"))
+INTEGRATED = sorted([*XBRL_DIR.glob("INTEGRATED_FILING_*.xml"), *XBRL_DIR.glob("IF_INS_COM_IND_AS_*.xml")])
 
 
-@pytest.mark.parametrize("path", INTEGRATED, ids=lambda p: p.name[18:40])
+@pytest.mark.parametrize("path", INTEGRATED, ids=lambda p: p.name[:40])
 def test_registry_covers_every_element_of_committed_filings(path):
     inst = parse_instance(path.read_bytes())
     profile = detect_profile(inst.entity_namespace)
-    if profile not in IMPLEMENTED_PROFILES:
-        pytest.skip(f"{profile}: inspected with its batch")
+    assert profile in IMPLEMENTED_PROFILES, (path.name, profile)  # since Batch 6 every committed filing is parsed
     elements = {f.name for f in inst.facts if not inst.contexts[f.context_id].dimensions}
     registered = set(REGISTRY["profiles"].get(profile, {}))
     assert elements - registered == set(), path.name

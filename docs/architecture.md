@@ -212,7 +212,7 @@ Notation: `avg(x)` = mean of opening and closing balance; `ttm(x)` = trailing 4 
 | ROIC | `ttm(nopat) / ((opening + closing) / 2 invested_capital)`, NULL without the opening balance sheet [C16] | 1 |
 | ROIIC 3Y/5Y | `(nopat_t − nopat_{t−n}) / (IC_t − IC_{t−n})`, FY values | 2 |
 | Reinvestment rate | `(capex − depreciation + Δ(working capital)) / nopat`, FY | 2 |
-| CROIC | `ttm(fcf) / invested_capital` (latest balance sheet; not covered by C16) | 1 |
+| CROIC | `ttm(fcf) / ((opening + closing) / 2 invested_capital)`, NULL without the opening balance sheet [C16] | 1 |
 | Shareholder yield | `(dividends paid + gross buybacks − gross equity issued) / market_cap` | 2 |
 | 5Y net dilution | `shares_adj_t / shares_adj_{t−5y} − 1` | 2 |
 | Incremental asset turnover | `Δ3y rev_ops / Δ3y net fixed assets` | 2 |
@@ -266,8 +266,8 @@ NULL for both. Bank `sales_ttm` = TTM interest earned (Screener's bank "Revenue"
 the standalone book (X60).
 
 **Denominators (C16):** ROE and ROE (continuing) use the latest **closing** owners' equity (Screener's convention,
-available from the first balance sheet). RoA, NIM proxy, credit cost and **ROIC** use **(opening + closing) / 2** over 12
-months and stay NULL until the opening balance sheet exists. CROIC keeps the latest invested capital.
+available from the first balance sheet). RoA, NIM proxy, credit cost, **ROIC and CROIC** use **(opening + closing) / 2** over 12
+months and stay NULL until the opening balance sheet exists.
 
 | Column | NBFC formula | Bank formula |
 |---|---|---|
@@ -286,9 +286,29 @@ months and stay NULL until the opening balance sheet exists. CROIC keeps the lat
 | `pb` | market cap / owners' equity | market cap / (Capital + Reserves and surplus) |
 | CASA % | — | `supplemental_kpis` (not in XBRL [X23]) |
 
-### 10.6 Insurers
-- General: claims ratio `NetClaimsIncurred / PremiumEarned`; combined ratio = claims ratio + `(NetCommission + OperatingExpensesRelatedToInsuranceBusiness) / NetPremiumWritten`; solvency (tag UNVERIFIED).
-- Life (UNVERIFIED): VNB margin, APE growth, EV, persistency → `supplemental_kpis`.
+### 10.6 Insurers (`IRDAI_LIFE`, `IRDAI_GENERAL`, `INDAS_INSURANCE`)
+
+Parsed by `parsers/irdai_insurance.py` (X62-X66). Three accounting bases coexist and are **never compared**:
+`insurer_basis` says which one a row uses. Industrial and lender ratios (EBITDA, OPM, ROCE, ROIC, CROIC, D/E, Altman,
+FCF, EV, NII, NIM) are NULL for insurers. `sales_ttm` = net premium earned (general), net premium (life) or insurance
+revenue (Ind AS 117). P/B = market cap / (share capital + reserves and surplus + application money) for IRDAI formats,
+market cap / `Equity` for Ind AS 117.
+
+| Column | IRDAI general | IRDAI life | Ind AS 117 |
+|---|---|---|---|
+| `net_premium_earned_ttm` | `PremiumEarned` | `NetPremiumIncome` | NULL |
+| `insurance_revenue_ttm` | NULL | NULL | `InsuranceRevenue` |
+| `claims_ratio` | `IncurredClaims / PremiumEarned` (= filed `IncurredClaimRatio`) | NULL | incurred claims / insurance revenue (gross of reinsurance) |
+| `expense_ratio` | (net commission + opex) / `NetPremiumWritten` | `ExpensesOfManagement / GrossPremiumIncome` | NULL |
+| `combined_ratio` | claims + expense (= filed `CombinedRatio`, X66) | NULL | (service expenses − net reinsurance) / insurance revenue |
+| `solvency_ratio` | filed, times (`SOLVENCY_PERCENT_SCALING`, X65) | same | NULL (no element) |
+| `investment_income_ttm` | policyholders' + shareholders' | same | `InvestmentIncome` |
+| `persistency_13m`, `_61m` | — | filed `PersistencyRatio13ThMonth`, `…61ThMonth` | — |
+
+`supplemental_kpis` (schema.sql) holds what XBRL lacks: VNB margin, embedded value, APE growth (life), and Batch 7's
+new-gen tech KPIs. Each row is point in time (`visible_from_ts` = publication of the vaulted source document). No fetcher
+yet (Phase 3). Persistency for listed life insurers comes from XBRL, so the table is only needed for unlisted
+comparisons or other periods.
 
 ### 10.7 `screener_features` columns in Phase 1
 
@@ -470,7 +490,7 @@ CFF = borrowings in/out, interest, dividends, leases, shares, other; Net Cash Fl
 
 Status (2026-11-13): **built and tested end to end** on real fixtures, all listed items below, plus index backfill (§11.6), quarantine resolution (D-6) and benchmarks (`docs/benchmarks.md`). Known gaps inside Phase 1:
 - `piotroski_f` / `beneish_m` columns exist but stay NULL: both need year-over-year annual data (Reg. 34, Phase 2).
-- Altman Z'' uses OtherEquity as the retained-earnings proxy; ROCE and ROE use the latest balance sheet (ROE by decision, C16); ROIC, RoA, NIM proxy and credit cost use opening + closing averages.
+- Altman Z'' uses OtherEquity as the retained-earnings proxy; ROCE and ROE use the latest balance sheet (ROE by decision, C16); ROIC, CROIC, RoA, NIM proxy and credit cost use opening + closing averages.
 - EV adds minority interest (`NonControllingInterest`, VERIFIED [X34, X42]); preference capital is still excluded (no tag seen). PE and ROE use the owners' share of profit and equity [X42].
 - Results-XBRL discovery API is UNVERIFIED [A7]; `fetch-results` takes URLs.
 - A split and a series change between two promoted days create a second security; the collision is quarantined and resolved with `quarantine resolve --action MERGE_SECURITIES` (SIGMA, Oct 2025).

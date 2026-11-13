@@ -356,6 +356,16 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     at1_pct             DOUBLE,              -- banks: filed AT1 ratio (standalone)
     roa_filed           DOUBLE,              -- banks: filed ReturnOnAssets, annualisation varies by bank [X59]
     govt_holding_pct    DOUBLE,              -- banks: PercentageOfShareHeldByGovernmentOfIndia (PSU marker)
+    insurer_basis       VARCHAR,             -- IRDAI_LIFE | IRDAI_GENERAL | INDAS117 (ratios not comparable across) [X64]
+    net_premium_earned_ttm DECIMAL(24,2),    -- IRDAI general: PremiumEarned; life: NetPremiumIncome
+    insurance_revenue_ttm  DECIMAL(24,2),    -- Ind AS 117 insurers only
+    claims_ratio        DOUBLE,              -- general / Ind AS 117 insurers (definitions in §10.6)
+    expense_ratio       DOUBLE,
+    combined_ratio      DOUBLE,
+    solvency_ratio      DOUBLE,              -- times, after SOLVENCY_PERCENT_SCALING [X65]; NULL for Ind AS 117 filers
+    investment_income_ttm DECIMAL(24,2),
+    persistency_13m     DOUBLE,              -- life insurers, filed in XBRL [X62]
+    persistency_61m     DOUBLE,
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -435,6 +445,16 @@ CREATE TABLE IF NOT EXISTS screener_features (
     at1_pct             DOUBLE,              -- banks: filed AT1 ratio (standalone)
     roa_filed           DOUBLE,              -- banks: filed ReturnOnAssets, annualisation varies by bank [X59]
     govt_holding_pct    DOUBLE,              -- banks: PercentageOfShareHeldByGovernmentOfIndia (PSU marker)
+    insurer_basis       VARCHAR,             -- IRDAI_LIFE | IRDAI_GENERAL | INDAS117 (ratios not comparable across) [X64]
+    net_premium_earned_ttm DECIMAL(24,2),    -- IRDAI general: PremiumEarned; life: NetPremiumIncome
+    insurance_revenue_ttm  DECIMAL(24,2),    -- Ind AS 117 insurers only
+    claims_ratio        DOUBLE,              -- general / Ind AS 117 insurers (definitions in §10.6)
+    expense_ratio       DOUBLE,
+    combined_ratio      DOUBLE,
+    solvency_ratio      DOUBLE,              -- times, after SOLVENCY_PERCENT_SCALING [X65]; NULL for Ind AS 117 filers
+    investment_income_ttm DECIMAL(24,2),
+    persistency_13m     DOUBLE,              -- life insurers, filed in XBRL [X62]
+    persistency_61m     DOUBLE,
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -450,4 +470,24 @@ CREATE TABLE IF NOT EXISTS promotion_log (
     status       VARCHAR NOT NULL,             -- PROMOTED | ALREADY_PROMOTED | QUARANTINED
     message      VARCHAR,
     promoted_at  TIMESTAMP NOT NULL
+);
+
+-- Presentation / IRDAI public-disclosure KPIs that are not in exchange XBRL (VNB margin, embedded value, APE growth for
+-- life insurers; GOV, take rate, contribution margin, NRR, CAC payback for new-gen tech). Point-in-time like every
+-- fundamental: visible_from_ts is when the source document became public. Phase 3 fills it; no fetcher yet.
+CREATE TABLE IF NOT EXISTS supplemental_kpis (
+    entity_id       VARCHAR NOT NULL REFERENCES entity_master(entity_id),
+    kpi             VARCHAR NOT NULL,        -- vnb_margin | embedded_value | ape_growth | persistency_13m | persistency_61m
+                                             -- | gov | take_rate | contribution_margin | nrr | cac_payback
+    period_start    DATE    NOT NULL,
+    period_end      DATE    NOT NULL,
+    value           DECIMAL(24,6) NOT NULL,
+    unit            VARCHAR NOT NULL,        -- INR | RATIO | MONTHS | COUNT
+    source_kind     VARCHAR NOT NULL,        -- INVESTOR_PRESENTATION | IRDAI_PUBLIC_DISCLOSURE | ANNUAL_REPORT | MANUAL
+    source_url      VARCHAR NOT NULL,
+    source_sha256   VARCHAR NOT NULL,        -- vaulted document
+    visible_from_ts TIMESTAMP NOT NULL,      -- UTC
+    recorded_at     TIMESTAMP NOT NULL,
+    notes           VARCHAR,
+    PRIMARY KEY (entity_id, kpi, period_start, period_end, visible_from_ts)
 );

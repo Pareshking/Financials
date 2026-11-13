@@ -17,6 +17,7 @@ from _fixture_helpers import XBRL_DIR
 from financials.parsers.igaap_bank import parse_igaap_bank_results
 from financials.parsers.indas_corp import parse_indas_corp_results
 from financials.parsers.indas_nbfc import parse_indas_nbfc_results
+from financials.parsers.irdai_insurance import parse_insurer_results
 from financials.parsers.xbrl import parse_instance
 from financials.statements.quarterly import (
     CR,
@@ -73,11 +74,12 @@ GOLDEN = {
                  "Tax": "301.01", "Net Profit": "946.40"}, {}),
 }  # fmt: skip
 
-RAW_BUILDERS = {"life": life_quarter, "general": general_quarter}  # raw until Batch 6
 PARSED_BUILDERS = {
     "corp": lambda data, period: corp_quarter(parse_indas_corp_results(data), *period),
     "nbfc": lambda data, period: nbfc_quarter(parse_indas_nbfc_results(data), *period),  # Batch 4 parser
     "bank": lambda data, period: bank_quarter(parse_igaap_bank_results(data), *period),  # Batch 5 parser
+    "life": lambda data, period: life_quarter(parse_insurer_results(data, "IRDAI_LIFE"), *period),  # Batch 6
+    "general": lambda data, period: general_quarter(parse_insurer_results(data, "IRDAI_GENERAL"), *period),
 }
 
 
@@ -85,7 +87,7 @@ def build(name: str):
     fixture, kind, _, _ = GOLDEN[name]
     data = (XBRL_DIR / fixture).read_bytes()
     facts = quarter_facts(parse_instance(data), Q[1])
-    st = PARSED_BUILDERS[kind](data, Q) if kind in PARSED_BUILDERS else RAW_BUILDERS[kind](facts)
+    st = PARSED_BUILDERS[kind](data, Q)  # every profile is parsed since Batch 6; raw facts only size divergences
     return st, facts
 
 
@@ -329,7 +331,7 @@ def test_second_quarter_ties_out_and_keeps_the_same_divergences(name):
     """Jan-Mar 2026: every statement reconciles to PBT; the divergence set is the same as in Jul-Sep 2026."""
     data, facts, _ = _q4(name)
     kind = Q4_KIND.get(name, "corp")
-    st = PARSED_BUILDERS[kind](data, Q4) if kind in PARSED_BUILDERS else RAW_BUILDERS[kind](facts)
+    st = PARSED_BUILDERS[kind](data, Q4)
     assert tie_out(st) == 0
     codes = {d.split(":")[0].split(" ")[0] for d in st.divergences}
     expected = {d.split(":")[0].split(" ")[0] for d in build(name)[0].divergences}

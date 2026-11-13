@@ -6,7 +6,7 @@ places where Screener follows the company's PDF presentation rather than anythin
 reported as `divergences`, never silently imitated [S3, S4].
 
 INDAS_CORP works on `ParsedResults` (canonical tags). Bank / NBFC / life / general-insurance rows work
-on the raw non-dimensional quarter facts until those parsers exist (Mandate 2 batches 4-6).
+on their own parsers' canonical tags (Batches 4-6); `quarter_facts` remains for inspection scripts.
 """
 
 from __future__ import annotations
@@ -139,16 +139,6 @@ def quarter_facts(inst: Instance, end: date) -> dict[str, Decimal]:
         except ArithmeticError:
             continue
     return out
-
-
-def _g(facts: dict[str, Decimal], *names: str) -> Decimal:
-    return sum((facts.get(n, ZERO) for n in names), ZERO)
-
-
-def _row(name: str, facts: dict[str, Decimal], plus: tuple[str, ...], minus: tuple[str, ...] = ()) -> Row:
-    parts = {n: facts.get(n) for n in plus} | {f"Less: {n}": (-facts[n] if n in facts else None) for n in minus}
-    present = any(n in facts for n in plus)
-    return Row(name, (_g(facts, *plus) - _g(facts, *minus)) if present else None, parts)
 
 
 def bank_quarter(result, start: date, end: date) -> QuarterStatement:
@@ -289,35 +279,39 @@ def _eps_divergence(st: QuarterStatement, result) -> None:
             st.divergences.append(f"EPS_INCONSISTENT: filed {w['filed']} vs computed {w['computed']} [X53]")
 
 
-def life_quarter(facts: dict[str, Decimal]) -> QuarterStatement:
-    """IntegratedFinance_LI [S6]: policyholders' revenue account + shareholders' P&L, tax from both."""
+def life_quarter(result, start: date, end: date) -> QuarterStatement:
+    """IRDAI_LIFE rows from the insurer parser [S6, X62]: policyholders' revenue account + shareholders' P&L."""
+
+    def z(tag: str) -> Decimal:
+        return result.value(tag, start, end) or ZERO
+
+    v = lambda tag: result.value(tag, start, end)  # noqa: E731
+    ph_tax = z("tax_policyholders")
+    rev = None if v("total_income") is None else (
+        z("total_income") - z("other_income_policyholders") - z("transfer_from_shareholders")
+        + z("investment_income_shareholders")
+    )  # fmt: skip
     rows = {
-        "Revenue": _row(
-            "Revenue",
-            facts,
-            ("Income", "InvestmentIncome"),
-            ("PolicyholdersAccountOtherIncome", "TransferOfFundsFromShareholdersAccount"),
-        ),
-        "Other Income": _row(
-            "Other Income",
-            facts,
-            (
-                "PolicyholdersAccountOtherIncome",
-                "ShareholdersAccountOtherIncome",
-                "TransferOfFundsFromShareholdersAccount",
-            ),
-        ),
-        "Expenses": _row(
-            "Expenses",
-            facts,
-            ("Expenses", "FundsForFutureAppropriation", "ShareholdersAccountExpenses"),
-            ("ProvisionForTax",),
-        ),
-        "Profit before tax": _row("Profit before tax", facts, ("ProfitLossBeforeTax", "ProvisionForTax")),
-        "Tax": _row("Tax", facts, ("ProvisionsForTaxes", "ProvisionForTax")),
-        "Net Profit": _row("Net Profit", facts, ("ProfitLossAfterTaxAndExtraordinaryItems",)),
-    }
-    st = QuarterStatement("IRDAI_LIFE", (None, None), rows)
+        "Revenue": Row("Revenue", rev, {
+            "Net premium": v("net_premium"), "Investment income (policyholders)": v("investment_income_policyholders"),
+            "Investment income (shareholders)": v("investment_income_shareholders"),
+        }),
+        "Other Income": Row("Other Income", z("other_income_policyholders") + z("other_income")
+                            + z("transfer_from_shareholders")),
+        "Expenses": Row("Expenses", None if v("total_expenses") is None else (
+            z("total_expenses") - ph_tax + z("funds_for_future_appropriation_flow") + z("shareholders_expenses")), {
+            "Benefits paid (net)": v("benefits_paid_net"),
+            "Change in actuarial liability": v("change_in_actuarial_liability"),
+            "Expenses of management": v("expenses_of_management"),
+        }),
+        "Profit before tax": Row("Profit before tax", None if v("pbt") is None else z("pbt") + ph_tax,
+                                 {"Shareholders' PBT": v("pbt"), "Policyholders' tax": ph_tax}),
+        "Tax": Row("Tax", z("tax_expense") + ph_tax),
+        "Net Profit": Row("Net Profit", v("pat")),
+        "Net surplus (policyholders)": Row("Net surplus (policyholders)", v("net_surplus")),
+        "EPS": eps_row(result, start, end),
+    }  # fmt: skip
+    st = QuarterStatement("IRDAI_LIFE", (start, end), rows)
     st.divergences.append(
         "LIFE_TRANSFER_GROSSUP: the shareholders->policyholders transfer sits in both Other Income and Expenses "
         "(nets to zero); Screener PBT adds back policyholder-account tax [S6]"
@@ -325,19 +319,74 @@ def life_quarter(facts: dict[str, Decimal]) -> QuarterStatement:
     return st
 
 
-def general_quarter(facts: dict[str, Decimal]) -> QuarterStatement:
-    """IntegratedFinance_GI [S7]: operating income (ex other income) + shareholders' investment income."""
+def general_quarter(result, start: date, end: date) -> QuarterStatement:
+    """IRDAI_GENERAL rows from the insurer parser [S7, X63]."""
+
+    def z(tag: str) -> Decimal:
+        return result.value(tag, start, end) or ZERO
+
+    v = lambda tag: result.value(tag, start, end)  # noqa: E731
+    rev = None if v("operating_income") is None else (
+        z("operating_income") - z("other_income_policyholders") + z("investment_income_shareholders")
+    )  # fmt: skip
     rows = {
-        "Revenue": _row(
-            "Revenue", facts, ("OperatingIncome", "ShareholdersAccountIncomeFromInvestments"), ("OtherIncome",)
-        ),
-        "Other Income": _row("Other Income", facts, ("OtherIncome", "ShareholdersAccountOtherIncome")),
-        "Expenses": _row("Expenses", facts, ("OperatingExpenses", "NonOperatingExpense")),
-        "Profit before tax": _row("Profit before tax", facts, ("ProfitOrLossBeforeTax",)),
-        "Tax": _row("Tax", facts, ("ProvisionForTax",)),
-        "Net Profit": _row("Net Profit", facts, ("ProfitLossAfterTax",)),
-    }
-    return QuarterStatement("IRDAI_GENERAL", (None, None), rows)
+        "Revenue": Row("Revenue", rev, {
+            "Net premium earned": v("net_premium_earned"),
+            "Investment income (policyholders)": v("investment_income_policyholders"),
+            "Investment income (shareholders)": v("investment_income_shareholders"),
+        }),
+        "Other Income": Row("Other Income", z("other_income_policyholders") + z("other_income")),
+        "Expenses": Row("Expenses", None if v("operating_expenses") is None else
+                        z("operating_expenses") + z("shareholders_expenses"), {
+            "Claims incurred": v("claims_incurred"), "Net commission": v("net_commission"),
+            "Operating expenses (insurance)": v("operating_expenses_insurance"),
+            "Shareholders' expenses": v("shareholders_expenses"),
+        }),
+        "Profit before tax": Row("Profit before tax", v("pbt")),
+        "Tax": Row("Tax", v("tax_expense")),
+        "Net Profit": Row("Net Profit", v("pat")),
+        "Underwriting result": Row("Underwriting result", v("underwriting_result")),
+        "EPS": eps_row(result, start, end),
+    }  # fmt: skip
+    return QuarterStatement("IRDAI_GENERAL", (start, end), rows)
+
+
+def indas_insurance_quarter(result, start: date, end: date) -> QuarterStatement:
+    """INDAS_INSURANCE (Ind AS 117) rows [X64]. Not comparable with IRDAI-format rows: revenue is insurance revenue
+    (not premium), expenses are insurance service expenses, and reinsurance is a separate net line."""
+    v = lambda tag: result.value(tag, start, end)  # noqa: E731
+    rows = {
+        "Insurance revenue": Row("Insurance revenue", v("insurance_revenue"),
+                                 {"PAA": v("insurance_revenue_paa"), "Non-PAA": v("insurance_revenue_non_paa")}),
+        "Insurance service expenses": Row("Insurance service expenses", v("insurance_service_expenses"), {
+            "Incurred claims": v("claims_incurred"),
+            "Adjustments to incurred-claims liabilities": v("adjustments_to_lic"),
+            "Commission": v("commission"), "Employee cost": v("employee_benefit_expense"),
+            "Other": v("other_insurance_service_expenses"),
+            "Acquisition cash-flow amortisation": v("acquisition_cash_flow_amortisation"),
+            "Onerous contracts": v("onerous_contract_losses"),
+        }),
+        "Net reinsurance result": Row("Net reinsurance result", v("net_reinsurance_result")),
+        "Insurance service result": Row("Insurance service result", v("insurance_service_result")),
+        "Net finance result": Row("Net finance result", v("net_finance_result"),
+                                  {"Investment income": v("investment_income_total_indas")}),
+        "Other income / expenses (net)": Row("Other income / expenses (net)", v("other_revenue_expenses_net")),
+        "Exceptional items": Row("Exceptional items", v("exceptional_items")),
+        "Profit before tax": Row("Profit before tax", v("pbt")),
+        "Net Profit": Row("Net Profit", v("pat")),
+        "EPS": eps_row(result, start, end),
+    }  # fmt: skip
+    return QuarterStatement("INDAS_INSURANCE", (start, end), rows)
+
+
+def indas_insurance_tie_out(st: QuarterStatement) -> Decimal | None:
+    """Revenue - service expenses + net reinsurance + net finance + other + exceptional - PBT (0 = rows reconcile)."""
+    r = {k: (row.value or ZERO) for k, row in st.rows.items() if k != "EPS"}
+    if st.rows["Insurance revenue"].value is None or st.rows["Profit before tax"].value is None:
+        return None
+    return (r["Insurance revenue"] - r["Insurance service expenses"] + r["Net reinsurance result"]
+            + r["Net finance result"] + r["Other income / expenses (net)"] + r["Exceptional items"]
+            - r["Profit before tax"])  # fmt: skip
 
 
 def tie_out(st: QuarterStatement) -> Decimal | None:

@@ -237,23 +237,22 @@ def test_results_filing_for_unknown_issuer_is_quarantined(market):
     ]
 
 
-def test_unimplemented_profile_is_quarantined_with_raw_kept(market):
-    """Insurers are not implemented yet (Batch 6). This test used the NBFC fixture until Batch 4, banks until 5."""
+def test_unknown_taxonomy_is_quarantined_with_raw_kept(market):
+    """Every current-era profile is implemented since Batch 6, so the routing guard is exercised with an unknown
+    namespace (HDFC Life's, renamed in memory; the fixture file is untouched). Until Batch 6 this test used, in turn,
+    the NBFC, bank and life-insurer fixtures as 'not implemented' profiles."""
+    data = LIFE.read_bytes().replace(b"IntegratedFinance_LI", b"IntegratedFinance_Unknown")
     stage = stage_results_xbrl(
-        market.vault,
-        market.stage_root,
-        data=LIFE.read_bytes(),
-        source_url=XBRL_URL + LIFE.name,
-        fetched_at=FETCHED_AT,
+        market.vault, market.stage_root, data=data, source_url=XBRL_URL + LIFE.name, fetched_at=FETCHED_AT
     )
     result = promote(market.con, stage)
     assert result.status == "QUARANTINED"
-    assert market.con.execute("SELECT reason_code FROM quarantine_queue").fetchall() == [("PROFILE_NOT_IMPLEMENTED",)]
-    assert count(market, "SELECT count(*) FROM raw_xbrl_facts") == 1527  # life-insurer fixture, all raw facts kept
+    assert market.con.execute("SELECT reason_code FROM quarantine_queue").fetchall() == [("UNKNOWN_TAXONOMY",)]
+    assert count(market, "SELECT count(*) FROM raw_xbrl_facts") == 1527  # all raw facts kept
 
 
 def test_nbfc_filing_is_parsed_then_stops_at_the_identity_gate(market):
-    """Batch 4: INDAS_NBFC is implemented; the routing test above moved to the (still unimplemented) bank profile."""
+    """Batch 4: INDAS_NBFC is implemented (the routing guard is tested above with an unknown namespace)."""
     stage = stage_results_xbrl(
         market.vault,
         market.stage_root,

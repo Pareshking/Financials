@@ -87,6 +87,15 @@ ALIASES: dict[str, tuple[str, str]] = {
     "at1": ("(at1_pct * 100)", "%, banks (standalone, filed)"),
     "roa filed": ("(roa_filed * 100)", "%, as filed (annualisation varies by bank)"),
     "government holding": ("(govt_holding_pct * 100)", "%, banks (PSU marker)"),
+    "claims ratio": ("(claims_ratio * 100)", "%, general insurers (basis in insurer_basis)"),
+    "expense ratio": ("(expense_ratio * 100)", "%, insurers"),
+    "combined ratio": ("(combined_ratio * 100)", "%, general insurers (IRDAI and Ind AS 117 bases differ)"),
+    "solvency ratio": ("solvency_ratio", "x (times)"),
+    "net premium earned": ("(net_premium_earned_ttm / 10000000)", "INR crore, TTM"),
+    "insurance revenue": ("(insurance_revenue_ttm / 10000000)", "INR crore, TTM, Ind AS 117"),
+    "investment income": ("(investment_income_ttm / 10000000)", "INR crore, TTM, insurers"),
+    "persistency 13m": ("(persistency_13m * 100)", "%, life insurers"),
+    "persistency 61m": ("(persistency_61m * 100)", "%, life insurers"),
 }
 
 KEYWORDS = {"and", "or", "not"}

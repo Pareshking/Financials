@@ -56,6 +56,15 @@ CREATE TABLE stg_holidays (
     filing_id VARCHAR NOT NULL, exchange VARCHAR NOT NULL, cal_date DATE NOT NULL, description VARCHAR NOT NULL,
     PRIMARY KEY (filing_id, cal_date)
 );
+CREATE TABLE stg_shp_meta (
+    filing_id VARCHAR PRIMARY KEY, parser_version VARCHAR NOT NULL, as_of_date DATE NOT NULL,
+    stated_isin VARCHAR NOT NULL, stated_symbol VARCHAR, has_partly_paid BOOLEAN, promoter_pledge_flag BOOLEAN,
+    promoter_pledged_shares BIGINT
+);
+CREATE TABLE stg_shp_categories (
+    filing_id VARCHAR NOT NULL, category VARCHAR NOT NULL, shares BIGINT, holders BIGINT, pct DOUBLE,
+    demat_shares BIGINT, voting_rights BIGINT, PRIMARY KEY (filing_id, category)
+);
 CREATE TABLE stg_issues (
     filing_id VARCHAR, stage VARCHAR NOT NULL, reason_code VARCHAR NOT NULL, details JSON NOT NULL
 );
@@ -70,6 +79,8 @@ TABLE_ORDER = (
     "raw_xbrl_facts",
     "raw_index_snapshot",
     "stg_holidays",
+    "stg_shp_meta",
+    "stg_shp_categories",
     "stg_xbrl_filing",
     "stg_xbrl_facts",
     "stg_corp_actions",
@@ -445,3 +456,81 @@ def stage_index_snapshot(
         {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)], "raw_index_snapshot": rows},
         extra={"index_name": index_name, "snapshot_date": str(snapshot_date)},
     )
+
+
+def stage_shareholding(
+    vault: Vault,
+    stage_root: Path,
+    *,
+    data: bytes,
+    source_url: str,
+    fetched_at: datetime,
+    broadcast_ts: datetime | None = None,
+    broadcast_ts_source: str = "UNKNOWN",
+    exchange: str = "NSE",
+) -> Path:
+    """Vault + parse one Reg. 31 shareholding XBRL. Broadcast time comes from the NSE master JSON."""
+    from financials.parsers.shareholding import parse_shareholding
+
+    blob = vault.put(data, ext="xml", media_type="application/xml", fetched_at=fetched_at)
+    filing = make_filing(
+        blob,
+        exchange=exchange,
+        category="SHP_XBRL",
+        source_url=source_url,
+        fetched_at=fetched_at,
+        broadcast_ts=broadcast_ts,
+        broadcast_ts_source=broadcast_ts_source,
+    )
+    fid = filing.filing_id
+    tables: dict[str, list[dict[str, Any]]] = {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)]}
+    try:
+        parsed = parse_shareholding(data)
+    except ParseError as exc:
+        tables["stg_issues"] = [
+            {
+                "filing_id": fid,
+                "stage": "PARSE",
+                "reason_code": "PARSE_ERROR",
+                "details": json.dumps({"error": str(exc)}),
+            }
+        ]
+        return write_stage(stage_root, "shareholding", fid, tables)
+    if parsed.issues:
+        tables["stg_issues"] = [
+            {
+                "filing_id": fid,
+                "stage": i.stage,
+                "reason_code": i.reason_code,
+                "details": json.dumps(i.details, default=str, sort_keys=True),
+            }
+            for i in parsed.issues
+        ]
+        return write_stage(stage_root, "shareholding", fid, tables)
+    m = parsed.meta
+    tables["stg_shp_meta"] = [
+        {
+            "filing_id": fid,
+            "parser_version": PARSER_VERSION,
+            "as_of_date": m["as_of_date"],
+            "stated_isin": m["stated_isin"],
+            "stated_symbol": m["stated_symbol"],
+            "has_partly_paid": m["has_partly_paid"],
+            "promoter_pledge_flag": m["promoter_pledge_flag"],
+            "promoter_pledged_shares": None
+            if m["promoter_pledged_shares"] is None
+            else int(m["promoter_pledged_shares"]),
+        }
+    ]
+    tables["stg_shp_categories"] = [
+        {
+            "filing_id": fid,
+            "category": cat,
+            **{
+                k: (float(v) if k == "pct" else int(v)) if v is not None else None
+                for k, v in ((k, vals.get(k)) for k in ("shares", "holders", "pct", "demat_shares", "voting_rights"))
+            },
+        }
+        for cat, vals in sorted(parsed.categories.items())
+    ]
+    return write_stage(stage_root, "shareholding", fid, tables)

@@ -55,6 +55,7 @@ def promote(con: duckdb.DuckDBPyConnection, stage_dir: Path) -> PromotionResult:
         "corp_actions": _promote_corp_actions,
         "holidays": _promote_holidays,
         "index_snapshot": _promote_index_snapshot,
+        "shareholding": _promote_shareholding,
     }.get(job)
     if handler is None:
         raise ValueError(f"unknown job {job!r}")
@@ -662,7 +663,8 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     )
     facts = read_table(con, stage_dir, "stg_xbrl_facts")
     insert_rows(con, "fact_observations", [{**f, "entity_id": entity_id, "visible_from_ts": visible} for f in facts])
-    return PromotionResult("PROMOTED", "results_xbrl", message=fid)
+    q = cross_check_shares(con, entity_id, meta["period_end"])
+    return PromotionResult("PROMOTED", "results_xbrl", message=fid, quarantined=[q] if q else [])
 
 
 def pit_fact(
@@ -789,3 +791,129 @@ def index_members(con, index_name: str, as_of: date, *, allow_survivorship_bias:
         [index_name, as_of, as_of],
     ).fetchall()
     return [r[0] for r in rows]
+
+
+# ── shareholding (Reg. 31) ─────────────────────────────────────────────────
+
+SHARE_CROSS_CHECK_TOLERANCE = Decimal("0.005")  # 0.5% relative (owner decision)
+
+
+def cross_check_shares(con, entity_id: str, as_of: date) -> str | None:
+    """Compare Reg. 31 total shares with results-derived paid-up / face value for the same date.
+
+    Returns a quarantine id on disagreement, else None. Skipped when partly-paid shares exist
+    (paid-up / face value is then not a share count [X18]) or either side is missing.
+    """
+    shp = con.execute(
+        "SELECT o.shares, m.has_partly_paid, o.filing_id FROM shareholding_observations o "
+        "JOIN shareholding_meta m USING (filing_id, parser_version) "
+        "WHERE o.entity_id = ? AND o.as_of_date = ? AND o.category = 'TOTAL' "
+        "ORDER BY o.visible_from_ts DESC, o.parser_version DESC LIMIT 1",
+        [entity_id, as_of],
+    ).fetchone()
+    res = con.execute(
+        "SELECT value_other, filing_id FROM fact_observations WHERE entity_id = ? AND canonical_tag = "
+        "'shares_from_paid_up' AND period_end = ? ORDER BY visible_from_ts DESC, parser_version DESC LIMIT 1",
+        [entity_id, as_of],
+    ).fetchone()
+    if shp is None or res is None or shp[1]:
+        return None
+    shp_total, derived = Decimal(shp[0]), Decimal(res[0])
+    diff = abs(shp_total - derived) / shp_total
+    if diff <= SHARE_CROSS_CHECK_TOLERANCE:
+        return None
+    return _quarantine(
+        con,
+        stage="SHARES",
+        reason_code="CROSS_CHECK_FAILED",
+        entity_id=entity_id,
+        details={
+            "as_of": as_of,
+            "reg31_total": shp_total,
+            "paid_up_over_face_value": derived,
+            "relative_diff": diff,
+            "shp_filing": shp[2],
+            "results_filing": res[1],
+        },
+    )
+
+
+def _promote_shareholding(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings"))
+    filing = read_table(con, stage_dir, "filings")[0]
+    fid = filing["filing_id"]
+    issues = read_table(con, stage_dir, "stg_issues")
+    if issues:
+        qs = [
+            _quarantine(
+                con, stage=i["stage"], reason_code=i["reason_code"], filing_id=fid, details=json.loads(i["details"])
+            )
+            for i in issues
+        ]
+        return PromotionResult("QUARANTINED", "shareholding", message=fid, quarantined=qs)
+    meta = read_table(con, stage_dir, "stg_shp_meta")[0]
+    if con.execute(
+        "SELECT count(*) FROM shareholding_meta WHERE filing_id = ? AND parser_version = ?",
+        [fid, meta["parser_version"]],
+    ).fetchone()[0]:
+        return PromotionResult("ALREADY_PROMOTED", "shareholding", message=fid)
+    secs = resolve_security_by_isin(con, filing["exchange"], meta["stated_isin"], meta["as_of_date"])
+    entities = sorted(
+        {con.execute("SELECT entity_id FROM securities WHERE security_id = ?", [s_]).fetchone()[0] for s_ in secs}
+    )
+    if len(entities) != 1:
+        q = _quarantine(
+            con,
+            stage="IDENTITY",
+            reason_code="UNKNOWN_ISIN" if not entities else "AMBIGUOUS_ISIN",
+            filing_id=fid,
+            details={"isin": meta["stated_isin"], "symbol": meta["stated_symbol"]},
+        )
+        return PromotionResult("QUARANTINED", "shareholding", message=fid, quarantined=[q])
+    entity_id = entities[0]
+    visible = filing["broadcast_ts"]
+    if visible is None:  # no board-meeting fallback exists for Reg. 31
+        q = _quarantine(
+            con,
+            stage="PERIOD",
+            reason_code="NO_VISIBILITY",
+            filing_id=fid,
+            entity_id=entity_id,
+            details={"as_of": meta["as_of_date"]},
+        )
+        return PromotionResult("QUARANTINED", "shareholding", message=fid, quarantined=[q])
+    insert_rows(
+        con,
+        "shareholding_meta",
+        [
+            {
+                "filing_id": fid,
+                "parser_version": meta["parser_version"],
+                "entity_id": entity_id,
+                "as_of_date": meta["as_of_date"],
+                "has_partly_paid": meta["has_partly_paid"],
+                "promoter_pledge_flag": meta["promoter_pledge_flag"],
+                "promoter_pledged_shares": meta["promoter_pledged_shares"],
+                "visible_from_ts": visible,
+            }
+        ],
+    )
+    insert_rows(
+        con,
+        "shareholding_observations",
+        [
+            {
+                **{
+                    k: c[k]
+                    for k in ("filing_id", "category", "shares", "holders", "pct", "demat_shares", "voting_rights")
+                },
+                "parser_version": meta["parser_version"],
+                "entity_id": entity_id,
+                "as_of_date": meta["as_of_date"],
+                "visible_from_ts": visible,
+            }
+            for c in read_table(con, stage_dir, "stg_shp_categories")
+        ],
+    )
+    q = cross_check_shares(con, entity_id, meta["as_of_date"])
+    return PromotionResult("PROMOTED", "shareholding", message=fid, quarantined=[q] if q else [])

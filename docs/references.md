@@ -91,6 +91,17 @@ Last reviewed: 2026-11-13.
 | IDX2 | Index lists can contain non-ISIN placeholders (`DUMMYHEG`, `DUM545A01024`), presumably around demergers. | VERIFIED (present) | test; quarantined as `PLACEHOLDER_ISIN` |
 | IDX3 | Against the 2025-10-14 bhavcopy, 31 of the 2026 constituents do not resolve by ISIN: later IPOs plus splits since (e.g. KOTAKBANK `INE237A01028` → `INE237A01036`). | OBSERVED | Snapshot must be promoted after the same day's bhavcopy |
 
+## 2d. Shareholding (Reg. 31) — fixture: ELIN 2026-09-30
+
+| # | Claim | Status | Evidence |
+|---|---|---|---|
+| SHP1 | Taxonomy namespace `http://www.bseindia.com/xbrl/shp/2025-10-31/in-bse-shp`; no `in-capmkt-ent`. | VERIFIED | `tests/test_shareholding.py` |
+| SHP2 | Category totals are instant contexts with one `CategoryOfShareholdersAxis` member (`ShareholdingPatternMember` total, `ShareholdingOfPromoterAndPromoterGroupMember`, `PublicShareholdingMember`, `InstitutionsDomesticMember`, `InstitutionsForeignMember`, `MutualFundsOrUTIMember`, `NonInstitutionsMember`); measures `NumberOfShares`, `NumberOfShareholders`, `ShareholdingAsAPercentageOfTotalNumberOfShares` (fraction), `NumberOfEquitySharesHeldInDematerializedForm`, `NumberOfVotingRights`. | VERIFIED | test |
+| SHP3 | Promoter + public = total exactly (16,388,405 + 33,320,815 = 49,709,220). A filing with non-promoter non-public (employee trust) shares would break this; member name UNVERIFIED. | VERIFIED (one filing) | test |
+| SHP4 | Reg. 31 total (49,709,220) vs results paid-up / face value (49,710,000): 0.0016%, within the 0.5% cross-check. The gap is rounding of paid-up capital to 0.01 M. | VERIFIED | test |
+| SHP5 | Pledged-share **quantity** tag: not present when nothing is pledged. | UNVERIFIED | Need a fixture with pledges |
+| SHP6 | `www.nseindia.com/api/corporate-share-holdings-master?index=equities&symbol=X` lists filings with `date`, `broadcastDate` (IST, second precision), `xbrl` URL, `revisedData`. | VERIFIED | test |
+
 ## 2a. Implementation facts (DuckDB 1.3.2, pyarrow 26)
 
 | # | Claim | Status | Evidence |

@@ -206,6 +206,33 @@ CREATE TABLE IF NOT EXISTS fact_observations (
     CHECK (period_months IS NULL OR period_months BETWEEN 1 AND 18)
 );
 
+CREATE TABLE IF NOT EXISTS shareholding_meta (
+    filing_id               VARCHAR NOT NULL REFERENCES filings(filing_id),
+    parser_version          VARCHAR NOT NULL,
+    entity_id               VARCHAR NOT NULL REFERENCES entity_master(entity_id),
+    as_of_date              DATE NOT NULL,
+    has_partly_paid         BOOLEAN,
+    promoter_pledge_flag    BOOLEAN,
+    promoter_pledged_shares BIGINT,              -- NULL when pledged but quantity tag unverified
+    visible_from_ts         TIMESTAMP NOT NULL,
+    PRIMARY KEY (filing_id, parser_version)
+);
+
+CREATE TABLE IF NOT EXISTS shareholding_observations (
+    filing_id       VARCHAR NOT NULL REFERENCES filings(filing_id),
+    parser_version  VARCHAR NOT NULL,
+    entity_id       VARCHAR NOT NULL REFERENCES entity_master(entity_id),
+    as_of_date      DATE NOT NULL,
+    category        VARCHAR NOT NULL,           -- TOTAL | PROMOTER | PUBLIC | FII | DII | MUTUAL_FUNDS | NON_INSTITUTIONS
+    shares          BIGINT,
+    holders         BIGINT,
+    pct             DOUBLE,                     -- fraction of total shares
+    demat_shares    BIGINT,
+    voting_rights   BIGINT,
+    visible_from_ts TIMESTAMP NOT NULL,
+    PRIMARY KEY (filing_id, parser_version, category)
+);
+
 -- ── Corporate actions & control ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS corp_actions (
     action_id         VARCHAR PRIMARY KEY,

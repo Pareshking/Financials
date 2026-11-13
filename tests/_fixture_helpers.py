@@ -47,7 +47,7 @@ def load_instance(path: Path) -> Instance:
         period = c.find(f"{{{XBRLI}}}period")
         assert period is not None
 
-        def txt(tag: str) -> str | None:
+        def txt(tag: str, period: ET.Element = period) -> str | None:
             el = period.find(f"{{{XBRLI}}}{tag}")
             return el.text.strip() if el is not None and el.text else None
 
@@ -89,6 +89,6 @@ def load_sec_bhavdata_full(ddmmyyyy: str) -> tuple[list[str], dict[tuple[str, st
         header = [h.strip() for h in next(reader)]
         rows = {}
         for raw in reader:
-            row = dict(zip(header, (v.strip() for v in raw)))
+            row = dict(zip(header, (v.strip() for v in raw), strict=False))
             rows[(row["SYMBOL"], row["SERIES"])] = row
     return header, rows

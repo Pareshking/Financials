@@ -9,6 +9,7 @@ UNVERIFIED there must not be hard-coded; code that depends on it quarantines on 
 
 - **Purpose:** personal, single-user research, screening and point-in-time (PIT) backtesting. No redistribution [C8].
 - **Universe v1:** NSE Mainboard `EQ`, `BE`, `BZ`, starting with the Nifty 500 [C7]. SME (`SM`, `ST`) out of scope. BSE is used only as a fallback and for historical Reg. 34 annual XBRL backfill.
+- **Data scope (v1, CHOICE [C9]):** `trade_date >= 2024-10-01` for prices, delivery, corporate actions and index snapshots; `period_end >= 2024-12-31` for financials and shareholding (`financials/scope.py`). Promotion returns `OUT_OF_SCOPE` for older inputs (vaulted, not parsed); `fetch-days` / `fetch-corp-actions` clamp start dates. Multi-year windows use `fundamentals.cagr(..., min_periods_required)` and stay NULL until enough in-scope quarters exist.
 - **Non-goals (v1):** multi-user, UI hosting, Cloudflare (R2/D1/Workers), real-time intraday prices, SME/Indian-GAAP corporates.
 
 ## 2. Runtime topology
@@ -18,7 +19,20 @@ UNVERIFIED there must not be hard-coded; code that depends on it quarantines on 
 | **Local machine** (owner's) | All fetchers (both `www.nseindia.com` session-cookie fetchers and `nsearchives.nseindia.com` archive fetchers), the vault, staging Parquet, the promoter, `data/market.duckdb`. |
 | **GitHub Actions** | Offline `pytest` on every push and PR (`.github/workflows/ci.yml`). Tests never touch the network. |
 
-Open decision **D-1** (see §16): scheduled archive fetching *in* GitHub Actions has no durable place to keep the data (`data/` is gitignored, artifacts expire, Cloudflare is deferred). Until D-1 is settled, every fetch runs locally.
+Decision **D-1** (owner, 2026-11-13): GitHub Actions runs only offline lint + tests; all fetching stays local (`data/` gitignored) until the pipeline is proven end to end. `www.nseindia.com/api/` endpoints also answered from a cloud container [A1], but that is not relied on.
+
+Operator commands (`python -m financials --data-dir data …`):
+
+| Command | Effect |
+|---|---|
+| `init-db` | apply `schema.sql` to `data/market.duckdb` |
+| `fetch-days START [END]`, `fetch-corp-actions START END`, `fetch-holidays`, `fetch-index --as-of D`, `fetch-shareholding SYM…`, `fetch-results URL [--broadcast-utc TS]` | download → vault → staging only |
+| `promote` | the single writer: applies pending stages in order (holidays, market days by date, index snapshots, corporate actions, results, shareholding, raw-only) and records them in `promotion_log`; ABORTED batches stay pending |
+| `materialize D` | builds features for `D` with gates G4/G5 |
+| `screen "QUERY" [--as-of D]` | runs a DSL screen on the live table or point-in-time on history |
+| `quarantine list [--stage --reason --entity --security --all]`, `quarantine resolve --id Q --action A --note N [--payload-json J]` | audited quarantine resolution (D-6) |
+| `extract-index-changes TEXT_DIR --out CSV`, `backfill-index --manifest CSV` | index membership before the first snapshot (§11.6) |
+| `python -m financials.bench --out docs/benchmarks.md` | reproducible benchmarks on the fixtures (`docs/benchmarks.md`) |
 
 ### 2.1 Data flow
 
@@ -41,15 +55,17 @@ data/vault/ab/ab12…ef.<ext>   ───────────▶  ▼  in on
 |---|---|---|---|---|
 | Daily prices + identifiers | `nsearchives…/content/cm/BhavCopy_NSE_CM_0_0_0_<YYYYMMDD>_F_0000.csv.zip` | UDiFF CSV in zip | VERIFIED [P1] | 1 |
 | Daily delivery | `nsearchives…/products/content/sec_bhavdata_full_<DDMMYYYY>.csv` | CSV, no ISIN | VERIFIED [P10] | 1 |
-| Index constituents (current) | `nsearchives…/content/indices/ind_nifty500list.csv` | CSV | OBSERVED [A6] | 1 |
+| Index constituents (current) | `nsearchives…/content/indices/ind_nifty500list.csv` | CSV | VERIFIED [IDX1, IDX2] | 1 |
 | Quarterly results XBRL | `nsearchives…/corporate/xbrl/<file>.xml`; discovery via `www.nseindia.com` API | XBRL | Files VERIFIED [X1]; discovery UNVERIFIED [A7] | 1 (corp), 2 (others) |
 | Reg. 30 event XBRL | `content/RSS/Online_announcements.xml` → `corporate/xbrl/` links | RSS + XBRL | OBSERVED [A3] | 3 |
-| Corporate actions | UNVERIFIED [P12] | ? | — | 1 |
-| Shareholding (Reg. 31) | UNVERIFIED | XBRL | — | 1 (total shares), 2 (full) |
+| Corporate actions | `www.nseindia.com/api/corporates-corporateActions?index=equities&from_date=…&to_date=…` | JSON | VERIFIED [P12, CA1-CA9] | 1 |
+| Corporate actions (discovery) | `nsearchives…/content/RSS/Corporate_action.xml` (no symbol/ISIN) | RSS | VERIFIED [CA6] | discovery only |
+| Trading holidays | `www.nseindia.com/api/holiday-master?type=trading` | JSON (current year) | VERIFIED [CAL1] | 1 |
+| Shareholding (Reg. 31) | `www.nseindia.com/api/corporate-share-holdings-master?index=equities&symbol=X` → `nsearchives…/corporate/xbrl/SHP_*.xml` | JSON + XBRL | VERIFIED [SHP1-SHP6] | 1 |
 | Reg. 34 annual XBRL | UNVERIFIED [R2] | XBRL | — | 2 |
 | F&O, SLBM, AMC portfolios, macro | UNVERIFIED | various | — | 3 |
 
-Fetch etiquette: ≥1 s between requests per host, exponential backoff with jitter on 403/429/5xx, never re-download a blob whose URL+ETag/sha is already vaulted, and keep a fixed, honest User-Agent per run.
+Fetch etiquette (implemented in `financials.fetch.http.PoliteFetcher`): ≥1 s between requests per host, at most 4 attempts with jittered exponential backoff on 403/429/5xx, other 4xx fail at once, a fixed identifiable User-Agent, optional one-time warm-up page per host. Every response that feeds the pipeline is vaulted (including the shareholding master JSON, via the `raw_only` job). Whether NSE blocks the identifiable User-Agent is UNVERIFIED: the probes used a plain browser string.
 
 ## 4. Storage layers
 
@@ -60,262 +76,42 @@ Fetch etiquette: ≥1 s between requests per host, exponential backoff with jitt
 | L2 Canonical | Identity (`entity_master`, `securities`, `security_identifier_history`), `ohlcv`, `filing_meta`, `fact_observations`, `corp_actions`, `index_constituents_history`, `trading_calendar` | Rebuildable from L0/L1 + `quarantine_queue` resolutions + `company_overrides`. |
 | L3 Derived | Adjustment factors, adjusted prices, total-return index, `screener_features`, snapshots | Fully rebuildable. Swapped atomically. |
 
-## 5. Schema (DuckDB DDL, Phase 1 core)
+## 5. Schema
 
-Conventions:
-- Timestamps are `TIMESTAMPTZ` stored in UTC. IST is used only at parse and display boundaries.
-- Money is `DECIMAL(20,2)` rupees [C1]. Prices are `DECIMAL(18,4)`. Ratios are `DOUBLE`.
-- IDs are ULID strings.
+**Source of truth: `src/financials/db/schema.sql`.** It is applied by `financials.db.apply_schema`
+and, so batches are type- and FK-checked before promotion, also by the staging writer.
+This section only records the decisions; it does not duplicate the DDL.
 
-```sql
--- ── L0 Vault ─────────────────────────────────────────────────────────────
-CREATE TABLE blobs (
-    sha256            VARCHAR PRIMARY KEY,
-    byte_size         BIGINT  NOT NULL,
-    media_type        VARCHAR NOT NULL,
-    storage_path      VARCHAR NOT NULL,          -- data/vault/<sha[:2]>/<sha>.<ext>
-    first_fetched_at  TIMESTAMPTZ NOT NULL
-);
+| Layer | Tables |
+|---|---|
+| L0 | `blobs` (sha256 PK), `filings` (one publication of a blob; `UNIQUE(exchange, source_url, sha256)`) |
+| L1 | `raw_cm_bhavcopy`, `raw_delivery`, `raw_xbrl_facts`. Keyed by source identifiers plus `filing_id`. No surrogate IDs. |
+| L2 identity | `entity_master`, `securities`, `security_identifier_history` (date-bounded; `valid_to` exclusive), `trading_calendar` |
+| L2 market | `ohlcv` (resolved, unadjusted; delivery joined) |
+| L2 fundamentals | `filing_meta` (per filing × parser_version), `fact_observations` (long format) |
+| Control | `corp_actions`, `quarantine_queue`, `company_overrides` |
+| L2 calendar/index | `trading_calendar`, `calendar_coverage`, `raw_index_snapshot`, `index_constituents_history` |
+| L2 shareholding | `shareholding_meta`, `shareholding_observations` |
+| L3 | `screener_features`, `screener_features_history`, `user_custom_ratios`; control: `promotion_log` |
+| Not yet built | `entity_classification_history` (sector/archetype history), `supplemental_kpis` |
 
--- A filing is one publication of a blob. The same blob mirrored on NSE and BSE,
--- or re-sent unchanged, is one blob with two filings.
-CREATE TABLE filings (
-    filing_id            VARCHAR PRIMARY KEY,
-    sha256               VARCHAR NOT NULL REFERENCES blobs(sha256),
-    exchange             VARCHAR NOT NULL,       -- NSE | BSE
-    category             VARCHAR NOT NULL,       -- RESULTS_XBRL | ANNUAL_XBRL | SHP_XBRL | REG30_XBRL
-                                                 -- | BHAVCOPY_CM | DELIVERY | INDEX_LIST | CORP_ACTIONS
-    source_url           VARCHAR NOT NULL,
-    exchange_ref         VARCHAR,                -- exchange-assigned id, if any
-    stated_symbol        VARCHAR,                -- as published, unresolved
-    stated_isin          VARCHAR,
-    broadcast_ts         TIMESTAMPTZ,            -- exchange dissemination time; NULL if unknown
-    broadcast_ts_source  VARCHAR NOT NULL,       -- RSS_PUBDATE | API_FIELD | EOD_RULE | UNKNOWN
-    fetched_at           TIMESTAMPTZ NOT NULL,
-    supersedes_filing_id VARCHAR REFERENCES filings(filing_id),  -- revised filing
-    UNIQUE (exchange, source_url, sha256)
-);
+Decisions:
+- **Timestamps are `TIMESTAMP` holding UTC.** `TIMESTAMPTZ` would make DuckDB's Python client require `pytz` [I2].
+- **Money is `DECIMAL(20,2)`, prices `DECIMAL(18,4)`, factors and ratios `DOUBLE`.** Bulk inserts go through Arrow (`decimal128`), which keeps decimals exact [I4].
+- **`fact_observations` has `period_type` (`DURATION`/`INSTANT`).** Instants store `period_start = period_end` because DuckDB PK columns cannot be NULL. CHECK constraints tie `unit` to `value_inr`/`value_other` and `period_type` to `period_months` (1..18).
+- **`filings.supersedes_filing_id` has no FK** (DuckDB self-reference limitation [I3]). It is enforced in code.
+- **No nullable `UNIQUE` columns.** DuckDB's `INSERT OR IGNORE` treats NULLs in them as conflicts and silently drops rows [I1]. `entity_master.cin` is therefore not UNIQUE.
+- **Deterministic IDs** (`financials.ids.stable_id`). A replay produces identical keys, so `INSERT OR IGNORE` makes promotion idempotent.
 
--- ── L1 Raw (source identifiers only, no surrogate IDs) ──────────────────
-CREATE TABLE raw_cm_bhavcopy (
-    filing_id      VARCHAR NOT NULL REFERENCES filings(filing_id),
-    exchange       VARCHAR NOT NULL,
-    trade_date     DATE    NOT NULL,
-    fin_instrm_id  VARCHAR,                      -- UDiFF FinInstrmId
-    isin           VARCHAR NOT NULL,
-    symbol         VARCHAR NOT NULL,
-    series         VARCHAR NOT NULL,
-    open           DECIMAL(18,4), high DECIMAL(18,4), low DECIMAL(18,4),
-    close          DECIMAL(18,4) NOT NULL,
-    last           DECIMAL(18,4),
-    prev_close_reported DECIMAL(18,4),           -- unadjusted [P2]; informational only
-    volume         BIGINT,
-    turnover_inr   DECIMAL(20,2),
-    trades         BIGINT,
-    PRIMARY KEY (exchange, trade_date, symbol, series, filing_id)
-);
+### 5.1 Identity resolution
+A universe row (`EQ`/`BE`/`BZ`) continues an existing security if **either**:
+- its `FinInstrmId` has ever belonged to that security (this survives splits [P5]), **or**
+- its ISIN is held by that security's open interval (this survives series changes, which assign a new `FinInstrmId` [P13]).
 
-CREATE TABLE raw_delivery (
-    filing_id   VARCHAR NOT NULL REFERENCES filings(filing_id),
-    exchange    VARCHAR NOT NULL,
-    trade_date  DATE    NOT NULL,
-    symbol      VARCHAR NOT NULL,
-    series      VARCHAR NOT NULL,
-    traded_qty  BIGINT,
-    deliv_qty   BIGINT,
-    deliv_pct   DOUBLE,
-    PRIMARY KEY (exchange, trade_date, symbol, series, filing_id)
-);
-
-CREATE TABLE raw_index_snapshot (
-    filing_id      VARCHAR NOT NULL REFERENCES filings(filing_id),
-    index_name     VARCHAR NOT NULL,             -- NIFTY 500
-    snapshot_date  DATE    NOT NULL,
-    symbol         VARCHAR NOT NULL,
-    series         VARCHAR NOT NULL,
-    isin           VARCHAR NOT NULL,
-    company_name   VARCHAR,
-    industry       VARCHAR,
-    PRIMARY KEY (index_name, snapshot_date, isin)
-);
-
-CREATE TABLE raw_xbrl_facts (
-    filing_id       VARCHAR NOT NULL REFERENCES filings(filing_id),
-    parser_version  VARCHAR NOT NULL,
-    element_ns      VARCHAR NOT NULL,
-    element_name    VARCHAR NOT NULL,
-    context_id      VARCHAR NOT NULL,
-    ctx_start       DATE,                         -- as written in the context (may be wrong [X26])
-    ctx_end         DATE,
-    ctx_instant     DATE,
-    dimensions      JSON,                         -- {"RelatedPartyTransactionAxis": "...", ...}
-    unit_ref        VARCHAR,
-    decimals        VARCHAR,                      -- recorded, never trusted [X5]
-    value_text      VARCHAR
-);
-
--- ── L2 Identity ─────────────────────────────────────────────────────────
-CREATE TABLE entity_master (
-    entity_id      VARCHAR PRIMARY KEY,
-    legal_name     VARCHAR NOT NULL,
-    cin            VARCHAR UNIQUE,
-    status         VARCHAR NOT NULL DEFAULT 'ACTIVE', -- ACTIVE | MERGED | DELISTED | SUSPENDED
-    inactive_date  DATE,
-    exit_reason    VARCHAR
-);
-
-CREATE TABLE securities (
-    security_id  VARCHAR PRIMARY KEY,
-    entity_id    VARCHAR NOT NULL REFERENCES entity_master(entity_id),
-    share_class  VARCHAR NOT NULL                  -- COMMON | DVR | PARTLY_PAID
-);
-
--- Splits change ISIN [P5]; symbols get renamed; series move EQ↔BE↔BZ.
-CREATE TABLE security_identifier_history (
-    security_id     VARCHAR NOT NULL REFERENCES securities(security_id),
-    exchange        VARCHAR NOT NULL,
-    fin_instrm_id   VARCHAR,                       -- stable across ISIN change [P5, P8]; reuse UNVERIFIED [P9]
-    symbol          VARCHAR NOT NULL,
-    series          VARCHAR NOT NULL,
-    isin            VARCHAR NOT NULL,
-    bse_scrip_code  VARCHAR,
-    valid_from      DATE NOT NULL,
-    valid_to        DATE,                          -- NULL = current
-    evidence_filing_id VARCHAR REFERENCES filings(filing_id),
-    PRIMARY KEY (security_id, exchange, valid_from)
-);
-
-CREATE TABLE entity_classification_history (
-    entity_id           VARCHAR NOT NULL REFERENCES entity_master(entity_id),
-    valuation_archetype VARCHAR NOT NULL,           -- INDUSTRIAL_SERVICES | FINANCIAL_LENDING | INSURANCE | NEW_GEN_TECH
-    macro_sector VARCHAR, sector VARCHAR, industry VARCHAR, basic_industry VARCHAR,
-    valid_from          DATE NOT NULL,
-    valid_to            DATE,
-    source              VARCHAR NOT NULL,           -- INDEX_LIST | MANUAL_OVERRIDE | …
-    PRIMARY KEY (entity_id, valid_from)
-);
-
-CREATE TABLE trading_calendar (
-    exchange    VARCHAR NOT NULL,
-    cal_date    DATE    NOT NULL,
-    is_trading  BOOLEAN NOT NULL,                  -- historical truth = a bhavcopy exists for the date
-    note        VARCHAR,
-    PRIMARY KEY (exchange, cal_date)
-);
-
-CREATE TABLE index_constituents_history (
-    index_name   VARCHAR NOT NULL,
-    security_id  VARCHAR NOT NULL REFERENCES securities(security_id),
-    valid_from   DATE NOT NULL,
-    valid_to     DATE,
-    source       VARCHAR NOT NULL,                 -- SNAPSHOT | MANUAL_BACKFILL
-    PRIMARY KEY (index_name, security_id, valid_from)
-);
-
--- ── L2 Market ───────────────────────────────────────────────────────────
-CREATE TABLE ohlcv (                               -- resolved, unadjusted
-    security_id  VARCHAR NOT NULL REFERENCES securities(security_id),
-    exchange     VARCHAR NOT NULL,
-    series       VARCHAR NOT NULL,
-    trade_date   DATE    NOT NULL,
-    open DECIMAL(18,4), high DECIMAL(18,4), low DECIMAL(18,4), close DECIMAL(18,4) NOT NULL,
-    volume       BIGINT,
-    turnover_inr DECIMAL(20,2),
-    deliv_qty    BIGINT,
-    price_filing_id    VARCHAR NOT NULL REFERENCES filings(filing_id),
-    delivery_filing_id VARCHAR REFERENCES filings(filing_id),
-    PRIMARY KEY (security_id, exchange, series, trade_date)
-);
-
--- ── L2 Fundamentals ─────────────────────────────────────────────────────
-CREATE TABLE filing_meta (                          -- one row per parsed XBRL filing
-    filing_id            VARCHAR PRIMARY KEY REFERENCES filings(filing_id),
-    parser_version       VARCHAR NOT NULL,
-    entity_id            VARCHAR NOT NULL REFERENCES entity_master(entity_id),
-    accounting_profile   VARCHAR NOT NULL,          -- from namespace [X1]: INDAS_CORP | INDAS_NBFC | IGAAP_BANK
-                                                    -- | IRDAI_GENERAL | IRDAI_LIFE
-    taxonomy_ns          VARCHAR NOT NULL,
-    scope                VARCHAR NOT NULL,          -- STANDALONE | CONSOLIDATED [X6]
-    level_of_rounding    VARCHAR NOT NULL,          -- Rupees | Thousands | Lakhs | Millions | Crores
-    fy_start             DATE NOT NULL,
-    fy_end               DATE NOT NULL,
-    reporting_quarter    VARCHAR,
-    audited              BOOLEAN,
-    board_meeting_end_ts TIMESTAMPTZ,
-    visible_from_ts      TIMESTAMPTZ NOT NULL,      -- §6.3
-    visible_from_source  VARCHAR NOT NULL,          -- BROADCAST | BOARD_MEETING_RULE
-    interest_paid_cfo_class VARCHAR,                -- OPERATING | FINANCING | NONE | MIXED [X14]
-    interest_recd_cfo_class VARCHAR                 -- OPERATING | INVESTING | NONE | MIXED
-);
-
--- Long-format canonical facts. Never updated in place: a revision is a new filing,
--- a re-parse is a new parser_version.
-CREATE TABLE fact_observations (
-    filing_id       VARCHAR NOT NULL REFERENCES filings(filing_id),
-    parser_version  VARCHAR NOT NULL,
-    entity_id       VARCHAR NOT NULL,
-    scope           VARCHAR NOT NULL,
-    canonical_tag   VARCHAR NOT NULL,               -- revenue_ops, pbt, borrowings_current, …
-    period_start    DATE,                           -- NULL for instants
-    period_end      DATE NOT NULL,
-    period_months   INTEGER,                        -- NULL for instants; 1..18
-    unit            VARCHAR NOT NULL,               -- INR | INR_PER_SHARE | PURE | SHARES
-    value_inr       DECIMAL(20,2),                  -- when unit = INR
-    value_other     DECIMAL(28,8),                  -- otherwise
-    source_element  VARCHAR NOT NULL,               -- raw element name(s)
-    visible_from_ts TIMESTAMPTZ NOT NULL,
-    PRIMARY KEY (filing_id, parser_version, canonical_tag, period_end, period_start),
-    CHECK ((unit = 'INR') = (value_inr IS NOT NULL))
-);
-
--- ── Corporate actions & control ─────────────────────────────────────────
-CREATE TABLE corp_actions (
-    action_id         VARCHAR PRIMARY KEY,
-    entity_id         VARCHAR NOT NULL REFERENCES entity_master(entity_id),
-    security_id       VARCHAR REFERENCES securities(security_id),
-    action_type       VARCHAR NOT NULL,             -- SPLIT | BONUS | RIGHTS | DEMERGER | MERGER | DIVIDEND | CONSOLIDATION
-    ex_date           DATE NOT NULL,
-    record_date       DATE,
-    ratio_num         DECIMAL(18,6),
-    ratio_den         DECIMAL(18,6),
-    issue_price       DECIMAL(18,4),                -- RIGHTS
-    cash_per_share    DECIMAL(18,4),                -- DIVIDEND (total-return only)
-    price_factor      DOUBLE,                       -- multiply prices before ex_date
-    eps_factor        DOUBLE,                       -- multiply per-share figures before ex_date (share-count events only)
-    observed_gap      DOUBLE,                       -- Open_ex / Close_{ex-1}
-    status            VARCHAR NOT NULL DEFAULT 'PENDING', -- PENDING | VERIFIED | UNOBSERVABLE | QUARANTINED | VERIFIED_MANUAL
-    related_entity_id VARCHAR REFERENCES entity_master(entity_id),
-    coa_pct           DOUBLE,                       -- cost-of-acquisition split for this side of a demerger
-    source_filing_id  VARCHAR NOT NULL REFERENCES filings(filing_id)
-);
-
-CREATE TABLE quarantine_queue (
-    quarantine_id   VARCHAR PRIMARY KEY,
-    stage           VARCHAR NOT NULL,               -- FETCH | PARSE | PERIOD | IDENTITY | IDENTIFIER | CORP_ACTION | GAP | GATE
-    reason_code     VARCHAR NOT NULL,
-    entity_id       VARCHAR,
-    security_id     VARCHAR,
-    filing_id       VARCHAR,
-    details         JSON NOT NULL,
-    created_at      TIMESTAMPTZ NOT NULL,
-    resolved_at     TIMESTAMPTZ,
-    resolution      VARCHAR,                        -- ACCEPTED | REJECTED | FIXED_BY_RULE | OVERRIDDEN
-    resolution_note VARCHAR
-);
-
-CREATE TABLE company_overrides (                    -- human decisions, each with a reason
-    override_id  VARCHAR PRIMARY KEY,
-    entity_id    VARCHAR NOT NULL REFERENCES entity_master(entity_id),
-    field        VARCHAR NOT NULL,                  -- e.g. valuation_archetype
-    value        VARCHAR NOT NULL,
-    valid_from   DATE NOT NULL,
-    valid_to     DATE,
-    reason       VARCHAR NOT NULL,
-    created_at   TIMESTAMPTZ NOT NULL
-);
-```
-
-L3 objects (views or tables rebuilt by the promoter): `price_adj_factors`, `ohlcv_adj`, `total_return_index`, `screener_features`, `screener_features_snapshots`, `user_custom_ratios`. Phase 2 adds `shareholding_observations` and `supplemental_kpis`. Phase 3 adds the event, F&O and AMC tables.
+Other outcomes:
+- Both keys pointing at different securities → `IDENTIFIER/ISIN_COLLISION`.
+- Any change of ISIN, symbol, series or `FinInstrmId` closes the open interval and opens a new one, emitting an event. `ISIN_CHANGE` feeds the gap auditor.
+- A split and a series change on the same day would create a new security. This is not seen yet; the gap auditor would flag it.
 
 ## 6. Time, period and scope rules
 
@@ -396,7 +192,7 @@ Element names are VERIFIED in the INDAS_CORP fixture unless marked otherwise.
 | `INDAS_NBFC` | `IntegratedFinance_NBFC` | `InterestEarned`, `FeesAndCommissionIncome`, `NetGainOnFairValueChanges`, `FinanceCosts`, `ImpairmentOnFinancialInstruments` (tags VERIFIED [X20]) | Fixture is an investment company; lending behaviour UNVERIFIED |
 | `IGAAP_BANK` | `IntegratedFinance_Banking` | [X21] (VERIFIED, Q1) | No BS in Q1 [X22]; CASA not tagged [X23]; CRAR UNVERIFIED [X24] |
 | `IRDAI_GENERAL` | `GeneralInsurance` namespace | `GrossPremiumsWritten`, `NetPremiumWritten`, `PremiumEarned`, `NetCommission`, `OperatingExpensesRelatedToInsuranceBusiness` (VERIFIED, legacy) | Context-date defect [X26] |
-| `IRDAI_LIFE` | UNVERIFIED | UNVERIFIED [X28] | No fixture |
+| `IRDAI_LIFE` | `IntegratedFinance_LI` (2025-01-31) [X33] | premium, actuarial, benefits, surplus, policyholder investments (VERIFIED) | Parser not built; extra `OcurI`/`OprevI` instants |
 
 Financial profiles are archetype `FINANCIAL_LENDING` or `INSURANCE`. For those archetypes, industrial ratios (EBITDA, gross profit, working capital, EV-based) are NULL.
 
@@ -477,6 +273,19 @@ All three are NULL for `FINANCIAL_LENDING` and `INSURANCE`; Beneish additionally
 - General: claims ratio `NetClaimsIncurred / PremiumEarned`; combined ratio = claims ratio + `(NetCommission + OperatingExpensesRelatedToInsuranceBusiness) / NetPremiumWritten`; solvency (tag UNVERIFIED).
 - Life (UNVERIFIED): VNB margin, APE growth, EV, persistency → `supplemental_kpis`.
 
+### 10.7 `screener_features` columns in Phase 1
+
+Source of truth: `screener_features_history` in `schema.sql`; aliases in `financials.dsl.ALIASES`.
+
+| Status | Columns |
+|---|---|
+| **Active** (always computed when a bar exists) | `close`, `price_date`, `return_1m/3m/6m/12m` (need 22/64/127/253 bars), `price_to_dma50/200` (50/200 bars), `dist_52w_high` (252 bars), `deliv_avg_5d/20d`, `delivery_velocity`, `in_nifty500` |
+| **Active once the input filing is visible** | `shares` (+`shares_source`), `market_cap`, `promoter_pct`, `fii_pct`, `dii_pct`, `float_turnover_pct`, `shp_as_of` (Reg. 31); `total_equity`, `net_debt`, `pb`, `debt_to_equity`, `bs_as_of` (H1/FY balance sheet); `altman_z_dd` (H1/FY BS + TTM EBIT; OtherEquity proxy) |
+| **Active once 4 same-scope quarters exist** | `sales_ttm`, `ebitda_ttm`, `pat_ttm`, `pe`, `ev_ebitda`, `enterprise_value`, `opm`, `roe`, `roce`, `roic`, `other_income_to_pbt`; `fcf_ttm`, `croic`, `fcff_yield`, `cf_as_of` via the H1/FY bridge |
+| **Active once 8 quarters exist** | `sales_growth_yoy`, `profit_growth_yoy` |
+| **NULL placeholder until Phase 2** | `piotroski_f`, `beneish_m` (need year-over-year annual Reg. 34 data) |
+| Not built (Phase 2+) | 3Y/5Y CAGR, 5Y dilution, valuation percentiles, RPT, lender/insurer ratios. `fundamentals.cagr(..., min_periods_required)` already returns NULL until history exists [C9] |
+
 ## 11. Corporate actions
 
 ### 11.1 Factors (applied to history strictly before `ex_date`)
@@ -492,23 +301,41 @@ All three are NULL for `FINANCIAL_LENDING` and `INSURANCE`; Beneish additionally
 
 Volumes before the ex-date are divided by `price_factor` for share-count events. Absolute financials (revenue, PAT, debt) are never multiplied by any factor.
 
-### 11.2 Verification
-`observed_gap = Open_ex / Close_{ex−1}` from unadjusted `ohlcv` (exchange `PrvsClsgPric` is unadjusted and useless here [P2]).
+### 11.2 Ingestion and resolution
+- Source: the NSE corporate-actions API [P12]. Purposes are parsed by explicit rules only (dividend, bonus `A:B`, face-value split, `Rights A:B @ Premium Rs X/-` with issue price = face value + premium, demerger) [CA4, CA5, CA9]. Anything else is recorded as `UNKNOWN` with status `QUARANTINED`, so the gap auditor freezes adjusted prices.
+- Security resolution [CA1, CA2, CA7]: the API ISIN on `ex_date − 1`; if no match, the API symbol, but only for a holder whose ISIN has the same 4-character issuer code (chars 4-7). Otherwise quarantine `STALE_ISIN_OTHER_ISSUER` / `UNKNOWN_ISIN`. Re-promoting the same file later records actions whose security has appeared since.
+- Action ids are deterministic (`ISIN, ex_date, subject, component`), so re-promotion is idempotent.
+
+### 11.3 Verification (per security and ex-date, as a group)
+`observed_gap = Open_ex / Close_{ex−1}` from unadjusted `ohlcv` (exchange `PrvsClsgPric` is unadjusted and useless here [P2]). All actions of one security on one ex-date are judged on their **combined** factor (NAZARA split + bonus = 0.25) [CA5].
 
 | Condition | Status |
 |---|---|
-| \|price_factor − 1\| < 0.10 | `UNOBSERVABLE` (indistinguishable from market noise; accepted, flagged) |
-| \|observed_gap / price_factor − 1\| ≤ 0.10 | `VERIFIED` |
+| any member unfactorable (UNKNOWN, bad ratio) | all `QUARANTINED` |
+| a DEMERGER in the group | all `VERIFIED`; demerger factor = observed / product of the others |
+| \|combined − 1\| < 0.10 | `UNOBSERVABLE` (dividends, small rights; accepted, flagged) |
+| \|observed_gap / combined − 1\| ≤ 0.10 | `VERIFIED` |
 | otherwise | `QUARANTINED` |
-| DEMERGER | `VERIFIED` once a demerger record exists (the factor is defined from the observed gap) |
 
-### 11.3 Unconditional gap auditor [C4]
-Every security, every trading day: if \|Open_t / Close_{t−1} − 1\| > 10% and no corp action is VERIFIED/UNOBSERVABLE/VERIFIED_MANUAL for that date, or the ISIN changed versus t−1 without a SPLIT/CONSOLIDATION record:
+### 11.4 Unconditional gap auditor [C4]
+Every security, every trading day: if the residual gap after dividing out the day's accepted price factors, \|Open_t / (Close_{t−1} · ΠF) − 1\|, exceeds 10% (so a dividend never explains a gap), or the ISIN changed versus t−1 without an accepted SPLIT/CONSOLIDATION:
 - quarantine `GAP`;
 - raw and `ohlcv` rows are still stored;
 - the **adjusted** series and price-derived features for that security are frozen at t−1 until resolved.
 
-Expected volume is 0–7 per day [P4].
+Expected volume is 0–7 per day [P4]. When an action verifies later, matching gap quarantines are resolved (`FIXED_BY_RULE`) only after re-auditing the residual. The auditor compares consecutive *stored* bars, so promote every trading day: a gap of months between bars (as in the test fixtures) quarantines most of the market.
+
+### 11.5 Total return
+`financials.returns.total_return_index`: r_t = (close_t + accepted cash dividends_t) / (close_{t−1} · F_t) − 1. Adjusted prices never include dividends [C2]. Both series stop at the first unresolved gap.
+
+### 11.6 Index membership backfill (before the first snapshot)
+`financials backfill-index --manifest reference/nifty500_changes.csv` (`financials.admin.backfill_index`, one transaction):
+- Starts from the membership resolved at the **first** `SNAPSHOT` date and walks **backward** through manifest events (`effective_date, action, symbol, kind, source`) to `MIN_TRADE_DATE`.
+- An ADD at E is reverted (must be a member); a REMOVE at E is restored (must not be). Symbols resolve on E (ADD) or E − 1 (REMOVE) through `security_identifier_history`, which handles renames such as AKZOINDIA → JSWDULUX [IDX6].
+- After every event date the real-member count must equal `expected_count` (500) plus active `TEMPORARY` members (listed spin-offs held between dummy inclusion and exclusion). Membership is constant between events, so this checks every trading day.
+- Any unresolved symbol, inconsistent event or count break aborts and writes nothing. On success `MANUAL_BACKFILL` rows `[from, min(to, first snapshot))` replace earlier backfill rows, so the operation is idempotent.
+- Prerequisites: price history (bhavcopy days) covering the event dates, and a complete first snapshot. The fixture snapshot resolves 497/500, so the backfill correctly refuses [IDX7].
+- Manifest: `reference/nifty500_changes.csv` is generated by `financials extract-index-changes` from the committed notices, and a test asserts it equals the extraction. Prose-only demerger notices (dummies) are **not** extracted; add `TEMPORARY` rows by hand when a backtest needs those days exact.
 
 ## 12. Promoter quality gates (in order)
 
@@ -517,8 +344,10 @@ Expected volume is 0–7 per day [P4].
 | G1 Completeness | EQ/BE/BZ rows ≥ 92% of the trailing 5-trading-day median | Abort batch; keep previous state; retry later |
 | G2 Identifier resolution | Every raw price row resolves to a `security_id` via `(exchange, fin_instrm_id \| symbol+series, isin, date)`; unresolved rows ≤ 1% | Unresolved rows → quarantine; above 1% → abort |
 | G3 Accounting identities | Per filing: P&L chain (X9 / bank equivalents), `Assets = EquityAndLiabilities` when BS present, expense components sum to `Expenses`; tolerance §7.3 | Quarantine that filing only |
-| G4 Null-spike | Null rate of critical canonical tags (close, market_cap, rev_ops, PAT, Equity) rises ≤ 1.5 percentage points vs the previous promotion | Abort batch |
-| G5 Atomic features | Build `screener_features_next`; row count = active universe; swap in one transaction | No partial state is ever visible |
+| G4 Null-spike (features) | Null rate of `close`, `market_cap`, `sales_ttm`, `pat_ttm`, `total_equity` rises ≤ 1.5 percentage points vs the previous materialised date | Abort; previous features stay live |
+| G5 Atomic features | Row count = universe (securities with a bar in the last 15 days and a valid identifier); history rows for the date and the live table replaced in one transaction | No partial state is ever visible |
+| ORDER | Market days and index snapshots must arrive in date order | Abort; replay needs a rebuild |
+| Share cross-check | Reg. 31 total vs results paid-up / face value differ by > 0.5% (skipped for partly-paid issuers) | Quarantine `SHARES/CROSS_CHECK_FAILED`; promotion continues |
 
 ## 13. Schedule (local machine, IST)
 
@@ -527,7 +356,9 @@ Expected volume is 0–7 per day [P4].
 | Trading days from 18:30, retry every 30 min until 23:30 | UDiFF bhavcopy + `sec_bhavdata_full` (publish time UNVERIFIED [P11]) |
 | Daily | `ind_nifty500list.csv` snapshot → close/open membership intervals on change |
 | Results season, every 2 h; otherwise daily | Results XBRL discovery (local, `www.nseindia.com` API) |
-| Daily | Corporate-actions feed (source TBD [P12]) |
+| Daily | Corporate-actions API for a rolling window (e.g. last 30 days to next 30 days) |
+| Yearly (January) and on change | Holiday master |
+| After each quarter's Reg. 31 deadline | Shareholding master + XBRL per symbol in the universe |
 | After each fetch batch | Promoter: gates → canonical → corp-action verification → gap auditor → features |
 
 ## 14. Screener DSL
@@ -541,18 +372,30 @@ comparison := arith ( "<" | "<=" | ">" | ">=" | "=" | "!=" ) arith
 arith      := term ( ("+" | "-") term )*
 term       := factor ( ("*" | "/") factor )*
 factor     := NUMBER | ALIAS | "(" arith ")" | "-" factor
-ALIAS      := a name in the alias registry (case-insensitive, spaces allowed, e.g. "Sales growth 3Years")
+ALIAS      := a name in financials.dsl.ALIASES or user_custom_ratios (case-insensitive, words may end in digits,
+              e.g. "Return 12M", "In Nifty 500")
 ```
+
+- Units follow Screener conventions and are stated per alias: money in INR crore, growth/returns/margins/holdings in percent.
 
 - Aliases map **only** to whitelisted `screener_features` columns or saved custom ratios.
 - Saved custom ratios are expanded before compilation; cycles are rejected.
 - Output is parameterised SQL: numbers become bound parameters, columns come from the registry, and no user text reaches SQL.
-- Division compiles to `x / NULLIF(y, 0)`. NULL comparisons are false, so a stock missing a metric never passes that filter.
+- Division compiles to `x / NULLIF(y, 0)`. NULL comparisons are not TRUE, and `NOT` keeps NULL as NULL, so a stock missing a metric never passes a filter on it.
 - An unknown alias is a compile error, never a guess.
 
 ## 15. Phases
 
 **Phase 1: thin slice, screenable end-to-end (Nifty 500)**
+
+Status (2026-11-13): **built and tested end to end** on real fixtures, all listed items below, plus index backfill (§11.6), quarantine resolution (D-6) and benchmarks (`docs/benchmarks.md`). Known gaps inside Phase 1:
+- `piotroski_f` / `beneish_m` columns exist but stay NULL: both need year-over-year annual data (Reg. 34, Phase 2).
+- Altman Z'' uses OtherEquity as the retained-earnings proxy; ROCE/ROE use the latest balance sheet, not an average.
+- EV excludes minority interest and preference capital (tags UNVERIFIED [X29]).
+- Results-XBRL discovery API is UNVERIFIED [A7]; `fetch-results` takes URLs.
+- A split and a series change between two promoted days create a second security; the collision is quarantined and resolved with `quarantine resolve --action MERGE_SECURITIES` (SIGMA, Oct 2025).
+- Index backfill covers regular replacement tables only; dummy/spin-off `TEMPORARY` rows are manual.
+
 - Vault (`blobs`, `filings`) and staging/promoter skeleton.
 - UDiFF bhavcopy + `sec_bhavdata_full` loaders.
 - `trading_calendar`.
@@ -582,8 +425,9 @@ ALIAS      := a name in the alias registry (case-insensitive, spaces allowed, e.
 
 | ID | Question | Current default |
 |---|---|---|
-| D-1 | Run archive fetchers in GitHub Actions? They need durable storage (artifacts expire; committing data bloats git; Cloudflare deferred). | All fetchers local; CI is offline tests only |
+| D-1 | Where fetchers run | **Decided**: local only; CI = offline lint + tests |
 | D-2 | Which known-defect rules (§7.4) to allow | None yet; quarantine |
-| D-3 | Fixtures still needed: lending NBFC, life insurer, H1 bank, consolidated corp, Q1/Q3 corp, loss-valued exceptional items, Reg. 34 annual, Reg. 31 shareholding, corp-actions feed sample | Block the related parser until present |
-| D-4 | Corporate-actions source [P12] | Undecided |
+| D-3 | Phase 2 fixtures | **Done** (2026-11-13): lending NBFC, life insurer, consolidated corporate with NCI, H1 bank, Reg. 34 annual and pledged Reg. 31 committed with evidence tests [X32-X38, SHP7]. Still useful later: Q1/Q3 corp, a loss-valued exceptional item, an employee-trust shareholding |
+| D-4 | Corporate-actions source | **Decided**: NSE API adapter (+ RSS for discovery); unparseable purposes → QUARANTINED. BSE fallback not built (`api.bseindia.com` returned 403 [A1]) |
+| D-6 | How a human resolves a quarantine | **Built**: `financials quarantine list` / `resolve --action ACCEPT\|REJECT\|OVERRIDE\|CORP_ACTION\|MERGE_SECURITIES --note …` (`financials.admin`). One transaction; rows are never deleted; every change is logged in `company_overrides`. `CORP_ACTION` must verify against the observed gap, which then unfreezes the adjusted series. `MERGE_SECURITIES` repoints identity, prices, actions, index rows and quarantine links to the `FinInstrmId` owner, tombstones the duplicate entity as `MERGED`, and loads the colliding bar from raw (SIGMA case [P14]). Known-defect rules (D-2) are still not built |
 | D-5 | Historical index-membership backfill source | Snapshot-forward only [L1] |

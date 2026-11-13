@@ -76,9 +76,9 @@ def test_corp_pnl_identities_and_exceptional_sign(ctx):
         n[("ProfitBeforeExceptionalItemsAndTax", ctx)] + n[("ExceptionalItemsBeforeTax", ctx)]
         == n[("ProfitBeforeTax", ctx)]
     )
-    assert n[("ProfitBeforeTax", ctx)] - n[("TaxExpense", ctx)] == n[
-        ("ProfitLossForPeriodFromContinuingOperations", ctx)
-    ]
+    assert (
+        n[("ProfitBeforeTax", ctx)] - n[("TaxExpense", ctx)] == n[("ProfitLossForPeriodFromContinuingOperations", ctx)]
+    )
 
 
 def test_corp_expenses_include_inventory_change_with_expense_sign():

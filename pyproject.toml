@@ -1,14 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "financials"
-version = "0.0.0"
+version = "0.1.0"
 description = "Personal Indian equity research, screening and point-in-time backtesting engine"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = ["duckdb>=1.3,<2", "pyarrow>=17"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "ruff>=0.12"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"financials.db" = ["*.sql"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["tests"]
 addopts = "-ra --strict-markers"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003"]  # allow unicode (×, −, →) in docs/strings
+
+[tool.ruff.lint.isort]
+known-first-party = ["financials", "_fixture_helpers"]

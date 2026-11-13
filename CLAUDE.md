@@ -2,6 +2,9 @@
 
 Personal, single-user Indian equity research, screening and point-in-time backtesting engine.
 Universe v1: NSE Mainboard `EQ`/`BE`/`BZ`, starting with the Nifty 500. SME excluded.
+**Data starts** (CHOICE C9, `financials/scope.py`): market data, corporate actions and index snapshots
+`>= 2024-10-01` (`MIN_TRADE_DATE`, UDiFF era); financials and shareholding `period_end >= 2024-12-31`
+(`MIN_PERIOD_END_DATE`, Q3 FY25). No parsers or fallbacks for older formats.
 No redistribution.
 
 **Read before changing anything:** `docs/architecture.md` (design) and `docs/references.md`
@@ -11,7 +14,18 @@ No redistribution.
 
 ```bash
 python -m pip install -e ".[dev]"   # Python 3.11+
-python -m pytest                    # must pass before every commit; CI runs the same
+python -m pytest                    # must pass before every commit
+ruff check src tests && ruff format --check src tests   # CI runs both
+
+# local operation (network; never in tests or CI)
+python -m financials --data-dir data init-db
+python -m financials --data-dir data fetch-days 2026-11-12        # also fetch-corp-actions / -holidays / -index / -shareholding / -results
+python -m financials --data-dir data promote                       # the only writer
+python -m financials --data-dir data materialize 2026-11-12
+python -m financials --data-dir data screen "Market Cap > 500 AND ROE > 15"
+python -m financials --data-dir data quarantine list --reason ISIN_COLLISION    # resolve: quarantine resolve --id … --action … --note …
+python -m financials --data-dir data backfill-index --manifest reference/nifty500_changes.csv
+python -m financials.bench --out docs/benchmarks.md                # after performance-relevant changes
 ```
 
 ## Layout
@@ -20,7 +34,12 @@ python -m pytest                    # must pass before every commit; CI runs the
 docs/                  architecture.md, references.md
 tests/fixtures/        real, unmodified NSE files + MANIFEST.md (sha256 + source URL)
 tests/test_*_fixture_facts.py   characterisation tests pinning VERIFIED claims
-src/                   (Phase 1, not yet created) ingest/ parsers/ corp_actions/ promoter/ features/ dsl/
+src/financials/        db/schema.sql (DDL source of truth), parsers/ (pure: bytes → rows), identity.py,
+                       corp_actions.py, returns.py, calendar.py, fundamentals.py, features.py, dsl.py,
+                       vault.py, staging.py (fetch/parse side), promoter.py (single writer),
+                       admin.py (index backfill, quarantine resolution; single writer), index_changes.py,
+                       fetch/ (polite HTTP + jobs), cli.py, bench.py
+reference/             curated data derived from fixtures (e.g. nifty500_changes.csv; a test pins it)
 data/                  local only, gitignored: vault/, staging/, market.duckdb
 ```
 
@@ -39,8 +58,9 @@ data/                  local only, gitignored: vault/, staging/, market.duckdb
    in place. A revision is a new filing (`supersedes_filing_id`). A re-parse is a new `parser_version`.
 2. **Blob ≠ filing.** One sha256 can have many filings (NSE + BSE mirror, re-sends), each with its own `broadcast_ts`.
 3. **Raw keeps source identifiers.** Raw tables store symbol/series/ISIN exactly as sent. Resolution
-   to `security_id` happens in L2 via `security_identifier_history` (date-bounded; splits change ISIN;
-   `FinInstrmId` is the continuity key).
+   to `security_id` happens in L2 via `security_identifier_history` (date-bounded). Splits change the
+   ISIN but keep `FinInstrmId`; series changes keep the ISIN but change `FinInstrmId`. Match on either, and
+   quarantine if they disagree (architecture §5.1).
 4. **Point-in-time.** Every fundamental row carries `visible_from_ts`. Every PIT read filters
    `visible_from_ts <= as_of`. Never "latest wins" without an as-of.
 5. **Per-filing, not per-entity:** accounting profile (from XBRL namespace), scope
@@ -58,12 +78,21 @@ data/                  local only, gitignored: vault/, staging/, market.duckdb
    derived data. A recurring defect may only be fixed by a named deterministic rule with its own fixture and test.
 10. **Single writer.** Fetchers and parsers write vault files and staging Parquet only. Only the
     promoter opens `data/market.duckdb` for writing, and promotes atomically after gates G1–G5.
-11. Timestamps are stored in UTC and converted to/from IST only at parse and display boundaries.
+11. Timestamps are `TIMESTAMP` columns holding UTC; convert to/from IST only at parse and display boundaries.
+12. IDs are deterministic (`stable_id`), so replays are idempotent. Never use random IDs for data rows.
+13. Schema lives only in `src/financials/db/schema.sql`. No nullable `UNIQUE` columns (DuckDB `OR IGNORE` bug [I1]).
+    Bulk inserts go through `financials.db.insert_rows` (Arrow), never row-by-row `executemany`.
+14. **Scope cutoff.** Out-of-scope inputs are vaulted (blob + filing) and promoted as `OUT_OF_SCOPE`;
+    nothing is parsed into canonical tables. Filter financials on period **end** (a Q3 FY25 Apr–Dec YTD
+    is in scope). Any window needing history before the cutoff (3Y/5Y CAGR, 5Y dilution, 5Y valuation
+    percentile, 3Y FCF conversion…) returns NULL via `min_periods_required`, never a partial-window number.
 
 ## Testing rules
 
 - Tests are offline. No test may touch the network. Fetchers are tested against vault/fixture files.
 - Every bug fix in parsing, corporate actions, periods or ratio math adds a regression test.
+- Never loop a query per row/security on a hot path (promotion, materialisation, screens): batch it.
+  `tests/test_benchmarks.py` guards this; refresh `docs/benchmarks.md` when timings change materially.
 - New parser or profile work starts from a real fixture of that exact profile and period type.
 
 ## Fetching (local machine only for now)

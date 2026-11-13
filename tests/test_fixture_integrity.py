@@ -23,9 +23,7 @@ def manifest_entries() -> list[tuple[str, str]]:
 def test_manifest_lists_every_fixture_file():
     listed = {p for p, _ in manifest_entries()}
     on_disk = {
-        str(p.relative_to(FIXTURES))
-        for p in FIXTURES.rglob("*")
-        if p.is_file() and p.parent != FIXTURES
+        str(p.relative_to(FIXTURES)) for p in FIXTURES.rglob("*") if p.is_file() and p.parent != FIXTURES
     }
     assert listed == on_disk
 

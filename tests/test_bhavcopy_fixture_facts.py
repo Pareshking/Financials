@@ -4,12 +4,22 @@ from decimal import Decimal
 
 from _fixture_helpers import load_sec_bhavdata_full, load_udiff
 
-UDIFF_REQUIRED = {"TradDt", "FinInstrmId", "ISIN", "TckrSymb", "SctySrs", "OpnPric", "ClsPric", "PrvsClsgPric", "TtlTradgVol"}
+UDIFF_REQUIRED = {
+    "TradDt",
+    "FinInstrmId",
+    "ISIN",
+    "TckrSymb",
+    "SctySrs",
+    "OpnPric",
+    "ClsPric",
+    "PrvsClsgPric",
+    "TtlTradgVol",
+}
 
 
 def test_udiff_columns_present_and_no_delivery_column():
     row = next(iter(load_udiff("20251014").values()))
-    assert UDIFF_REQUIRED <= row.keys()
+    assert row.keys() >= UDIFF_REQUIRED
     assert not any("deliv" in k.lower() for k in row)
 
 
@@ -45,3 +55,11 @@ def test_sec_bhavdata_full_has_delivery_but_no_isin_and_unadjusted_prev_close():
     assert "ISIN" not in header
     assert rows[("TATAMOTORS", "EQ")]["PREV_CLOSE"] == "660.75"
     assert rows[("TATAINVEST", "EQ")]["PREV_CLOSE"] == "9922.00"
+
+
+def test_series_change_changes_fin_instrm_id_but_keeps_isin():
+    """FinInstrmId identifies a (security, series) pair, not a security [P13]."""
+    before, after = load_udiff("20250923")["AAATECH"], load_udiff("20251013")["AAATECH"]
+    assert before["ISIN"] == after["ISIN"] == "INE0D0U01013"
+    assert (before["SctySrs"], before["FinInstrmId"]) == ("EQ", "12533")
+    assert (after["SctySrs"], after["FinInstrmId"]) == ("BE", "12542")

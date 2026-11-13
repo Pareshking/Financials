@@ -60,262 +60,39 @@ Fetch etiquette: ≥1 s between requests per host, exponential backoff with jitt
 | L2 Canonical | Identity (`entity_master`, `securities`, `security_identifier_history`), `ohlcv`, `filing_meta`, `fact_observations`, `corp_actions`, `index_constituents_history`, `trading_calendar` | Rebuildable from L0/L1 + `quarantine_queue` resolutions + `company_overrides`. |
 | L3 Derived | Adjustment factors, adjusted prices, total-return index, `screener_features`, snapshots | Fully rebuildable. Swapped atomically. |
 
-## 5. Schema (DuckDB DDL, Phase 1 core)
+## 5. Schema
 
-Conventions:
-- Timestamps are `TIMESTAMPTZ` stored in UTC. IST is used only at parse and display boundaries.
-- Money is `DECIMAL(20,2)` rupees [C1]. Prices are `DECIMAL(18,4)`. Ratios are `DOUBLE`.
-- IDs are ULID strings.
+**Source of truth: `src/financials/db/schema.sql`.** It is applied by `financials.db.apply_schema`
+and, so batches are type- and FK-checked before promotion, also by the staging writer.
+This section only records the decisions; it does not duplicate the DDL.
 
-```sql
--- ── L0 Vault ─────────────────────────────────────────────────────────────
-CREATE TABLE blobs (
-    sha256            VARCHAR PRIMARY KEY,
-    byte_size         BIGINT  NOT NULL,
-    media_type        VARCHAR NOT NULL,
-    storage_path      VARCHAR NOT NULL,          -- data/vault/<sha[:2]>/<sha>.<ext>
-    first_fetched_at  TIMESTAMPTZ NOT NULL
-);
+| Layer | Tables |
+|---|---|
+| L0 | `blobs` (sha256 PK), `filings` (one publication of a blob; `UNIQUE(exchange, source_url, sha256)`) |
+| L1 | `raw_cm_bhavcopy`, `raw_delivery`, `raw_xbrl_facts`. Keyed by source identifiers plus `filing_id`. No surrogate IDs. |
+| L2 identity | `entity_master`, `securities`, `security_identifier_history` (date-bounded; `valid_to` exclusive), `trading_calendar` |
+| L2 market | `ohlcv` (resolved, unadjusted; delivery joined) |
+| L2 fundamentals | `filing_meta` (per filing × parser_version), `fact_observations` (long format) |
+| Control | `corp_actions`, `quarantine_queue`, `company_overrides` |
+| Not yet built | `entity_classification_history`, `index_constituents_history`, `raw_index_snapshot`, L3 tables |
 
--- A filing is one publication of a blob. The same blob mirrored on NSE and BSE,
--- or re-sent unchanged, is one blob with two filings.
-CREATE TABLE filings (
-    filing_id            VARCHAR PRIMARY KEY,
-    sha256               VARCHAR NOT NULL REFERENCES blobs(sha256),
-    exchange             VARCHAR NOT NULL,       -- NSE | BSE
-    category             VARCHAR NOT NULL,       -- RESULTS_XBRL | ANNUAL_XBRL | SHP_XBRL | REG30_XBRL
-                                                 -- | BHAVCOPY_CM | DELIVERY | INDEX_LIST | CORP_ACTIONS
-    source_url           VARCHAR NOT NULL,
-    exchange_ref         VARCHAR,                -- exchange-assigned id, if any
-    stated_symbol        VARCHAR,                -- as published, unresolved
-    stated_isin          VARCHAR,
-    broadcast_ts         TIMESTAMPTZ,            -- exchange dissemination time; NULL if unknown
-    broadcast_ts_source  VARCHAR NOT NULL,       -- RSS_PUBDATE | API_FIELD | EOD_RULE | UNKNOWN
-    fetched_at           TIMESTAMPTZ NOT NULL,
-    supersedes_filing_id VARCHAR REFERENCES filings(filing_id),  -- revised filing
-    UNIQUE (exchange, source_url, sha256)
-);
+Decisions:
+- **Timestamps are `TIMESTAMP` holding UTC.** `TIMESTAMPTZ` would make DuckDB's Python client require `pytz` [I2].
+- **Money is `DECIMAL(20,2)`, prices `DECIMAL(18,4)`, factors and ratios `DOUBLE`.** Bulk inserts go through Arrow (`decimal128`), which keeps decimals exact [I4].
+- **`fact_observations` has `period_type` (`DURATION`/`INSTANT`).** Instants store `period_start = period_end` because DuckDB PK columns cannot be NULL. CHECK constraints tie `unit` to `value_inr`/`value_other` and `period_type` to `period_months` (1..18).
+- **`filings.supersedes_filing_id` has no FK** (DuckDB self-reference limitation [I3]). It is enforced in code.
+- **No nullable `UNIQUE` columns.** DuckDB's `INSERT OR IGNORE` treats NULLs in them as conflicts and silently drops rows [I1]. `entity_master.cin` is therefore not UNIQUE.
+- **Deterministic IDs** (`financials.ids.stable_id`). A replay produces identical keys, so `INSERT OR IGNORE` makes promotion idempotent.
 
--- ── L1 Raw (source identifiers only, no surrogate IDs) ──────────────────
-CREATE TABLE raw_cm_bhavcopy (
-    filing_id      VARCHAR NOT NULL REFERENCES filings(filing_id),
-    exchange       VARCHAR NOT NULL,
-    trade_date     DATE    NOT NULL,
-    fin_instrm_id  VARCHAR,                      -- UDiFF FinInstrmId
-    isin           VARCHAR NOT NULL,
-    symbol         VARCHAR NOT NULL,
-    series         VARCHAR NOT NULL,
-    open           DECIMAL(18,4), high DECIMAL(18,4), low DECIMAL(18,4),
-    close          DECIMAL(18,4) NOT NULL,
-    last           DECIMAL(18,4),
-    prev_close_reported DECIMAL(18,4),           -- unadjusted [P2]; informational only
-    volume         BIGINT,
-    turnover_inr   DECIMAL(20,2),
-    trades         BIGINT,
-    PRIMARY KEY (exchange, trade_date, symbol, series, filing_id)
-);
+### 5.1 Identity resolution
+A universe row (`EQ`/`BE`/`BZ`) continues an existing security if **either**:
+- its `FinInstrmId` has ever belonged to that security (this survives splits [P5]), **or**
+- its ISIN is held by that security's open interval (this survives series changes, which assign a new `FinInstrmId` [P13]).
 
-CREATE TABLE raw_delivery (
-    filing_id   VARCHAR NOT NULL REFERENCES filings(filing_id),
-    exchange    VARCHAR NOT NULL,
-    trade_date  DATE    NOT NULL,
-    symbol      VARCHAR NOT NULL,
-    series      VARCHAR NOT NULL,
-    traded_qty  BIGINT,
-    deliv_qty   BIGINT,
-    deliv_pct   DOUBLE,
-    PRIMARY KEY (exchange, trade_date, symbol, series, filing_id)
-);
-
-CREATE TABLE raw_index_snapshot (
-    filing_id      VARCHAR NOT NULL REFERENCES filings(filing_id),
-    index_name     VARCHAR NOT NULL,             -- NIFTY 500
-    snapshot_date  DATE    NOT NULL,
-    symbol         VARCHAR NOT NULL,
-    series         VARCHAR NOT NULL,
-    isin           VARCHAR NOT NULL,
-    company_name   VARCHAR,
-    industry       VARCHAR,
-    PRIMARY KEY (index_name, snapshot_date, isin)
-);
-
-CREATE TABLE raw_xbrl_facts (
-    filing_id       VARCHAR NOT NULL REFERENCES filings(filing_id),
-    parser_version  VARCHAR NOT NULL,
-    element_ns      VARCHAR NOT NULL,
-    element_name    VARCHAR NOT NULL,
-    context_id      VARCHAR NOT NULL,
-    ctx_start       DATE,                         -- as written in the context (may be wrong [X26])
-    ctx_end         DATE,
-    ctx_instant     DATE,
-    dimensions      JSON,                         -- {"RelatedPartyTransactionAxis": "...", ...}
-    unit_ref        VARCHAR,
-    decimals        VARCHAR,                      -- recorded, never trusted [X5]
-    value_text      VARCHAR
-);
-
--- ── L2 Identity ─────────────────────────────────────────────────────────
-CREATE TABLE entity_master (
-    entity_id      VARCHAR PRIMARY KEY,
-    legal_name     VARCHAR NOT NULL,
-    cin            VARCHAR UNIQUE,
-    status         VARCHAR NOT NULL DEFAULT 'ACTIVE', -- ACTIVE | MERGED | DELISTED | SUSPENDED
-    inactive_date  DATE,
-    exit_reason    VARCHAR
-);
-
-CREATE TABLE securities (
-    security_id  VARCHAR PRIMARY KEY,
-    entity_id    VARCHAR NOT NULL REFERENCES entity_master(entity_id),
-    share_class  VARCHAR NOT NULL                  -- COMMON | DVR | PARTLY_PAID
-);
-
--- Splits change ISIN [P5]; symbols get renamed; series move EQ↔BE↔BZ.
-CREATE TABLE security_identifier_history (
-    security_id     VARCHAR NOT NULL REFERENCES securities(security_id),
-    exchange        VARCHAR NOT NULL,
-    fin_instrm_id   VARCHAR,                       -- stable across ISIN change [P5, P8]; reuse UNVERIFIED [P9]
-    symbol          VARCHAR NOT NULL,
-    series          VARCHAR NOT NULL,
-    isin            VARCHAR NOT NULL,
-    bse_scrip_code  VARCHAR,
-    valid_from      DATE NOT NULL,
-    valid_to        DATE,                          -- NULL = current
-    evidence_filing_id VARCHAR REFERENCES filings(filing_id),
-    PRIMARY KEY (security_id, exchange, valid_from)
-);
-
-CREATE TABLE entity_classification_history (
-    entity_id           VARCHAR NOT NULL REFERENCES entity_master(entity_id),
-    valuation_archetype VARCHAR NOT NULL,           -- INDUSTRIAL_SERVICES | FINANCIAL_LENDING | INSURANCE | NEW_GEN_TECH
-    macro_sector VARCHAR, sector VARCHAR, industry VARCHAR, basic_industry VARCHAR,
-    valid_from          DATE NOT NULL,
-    valid_to            DATE,
-    source              VARCHAR NOT NULL,           -- INDEX_LIST | MANUAL_OVERRIDE | …
-    PRIMARY KEY (entity_id, valid_from)
-);
-
-CREATE TABLE trading_calendar (
-    exchange    VARCHAR NOT NULL,
-    cal_date    DATE    NOT NULL,
-    is_trading  BOOLEAN NOT NULL,                  -- historical truth = a bhavcopy exists for the date
-    note        VARCHAR,
-    PRIMARY KEY (exchange, cal_date)
-);
-
-CREATE TABLE index_constituents_history (
-    index_name   VARCHAR NOT NULL,
-    security_id  VARCHAR NOT NULL REFERENCES securities(security_id),
-    valid_from   DATE NOT NULL,
-    valid_to     DATE,
-    source       VARCHAR NOT NULL,                 -- SNAPSHOT | MANUAL_BACKFILL
-    PRIMARY KEY (index_name, security_id, valid_from)
-);
-
--- ── L2 Market ───────────────────────────────────────────────────────────
-CREATE TABLE ohlcv (                               -- resolved, unadjusted
-    security_id  VARCHAR NOT NULL REFERENCES securities(security_id),
-    exchange     VARCHAR NOT NULL,
-    series       VARCHAR NOT NULL,
-    trade_date   DATE    NOT NULL,
-    open DECIMAL(18,4), high DECIMAL(18,4), low DECIMAL(18,4), close DECIMAL(18,4) NOT NULL,
-    volume       BIGINT,
-    turnover_inr DECIMAL(20,2),
-    deliv_qty    BIGINT,
-    price_filing_id    VARCHAR NOT NULL REFERENCES filings(filing_id),
-    delivery_filing_id VARCHAR REFERENCES filings(filing_id),
-    PRIMARY KEY (security_id, exchange, series, trade_date)
-);
-
--- ── L2 Fundamentals ─────────────────────────────────────────────────────
-CREATE TABLE filing_meta (                          -- one row per parsed XBRL filing
-    filing_id            VARCHAR PRIMARY KEY REFERENCES filings(filing_id),
-    parser_version       VARCHAR NOT NULL,
-    entity_id            VARCHAR NOT NULL REFERENCES entity_master(entity_id),
-    accounting_profile   VARCHAR NOT NULL,          -- from namespace [X1]: INDAS_CORP | INDAS_NBFC | IGAAP_BANK
-                                                    -- | IRDAI_GENERAL | IRDAI_LIFE
-    taxonomy_ns          VARCHAR NOT NULL,
-    scope                VARCHAR NOT NULL,          -- STANDALONE | CONSOLIDATED [X6]
-    level_of_rounding    VARCHAR NOT NULL,          -- Rupees | Thousands | Lakhs | Millions | Crores
-    fy_start             DATE NOT NULL,
-    fy_end               DATE NOT NULL,
-    reporting_quarter    VARCHAR,
-    audited              BOOLEAN,
-    board_meeting_end_ts TIMESTAMPTZ,
-    visible_from_ts      TIMESTAMPTZ NOT NULL,      -- §6.3
-    visible_from_source  VARCHAR NOT NULL,          -- BROADCAST | BOARD_MEETING_RULE
-    interest_paid_cfo_class VARCHAR,                -- OPERATING | FINANCING | NONE | MIXED [X14]
-    interest_recd_cfo_class VARCHAR                 -- OPERATING | INVESTING | NONE | MIXED
-);
-
--- Long-format canonical facts. Never updated in place: a revision is a new filing,
--- a re-parse is a new parser_version.
-CREATE TABLE fact_observations (
-    filing_id       VARCHAR NOT NULL REFERENCES filings(filing_id),
-    parser_version  VARCHAR NOT NULL,
-    entity_id       VARCHAR NOT NULL,
-    scope           VARCHAR NOT NULL,
-    canonical_tag   VARCHAR NOT NULL,               -- revenue_ops, pbt, borrowings_current, …
-    period_start    DATE,                           -- NULL for instants
-    period_end      DATE NOT NULL,
-    period_months   INTEGER,                        -- NULL for instants; 1..18
-    unit            VARCHAR NOT NULL,               -- INR | INR_PER_SHARE | PURE | SHARES
-    value_inr       DECIMAL(20,2),                  -- when unit = INR
-    value_other     DECIMAL(28,8),                  -- otherwise
-    source_element  VARCHAR NOT NULL,               -- raw element name(s)
-    visible_from_ts TIMESTAMPTZ NOT NULL,
-    PRIMARY KEY (filing_id, parser_version, canonical_tag, period_end, period_start),
-    CHECK ((unit = 'INR') = (value_inr IS NOT NULL))
-);
-
--- ── Corporate actions & control ─────────────────────────────────────────
-CREATE TABLE corp_actions (
-    action_id         VARCHAR PRIMARY KEY,
-    entity_id         VARCHAR NOT NULL REFERENCES entity_master(entity_id),
-    security_id       VARCHAR REFERENCES securities(security_id),
-    action_type       VARCHAR NOT NULL,             -- SPLIT | BONUS | RIGHTS | DEMERGER | MERGER | DIVIDEND | CONSOLIDATION
-    ex_date           DATE NOT NULL,
-    record_date       DATE,
-    ratio_num         DECIMAL(18,6),
-    ratio_den         DECIMAL(18,6),
-    issue_price       DECIMAL(18,4),                -- RIGHTS
-    cash_per_share    DECIMAL(18,4),                -- DIVIDEND (total-return only)
-    price_factor      DOUBLE,                       -- multiply prices before ex_date
-    eps_factor        DOUBLE,                       -- multiply per-share figures before ex_date (share-count events only)
-    observed_gap      DOUBLE,                       -- Open_ex / Close_{ex-1}
-    status            VARCHAR NOT NULL DEFAULT 'PENDING', -- PENDING | VERIFIED | UNOBSERVABLE | QUARANTINED | VERIFIED_MANUAL
-    related_entity_id VARCHAR REFERENCES entity_master(entity_id),
-    coa_pct           DOUBLE,                       -- cost-of-acquisition split for this side of a demerger
-    source_filing_id  VARCHAR NOT NULL REFERENCES filings(filing_id)
-);
-
-CREATE TABLE quarantine_queue (
-    quarantine_id   VARCHAR PRIMARY KEY,
-    stage           VARCHAR NOT NULL,               -- FETCH | PARSE | PERIOD | IDENTITY | IDENTIFIER | CORP_ACTION | GAP | GATE
-    reason_code     VARCHAR NOT NULL,
-    entity_id       VARCHAR,
-    security_id     VARCHAR,
-    filing_id       VARCHAR,
-    details         JSON NOT NULL,
-    created_at      TIMESTAMPTZ NOT NULL,
-    resolved_at     TIMESTAMPTZ,
-    resolution      VARCHAR,                        -- ACCEPTED | REJECTED | FIXED_BY_RULE | OVERRIDDEN
-    resolution_note VARCHAR
-);
-
-CREATE TABLE company_overrides (                    -- human decisions, each with a reason
-    override_id  VARCHAR PRIMARY KEY,
-    entity_id    VARCHAR NOT NULL REFERENCES entity_master(entity_id),
-    field        VARCHAR NOT NULL,                  -- e.g. valuation_archetype
-    value        VARCHAR NOT NULL,
-    valid_from   DATE NOT NULL,
-    valid_to     DATE,
-    reason       VARCHAR NOT NULL,
-    created_at   TIMESTAMPTZ NOT NULL
-);
-```
-
-L3 objects (views or tables rebuilt by the promoter): `price_adj_factors`, `ohlcv_adj`, `total_return_index`, `screener_features`, `screener_features_snapshots`, `user_custom_ratios`. Phase 2 adds `shareholding_observations` and `supplemental_kpis`. Phase 3 adds the event, F&O and AMC tables.
+Other outcomes:
+- Both keys pointing at different securities → `IDENTIFIER/ISIN_COLLISION`.
+- Any change of ISIN, symbol, series or `FinInstrmId` closes the open interval and opens a new one, emitting an event. `ISIN_CHANGE` feeds the gap auditor.
+- A split and a series change on the same day would create a new security. This is not seen yet; the gap auditor would flag it.
 
 ## 6. Time, period and scope rules
 
@@ -553,6 +330,9 @@ ALIAS      := a name in the alias registry (case-insensitive, spaces allowed, e.
 ## 15. Phases
 
 **Phase 1: thin slice, screenable end-to-end (Nifty 500)**
+
+Status: built and tested are the vault, staging, promoter (G1, G2, G3 via parser), UDiFF and delivery loaders, identity history, corp-action ledger and verification, gap auditor, price adjustment, `INDAS_CORP` parser and PIT read. Not built yet: `index_constituents_history` and snapshot loader, total-return index, `shares_out` cross-check with Reg. 31, `screener_features`, DSL, G4/G5, fetchers.
+
 - Vault (`blobs`, `filings`) and staging/promoter skeleton.
 - UDiFF bhavcopy + `sec_bhavdata_full` loaders.
 - `trading_calendar`.

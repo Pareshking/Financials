@@ -61,10 +61,21 @@ Last reviewed: 2026-11-13.
 | P6 | Bonus keeps ISIN (PIDILITIND). | VERIFIED | fixtures |
 | P7 | Demerger parent keeps ISIN and symbol on ex-date (TATAMOTORS `INE155A01022`, open 400.00 vs prior close 660.75). | VERIFIED | fixtures |
 | P8 | `FinInstrmId` stable across ISIN change: TATAINVEST (1621) and PIDILITIND (2664) too. | OBSERVED | scratch analysis |
+| P13 | `FinInstrmId` identifies a **(security, series)** pair: a series change (EQ↔BE↔BZ) keeps the ISIN but assigns a different `FinInstrmId` (AAATECH EQ 12533 → BE 12542). 143 ISINs did this in 28 days; 97 within the 5 committed fixture days. No `FinInstrmId` appeared in more than one series. | VERIFIED | `test_series_change_changes_fin_instrm_id_but_keeps_isin`; scratch analysis for counts |
 | P9 | `FinInstrmId` is never reused for a different security | UNVERIFIED | |
 | P10 | `sec_bhavdata_full_DDMMYYYY.csv` has `PREV_CLOSE`, OHLC, `TTL_TRD_QNTY`, `DELIV_QTY`, `DELIV_PER`; **no ISIN**; `PREV_CLOSE` unadjusted on ex-date. Leading spaces after commas. | VERIFIED | 2025-10-14 fixture |
 | P11 | Time of day the bhavcopy and delivery files become available | UNVERIFIED | |
 | P12 | Source for corporate-action records (ratios, ex-dates) | UNVERIFIED | Likely `www.nseindia.com` API → local fetcher |
+
+## 2a. Implementation facts (DuckDB 1.3.2, pyarrow 26)
+
+| # | Claim | Status | Evidence |
+|---|---|---|---|
+| I1 | `INSERT OR IGNORE` into a table with a nullable `UNIQUE` column treats NULLs as conflicts: 2 of 2,460 rows inserted. | VERIFIED | `test_insert_or_ignore_keeps_all_rows_with_null_optional_columns` |
+| I2 | Fetching `TIMESTAMPTZ` into Python requires `pytz`. | OBSERVED | 2026-11-13 |
+| I3 | A self-referencing FK rejects a parent and child inserted in one statement. | OBSERVED | 2026-11-13 |
+| I4 | DECIMAL and JSON survive a Parquet round trip; Arrow `decimal128` loads into DECIMAL columns exactly. | VERIFIED | pipeline tests (exact Decimal assertions) |
+| I5 | `executemany` is ~1 ms/row; Arrow registration loads ~3,000 rows in <0.1 s. | OBSERVED | benchmark 2026-11-13 |
 
 ## 3. Access & discovery
 

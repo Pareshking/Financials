@@ -111,6 +111,12 @@ def build_parser() -> argparse.ArgumentParser:
     bf.add_argument("--manifest", type=Path, required=True)
     bf.add_argument("--index", default="NIFTY 500")
     bf.add_argument("--expected-count", type=int, default=500)
+    so = sub.add_parser("scope-override", help="pin (or --clear) a company's default scopes (audited)")
+    so.add_argument("--entity", required=True)
+    so.add_argument("--quarterly", choices=("CONSOLIDATED", "STANDALONE"))
+    so.add_argument("--annual", choices=("CONSOLIDATED", "STANDALONE"))
+    so.add_argument("--clear", action="store_true")
+    so.add_argument("--reason", required=True)
     sc = sub.add_parser("screen")
     sc.add_argument("query")
     sc.add_argument("--as-of", type=_date)
@@ -193,6 +199,17 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
                 print(f"error: {exc}", file=out)
                 return 1
             print(json.dumps(result, default=str, indent=1), file=out)
+            return 0
+        if args.cmd == "scope-override":
+            from financials.admin import AdminError, set_scope_override
+
+            q, an = (None, None) if args.clear else (args.quarterly, args.annual)
+            try:
+                print(json.dumps(set_scope_override(con, args.entity, quarterly=q, annual=an, reason=args.reason)),
+                      file=out)  # fmt: skip
+            except AdminError as exc:
+                print(f"error: {exc}", file=out)
+                return 2
             return 0
         if args.cmd == "backfill-index":
             from financials.admin import AdminError, backfill_index

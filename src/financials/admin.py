@@ -294,3 +294,40 @@ def _merge_securities(con, q: dict, details: dict, note: str) -> dict:
                 details={"trade_date": trade_date, "gap": f.gap, "prev_close": prev, "open": r["open"]},
             )
     return {"kept": keep, "merged": drop, "bars_loaded": loaded}
+
+
+# ── scope override (Mandate 3) ─────────────────────────────────────────────
+
+SCOPE_VALUES = ("CONSOLIDATED", "STANDALONE")
+
+
+def set_scope_override(con, entity_id: str, *, quarterly: str | None, annual: str | None, reason: str) -> dict:
+    """Pin a company's quarterly / annual scope (C18), or clear the pin with quarterly = annual = None.
+    Audited: every change appends a company_overrides row (field 'scope_policy')."""
+    if not reason.strip():
+        raise AdminError("a reason is required")
+    if (quarterly is None) != (annual is None):
+        raise AdminError("set both scopes, or neither to clear the override")
+    for v in (quarterly, annual):
+        if v is not None and v not in SCOPE_VALUES:
+            raise AdminError(f"scope must be one of {SCOPE_VALUES}")
+    return _transaction(con, _set_scope, entity_id, quarterly, annual, reason.strip())
+
+
+def _set_scope(con, entity_id: str, quarterly: str | None, annual: str | None, reason: str) -> dict:
+    if con.execute("SELECT 1 FROM entity_master WHERE entity_id = ?", [entity_id]).fetchone() is None:
+        raise AdminError(f"unknown entity {entity_id}")
+    now = utc_now()
+    con.execute("DELETE FROM entity_scope_override WHERE entity_id = ?", [entity_id])
+    value = {"quarterly": quarterly, "annual": annual} if quarterly else "CLEARED"
+    if quarterly:
+        row = {"entity_id": entity_id, "quarterly_scope": quarterly, "annual_scope": annual, "reason": reason,
+               "recorded_at": now}  # fmt: skip
+        insert_rows(con, "entity_scope_override", [row])
+    body = value if isinstance(value, str) else json.dumps(value, sort_keys=True)
+    insert_rows(con, "company_overrides", [{
+        "override_id": stable_id("ovr", entity_id, "scope_policy", body, now), "entity_id": entity_id,
+        "field": "scope_policy", "value": body, "valid_from": now.date(), "valid_to": None, "reason": reason,
+        "created_at": now,
+    }])  # fmt: skip
+    return {"entity_id": entity_id, "scope_policy": value}

@@ -131,6 +131,14 @@ Other outcomes:
 - Precedence for 12-month periods: a Reg. 34 annual fact supersedes the Reg. 33 FY fact **only from its own `visible_from_ts`**.
 
 ### 6.4 Scope continuity
+
+**Default scope per company (Mandate 3, C18).** `fundamentals.resolve_scope` returns one `ScopeDecision` per company and
+as-of: the default quarterly scope (consolidated if the latest quarterly filing has a consolidated version, else
+standalone), a complete fallback scope, an H1/FY bridge, or balance-sheet-only, never a mix. `scope_reason` records
+which. `default_annual_scope` (same rule on FY filings) drives annual statements. A manual override
+(`python -m financials scope-override --entity … --quarterly … --annual … --reason …`, or `--clear`) pins both and is
+audited.
+
 - TTM uses CONSOLIDATED only when all 4 trailing quarters exist in CONSOLIDATED; otherwise STANDALONE.
 - YoY on TTM needs **8** consecutive same-scope quarters.
 - A ratio never mixes scopes. Every row exposes `scope_used`.
@@ -257,6 +265,21 @@ All three are NULL for `FINANCIAL_LENDING` and `INSURANCE`; Beneish additionally
 ### 10.4 New-gen tech (archetype `NEW_GEN_TECH`)
 - From XBRL: EV/gross profit, ex-cash PE `(market_cap − cash_liquid) / (PAT − OtherIncome × (1 − etr))`, EV/billings `ev / (rev_ops + Δ contract liabilities)` (annual), EV/ESOP-adjusted EBITDA (`AdjustmentsForSharebasedPayments` is tagged in the CF), P/CFO, Rule of 40, net working-capital float, burn multiple, cash runway, ESOP-adjusted FCF.
 - From `supplemental_kpis` (manual or presentation-sourced, Phase 3): EV/GOV, take rate, contribution margin, NRR, CAC payback.
+
+### 10.1b Cash conversion and operating leverage (industrial, C19)
+
+| Column | Formula | Guard |
+|---|---|---|
+| `sloan_accrual` | (TTM PAT − CFO − CFI) / avg total assets | opening balance sheet |
+| `cfo_to_ebitda` | TTM CFO / TTM EBITDA | EBITDA > 0 |
+| `fcf_to_pat` | TTM FCF / TTM PAT | PAT > 0 |
+| `working_capital_intensity` | (receivables + inventories − payables) / TTM revenue | latest balance sheet |
+| `receivables_sales_divergence` | receivables YoY − revenue YoY | 8 quarters |
+| `net_debt_to_fcf` | net debt / TTM FCF | FCF > 0 |
+| `cost_of_debt` | TTM finance costs / avg (borrowings + leases) | opening balance sheet |
+| `dol` | EBIT YoY / revenue YoY | 8 quarters, \|revenue YoY\| ≥ 5%, EBIT > 0 both years |
+| `gross_ebitda_spread` | (gross profit − EBITDA) / revenue | COGS ≥ 10% of revenue |
+| `fcff_yield` | FCFF / EV, interest add-back per filing CFO classification | existing |
 
 ### 10.5 Lenders (`INDAS_NBFC`, `IGAAP_BANK`)
 

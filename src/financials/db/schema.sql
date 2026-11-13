@@ -366,6 +366,18 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     investment_income_ttm DECIMAL(24,2),
     persistency_13m     DOUBLE,              -- life insurers, filed in XBRL [X62]
     persistency_61m     DOUBLE,
+    scope_reason        VARCHAR,             -- DEFAULT | FALLBACK_DEFAULT_INCOMPLETE | OVERRIDE | YTD_BRIDGE | BALANCE_SHEET_ONLY
+    default_quarterly_scope VARCHAR,         -- company default for quarterly / TTM figures [C18]
+    default_annual_scope    VARCHAR,         -- company default for annual statements [C18]
+    sloan_accrual       DOUBLE,              -- (TTM PAT - CFO - CFI) / avg total assets [C19]
+    cfo_to_ebitda       DOUBLE,
+    fcf_to_pat          DOUBLE,
+    working_capital_intensity DOUBLE,        -- (receivables + inventory - payables) / TTM revenue
+    receivables_sales_divergence DOUBLE,     -- receivables YoY - revenue YoY (needs 8 quarters)
+    net_debt_to_fcf     DOUBLE,
+    cost_of_debt        DOUBLE,              -- TTM finance costs / avg (borrowings + leases)
+    dol                 DOUBLE,              -- EBIT YoY / revenue YoY, only if |revenue YoY| >= 5% (needs 8 quarters)
+    gross_ebitda_spread DOUBLE,              -- (gross profit - EBITDA) / revenue; COGS >= 10% guard (C6)
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -455,6 +467,18 @@ CREATE TABLE IF NOT EXISTS screener_features (
     investment_income_ttm DECIMAL(24,2),
     persistency_13m     DOUBLE,              -- life insurers, filed in XBRL [X62]
     persistency_61m     DOUBLE,
+    scope_reason        VARCHAR,             -- DEFAULT | FALLBACK_DEFAULT_INCOMPLETE | OVERRIDE | YTD_BRIDGE | BALANCE_SHEET_ONLY
+    default_quarterly_scope VARCHAR,         -- company default for quarterly / TTM figures [C18]
+    default_annual_scope    VARCHAR,         -- company default for annual statements [C18]
+    sloan_accrual       DOUBLE,              -- (TTM PAT - CFO - CFI) / avg total assets [C19]
+    cfo_to_ebitda       DOUBLE,
+    fcf_to_pat          DOUBLE,
+    working_capital_intensity DOUBLE,        -- (receivables + inventory - payables) / TTM revenue
+    receivables_sales_divergence DOUBLE,     -- receivables YoY - revenue YoY (needs 8 quarters)
+    net_debt_to_fcf     DOUBLE,
+    cost_of_debt        DOUBLE,              -- TTM finance costs / avg (borrowings + leases)
+    dol                 DOUBLE,              -- EBIT YoY / revenue YoY, only if |revenue YoY| >= 5% (needs 8 quarters)
+    gross_ebitda_spread DOUBLE,              -- (gross profit - EBITDA) / revenue; COGS >= 10% guard (C6)
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -490,4 +514,14 @@ CREATE TABLE IF NOT EXISTS supplemental_kpis (
     recorded_at     TIMESTAMP NOT NULL,
     notes           VARCHAR,
     PRIMARY KEY (entity_id, kpi, period_start, period_end, visible_from_ts)
+);
+
+-- Manual per-company scope override (Mandate 3, C18). Written only through admin.set_scope_override, which also
+-- appends an audit row to company_overrides; a user preference, not data, so it applies at every as-of date.
+CREATE TABLE IF NOT EXISTS entity_scope_override (
+    entity_id       VARCHAR PRIMARY KEY REFERENCES entity_master(entity_id),
+    quarterly_scope VARCHAR NOT NULL,        -- CONSOLIDATED | STANDALONE
+    annual_scope    VARCHAR NOT NULL,
+    reason          VARCHAR NOT NULL,
+    recorded_at     TIMESTAMP NOT NULL
 );

@@ -96,6 +96,15 @@ ALIASES: dict[str, tuple[str, str]] = {
     "investment income": ("(investment_income_ttm / 10000000)", "INR crore, TTM, insurers"),
     "persistency 13m": ("(persistency_13m * 100)", "%, life insurers"),
     "persistency 61m": ("(persistency_61m * 100)", "%, life insurers"),
+    "sloan accrual": ("(sloan_accrual * 100)", "% of avg total assets"),
+    "cfo to ebitda": ("(cfo_to_ebitda * 100)", "%"),
+    "fcf to pat": ("(fcf_to_pat * 100)", "%"),
+    "working capital intensity": ("(working_capital_intensity * 100)", "% of TTM revenue"),
+    "receivables sales divergence": ("(receivables_sales_divergence * 100)", "percentage points (needs 8 quarters)"),
+    "net debt to fcf": ("net_debt_to_fcf", "years"),
+    "cost of debt": ("(cost_of_debt * 100)", "%"),
+    "dol": ("dol", "x (needs 8 quarters, |revenue change| >= 5%)"),
+    "gross ebitda spread": ("(gross_ebitda_spread * 100)", "percentage points"),
 }
 
 KEYWORDS = {"and", "or", "not"}

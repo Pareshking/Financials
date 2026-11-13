@@ -136,17 +136,99 @@ def load_factbook(con, entity_id: str, scope: str, as_of: datetime) -> FactBook:
     return book
 
 
-def choose_scope(con, entity_id: str, as_of: datetime, end: date, *, quarters: int = 4) -> tuple[str, FactBook] | None:
-    """CONSOLIDATED when `quarters` consecutive consolidated quarters exist, else STANDALONE (§6.4)."""
-    for scope in ("CONSOLIDATED", "STANDALONE"):
-        book = load_factbook(con, entity_id, scope, as_of)
-        if all(book.quarter("revenue_from_operations", _add_months(end, -3 * i)) is not None for i in range(quarters)):
-            return scope, book
-    for scope in ("CONSOLIDATED", "STANDALONE"):  # H1/FY-only reporters (TTM via YTD bridge)
-        book = load_factbook(con, entity_id, scope, as_of)
-        if book.ttm("revenue_from_operations", end) is not None:
-            return scope, book
+SCOPES = ("CONSOLIDATED", "STANDALONE")
+ANCHOR_TAG = "pat"  # every profile (corporate, NBFC, bank, insurer) files profit for the period
+
+
+@dataclass(frozen=True)
+class ScopePolicy:
+    """Per-company default scopes [Mandate 3, C18]: consolidated when the company files consolidated results for its
+    latest quarter (resp. financial year) visible at as-of, else standalone; a manual override wins."""
+
+    default_quarterly_scope: str | None
+    default_annual_scope: str | None
+    source: str  # DERIVED | OVERRIDE | NONE
+
+
+@dataclass
+class ScopeDecision:
+    scope: str
+    book: FactBook
+    reason: str  # DEFAULT | FALLBACK_DEFAULT_INCOMPLETE | OVERRIDE | YTD_BRIDGE | BALANCE_SHEET_ONLY
+    policy: ScopePolicy
+
+
+def scope_policy(con, entity_id: str, as_of: datetime) -> ScopePolicy:
+    row = con.execute(
+        "SELECT quarterly_scope, annual_scope FROM entity_scope_override WHERE entity_id = ?", [entity_id]
+    ).fetchone()
+    if row:
+        return ScopePolicy(row[0], row[1], "OVERRIDE")
+    latest = {
+        (months, scope): end
+        for months, scope, end in con.execute(
+            """SELECT period_months, scope, max(period_end) FROM fact_observations
+               WHERE entity_id = ? AND canonical_tag = ? AND period_type = 'DURATION' AND period_months IN (3, 12)
+                 AND visible_from_ts <= ? GROUP BY period_months, scope""",
+            [entity_id, ANCHOR_TAG, as_of],
+        ).fetchall()
+    }
+
+    def pick(months: int) -> str | None:
+        cons, stand = latest.get((months, "CONSOLIDATED")), latest.get((months, "STANDALONE"))
+        if cons is None and stand is None:
+            return None
+        return "CONSOLIDATED" if cons is not None and (stand is None or cons >= stand) else "STANDALONE"
+
+    quarterly = pick(3)
+    annual = pick(12) or quarterly
+    return ScopePolicy(quarterly, annual, "DERIVED" if quarterly or annual else "NONE")
+
+
+def _anchor(book: FactBook) -> str:
+    return ANCHOR_TAG if ANCHOR_TAG in book.durations else "revenue_from_operations"
+
+
+def _has_quarters(book: FactBook, end: date, quarters: int) -> bool:
+    tag = _anchor(book)
+    return all(book.quarter(tag, _add_months(end, -3 * i)) is not None for i in range(quarters))
+
+
+def resolve_scope(con, entity_id: str, as_of: datetime, end: date, *, quarters: int = 4) -> ScopeDecision | None:
+    """One scope for the whole TTM window, never a mix of standalone and consolidated quarters (§6.4).
+
+    1. The default quarterly scope, if it has all `quarters` quarters.
+    2. Otherwise the other scope, only if *it* has all of them (reason FALLBACK_DEFAULT_INCOMPLETE).
+    3. Otherwise a TTM via the H1 / FY bridge in the default scope, then the other one (YTD_BRIDGE).
+    4. Otherwise the latest balance sheet in the default scope, then the other (BALANCE_SHEET_ONLY): no flow ratios.
+    A manual override pins the scope and is never silently replaced: if it lacks data the decision is None.
+    """
+    policy = scope_policy(con, entity_id, as_of)
+    if policy.default_quarterly_scope is None and policy.source != "OVERRIDE":
+        order = list(SCOPES)
+    else:
+        first = policy.default_quarterly_scope or "CONSOLIDATED"
+        order = [first] if policy.source == "OVERRIDE" else [first, *[s for s in SCOPES if s != first]]
+    books = {s: load_factbook(con, entity_id, s, as_of) for s in order}
+    default_reason = "OVERRIDE" if policy.source == "OVERRIDE" else "DEFAULT"
+    for i, s in enumerate(order):
+        if _has_quarters(books[s], end, quarters):
+            return ScopeDecision(s, books[s], default_reason if i == 0 else "FALLBACK_DEFAULT_INCOMPLETE", policy)
+    for s in order:
+        if books[s].ttm(_anchor(books[s]), end) is not None:
+            return ScopeDecision(s, books[s], "YTD_BRIDGE", policy)
+    for s in order:
+        if books[s].latest_instant("total_assets", end) is not None:
+            return ScopeDecision(s, books[s], "BALANCE_SHEET_ONLY", policy)
     return None
+
+
+def choose_scope(con, entity_id: str, as_of: datetime, end: date, *, quarters: int = 4) -> tuple[str, FactBook] | None:
+    """Backward-compatible wrapper: (scope, book) of `resolve_scope`, excluding balance-sheet-only decisions."""
+    d = resolve_scope(con, entity_id, as_of, end, quarters=quarters)
+    if d is None or d.reason == "BALANCE_SHEET_ONLY":
+        return None
+    return d.scope, d.book
 
 
 def safe_div(a: Decimal | None, b: Decimal | None, *, positive_denominator: bool = True) -> Decimal | None:
@@ -297,6 +379,65 @@ def _avg_invested(book: FactBook, closing_date: date | None, closing: Decimal | 
         return None
     opening = invested_capital_at(book, _add_months(closing_date, -12))
     return None if opening is None else (opening + closing) / 2
+
+
+CASH_CONVERSION_COLUMNS = (
+    "sloan_accrual", "cfo_to_ebitda", "fcf_to_pat", "working_capital_intensity", "receivables_sales_divergence",
+    "net_debt_to_fcf", "cost_of_debt", "dol", "gross_ebitda_spread",
+)  # fmt: skip
+DOL_MIN_REVENUE_CHANGE = Decimal("0.05")
+
+
+def debt_at(book: FactBook, d: date) -> Decimal | None:
+    g = lambda tag: book.instants.get(tag, {}).get(d)  # noqa: E731
+    borrowings = _sum(g("borrowings_noncurrent"), g("borrowings_current"))
+    if borrowings is None:
+        return None
+    return (
+        borrowings + (g("lease_liabilities_noncurrent") or Decimal(0)) + (g("lease_liabilities_current") or Decimal(0))
+    )
+
+
+def cash_conversion_blocks(book: FactBook, end: date, b: dict) -> dict:
+    """Corporate cash-conversion and operating-leverage ratios (architecture §10.1b) [C19]. Industrial books only
+    (callers NULL them for lenders / insurers). Averages are (opening + closing) / 2 over 12 months; YoY ratios need
+    8 in-scope quarters (C9) and stay NULL until then."""
+    out = dict.fromkeys(CASH_CONVERSION_COLUMNS)
+    t = lambda tag: book.ttm(tag, end)  # noqa: E731
+    rev, pat, ebitda, cfo, fcf = b["rev_ops"], b["pat"], b["ebitda"], b["cfo"], b["fcf"]
+    cf_end = b["cf_as_of"]
+    cfi = book.ttm_from_ytd("cfi", cf_end) if cf_end else None
+    avg_assets, _, _ = average_instant(book, "total_assets", end)
+    if None not in (pat, cfo, cfi, avg_assets) and avg_assets:
+        out["sloan_accrual"] = (pat - cfo - cfi) / avg_assets
+    if ebitda is not None and ebitda > 0:
+        out["cfo_to_ebitda"] = safe_div(cfo, ebitda)
+    if pat is not None and pat > 0:
+        out["fcf_to_pat"] = safe_div(fcf, pat)
+    bs = b["bs_as_of"]
+    stock = lambda tag, d=bs: book.instants.get(tag, {}).get(d) if d else None  # noqa: E731
+    recv, inv, pay = stock("trade_receivables_current"), stock("inventories"), stock("trade_payables_current")
+    if None not in (recv, inv, pay) and rev:
+        out["working_capital_intensity"] = (recv + inv - pay) / rev
+    if fcf is not None and fcf > 0 and b["net_debt"] is not None:
+        out["net_debt_to_fcf"] = b["net_debt"] / fcf
+    closing, opening = b["total_debt"], (debt_at(book, _add_months(bs, -12)) if bs else None)
+    fin = t("finance_costs")
+    if None not in (closing, opening, fin) and closing + opening > 0:
+        out["cost_of_debt"] = fin / ((closing + opening) / 2)
+    if b["gross_profit"] is not None and rev and ebitda is not None:  # gross profit already needs COGS >= 10% (C6)
+        out["gross_ebitda_spread"] = (b["gross_profit"] - ebitda) / rev
+    if quarters_available_since(end, 8):
+        prev = building_blocks(book, _add_months(end, -12))
+        rev0, ebit0, ebit = prev["rev_ops"], prev["ebit"], b["ebit"]
+        if None not in (rev, rev0, ebit, ebit0) and rev0 > 0 and ebit0 > 0 and ebit > 0:
+            drev = rev / rev0 - 1
+            if abs(drev) >= DOL_MIN_REVENUE_CHANGE:  # guard: DOL explodes when revenue barely moves
+                out["dol"] = (ebit / ebit0 - 1) / drev
+        recv0 = book.instants.get("trade_receivables_current", {}).get(_add_months(bs, -12)) if bs else None
+        if None not in (recv, recv0, rev, rev0) and recv0 > 0 and rev0 > 0:
+            out["receivables_sales_divergence"] = (recv / recv0 - 1) - (rev / rev0 - 1)
+    return out
 
 
 def _core(continuing: Decimal | None, exceptional: Decimal | None, etr: Decimal) -> Decimal | None:

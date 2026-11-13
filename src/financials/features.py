@@ -22,15 +22,17 @@ from financials.corp_actions import ACCEPTED_STATUSES
 from financials.db import insert_rows, table_columns
 from financials.fundamentals import (
     BANK_COLUMNS,
+    CASH_CONVERSION_COLUMNS,
     INSURER_COLUMNS,
     NBFC_COLUMNS,
     altman_z_double_prime,
     bank_blocks,
     building_blocks,
-    choose_scope,
+    cash_conversion_blocks,
     insurer_blocks,
     load_factbook,
     nbfc_blocks,
+    resolve_scope,
     safe_div,
     yoy_growth,
 )
@@ -155,8 +157,8 @@ def _preload(con, as_of_ts: datetime):
     )
     quarter_end = dict(
         con.execute(
-            """SELECT entity_id, max(period_end) FROM fact_observations WHERE canonical_tag = 'revenue_from_operations'
-               AND period_type = 'DURATION' AND visible_from_ts <= ? GROUP BY entity_id""",
+            """SELECT entity_id, max(period_end) FROM fact_observations WHERE canonical_tag IN ('pat',
+               'revenue_from_operations') AND period_type = 'DURATION' AND visible_from_ts <= ? GROUP BY entity_id""",
             [as_of_ts],
         ).fetchall()
     )
@@ -239,14 +241,17 @@ _EMPTY_FUNDAMENTALS: dict = {
     "sales_ttm": None, "ebitda_ttm": None, "pat_ttm": None, "fcf_ttm": None, "net_debt": None,
     "total_equity": None, "opm": None, "sales_growth_yoy": None, "profit_growth_yoy": None, "roe": None,
     "roce": None, "roic": None, "croic": None, "debt_to_equity": None, "other_income_to_pbt": None,
-    "altman_z_dd": None, "scope_used": None, "fundamentals_end": None, "bs_as_of": None, "cf_as_of": None,
+    "altman_z_dd": None, "scope_used": None, "scope_reason": None, "default_quarterly_scope": None,
+    "default_annual_scope": None, "fundamentals_end": None, "bs_as_of": None, "cf_as_of": None,
     "_net_debt": None, "_fcff": None, "_pat_owners": None, "_pe_earnings": None, "_equity_owners": None,
     "_minority": None, "roe_continuing": None, "core_profit_ttm": None, "_pat_owners_total": None,
-    **dict.fromkeys(NBFC_COLUMNS + BANK_COLUMNS + INSURER_COLUMNS),
+    **dict.fromkeys(NBFC_COLUMNS + BANK_COLUMNS + INSURER_COLUMNS + CASH_CONVERSION_COLUMNS),
 }  # fmt: skip
 
 # Industrial ratios that do not apply to lenders (architecture §10): NULL for INDAS_NBFC books.
-_NOT_FOR_LENDERS = ("ebitda_ttm", "opm", "roce", "roic", "croic", "debt_to_equity", "altman_z_dd", "fcf_ttm")
+_NOT_FOR_LENDERS = (
+    "ebitda_ttm", "opm", "roce", "roic", "croic", "debt_to_equity", "altman_z_dd", "fcf_ttm", *CASH_CONVERSION_COLUMNS,
+)  # fmt: skip
 
 
 def _eps(profit: Decimal | None, shares: Decimal | None) -> Decimal | None:
@@ -257,24 +262,23 @@ def _eps(profit: Decimal | None, shares: Decimal | None) -> Decimal | None:
 
 def _fundamentals(con, entity_id: str, as_of_ts: datetime, end: date) -> dict:
     empty = dict(_EMPTY_FUNDAMENTALS)
-    chosen = choose_scope(con, entity_id, as_of_ts, end)
-    if chosen is None:
-        # No TTM window yet: balance-sheet ratios still apply (consolidated first).
-        for scope in ("CONSOLIDATED", "STANDALONE"):
-            book = load_factbook(con, entity_id, scope, as_of_ts)
-            if book.latest_instant("total_assets", end) is not None:
-                chosen = (scope, book)
-                break
-    if chosen is None:
+    decision = resolve_scope(con, entity_id, as_of_ts, end)  # one scope per row, never mixed [C18]
+    if decision is None:
         return {**empty, "fundamentals_end": end}
-    scope, book = chosen
+    scope, book = decision.scope, decision.book
+    scope_cols = {
+        "scope_reason": decision.reason,
+        "default_quarterly_scope": decision.policy.default_quarterly_scope,
+        "default_annual_scope": decision.policy.default_annual_scope,
+    }
     b = building_blocks(book, end)
     eq, debt = b["total_equity"], b["total_debt"]
     capital = eq + debt if eq is not None and debt is not None else None
     regulatory = None
     if scope == "CONSOLIDATED" and "interest_expended" in book.durations:
         regulatory = load_factbook(con, entity_id, "STANDALONE", as_of_ts)  # standalone disclosures [X60]
-    return _lender_columns(book, end, regulatory) | _insurer_columns(book, end) | {
+    cash = {k: _f(v) for k, v in cash_conversion_blocks(book, end, b).items()}
+    return scope_cols | cash | _lender_columns(book, end, regulatory) | _insurer_columns(book, end) | {
         "sales_ttm": b["rev_ops"], "ebitda_ttm": b["ebitda"], "pat_ttm": b["pat"], "fcf_ttm": b["fcf"],
         "net_debt": b["net_debt"], "total_equity": eq,
         "opm": _f(safe_div(b["ebitda"], b["rev_ops"])),

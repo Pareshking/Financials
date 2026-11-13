@@ -13,6 +13,13 @@ No redistribution.
 python -m pip install -e ".[dev]"   # Python 3.11+
 python -m pytest                    # must pass before every commit
 ruff check src tests && ruff format --check src tests   # CI runs both
+
+# local operation (network; never in tests or CI)
+python -m financials --data-dir data init-db
+python -m financials --data-dir data fetch-days 2026-11-12        # also fetch-corp-actions / -holidays / -index / -shareholding / -results
+python -m financials --data-dir data promote                       # the only writer
+python -m financials --data-dir data materialize 2026-11-12
+python -m financials --data-dir data screen "Market Cap > 500 AND ROE > 15"
 ```
 
 ## Layout
@@ -22,7 +29,9 @@ docs/                  architecture.md, references.md
 tests/fixtures/        real, unmodified NSE files + MANIFEST.md (sha256 + source URL)
 tests/test_*_fixture_facts.py   characterisation tests pinning VERIFIED claims
 src/financials/        db/schema.sql (DDL source of truth), parsers/ (pure: bytes → rows), identity.py,
-                       corp_actions.py, vault.py, staging.py (fetch/parse side), promoter.py (single writer)
+                       corp_actions.py, returns.py, calendar.py, fundamentals.py, features.py, dsl.py,
+                       vault.py, staging.py (fetch/parse side), promoter.py (single writer),
+                       fetch/ (polite HTTP + jobs), cli.py
 data/                  local only, gitignored: vault/, staging/, market.duckdb
 ```
 

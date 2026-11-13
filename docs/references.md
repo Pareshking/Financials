@@ -61,6 +61,8 @@ Last reviewed: 2026-11-13.
 | P6 | Bonus keeps ISIN (PIDILITIND). | VERIFIED | fixtures |
 | P7 | Demerger parent keeps ISIN and symbol on ex-date (TATAMOTORS `INE155A01022`, open 400.00 vs prior close 660.75). | VERIFIED | fixtures |
 | P8 | `FinInstrmId` stable across ISIN change: TATAINVEST (1621) and PIDILITIND (2664) too. | OBSERVED | scratch analysis |
+| P14 | A split and a series change can both happen between two promoted days: SIGMA split on 2025-10-06 (ISIN `INE0A0S01010` → `INE0A0S01028`) and traded as BE (new `FinInstrmId` 16664) by 2025-10-13; by 2026-11-12 it was back in EQ under `FinInstrmId` 16658 with the new ISIN. The registry opens a second security and later quarantines `ISIN_COLLISION`. | OBSERVED | full-market test build |
+| P15 | Symbol changes keep ISIN and `FinInstrmId`: TATAMOTORS (2025) → TMPV (2026-11-12 bhavcopy), ISIN `INE155A01022`. | VERIFIED | `tests/test_features.py` |
 | P13 | `FinInstrmId` identifies a **(security, series)** pair: a series change (EQ↔BE↔BZ) keeps the ISIN but assigns a different `FinInstrmId` (AAATECH EQ 12533 → BE 12542). 143 ISINs did this in 28 days; 97 within the 5 committed fixture days. No `FinInstrmId` appeared in more than one series. | VERIFIED | `test_series_change_changes_fin_instrm_id_but_keeps_isin`; scratch analysis for counts |
 | P9 | `FinInstrmId` is never reused for a different security | UNVERIFIED | |
 | P10 | `sec_bhavdata_full_DDMMYYYY.csv` has `PREV_CLOSE`, OHLC, `TTL_TRD_QNTY`, `DELIV_QTY`, `DELIV_PER`; **no ISIN**; `PREV_CLOSE` unadjusted on ex-date. Leading spaces after commas. | VERIFIED | 2025-10-14 fixture |

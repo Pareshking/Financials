@@ -18,7 +18,17 @@ UNVERIFIED there must not be hard-coded; code that depends on it quarantines on 
 | **Local machine** (owner's) | All fetchers (both `www.nseindia.com` session-cookie fetchers and `nsearchives.nseindia.com` archive fetchers), the vault, staging Parquet, the promoter, `data/market.duckdb`. |
 | **GitHub Actions** | Offline `pytest` on every push and PR (`.github/workflows/ci.yml`). Tests never touch the network. |
 
-Open decision **D-1** (see §16): scheduled archive fetching *in* GitHub Actions has no durable place to keep the data (`data/` is gitignored, artifacts expire, Cloudflare is deferred). Until D-1 is settled, every fetch runs locally.
+Decision **D-1** (owner, 2026-11-13): GitHub Actions runs only offline lint + tests; all fetching stays local (`data/` gitignored) until the pipeline is proven end to end. `www.nseindia.com/api/` endpoints also answered from a cloud container [A1], but that is not relied on.
+
+Operator commands (`python -m financials --data-dir data …`):
+
+| Command | Effect |
+|---|---|
+| `init-db` | apply `schema.sql` to `data/market.duckdb` |
+| `fetch-days START [END]`, `fetch-corp-actions START END`, `fetch-holidays`, `fetch-index --as-of D`, `fetch-shareholding SYM…`, `fetch-results URL [--broadcast-utc TS]` | download → vault → staging only |
+| `promote` | the single writer: applies pending stages in order (holidays, market days by date, index snapshots, corporate actions, results, shareholding, raw-only) and records them in `promotion_log`; ABORTED batches stay pending |
+| `materialize D` | builds features for `D` with gates G4/G5 |
+| `screen "QUERY" [--as-of D]` | runs a DSL screen on the live table or point-in-time on history |
 
 ### 2.1 Data flow
 
@@ -41,15 +51,17 @@ data/vault/ab/ab12…ef.<ext>   ───────────▶  ▼  in on
 |---|---|---|---|---|
 | Daily prices + identifiers | `nsearchives…/content/cm/BhavCopy_NSE_CM_0_0_0_<YYYYMMDD>_F_0000.csv.zip` | UDiFF CSV in zip | VERIFIED [P1] | 1 |
 | Daily delivery | `nsearchives…/products/content/sec_bhavdata_full_<DDMMYYYY>.csv` | CSV, no ISIN | VERIFIED [P10] | 1 |
-| Index constituents (current) | `nsearchives…/content/indices/ind_nifty500list.csv` | CSV | OBSERVED [A6] | 1 |
+| Index constituents (current) | `nsearchives…/content/indices/ind_nifty500list.csv` | CSV | VERIFIED [IDX1, IDX2] | 1 |
 | Quarterly results XBRL | `nsearchives…/corporate/xbrl/<file>.xml`; discovery via `www.nseindia.com` API | XBRL | Files VERIFIED [X1]; discovery UNVERIFIED [A7] | 1 (corp), 2 (others) |
 | Reg. 30 event XBRL | `content/RSS/Online_announcements.xml` → `corporate/xbrl/` links | RSS + XBRL | OBSERVED [A3] | 3 |
-| Corporate actions | UNVERIFIED [P12] | ? | — | 1 |
-| Shareholding (Reg. 31) | UNVERIFIED | XBRL | — | 1 (total shares), 2 (full) |
+| Corporate actions | `www.nseindia.com/api/corporates-corporateActions?index=equities&from_date=…&to_date=…` | JSON | VERIFIED [P12, CA1-CA9] | 1 |
+| Corporate actions (discovery) | `nsearchives…/content/RSS/Corporate_action.xml` (no symbol/ISIN) | RSS | VERIFIED [CA6] | discovery only |
+| Trading holidays | `www.nseindia.com/api/holiday-master?type=trading` | JSON (current year) | VERIFIED [CAL1] | 1 |
+| Shareholding (Reg. 31) | `www.nseindia.com/api/corporate-share-holdings-master?index=equities&symbol=X` → `nsearchives…/corporate/xbrl/SHP_*.xml` | JSON + XBRL | VERIFIED [SHP1-SHP6] | 1 |
 | Reg. 34 annual XBRL | UNVERIFIED [R2] | XBRL | — | 2 |
 | F&O, SLBM, AMC portfolios, macro | UNVERIFIED | various | — | 3 |
 
-Fetch etiquette: ≥1 s between requests per host, exponential backoff with jitter on 403/429/5xx, never re-download a blob whose URL+ETag/sha is already vaulted, and keep a fixed, honest User-Agent per run.
+Fetch etiquette (implemented in `financials.fetch.http.PoliteFetcher`): ≥1 s between requests per host, at most 4 attempts with jittered exponential backoff on 403/429/5xx, other 4xx fail at once, a fixed identifiable User-Agent, optional one-time warm-up page per host. Every response that feeds the pipeline is vaulted (including the shareholding master JSON, via the `raw_only` job). Whether NSE blocks the identifiable User-Agent is UNVERIFIED: the probes used a plain browser string.
 
 ## 4. Storage layers
 
@@ -74,7 +86,10 @@ This section only records the decisions; it does not duplicate the DDL.
 | L2 market | `ohlcv` (resolved, unadjusted; delivery joined) |
 | L2 fundamentals | `filing_meta` (per filing × parser_version), `fact_observations` (long format) |
 | Control | `corp_actions`, `quarantine_queue`, `company_overrides` |
-| Not yet built | `entity_classification_history`, `index_constituents_history`, `raw_index_snapshot`, L3 tables |
+| L2 calendar/index | `trading_calendar`, `calendar_coverage`, `raw_index_snapshot`, `index_constituents_history` |
+| L2 shareholding | `shareholding_meta`, `shareholding_observations` |
+| L3 | `screener_features`, `screener_features_history`, `user_custom_ratios`; control: `promotion_log` |
+| Not yet built | `entity_classification_history` (sector/archetype history), `supplemental_kpis` |
 
 Decisions:
 - **Timestamps are `TIMESTAMP` holding UTC.** `TIMESTAMPTZ` would make DuckDB's Python client require `pytz` [I2].
@@ -269,23 +284,32 @@ All three are NULL for `FINANCIAL_LENDING` and `INSURANCE`; Beneish additionally
 
 Volumes before the ex-date are divided by `price_factor` for share-count events. Absolute financials (revenue, PAT, debt) are never multiplied by any factor.
 
-### 11.2 Verification
-`observed_gap = Open_ex / Close_{ex−1}` from unadjusted `ohlcv` (exchange `PrvsClsgPric` is unadjusted and useless here [P2]).
+### 11.2 Ingestion and resolution
+- Source: the NSE corporate-actions API [P12]. Purposes are parsed by explicit rules only (dividend, bonus `A:B`, face-value split, `Rights A:B @ Premium Rs X/-` with issue price = face value + premium, demerger) [CA4, CA5, CA9]. Anything else is recorded as `UNKNOWN` with status `QUARANTINED`, so the gap auditor freezes adjusted prices.
+- Security resolution [CA1, CA2, CA7]: the API ISIN on `ex_date − 1`; if no match, the API symbol, but only for a holder whose ISIN has the same 4-character issuer code (chars 4-7). Otherwise quarantine `STALE_ISIN_OTHER_ISSUER` / `UNKNOWN_ISIN`. Re-promoting the same file later records actions whose security has appeared since.
+- Action ids are deterministic (`ISIN, ex_date, subject, component`), so re-promotion is idempotent.
+
+### 11.3 Verification (per security and ex-date, as a group)
+`observed_gap = Open_ex / Close_{ex−1}` from unadjusted `ohlcv` (exchange `PrvsClsgPric` is unadjusted and useless here [P2]). All actions of one security on one ex-date are judged on their **combined** factor (NAZARA split + bonus = 0.25) [CA5].
 
 | Condition | Status |
 |---|---|
-| \|price_factor − 1\| < 0.10 | `UNOBSERVABLE` (indistinguishable from market noise; accepted, flagged) |
-| \|observed_gap / price_factor − 1\| ≤ 0.10 | `VERIFIED` |
+| any member unfactorable (UNKNOWN, bad ratio) | all `QUARANTINED` |
+| a DEMERGER in the group | all `VERIFIED`; demerger factor = observed / product of the others |
+| \|combined − 1\| < 0.10 | `UNOBSERVABLE` (dividends, small rights; accepted, flagged) |
+| \|observed_gap / combined − 1\| ≤ 0.10 | `VERIFIED` |
 | otherwise | `QUARANTINED` |
-| DEMERGER | `VERIFIED` once a demerger record exists (the factor is defined from the observed gap) |
 
-### 11.3 Unconditional gap auditor [C4]
-Every security, every trading day: if \|Open_t / Close_{t−1} − 1\| > 10% and no corp action is VERIFIED/UNOBSERVABLE/VERIFIED_MANUAL for that date, or the ISIN changed versus t−1 without a SPLIT/CONSOLIDATION record:
+### 11.4 Unconditional gap auditor [C4]
+Every security, every trading day: if the residual gap after dividing out the day's accepted price factors, \|Open_t / (Close_{t−1} · ΠF) − 1\|, exceeds 10% (so a dividend never explains a gap), or the ISIN changed versus t−1 without an accepted SPLIT/CONSOLIDATION:
 - quarantine `GAP`;
 - raw and `ohlcv` rows are still stored;
 - the **adjusted** series and price-derived features for that security are frozen at t−1 until resolved.
 
-Expected volume is 0–7 per day [P4].
+Expected volume is 0–7 per day [P4]. When an action verifies later, matching gap quarantines are resolved (`FIXED_BY_RULE`) only after re-auditing the residual. The auditor compares consecutive *stored* bars, so promote every trading day: a gap of months between bars (as in the test fixtures) quarantines most of the market.
+
+### 11.5 Total return
+`financials.returns.total_return_index`: r_t = (close_t + accepted cash dividends_t) / (close_{t−1} · F_t) − 1. Adjusted prices never include dividends [C2]. Both series stop at the first unresolved gap.
 
 ## 12. Promoter quality gates (in order)
 
@@ -294,8 +318,10 @@ Expected volume is 0–7 per day [P4].
 | G1 Completeness | EQ/BE/BZ rows ≥ 92% of the trailing 5-trading-day median | Abort batch; keep previous state; retry later |
 | G2 Identifier resolution | Every raw price row resolves to a `security_id` via `(exchange, fin_instrm_id \| symbol+series, isin, date)`; unresolved rows ≤ 1% | Unresolved rows → quarantine; above 1% → abort |
 | G3 Accounting identities | Per filing: P&L chain (X9 / bank equivalents), `Assets = EquityAndLiabilities` when BS present, expense components sum to `Expenses`; tolerance §7.3 | Quarantine that filing only |
-| G4 Null-spike | Null rate of critical canonical tags (close, market_cap, rev_ops, PAT, Equity) rises ≤ 1.5 percentage points vs the previous promotion | Abort batch |
-| G5 Atomic features | Build `screener_features_next`; row count = active universe; swap in one transaction | No partial state is ever visible |
+| G4 Null-spike (features) | Null rate of `close`, `market_cap`, `sales_ttm`, `pat_ttm`, `total_equity` rises ≤ 1.5 percentage points vs the previous materialised date | Abort; previous features stay live |
+| G5 Atomic features | Row count = universe (securities with a bar in the last 15 days and a valid identifier); history rows for the date and the live table replaced in one transaction | No partial state is ever visible |
+| ORDER | Market days and index snapshots must arrive in date order | Abort; replay needs a rebuild |
+| Share cross-check | Reg. 31 total vs results paid-up / face value differ by > 0.5% (skipped for partly-paid issuers) | Quarantine `SHARES/CROSS_CHECK_FAILED`; promotion continues |
 
 ## 13. Schedule (local machine, IST)
 
@@ -304,7 +330,9 @@ Expected volume is 0–7 per day [P4].
 | Trading days from 18:30, retry every 30 min until 23:30 | UDiFF bhavcopy + `sec_bhavdata_full` (publish time UNVERIFIED [P11]) |
 | Daily | `ind_nifty500list.csv` snapshot → close/open membership intervals on change |
 | Results season, every 2 h; otherwise daily | Results XBRL discovery (local, `www.nseindia.com` API) |
-| Daily | Corporate-actions feed (source TBD [P12]) |
+| Daily | Corporate-actions API for a rolling window (e.g. last 30 days to next 30 days) |
+| Yearly (January) and on change | Holiday master |
+| After each quarter's Reg. 31 deadline | Shareholding master + XBRL per symbol in the universe |
 | After each fetch batch | Promoter: gates → canonical → corp-action verification → gap auditor → features |
 
 ## 14. Screener DSL
@@ -318,20 +346,28 @@ comparison := arith ( "<" | "<=" | ">" | ">=" | "=" | "!=" ) arith
 arith      := term ( ("+" | "-") term )*
 term       := factor ( ("*" | "/") factor )*
 factor     := NUMBER | ALIAS | "(" arith ")" | "-" factor
-ALIAS      := a name in the alias registry (case-insensitive, spaces allowed, e.g. "Sales growth 3Years")
+ALIAS      := a name in financials.dsl.ALIASES or user_custom_ratios (case-insensitive, words may end in digits,
+              e.g. "Return 12M", "In Nifty 500")
 ```
+
+- Units follow Screener conventions and are stated per alias: money in INR crore, growth/returns/margins/holdings in percent.
 
 - Aliases map **only** to whitelisted `screener_features` columns or saved custom ratios.
 - Saved custom ratios are expanded before compilation; cycles are rejected.
 - Output is parameterised SQL: numbers become bound parameters, columns come from the registry, and no user text reaches SQL.
-- Division compiles to `x / NULLIF(y, 0)`. NULL comparisons are false, so a stock missing a metric never passes that filter.
+- Division compiles to `x / NULLIF(y, 0)`. NULL comparisons are not TRUE, and `NOT` keeps NULL as NULL, so a stock missing a metric never passes a filter on it.
 - An unknown alias is a compile error, never a guess.
 
 ## 15. Phases
 
 **Phase 1: thin slice, screenable end-to-end (Nifty 500)**
 
-Status: built and tested are the vault, staging, promoter (G1, G2, G3 via parser), UDiFF and delivery loaders, identity history, corp-action ledger and verification, gap auditor, price adjustment, `INDAS_CORP` parser and PIT read. Not built yet: `index_constituents_history` and snapshot loader, total-return index, `shares_out` cross-check with Reg. 31, `screener_features`, DSL, G4/G5, fetchers.
+Status (2026-11-13): **built and tested end to end** on real fixtures, all listed items below. Known gaps inside Phase 1:
+- `piotroski_f` / `beneish_m` columns exist but stay NULL: both need year-over-year annual data (Reg. 34, Phase 2).
+- Altman Z'' uses OtherEquity as the retained-earnings proxy; ROCE/ROE use the latest balance sheet, not an average.
+- EV excludes minority interest and preference capital (tags UNVERIFIED [X29]).
+- Results-XBRL discovery API is UNVERIFIED [A7]; `fetch-results` takes URLs.
+- A split and a series change between two promoted days create a second security; the collision is quarantined for a human (seen for SIGMA, Oct 2025).
 
 - Vault (`blobs`, `filings`) and staging/promoter skeleton.
 - UDiFF bhavcopy + `sec_bhavdata_full` loaders.
@@ -362,8 +398,9 @@ Status: built and tested are the vault, staging, promoter (G1, G2, G3 via parser
 
 | ID | Question | Current default |
 |---|---|---|
-| D-1 | Run archive fetchers in GitHub Actions? They need durable storage (artifacts expire; committing data bloats git; Cloudflare deferred). | All fetchers local; CI is offline tests only |
+| D-1 | Where fetchers run | **Decided**: local only; CI = offline lint + tests |
 | D-2 | Which known-defect rules (§7.4) to allow | None yet; quarantine |
-| D-3 | Fixtures still needed: lending NBFC, life insurer, H1 bank, consolidated corp, Q1/Q3 corp, loss-valued exceptional items, Reg. 34 annual, Reg. 31 shareholding, corp-actions feed sample | Block the related parser until present |
-| D-4 | Corporate-actions source [P12] | Undecided |
+| D-3 | Fixtures still needed: lending NBFC, life insurer, H1 bank, consolidated corp, Q1/Q3 corp, loss-valued exceptional items, Reg. 34 annual, Reg. 31 with pledges / employee trusts | Owner supplies URLs after Phase 1; block the related parser until present |
+| D-4 | Corporate-actions source | **Decided**: NSE API adapter (+ RSS for discovery); unparseable purposes → QUARANTINED. BSE fallback not built (`api.bseindia.com` returned 403 [A1]) |
+| D-6 | How a human resolves a quarantine (merge securities, accept a gap, add a known-defect rule) | Not built; resolutions are SQL updates to `quarantine_queue` for now |
 | D-5 | Historical index-membership backfill source | Snapshot-forward only [L1] |

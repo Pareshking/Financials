@@ -29,7 +29,7 @@ from financials.vault import Vault
 UNIVERSES = ("nifty500", "active")
 
 JOB_ORDER = {"holidays": 0, "market_day": 1, "index_snapshot": 2, "corp_actions": 3, "results_xbrl": 4,
-             "shareholding": 5, "raw_only": 6}  # fmt: skip
+             "shareholding": 5, "raw_only": 6, "kpis": 7}  # fmt: skip
 
 
 def _paths(data_dir: Path) -> tuple[Path, Path, Path]:
@@ -121,6 +121,8 @@ def build_parser() -> argparse.ArgumentParser:
     rd = sub.add_parser("run-day", help="holidays, days, corporate actions, discovery, promote, materialize")
     rd.add_argument("--date", type=_date, required=True)
     rd.add_argument("--lookback-days", type=int, default=7)
+    lk = sub.add_parser("load-kpis", help="stage a supplemental KPI file (CSV/JSON: parsers.kpis) for promote")
+    lk.add_argument("path", type=Path)
     sub.add_parser("promote", help="apply all pending staged batches (single writer)")
     rb = sub.add_parser("rebuild-market", help="roll market-derived state back to a date and replay it (audited)")
     rb.add_argument("--from", dest="from_date", type=_date, required=True)
@@ -185,6 +187,13 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
         for e in errors:
             print(f"error: {e}", file=out)
         return 1 if errors else 0
+    if args.cmd == "load-kpis":
+        from financials.staging import stage_kpis
+
+        s = stage_kpis(Vault(vault_dir), stage_root, data=args.path.read_bytes(),
+                       source_url=args.path.resolve().as_uri(), fetched_at=utc_now())  # fmt: skip
+        print(f"staged {s.relative_to(stage_root).as_posix()} (run promote)", file=out)
+        return 0
     if args.cmd == "run-day":
         return run_day(args, transport, out)
 

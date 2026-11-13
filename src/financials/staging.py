@@ -82,6 +82,11 @@ CREATE TABLE stg_events (
     cessation_category VARCHAR, details JSON, stated_symbol VARCHAR, stated_isin VARCHAR,
     PRIMARY KEY (filing_id, record_key)
 );
+CREATE TABLE stg_kpis (
+    filing_id VARCHAR NOT NULL, seq INTEGER NOT NULL, symbol VARCHAR NOT NULL, kpi VARCHAR NOT NULL,
+    period_start DATE, period_end DATE, value DECIMAL(24,6), unit VARCHAR NOT NULL, source_kind VARCHAR NOT NULL,
+    source_url VARCHAR NOT NULL, visible_from_ts TIMESTAMP, notes VARCHAR, issue VARCHAR, PRIMARY KEY (filing_id, seq)
+);
 CREATE TABLE stg_issues (
     filing_id VARCHAR, stage VARCHAR NOT NULL, reason_code VARCHAR NOT NULL, details JSON NOT NULL
 );
@@ -104,6 +109,7 @@ TABLE_ORDER = (
     "stg_xbrl_facts",
     "stg_corp_actions",
     "stg_events",
+    "stg_kpis",
     "stg_issues",
 )
 
@@ -678,6 +684,24 @@ def stage_reg30_event(
         for e in parsed.events
     ]
     return write_stage(stage_root, "reg30_event", fid, tables, extra={"family": parsed.family})
+
+
+def stage_kpis(vault: Vault, stage_root: Path, *, data: bytes, source_url: str, fetched_at: datetime) -> Path:
+    """Vault + parse a supplemental-KPI file (CSV/JSON, parsers.kpis). The file itself is the evidence."""
+    from financials.parsers.kpis import parse_kpis
+
+    rows = parse_kpis(data)
+    ext = "json" if data.lstrip()[:1] in (b"[", b"{") else "csv"
+    blob = vault.put(
+        data, ext=ext, media_type="application/json" if ext == "json" else "text/csv", fetched_at=fetched_at
+    )
+    filing = make_filing(blob, exchange="MANUAL", category="SUPPLEMENTAL_KPIS", source_url=source_url,
+                         fetched_at=fetched_at)  # fmt: skip
+    return write_stage(
+        stage_root, "kpis", filing.filing_id,
+        {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)],
+         "stg_kpis": [{"filing_id": filing.filing_id, **asdict(r)} for r in rows]},
+    )  # fmt: skip
 
 
 def stage_raw_only(

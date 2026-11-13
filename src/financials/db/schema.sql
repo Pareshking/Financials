@@ -498,6 +498,14 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     days_payable        DOUBLE,              -- closing trade payables / (sales / 365) [S23]
     cash_conversion_cycle DOUBLE,            -- debtor + inventory - payable days [S23]
     working_capital_days DOUBLE,             -- (CA - cash & bank - current investments - CL) / (sales / 365) [S23]
+    vnb_margin          DOUBLE,              -- supplemental_kpis (life insurers), latest period visible at as-of
+    embedded_value      DECIMAL(24,2),       -- supplemental_kpis, rupees
+    ape_growth          DOUBLE,              -- supplemental_kpis
+    gov                 DECIMAL(24,2),       -- supplemental_kpis (new-gen tech): gross order value, rupees
+    take_rate           DOUBLE,              -- supplemental_kpis: net take rate
+    contribution_margin DOUBLE,              -- supplemental_kpis
+    nrr                 DOUBLE,              -- supplemental_kpis: net revenue retention
+    cac_payback         DOUBLE,              -- supplemental_kpis: months
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -646,6 +654,14 @@ CREATE TABLE IF NOT EXISTS screener_features (
     days_payable        DOUBLE,              -- closing trade payables / (sales / 365) [S23]
     cash_conversion_cycle DOUBLE,            -- debtor + inventory - payable days [S23]
     working_capital_days DOUBLE,             -- (CA - cash & bank - current investments - CL) / (sales / 365) [S23]
+    vnb_margin          DOUBLE,              -- supplemental_kpis (life insurers), latest period visible at as-of
+    embedded_value      DECIMAL(24,2),       -- supplemental_kpis, rupees
+    ape_growth          DOUBLE,              -- supplemental_kpis
+    gov                 DECIMAL(24,2),       -- supplemental_kpis (new-gen tech): gross order value, rupees
+    take_rate           DOUBLE,              -- supplemental_kpis: net take rate
+    contribution_margin DOUBLE,              -- supplemental_kpis
+    nrr                 DOUBLE,              -- supplemental_kpis: net revenue retention
+    cac_payback         DOUBLE,              -- supplemental_kpis: months
     PRIMARY KEY (as_of_date, security_id)
 );
 

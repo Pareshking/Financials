@@ -86,6 +86,26 @@ def _universe(con, exchange: str, as_of: date) -> list[tuple[str, str, str, str]
     ).fetchall()
 
 
+KPI_COLUMNS = ("vnb_margin", "embedded_value", "ape_growth", "gov", "take_rate", "contribution_margin", "nrr",
+               "cac_payback")  # fmt: skip
+_KPI_RUPEES = ("embedded_value", "gov")
+
+
+def supplemental_kpi_columns(con, as_of_ts: datetime) -> dict[str, dict]:
+    """Per entity: each KPI for its latest period visible at `as_of_ts`, latest visible version (one query)."""
+    rows = con.execute(
+        """SELECT entity_id, kpi, value FROM (
+             SELECT *, row_number() OVER (PARTITION BY entity_id, kpi
+                                          ORDER BY period_end DESC, visible_from_ts DESC) AS rn
+             FROM supplemental_kpis WHERE visible_from_ts <= ?) WHERE rn = 1""",
+        [as_of_ts],
+    ).fetchall()
+    out: dict[str, dict] = defaultdict(dict)
+    for ent, kpi, value in rows:
+        out[ent][kpi] = Decimal(value).quantize(Decimal("0.01")) if kpi in _KPI_RUPEES else float(value)
+    return out
+
+
 KNOWLEDGE_MODES = ("valid", "system")
 
 
@@ -363,6 +383,7 @@ def compute_rows(con, as_of: date, exchange: str = "NSE", *, knowledge: str = "v
     }
     shp_all, paid_up, quarter_end = _preload(con, as_of_ts)
     events = _event_counts(con, as_of, as_of_ts)
+    kpis = supplemental_kpi_columns(con, as_of_ts)
     history = _valuation_history(con, as_of)
     curated = _curated_archetypes()
     arch_override = dict(con.execute("SELECT entity_id, valuation_archetype FROM entity_archetype_override").fetchall())
@@ -388,6 +409,11 @@ def compute_rows(con, as_of: date, exchange: str = "NSE", *, knowledge: str = "v
             )
         fund = fundamentals_cache[ent]
         row.update({k: v for k, v in fund.items() if not k.startswith("_")})
+        kp = kpis.get(ent, {})
+        row.update({k: kp.get(k) for k in KPI_COLUMNS})
+        for k in ("persistency_13m", "persistency_61m"):  # filed in XBRL [X62] wins; a loaded KPI only fills NULL
+            if row.get(k) is None and k in kp:
+                row[k] = kp[k]
 
         shp = shp_all.get(ent, {})
         if "TOTAL" in shp:

@@ -60,6 +60,7 @@ def promote(con: duckdb.DuckDBPyConnection, stage_dir: Path) -> PromotionResult:
         "shareholding": _promote_shareholding,
         "reg30_event": _promote_reg30_event,
         "raw_only": _promote_raw_only,
+        "kpis": _promote_kpis,
     }.get(job)
     if handler is None:
         raise ValueError(f"unknown job {job!r}")
@@ -1163,6 +1164,56 @@ def _promote_shareholding(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     )
     q = cross_check_shares(con, entity_id, meta["as_of_date"])
     return PromotionResult("PROMOTED", "shareholding", message=fid, quarantined=[q] if q else [])
+
+
+def _promote_kpis(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
+    """Supplemental KPIs [P2 closeout]: each valid row resolves its symbol on period_end and lands in
+    supplemental_kpis keyed by visible_from_ts (point in time). Invalid or unresolvable rows are quarantined."""
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings"))
+    filing = read_table(con, stage_dir, "filings")[0]
+    blob_sha = filing["sha256"]
+    rows = read_table(con, stage_dir, "stg_kpis")
+    good, quarantined = [], []
+    for r in rows:
+        ent = []
+        if r["issue"] is None:
+            ent = con.execute(
+                "SELECT DISTINCT s.entity_id FROM security_identifier_history h JOIN securities s USING (security_id) "
+                "WHERE h.symbol = ? AND h.valid_from <= ? AND (h.valid_to IS NULL OR h.valid_to > ?)",
+                [r["symbol"], r["period_end"], r["period_end"]],
+            ).fetchall() or con.execute(
+                "SELECT DISTINCT s.entity_id FROM security_identifier_history h JOIN securities s USING (security_id) "
+                "WHERE h.symbol = ?", [r["symbol"]]).fetchall()  # fmt: skip
+        if r["issue"] is not None or len(ent) != 1:
+            reason = r["issue"] or ("UNKNOWN_SYMBOL" if not ent else "AMBIGUOUS_SYMBOL")
+            quarantined.append(
+                _quarantine(
+                    con,
+                    stage="KPI",
+                    reason_code=reason,
+                    filing_id=filing["filing_id"],
+                    details={"seq": r["seq"], "symbol": r["symbol"], "kpi": r["kpi"]},
+                )
+            )
+            continue
+        good.append(
+            {
+                "entity_id": ent[0][0],
+                "kpi": r["kpi"],
+                "period_start": r["period_start"],
+                "period_end": r["period_end"],
+                "value": r["value"],
+                "unit": r["unit"],
+                "source_kind": r["source_kind"],
+                "source_url": r["source_url"],
+                "source_sha256": blob_sha,
+                "visible_from_ts": r["visible_from_ts"],
+                "recorded_at": utc_now(),
+                "notes": r["notes"],
+            }
+        )
+    insert_rows(con, "supplemental_kpis", good, or_ignore=True)
+    return PromotionResult("PROMOTED", "kpis", message=f"{len(good)} KPI rows", quarantined=quarantined)
 
 
 def _promote_raw_only(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:

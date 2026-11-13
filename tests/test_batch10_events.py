@@ -162,3 +162,15 @@ def test_fraud_disclosure_counts_for_an_in_universe_symbol(events_market, rss):
     ).fetchone()[0]
     counts = _event_counts(m.con, date(2026, 11, 13), ist_to_utc(date(2026, 11, 14), time(0, 0)))[ent]
     assert counts["fraud_or_default_90d"] == 1 and counts["kmp_resignations_90d"] == 1
+
+
+def test_regulatory_action_filings_are_listed_but_not_parsed_yet(rss):
+    """E12: penalties / regulatory actions are Reg. 30 Para B sub-para 20 ("Action(s) taken or orders passed"),
+    filed as `AIATOP_<id>_WebXMLFile_<ts>.xml` (One Mobikwik, Styrenix on 13 Nov 2026). No such file is a fixture
+    yet, so the family is not fetched (EVENT_PREFIXES) or parsed, and `penalties_90d` stays NULL, never 0."""
+    from financials.fetch.jobs import EVENT_PREFIXES
+
+    aiatop = sorted(n for n in rss if n.startswith("AIATOP_"))
+    assert aiatop == ["AIATOP_19759_WebXMLFile_20261113_171940576.xml", "AIATOP_753_WebXMLFile_20261113_152634093.xml"]
+    assert not any(n.startswith(EVENT_PREFIXES) for n in aiatop)
+    assert all("orders passed" in rss[n].subject for n in aiatop)

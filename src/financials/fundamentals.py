@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import calendar
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from financials.parsers.indas_corp import period_months
@@ -912,7 +912,12 @@ SCREENER_CONVENTION_COLUMNS = (
 
 
 class _BookAsResult:
-    """Lets the parity-tested statement builders (statements/*) read a FactBook: same rows, same definitions."""
+    """Lets the parity-tested statement builders (statements/*) read a FactBook: same rows, same definitions.
+
+    A flow that was not filed for exactly (start, end) is derived as YTD(s0, end) - YTD(s0, start - 1 day) for a
+    filed s0 < start: Q4 = FY - 9M for the P&L, H2 = FY - H1 for the cash flow (§6.2). The book holds one entity and
+    one scope as visible at its as-of, so a derived value never mixes scopes and exists only once both filings are
+    visible (visibility = the later of the two broadcasts)."""
 
     def __init__(self, book: FactBook) -> None:
         self.book = book
@@ -921,7 +926,15 @@ class _BookAsResult:
     def value(self, tag: str, start: date, end: date) -> Decimal | None:
         if start == end:
             return self.book.instants.get(tag, {}).get(end)
-        return self.book.durations.get(tag, {}).get((start, end))
+        d = self.book.durations.get(tag, {})
+        if (start, end) in d:
+            return d[(start, end)]
+        before = start - timedelta(days=1)
+        candidates = sorted(s0 for (s0, e) in d if e == end and s0 < start and (s0, before) in d)
+        return d[(candidates[-1], end)] - d[(candidates[-1], before)] if candidates else None
+
+
+BookAsResult = _BookAsResult  # public name for statement builders over a point-in-time FactBook
 
 
 def screener_convention_ratios(book: FactBook, on_or_before: date) -> dict:

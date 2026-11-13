@@ -388,7 +388,7 @@
 | phase | 2 |
 | verification_status | VERIFIED |
 | evidence | A3, A4, E1, E2, E3, E4, E5, E6, E7 |
-| notes | fetch-events: Para B (orders, litigation), changes in management, allotments, fraud/default parsed; other families vaulted raw. Penalty / regulatory-action events not observed (E7): penalties_90d NULL. |
+| notes | fetch-events: Para B (orders, litigation), changes in management, allotments, fraud/default parsed; other families vaulted raw. Penalty / regulatory-action filings are Para B sub-para 20 AIATOP_*.xml (E12): listed in the RSS, contents not yet inspected, so not fetched or parsed; penalties_90d NULL. |
 
 ## F22 — Credit rating disclosures and Reg. 50/52/57 debt XBRL
 

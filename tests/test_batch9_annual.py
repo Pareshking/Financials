@@ -281,3 +281,40 @@ def test_annual_ratios_reach_screener_features(tcs_market):
     assert row["cwip_to_gross_block"] == pytest.approx(2665 / 39208, abs=1e-4)
     assert row["rote"] == pytest.approx(49210 / 97956, abs=1e-4)
     assert row["rnd_and_royalty_intensity"] is None
+    assert row["roce_screener"] == pytest.approx(
+        (65487 + 1227) * 2 / ((362 + 94394 + 9392) + (362 + 106878 + 11283)), rel=1e-3
+    )
+    assert row["debtor_days"] == pytest.approx(67714 / (267021 / 365), rel=1e-3)
+
+
+# Screener export formulas (template v2.1) applied to the Screener Data Sheet of the TCS and Eternal exports, FY26
+# [S22]: ROCE = (PBT + Interest) x 2 / (opening + closing (Equity Capital + Reserves + Borrowings)); Debtor Days =
+# Receivables / (Sales / 365); Inventory Turnover = Sales / Inventory; Working Capital = Other Assets - Other
+# Liabilities. Expected values are computed from the exports' figures (Rs Cr), not from our code.
+SCREENER_FORMULA_GOLDEN = {
+    TCS26: {"roce_screener": (65487 + 1227) * 2 / ((362 + 94394 + 9392) + (362 + 106878 + 11283)),
+            "debtor_days": 67714 / (267021 / 365), "inventory_turnover": 267021 / 29, "working_capital_cr": 50527},
+    ETERNAL26: {"roce_screener": (615 + 392) * 2 / ((907 + 29410 + 2045) + (919 + 30061 + 4592)),
+                "debtor_days": 1764 / (54364 / 365), "inventory_turnover": 54364 / 2181, "working_capital_cr": 7928},
+}  # fmt: skip
+
+
+@pytest.mark.parametrize("path", list(SCREENER_FORMULA_GOLDEN), ids=lambda p: p.stem)
+def test_screener_convention_ratios_match_the_export_formulas(path):
+    from financials.fundamentals import screener_convention_ratios
+
+    out = screener_convention_ratios(_book(parse_reg34_annual(path.read_bytes(), path.name)), date(2026, 9, 30))
+    want = SCREENER_FORMULA_GOLDEN[path]
+    # Screener shows these companies in whole crores; our rows are rupee-precise: agreement to 1e-3 relative
+    assert float(out["roce_screener"]) == pytest.approx(want["roce_screener"], rel=1e-3)
+    assert float(out["debtor_days"]) == pytest.approx(want["debtor_days"], rel=1e-3)
+    assert float(out["inventory_turnover"]) == pytest.approx(want["inventory_turnover"], rel=1e-3)
+    assert float(out["working_capital"] / CR) == pytest.approx(want["working_capital_cr"], abs=0.5)
+
+
+def test_screener_roce_differs_from_our_roce_by_definition(tcs26):
+    """Ours excludes other income and uses closing capital; Screener's includes it and averages capital [S22]."""
+    from financials.fundamentals import screener_convention_ratios
+
+    out = screener_convention_ratios(_book(tcs26), date(2026, 9, 30))
+    assert out["roce_screener"] is not None and out["working_capital"] is not None

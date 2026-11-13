@@ -487,6 +487,10 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     auditor_resignations_90d INTEGER,        -- auditor cessations by resignation [E5]
     fraud_or_default_90d INTEGER,            -- fraud / default disclosures [E7]
     penalties_90d       INTEGER,             -- NULL: no penalty / regulatory-action event observed (UNVERIFIED) [E7]
+    roce_screener       DOUBLE,              -- Screener export: (PBT + Interest) x 2 / (opening + closing capital) [S22]
+    debtor_days         DOUBLE,              -- Screener export: closing debtors / (sales / 365) [S22]
+    inventory_turnover  DOUBLE,              -- Screener export: sales / closing inventory [S22]
+    working_capital     DECIMAL(24,2),       -- Screener export: Other Assets - Other Liabilities (rupees) [S22]
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -627,6 +631,10 @@ CREATE TABLE IF NOT EXISTS screener_features (
     auditor_resignations_90d INTEGER,        -- auditor cessations by resignation [E5]
     fraud_or_default_90d INTEGER,            -- fraud / default disclosures [E7]
     penalties_90d       INTEGER,             -- NULL: no penalty / regulatory-action event observed (UNVERIFIED) [E7]
+    roce_screener       DOUBLE,              -- Screener export: (PBT + Interest) x 2 / (opening + closing capital) [S22]
+    debtor_days         DOUBLE,              -- Screener export: closing debtors / (sales / 365) [S22]
+    inventory_turnover  DOUBLE,              -- Screener export: sales / closing inventory [S22]
+    working_capital     DECIMAL(24,2),       -- Screener export: Other Assets - Other Liabilities (rupees) [S22]
     PRIMARY KEY (as_of_date, security_id)
 );
 

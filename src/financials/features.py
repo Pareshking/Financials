@@ -28,6 +28,7 @@ from financials.fundamentals import (
     NBFC_COLUMNS,
     REVERSE_DCF_TERMINAL_G,
     REVERSE_DCF_WACC,
+    SCREENER_CONVENTION_COLUMNS,
     altman_z_double_prime,
     annual_ratios,
     bank_blocks,
@@ -42,6 +43,7 @@ from financials.fundamentals import (
     resolve_scope,
     reverse_dcf_implied_growth,
     safe_div,
+    screener_convention_ratios,
     yoy_growth,
 )
 from financials.timeutil import ist_to_utc
@@ -430,7 +432,8 @@ _EMPTY_FUNDAMENTALS: dict = {
     "default_annual_scope": None, "fundamentals_end": None, "bs_as_of": None, "cf_as_of": None,
     "_net_debt": None, "_fcff": None, "_pat_owners": None, "_pe_earnings": None, "_equity_owners": None,
     "_minority": None, "roe_continuing": None, "core_profit_ttm": None, "_pat_owners_total": None,
-    **dict.fromkeys(NBFC_COLUMNS + BANK_COLUMNS + INSURER_COLUMNS + CASH_CONVERSION_COLUMNS + ANNUAL_COLUMNS),
+    **dict.fromkeys(NBFC_COLUMNS + BANK_COLUMNS + INSURER_COLUMNS + CASH_CONVERSION_COLUMNS + ANNUAL_COLUMNS
+                  + SCREENER_CONVENTION_COLUMNS),
 }  # fmt: skip
 
 # Industrial ratios that do not apply to lenders (architecture §10): NULL for INDAS_NBFC books.
@@ -495,8 +498,12 @@ def _fundamentals(con, entity_id: str, as_of_ts: datetime, end: date) -> dict:
     cash = {k: _f(v) for k, v in cash_conversion_blocks(book, end, b).items()}
     scope_cols["_archetype"] = derived_archetype(book)
     # Annual-statement ratios [C23]: industrial books only (Piotroski/Beneish are not defined for lenders/insurers).
-    annual = annual_ratios(book, end) if scope_cols["_archetype"] == "INDUSTRIAL_SERVICES" else {}
-    scope_cols |= {k: (v if k in ("annual_fy_end", "piotroski_f") else _f(v)) for k, v in annual.items()}
+    industrial = scope_cols["_archetype"] == "INDUSTRIAL_SERVICES"
+    annual = annual_ratios(book, end) | screener_convention_ratios(book, end) if industrial else {}
+    keep = ("annual_fy_end", "piotroski_f", "working_capital")  # date, integer, rupees (DECIMAL)
+    scope_cols |= {k: (v if k in keep else _f(v)) for k, v in annual.items()}
+    if annual.get("working_capital") is not None:
+        scope_cols["working_capital"] = annual["working_capital"].quantize(Decimal("0.01"))
     scope_cols["_newgen"] = newgen_inputs(book, end, b)
     scope_cols["_gross_profit"] = b["gross_profit"]
     scope_cols["_cfo"] = b["cfo"]

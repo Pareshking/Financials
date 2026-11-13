@@ -902,3 +902,59 @@ def annual_ratios(book: FactBook, on_or_before: date) -> dict:
         else None,
     )
     return out
+
+
+# ── Screener export conventions [S22] ────────────────────────────────────────────────────────────────
+SCREENER_CONVENTION_COLUMNS = ("roce_screener", "debtor_days", "inventory_turnover", "working_capital")
+
+
+class _BookAsResult:
+    """Lets the parity-tested statement builders (statements/*) read a FactBook: same rows, same definitions."""
+
+    def __init__(self, book: FactBook) -> None:
+        self.book = book
+        self.meta = {"scope": book.scope}
+
+    def value(self, tag: str, start: date, end: date) -> Decimal | None:
+        if start == end:
+            return self.book.instants.get(tag, {}).get(end)
+        return self.book.durations.get(tag, {}).get((start, end))
+
+
+def screener_convention_ratios(book: FactBook, on_or_before: date) -> dict:
+    """Screener's export formulas (template v2.1) on our Screener-style rows, latest fiscal year [S22]:
+    ROCE = (PBT + Interest) x 2 / (opening + closing (Equity Capital + Reserves + Borrowings));
+    Debtor Days = closing Debtors / (Sales / 365); Inventory Turnover = Sales / closing Inventory;
+    Working Capital = Other Assets - Other Liabilities (rupees). Kept beside our own ratios, not instead of them:
+    `roce` excludes other income and uses closing capital."""
+    from financials.statements.balance_sheet import balance_sheet
+    from financials.statements.quarterly import corp_quarter
+
+    out: dict = dict.fromkeys(SCREENER_CONVENTION_COLUMNS)
+    fy = latest_fiscal_year(book, on_or_before)
+    if fy is None:
+        return out
+    res = _BookAsResult(book)
+    pl, bs = corp_quarter(res, *fy), balance_sheet(res, fy[1])
+    if bs is None:
+        return out
+    sales = pl.rows["Sales"].value
+    oa = bs.rows["Other Assets"]
+    if oa.value is not None and bs.rows["Other Liabilities"].value is not None:
+        out["working_capital"] = oa.value - bs.rows["Other Liabilities"].value
+    if sales and sales > 0:
+        recv, stock = oa.parts.get("Receivables"), oa.parts.get("Inventory")
+        out["debtor_days"] = recv / (sales / 365) if recv is not None else None
+        out["inventory_turnover"] = sales / stock if stock else None
+
+    def capital(b):
+        vals = [b.rows[k].value for k in ("Equity Capital", "Reserves", "Borrowings")]
+        return None if None in vals else sum(vals, Decimal(0))
+
+    prev = balance_sheet(res, _add_months(fy[1], -12))
+    pbt, interest = pl.rows["Profit before tax"].value, pl.rows["Interest"].value
+    if prev is not None and None not in (pbt, interest):
+        c0, c1 = capital(prev), capital(bs)
+        if c0 is not None and c1 is not None and c0 + c1 > 0:
+            out["roce_screener"] = (pbt + interest) * 2 / (c0 + c1)
+    return out

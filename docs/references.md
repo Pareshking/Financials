@@ -91,6 +91,10 @@ Last reviewed: 2026-11-13.
 | CAL2 | Special sessions (Muhurat) can produce a bhavcopy on a listed holiday. | UNVERIFIED | Rule anyway: bhavcopy overrides holiday rows |
 | IDX1 | `ind_nifty500list.csv` (2026-11-13): 501 rows, columns `Company Name, Industry, Symbol, Series, ISIN Code`. | VERIFIED | test |
 | IDX2 | Index lists can contain non-ISIN placeholders (`DUMMYHEG`, `DUM545A01024`), presumably around demergers. | VERIFIED (present) | test; quarantined as `PLACEHOLDER_ISIN` |
+| IDX4 | NSE Indices "Replacement(s) in indices" notices (`niftyindices.com/Press_Release/ind_prsDDMMYYYY[_n].pdf`, listed on `/press-release`) give, per index, a `1) Nifty 500` / `b) Nifty 500` section with "being excluded" / "being included" tables (Sr. No., Company Name, Symbol). The effective date is the first "w.e.f. / effective from Month DD, YYYY", which can wrap across lines. Replacement tables are balanced (18/18, 27/27, 31/31). | VERIFIED | 12 PDFs + derived text; `tests/test_index_backfill.py` |
+| IDX5 | Demerger dummies: e.g. `DUMMYTATAM` included 2025-10-14, the listed TMCV excluded 2025-11-17. Such notices are prose with a list of affected indices, not tables, so they are not machine-extracted. | VERIFIED (one notice) | `ind_prs13112025` |
+| IDX6 | Walking back from the 2026-11-13 list through the 12 regular notices to 2024-10-01 is consistent (no contradiction, 500 on every step) once renames are resolved via `FinInstrmId`; without that, AKZOINDIA (added 2025-09-30, now JSWDULUX, ISIN `INE133A01011` → `INE133A01029`) breaks the walk. | VERIFIED | `test_real_walk_keeps_500_on_every_step` |
+| IDX7 | A consistent walk does not prove completeness: a missing *balanced* event is only caught if a later event contradicts it. Ad-hoc notices without a table section, and dummies, are not in the manifest. | CHOICE / limitation | |
 | IDX3 | Against the 2025-10-14 bhavcopy, 31 of the 2026 constituents do not resolve by ISIN: later IPOs plus splits since (e.g. KOTAKBANK `INE237A01028` → `INE237A01036`). | OBSERVED | Snapshot must be promoted after the same day's bhavcopy |
 
 ## 2d. Shareholding (Reg. 31) — fixture: ELIN 2026-09-30
@@ -112,6 +116,8 @@ Last reviewed: 2026-11-13.
 | I2 | Fetching `TIMESTAMPTZ` into Python requires `pytz`. | OBSERVED | 2026-11-13 |
 | I3 | A self-referencing FK rejects a parent and child inserted in one statement. | OBSERVED | 2026-11-13 |
 | I4 | DECIMAL and JSON survive a Parquet round trip; Arrow `decimal128` loads into DECIMAL columns exactly. | VERIFIED | pipeline tests (exact Decimal assertions) |
+| I6 | DuckDB cannot delete a referenced row in the same transaction that repointed its references ("still referenced by a foreign key"). Merges therefore tombstone instead of deleting. | OBSERVED | `tests/test_quarantine_cli.py` |
+| I7 | Inserting quarantine rows one at a time (Arrow register + insert per row) made a gap-heavy promotion take 11.2 s; bulk insert takes 0.9 s. | OBSERVED | `docs/benchmarks.md`, `tests/test_benchmarks.py` |
 | I5 | `executemany` is ~1 ms/row; Arrow registration loads ~3,000 rows in <0.1 s. | OBSERVED | benchmark 2026-11-13 |
 
 ## 3. Access & discovery
@@ -145,7 +151,7 @@ Last reviewed: 2026-11-13.
 
 ## 5. Known data limitations (affect results, must be disclosed in any backtest output)
 
-- **L1 Survivorship bias**: `index_constituents_history` starts at the first snapshot date (Phase 1 go-live). The C9 cutoff (2024-10-01) does **not** fix this: no machine-readable history exists, so 2024-10-01 → first snapshot still needs a manual backfill. Any backtest with an as-of date before that uses today's constituents and is **survivorship-biased** until historical changes are backfilled manually.
+- **L1 Survivorship bias**: `index_constituents_history` starts at the first snapshot date. `backfill-index` (architecture §11.6) reconstructs 2024-10-01 → first snapshot from the regular NSE Indices notices [IDX4-IDX7]. It needs local price history for the event dates, and dummy/spin-off days remain approximate until `TEMPORARY` rows are added. Any backtest with an as-of date before that uses today's constituents and is **survivorship-biased** until historical changes are backfilled manually.
 - **L2 Restated comparatives**: after demergers or mergers, prior-year quarters are as-reported (pre-restatement) until restated values are captured from a later Reg. 34 annual XBRL (FY level only) or a verified PDF supplement. YoY growth across such events is flagged, not trusted.
 - **L3 Half-yearly balance sheet and cash flow**: in Q1/Q3, balance-sheet and cash-flow inputs are carried forward from the last H1/FY filing; every derived ratio exposes `bs_as_of` / `cf_as_of`.
 - **L4 Quarterly debt excludes leases** (X16) and **cash excludes non-current treasury investments** (X17) until annual notes are parsed.

@@ -91,8 +91,7 @@ def _insert_vault_rows(con, stage_dir: Path, tables: Iterable[str]) -> None:
             con.execute(f"INSERT OR IGNORE INTO {t} BY NAME SELECT * FROM read_parquet(?)", [path.as_posix()])
 
 
-def _quarantine(
-    con,
+def _quarantine_row(
     *,
     stage: str,
     reason_code: str,
@@ -100,27 +99,28 @@ def _quarantine(
     entity_id: str | None = None,
     security_id: str | None = None,
     filing_id: str | None = None,
-) -> str:
+) -> dict[str, Any]:
     body = json.dumps(details, default=str, sort_keys=True)
-    qid = stable_id("q", stage, reason_code, entity_id, security_id, filing_id, body)
-    insert_rows(
-        con,
-        "quarantine_queue",
-        [
-            {
-                "quarantine_id": qid,
-                "stage": stage,
-                "reason_code": reason_code,
-                "entity_id": entity_id,
-                "security_id": security_id,
-                "filing_id": filing_id,
-                "details": body,
-                "created_at": utc_now(),
-            }
-        ],
-        or_ignore=True,
-    )
-    return qid
+    return {
+        "quarantine_id": stable_id("q", stage, reason_code, entity_id, security_id, filing_id, body),
+        "stage": stage,
+        "reason_code": reason_code,
+        "entity_id": entity_id,
+        "security_id": security_id,
+        "filing_id": filing_id,
+        "details": body,
+        "created_at": utc_now(),
+    }
+
+
+def _quarantine_many(con, rows: list[dict[str, Any]]) -> list[str]:
+    """One bulk insert for many findings (a gap-heavy day can raise thousands)."""
+    insert_rows(con, "quarantine_queue", rows, or_ignore=True)
+    return [r["quarantine_id"] for r in rows]
+
+
+def _quarantine(con, **kwargs: Any) -> str:
+    return _quarantine_many(con, [_quarantine_row(**kwargs)])[0]
 
 
 def _load_intervals(con, exchange: str) -> list[Interval]:
@@ -295,24 +295,17 @@ def _audit_gaps(con, exchange: str, trade_date: date, obs) -> list[str]:
     for a in actions:
         by_sec.setdefault(a.security_id, []).append(a)
     isin_changed = {e.security_id for e in obs.events if e.kind == "ISIN_CHANGE"}
-    out = []
-    for sec, open_t in opens.items():
-        for finding in audit_day(sec, trade_date, open_t, prev.get(sec), by_sec.get(sec, ()), sec in isin_changed):
-            out.append(
-                _quarantine(
-                    con,
-                    stage="GAP",
-                    reason_code=finding.reason_code,
-                    security_id=sec,
-                    details={
-                        "trade_date": trade_date,
-                        "gap": finding.gap,
-                        "prev_close": prev.get(sec),
-                        "open": open_t,
-                    },
-                )
-            )
-    return out
+    rows = [
+        _quarantine_row(
+            stage="GAP",
+            reason_code=finding.reason_code,
+            security_id=sec,
+            details={"trade_date": trade_date, "gap": finding.gap, "prev_close": prev.get(sec), "open": open_t},
+        )
+        for sec, open_t in opens.items()
+        for finding in audit_day(sec, trade_date, open_t, prev.get(sec), by_sec.get(sec, ()), sec in isin_changed)
+    ]
+    return _quarantine_many(con, rows)
 
 
 # ── corporate actions ───────────────────────────────────────────────────
@@ -377,20 +370,22 @@ def verify_pending_actions(con, exchange: str) -> int:
     Returns the number of actions decided. Earlier GAP quarantines on that date are resolved
     only if the accepted factors now explain the gap (residual re-audit).
     """
-    pending = _actions(con, "status = 'PENDING'", [])
-    keys = sorted({(a.security_id, a.ex_date) for a in pending})
+    # Only actions whose ex-date bar exists can be decided: find them in one query (no per-action N+1).
+    ready = con.execute(
+        """SELECT DISTINCT a.security_id, a.ex_date, o.open,
+                  (SELECT arg_max(p.close, p.trade_date) FROM ohlcv p
+                    WHERE p.security_id = a.security_id AND p.exchange = o.exchange AND p.trade_date < a.ex_date)
+           FROM corp_actions a JOIN ohlcv o
+             ON o.security_id = a.security_id AND o.trade_date = a.ex_date AND o.exchange = ?
+           WHERE a.status = 'PENDING' ORDER BY 1, 2""",
+        [exchange],
+    ).fetchall()
     decided = 0
-    for sec, ex in keys:
-        group = _actions(con, "security_id = ? AND ex_date = ? AND status IN ('PENDING', 'QUARANTINED')", [sec, ex])
-        bar = con.execute(
-            "SELECT open FROM ohlcv WHERE security_id = ? AND exchange = ? AND trade_date = ?", [sec, exchange, ex]
-        ).fetchone()
-        prev = con.execute(
-            "SELECT arg_max(close, trade_date) FROM ohlcv WHERE security_id = ? AND exchange = ? AND trade_date < ?",
-            [sec, exchange, ex],
-        ).fetchone()
-        if bar is None or prev is None or prev[0] is None:
+    for sec, ex, open_ex, prev_close in ready:
+        if prev_close is None:
             continue
+        group = _actions(con, "security_id = ? AND ex_date = ? AND status IN ('PENDING', 'QUARANTINED')", [sec, ex])
+        bar, prev = (open_ex,), (prev_close,)
         results = verify_group(group, bar[0], prev[0])
         for a, v in zip(group, results, strict=True):
             con.execute(

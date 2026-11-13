@@ -14,6 +14,7 @@ import urllib.error
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Protocol
 from urllib.parse import urlsplit
 
 DEFAULT_USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) financials-research/0.1 (personal, non-commercial)"
@@ -33,12 +34,11 @@ class Response:
     headers: dict[str, str] = field(default_factory=dict)
 
 
-class Transport:
-    def get(self, url: str, headers: dict[str, str], timeout: float) -> Response:  # pragma: no cover
-        raise NotImplementedError
+class Transport(Protocol):
+    def get(self, url: str, headers: dict[str, str], timeout: float) -> Response: ...
 
 
-class UrllibTransport(Transport):
+class UrllibTransport:
     def __init__(self) -> None:
         self.cookies = http.cookiejar.CookieJar()
         self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(self.cookies))

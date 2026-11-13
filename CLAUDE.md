@@ -23,6 +23,9 @@ python -m financials --data-dir data fetch-days 2026-11-12        # also fetch-c
 python -m financials --data-dir data promote                       # the only writer
 python -m financials --data-dir data materialize 2026-11-12
 python -m financials --data-dir data screen "Market Cap > 500 AND ROE > 15"
+python -m financials --data-dir data quarantine list --reason ISIN_COLLISION    # resolve: quarantine resolve --id … --action … --note …
+python -m financials --data-dir data backfill-index --manifest reference/nifty500_changes.csv
+python -m financials.bench --out docs/benchmarks.md                # after performance-relevant changes
 ```
 
 ## Layout
@@ -34,7 +37,9 @@ tests/test_*_fixture_facts.py   characterisation tests pinning VERIFIED claims
 src/financials/        db/schema.sql (DDL source of truth), parsers/ (pure: bytes → rows), identity.py,
                        corp_actions.py, returns.py, calendar.py, fundamentals.py, features.py, dsl.py,
                        vault.py, staging.py (fetch/parse side), promoter.py (single writer),
-                       fetch/ (polite HTTP + jobs), cli.py
+                       admin.py (index backfill, quarantine resolution; single writer), index_changes.py,
+                       fetch/ (polite HTTP + jobs), cli.py, bench.py
+reference/             curated data derived from fixtures (e.g. nifty500_changes.csv; a test pins it)
 data/                  local only, gitignored: vault/, staging/, market.duckdb
 ```
 
@@ -86,6 +91,8 @@ data/                  local only, gitignored: vault/, staging/, market.duckdb
 
 - Tests are offline. No test may touch the network. Fetchers are tested against vault/fixture files.
 - Every bug fix in parsing, corporate actions, periods or ratio math adds a regression test.
+- Never loop a query per row/security on a hot path (promotion, materialisation, screens): batch it.
+  `tests/test_benchmarks.py` guards this; refresh `docs/benchmarks.md` when timings change materially.
 - New parser or profile work starts from a real fixture of that exact profile and period type.
 
 ## Fetching (local machine only for now)

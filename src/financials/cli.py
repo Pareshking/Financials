@@ -88,6 +88,29 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("promote", help="apply all pending staged batches (single writer)")
     mt = sub.add_parser("materialize")
     mt.add_argument("as_of", type=_date)
+    q = sub.add_parser("quarantine", help="list or resolve quarantined items (audited)")
+    qs = q.add_subparsers(dest="qcmd", required=True)
+    ql = qs.add_parser("list")
+    ql.add_argument("--stage")
+    ql.add_argument("--reason")
+    ql.add_argument("--entity")
+    ql.add_argument("--security")
+    ql.add_argument("--all", action="store_true", help="include resolved rows")
+    ql.add_argument("--limit", type=int, default=200)
+    qr = qs.add_parser("resolve")
+    qr.add_argument("--id", required=True)
+    qr.add_argument("--action", required=True, choices=["ACCEPT", "REJECT", "OVERRIDE", "CORP_ACTION",
+                                                         "MERGE_SECURITIES"])  # fmt: skip
+    qr.add_argument("--note", required=True)
+    qr.add_argument("--payload-json", default="{}")
+    ex = sub.add_parser("extract-index-changes", help="NSE Indices notices (pdftotext -layout .txt) -> manifest CSV")
+    ex.add_argument("text_dir", type=Path)
+    ex.add_argument("--index", default="Nifty 500")
+    ex.add_argument("--out", type=Path, required=True)
+    bf = sub.add_parser("backfill-index", help="rebuild membership before the first snapshot from a manifest")
+    bf.add_argument("--manifest", type=Path, required=True)
+    bf.add_argument("--index", default="NIFTY 500")
+    bf.add_argument("--expected-count", type=int, default=500)
     sc = sub.add_parser("screen")
     sc.add_argument("query")
     sc.add_argument("--as-of", type=_date)
@@ -123,6 +146,16 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
             print(f"staged {s.relative_to(stage_root).as_posix()}", file=out)
         return 0
 
+    if args.cmd == "extract-index-changes":
+        from financials.index_changes import parse_change_notice, write_manifest
+
+        events = []
+        for p in sorted(args.text_dir.glob("*.txt")):
+            events += parse_change_notice(p.read_text(encoding="utf-8"), args.index, p.name)
+        args.out.write_text(write_manifest(events), encoding="utf-8")
+        print(f"{len(events)} events from {len(sorted(args.text_dir.glob('*.txt')))} notices -> {args.out}", file=out)
+        return 0
+
     args.data_dir.mkdir(parents=True, exist_ok=True)
     con = connect(db_path)
     try:
@@ -136,6 +169,42 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
             r = materialize(con, args.as_of)
             print(f"{r.status} {r.as_of_date} rows={r.rows} {r.gate or ''} {r.message}", file=out)
             return 0 if r.status == "PROMOTED" else 1
+        if args.cmd == "quarantine":
+            from financials.admin import AdminError, list_quarantine, resolve_quarantine
+
+            if args.qcmd == "list":
+                rows = list_quarantine(
+                    con,
+                    stage=args.stage,
+                    reason_code=args.reason,
+                    entity_id=args.entity,
+                    security_id=args.security,
+                    include_resolved=args.all,
+                    limit=args.limit,
+                )
+                print(json.dumps(rows, default=str, indent=1), file=out)
+                return 0
+            try:
+                result = resolve_quarantine(con, args.id, action=args.action, note=args.note,
+                                            payload=json.loads(args.payload_json))  # fmt: skip
+            except AdminError as exc:
+                print(f"error: {exc}", file=out)
+                return 1
+            print(json.dumps(result, default=str, indent=1), file=out)
+            return 0
+        if args.cmd == "backfill-index":
+            from financials.admin import AdminError, backfill_index
+            from financials.index_changes import IndexInvariantError, read_manifest
+
+            try:
+                r = backfill_index(con, args.index, read_manifest(args.manifest.read_text(encoding="utf-8")),
+                                   expected_count=args.expected_count)  # fmt: skip
+            except (AdminError, IndexInvariantError) as exc:
+                print(f"error: {exc}", file=out)
+                return 1
+            print(f"backfilled {r['rows']} intervals before {r['first_snapshot']} across {len(r['steps'])} "
+                  f"event dates", file=out)  # fmt: skip
+            return 0
         if args.cmd == "screen":
             rows = run_screen(con, args.query, as_of=args.as_of)
             print(json.dumps(rows, default=str, indent=1), file=out)

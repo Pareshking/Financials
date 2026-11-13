@@ -278,3 +278,124 @@ CREATE TABLE IF NOT EXISTS company_overrides (
     reason       VARCHAR NOT NULL,
     created_at   TIMESTAMP NOT NULL
 );
+
+-- ── L3 Features (rebuilt by the promoter process; G4/G5 in financials.features) ──
+CREATE TABLE IF NOT EXISTS screener_features_history (
+    as_of_date          DATE    NOT NULL,
+    security_id         VARCHAR NOT NULL,
+    entity_id           VARCHAR NOT NULL,
+    symbol              VARCHAR NOT NULL,
+    series              VARCHAR NOT NULL,
+    price_date          DATE,                -- last bar on/before as_of_date
+    close               DECIMAL(18,4),
+    shares              BIGINT,
+    shares_source       VARCHAR,             -- REG31 | PAID_UP
+    market_cap          DECIMAL(24,2),
+    enterprise_value    DECIMAL(24,2),
+    sales_ttm           DECIMAL(24,2),
+    ebitda_ttm          DECIMAL(24,2),
+    pat_ttm             DECIMAL(24,2),
+    fcf_ttm             DECIMAL(24,2),
+    net_debt            DECIMAL(24,2),
+    total_equity        DECIMAL(24,2),
+    pe                  DOUBLE,
+    pb                  DOUBLE,
+    ev_ebitda           DOUBLE,
+    opm                 DOUBLE,
+    sales_growth_yoy    DOUBLE,
+    profit_growth_yoy   DOUBLE,
+    roe                 DOUBLE,
+    roce                DOUBLE,
+    roic                DOUBLE,
+    croic               DOUBLE,
+    debt_to_equity      DOUBLE,
+    fcff_yield          DOUBLE,
+    other_income_to_pbt DOUBLE,
+    altman_z_dd         DOUBLE,              -- X2 uses OtherEquity as retained-earnings proxy
+    piotroski_f         INTEGER,             -- NULL until annual (Reg. 34) data exists
+    beneish_m           DOUBLE,              -- NULL until annual (Reg. 34) data exists
+    return_1m           DOUBLE,
+    return_3m           DOUBLE,
+    return_6m           DOUBLE,
+    return_12m          DOUBLE,
+    price_to_dma50      DOUBLE,
+    price_to_dma200     DOUBLE,
+    dist_52w_high       DOUBLE,
+    deliv_avg_5d        DOUBLE,
+    deliv_avg_20d       DOUBLE,
+    delivery_velocity   DOUBLE,
+    float_turnover_pct  DOUBLE,
+    promoter_pct        DOUBLE,
+    fii_pct             DOUBLE,
+    dii_pct             DOUBLE,
+    scope_used          VARCHAR,
+    fundamentals_end    DATE,                -- quarter end of the TTM window
+    bs_as_of            DATE,
+    cf_as_of            DATE,
+    shp_as_of           DATE,
+    in_nifty500         BOOLEAN,
+    PRIMARY KEY (as_of_date, security_id)
+);
+
+CREATE TABLE IF NOT EXISTS screener_features (
+    as_of_date          DATE    NOT NULL,
+    security_id         VARCHAR NOT NULL,
+    entity_id           VARCHAR NOT NULL,
+    symbol              VARCHAR NOT NULL,
+    series              VARCHAR NOT NULL,
+    price_date          DATE,                -- last bar on/before as_of_date
+    close               DECIMAL(18,4),
+    shares              BIGINT,
+    shares_source       VARCHAR,             -- REG31 | PAID_UP
+    market_cap          DECIMAL(24,2),
+    enterprise_value    DECIMAL(24,2),
+    sales_ttm           DECIMAL(24,2),
+    ebitda_ttm          DECIMAL(24,2),
+    pat_ttm             DECIMAL(24,2),
+    fcf_ttm             DECIMAL(24,2),
+    net_debt            DECIMAL(24,2),
+    total_equity        DECIMAL(24,2),
+    pe                  DOUBLE,
+    pb                  DOUBLE,
+    ev_ebitda           DOUBLE,
+    opm                 DOUBLE,
+    sales_growth_yoy    DOUBLE,
+    profit_growth_yoy   DOUBLE,
+    roe                 DOUBLE,
+    roce                DOUBLE,
+    roic                DOUBLE,
+    croic               DOUBLE,
+    debt_to_equity      DOUBLE,
+    fcff_yield          DOUBLE,
+    other_income_to_pbt DOUBLE,
+    altman_z_dd         DOUBLE,              -- X2 uses OtherEquity as retained-earnings proxy
+    piotroski_f         INTEGER,             -- NULL until annual (Reg. 34) data exists
+    beneish_m           DOUBLE,              -- NULL until annual (Reg. 34) data exists
+    return_1m           DOUBLE,
+    return_3m           DOUBLE,
+    return_6m           DOUBLE,
+    return_12m          DOUBLE,
+    price_to_dma50      DOUBLE,
+    price_to_dma200     DOUBLE,
+    dist_52w_high       DOUBLE,
+    deliv_avg_5d        DOUBLE,
+    deliv_avg_20d       DOUBLE,
+    delivery_velocity   DOUBLE,
+    float_turnover_pct  DOUBLE,
+    promoter_pct        DOUBLE,
+    fii_pct             DOUBLE,
+    dii_pct             DOUBLE,
+    scope_used          VARCHAR,
+    fundamentals_end    DATE,                -- quarter end of the TTM window
+    bs_as_of            DATE,
+    cf_as_of            DATE,
+    shp_as_of           DATE,
+    in_nifty500         BOOLEAN,
+    PRIMARY KEY (as_of_date, security_id)
+);
+
+CREATE TABLE IF NOT EXISTS user_custom_ratios (
+    name        VARCHAR PRIMARY KEY,            -- alias usable in screens
+    expression  VARCHAR NOT NULL,               -- DSL arithmetic over aliases / other custom ratios
+    created_at  TIMESTAMP NOT NULL
+);

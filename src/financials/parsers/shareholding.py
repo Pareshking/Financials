@@ -1,6 +1,6 @@
 """Reg. 31 shareholding pattern XBRL (`in-bse-shp` taxonomy) and the NSE shareholding master JSON.
 
-Evidence (docs/references.md SHP1-SHP14):
+Evidence (docs/references.md SHP1-SHP15):
 - namespace `http://www.bseindia.com/xbrl/shp/<version>/in-bse-shp` (no `in-capmkt-ent`);
 - category totals sit in instant contexts with one `CategoryOfShareholdersAxis` member;
 - promoter + public + non-promoter non-public = total, exactly [SHP8];
@@ -38,6 +38,8 @@ CATEGORIES = {
     "InstitutionsForeignPortfolioInvestorCategoryTwoMember": "FPI_CAT2",
     "ForeignDirectInvestmentMember": "FDI",
     "OverseasDepositoriesMember": "OVERSEAS_DEPOSITORIES",
+    "SovereignWealthFundsDomesticMember": "SWF_DOMESTIC",
+    "GovernmentsMember": "GOVERNMENTS",
 }
 PROMOTER_MEMBER = "ShareholdingOfPromoterAndPromoterGroupMember"
 # Encumbrance quantities on the promoter member [SHP10]; pledge is one kind of encumbrance.

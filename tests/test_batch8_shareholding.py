@@ -1,6 +1,6 @@
 """Batch 8: Reg. 31 shareholding pattern (in-bse-shp 2025-10-31) across pledged, no-promoter and DR filers.
 
-Evidence SHP8-SHP14 in docs/references.md. All fixtures are real, unmodified NSE files (MANIFEST.md);
+Evidence SHP8-SHP15 in docs/references.md. All fixtures are real, unmodified NSE files (MANIFEST.md);
 tampering happens in memory only.
 """
 
@@ -16,6 +16,7 @@ from conftest import FETCHED_AT
 from _fixture_helpers import XBRL_DIR
 from financials.features import _preload, _quarter_before, shareholding_columns
 from financials.parsers.shareholding import NO_PROMOTER_RULE, parse_shareholding
+from financials.parsers.xbrl import parse_instance
 from financials.promoter import promote
 from financials.staging import stage_shareholding
 
@@ -268,3 +269,55 @@ def test_dsl_aliases_compile_to_the_new_columns():
         "fii_dii_qoq_change_pct",
     ):
         assert col in sql
+
+
+# ── Screener parity (user-pasted Screener pages, Sep 2026 column) [SHP15] ─────────────────────────────
+
+NAUKRI = XBRL_DIR / "SHP_1742520_21102026115715_WEB.xml"
+SCREENER_SHP = {
+    HDFC_SEP: {"Promoters": "0", "FIIs": "39.39", "DIIs": "43.44", "Government": "0.19", "Public": "16.96",
+               "Others": "0"},
+    NAUKRI: {"Promoters": "37.19", "FIIs": "25.46", "DIIs": "26.81", "Government": "0.00", "Public": "10.47",
+             "Others": "0.06"},
+}  # fmt: skip
+
+
+def screener_view(r) -> dict[str, Decimal]:
+    """Screener's buckets from SEBI categories: domestic SWF moves from DII to Government; employee trusts are
+    'Others'; percentages on total minus DR shares [SHP9, SHP15]."""
+
+    def s(cat):
+        return r.categories.get(cat, {}).get("shares", Decimal(0))
+
+    den = s("TOTAL") - s("DR_CUSTODIAN")
+    view = {
+        "Promoters": s("PROMOTER"),
+        "FIIs": s("FII"),
+        "DIIs": s("DII") - s("SWF_DOMESTIC"),
+        "Government": s("SWF_DOMESTIC") + s("GOVERNMENTS"),
+        "Public": s("NON_INSTITUTIONS"),
+        "Others": s("NON_PROMOTER_NON_PUBLIC") - s("DR_CUSTODIAN"),
+    }
+    return {k: 100 * v / den for k, v in view.items()}
+
+
+@pytest.mark.parametrize("path", list(SCREENER_SHP), ids=lambda p: p.stem)
+def test_screener_shareholding_parity(path):
+    """Screener's rounding is neither half-up nor truncation (HDFC FII 39.398 -> 39.39, Info Edge FII
+    25.459 -> 25.46), so the tolerance is one display unit: 0.01 percentage points."""
+    view = screener_view(parse_shareholding(path.read_bytes()))
+    for line, golden in SCREENER_SHP[path].items():
+        assert abs(view[line] - Decimal(golden)) <= Decimal("0.01"), (line, view[line], golden)
+
+
+def test_raw_facts_of_every_shareholding_filing_are_saved(hdfc):
+    """Invariant 3: every fact, every context, as sent; the parser's canonical subset is derived from it."""
+    con = hdfc.con
+    got = dict(
+        con.execute(
+            "SELECT f.source_url, count(*) FROM raw_xbrl_facts r JOIN filings f USING (filing_id) GROUP BY 1"
+        ).fetchall()
+    )
+    for path in (HDFC_JUN, HDFC_SEP):
+        n = len(parse_instance(path.read_bytes()).facts)
+        assert got["https://nsearchives.nseindia.com/corporate/xbrl/" + path.name] == n

@@ -13,7 +13,7 @@
 | F05 | Index constituents and rebalance notices | 1 | VERIFIED | CONTAINER_DIRECT | IDX1, IDX2, IDX4, IDX5, IDX6 |
 | F06 | Integrated Filing - Financials (Reg. 33 quarterly XBRL) | 1 | VERIFIED | CONTAINER_DIRECT | X1, X2, X4, X6, X32, X33, X34, X35, X38, A7 |
 | F07 | Reg. 34(1) annual report XBRL (MCA Ind AS taxonomy) | 2 | VERIFIED | CONTAINER_DIRECT | X36, X37, A8 |
-| F08 | Reg. 31 shareholding pattern XBRL | 1 | VERIFIED | CONTAINER_DIRECT | SHP1, SHP2, SHP3, SHP4, SHP6, SHP7, SHP8, SHP9, SHP10, SHP11, SHP12, SHP13, SHP14 |
+| F08 | Reg. 31 shareholding pattern XBRL | 1 | VERIFIED | CONTAINER_DIRECT | SHP1, SHP2, SHP3, SHP4, SHP6, SHP7, SHP8, SHP9, SHP10, SHP11, SHP12, SHP13, SHP14, SHP15 |
 | F09 | Reg. 76 reconciliation of share capital audit XBRL | 2 | UNVERIFIED | UNKNOWN | — |
 | F10 | Reg. 23(9) related party transactions | 2 | VERIFIED | CONTAINER_DIRECT | X19 |
 | F11 | SEBI PIT Reg. 7(2) insider trading disclosures | 3 | UNVERIFIED | UNKNOWN | — |
@@ -166,7 +166,7 @@
 | unlocked_metrics | shares outstanding, promoter/FII/DII/MF holdings, pledge, float turnover |
 | phase | 1 |
 | verification_status | VERIFIED |
-| evidence | SHP1, SHP2, SHP3, SHP4, SHP6, SHP7, SHP8, SHP9, SHP10, SHP11, SHP12, SHP13, SHP14 |
+| evidence | SHP1, SHP2, SHP3, SHP4, SHP6, SHP7, SHP8, SHP9, SHP10, SHP11, SHP12, SHP13, SHP14, SHP15 |
 | notes | Visibility from master broadcastDate. Pledge and encumbrance quantities, NPNP, >1% public holders parsed (SHP8-SHP14). Percentages exclude DR shares (SHP9). |
 
 ## F09 — Reg. 76 reconciliation of share capital audit XBRL

@@ -131,7 +131,7 @@ feeds:
     unlocked_metrics: [shares outstanding, promoter/FII/DII/MF holdings, pledge, float turnover]
     phase: 1
     verification_status: VERIFIED
-    evidence: [SHP1, SHP2, SHP3, SHP4, SHP6, SHP7, SHP8, SHP9, SHP10, SHP11, SHP12, SHP13, SHP14]
+    evidence: [SHP1, SHP2, SHP3, SHP4, SHP6, SHP7, SHP8, SHP9, SHP10, SHP11, SHP12, SHP13, SHP14, SHP15]
     notes: Visibility from master broadcastDate. Pledge and encumbrance quantities, NPNP, >1% public holders parsed (SHP8-SHP14). Percentages exclude DR shares (SHP9).
 
   - feed_id: F09

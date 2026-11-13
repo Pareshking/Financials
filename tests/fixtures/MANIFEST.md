@@ -165,6 +165,7 @@ Source URL pattern for all forty-nine: `https://nsearchives.nseindia.com/corpora
 | `xbrl/SHP_1740148_16102026052137_WEB.xml` | B8: Vedanta 2026-09-30. NDU + other encumbrance, no pledge (SHP10); EBT in NPNP | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_1740148_16102026052137_WEB.xml` | `e1f98ab9a4db78a1b21f2e7b9f90d9cfd7e47e5fd5ec72e9525a9e0630d5eda5` |
 | `xbrl/SHP_1743210_21102026055808_WEB.xml` | B8: JSW Steel 2026-09-30. Promoter pledge 12.25%; FDI (JFE) 15% (SHP10, SHP13) | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_1743210_21102026055808_WEB.xml` | `5a53b46441c60727a6a855b78aeed0a68921201b32ec8661daf86e58541f6bd0` |
 | `xbrl/SHP_1733654_07102026112959_WEB.xml` | B8: Apollo Hospitals 2026-09-30. Promoter pledge 2.91%; >1% public holders (SHP10, SHP12) | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_1733654_07102026112959_WEB.xml` | `4686100c7f9c77b5491aa1576e9a4be3a4d8ddcc988caa05ea628a0615ea0228` |
+| `xbrl/SHP_1742520_21102026115715_WEB.xml` | B8: Info Edge (NAUKRI) 2026-09-30. Screener shareholding parity; employee trust as Screener 'Others' (SHP15) | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_1742520_21102026115715_WEB.xml` | `1a7b188e3940d89ce5c1680a10919329dce743b5b091384cfb2abea0ae431094` |
 
 Inspected for Batch 8 but not committed (registered in docs/tag_registry.yaml):
 

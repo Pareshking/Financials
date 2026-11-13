@@ -253,26 +253,7 @@ def stage_results_xbrl(
         ]
         return write_stage(stage_root, "results_xbrl", fid, tables)
 
-    tables["raw_xbrl_facts"] = [
-        {
-            "filing_id": fid,
-            "parser_version": PARSER_VERSION,
-            "seq": f.seq,
-            "element_ns": f.ns,
-            "element_name": f.name,
-            "context_id": f.context_id,
-            "ctx_start": inst.contexts[f.context_id].start,
-            "ctx_end": inst.contexts[f.context_id].end,
-            "ctx_instant": inst.contexts[f.context_id].instant,
-            "dimensions": json.dumps(dict(inst.contexts[f.context_id].dimensions))
-            if inst.contexts[f.context_id].dimensions
-            else None,
-            "unit_ref": f.unit_ref,
-            "decimals": f.decimals,
-            "value_text": f.value_text,
-        }
-        for f in inst.facts
-    ]
+    tables["raw_xbrl_facts"] = _raw_fact_rows(fid, inst)
 
     try:
         parsed = parse_integrated_results(data)
@@ -467,6 +448,31 @@ def stage_index_snapshot(
     )
 
 
+def _raw_fact_rows(fid: str, inst) -> list[dict[str, Any]]:
+    """Every fact of an instance, every context, exactly as sent (invariant 3)."""
+    rows = []
+    for f in inst.facts:
+        c = inst.contexts[f.context_id]
+        rows.append(
+            {
+                "filing_id": fid,
+                "parser_version": PARSER_VERSION,
+                "seq": f.seq,
+                "element_ns": f.ns,
+                "element_name": f.name,
+                "context_id": f.context_id,
+                "ctx_start": c.start,
+                "ctx_end": c.end,
+                "ctx_instant": c.instant,
+                "dimensions": json.dumps(dict(c.dimensions)) if c.dimensions else None,
+                "unit_ref": f.unit_ref,
+                "decimals": f.decimals,
+                "value_text": f.value_text,
+            }
+        )
+    return rows
+
+
 def _int_or_none(v) -> int | None:
     return None if v is None else int(v)
 
@@ -498,6 +504,7 @@ def stage_shareholding(
     fid = filing.filing_id
     tables: dict[str, list[dict[str, Any]]] = {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)]}
     try:
+        tables["raw_xbrl_facts"] = _raw_fact_rows(fid, parse_instance(data))
         parsed = parse_shareholding(data)
     except ParseError as exc:
         tables["stg_issues"] = [

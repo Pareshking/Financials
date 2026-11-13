@@ -871,7 +871,7 @@ def _promote_shareholding(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
         return _out_of_scope(
             con, stage_dir, "shareholding", f"as of {staged_meta[0]['as_of_date']} < {MIN_PERIOD_END_DATE}"
         )
-    _insert_vault_rows(con, stage_dir, ("blobs", "filings"))
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_xbrl_facts"))
     filing = read_table(con, stage_dir, "filings")[0]
     fid = filing["filing_id"]
     issues = read_table(con, stage_dir, "stg_issues")

@@ -399,3 +399,11 @@ CREATE TABLE IF NOT EXISTS user_custom_ratios (
     expression  VARCHAR NOT NULL,               -- DSL arithmetic over aliases / other custom ratios
     created_at  TIMESTAMP NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS promotion_log (
+    stage_path   VARCHAR PRIMARY KEY,          -- relative to the staging root
+    job          VARCHAR NOT NULL,
+    status       VARCHAR NOT NULL,             -- PROMOTED | ALREADY_PROMOTED | QUARANTINED
+    message      VARCHAR,
+    promoted_at  TIMESTAMP NOT NULL
+);

@@ -108,7 +108,10 @@ def write_stage(
         raise KeyError(f"unknown staging tables {sorted(unknown)}")
     final = Path(stage_root) / job / run_id
     if final.exists():
-        raise FileExistsError(f"stage already exists: {final}")
+        # Run ids are derived from content (sha/filing id), so an existing stage is the same batch.
+        if read_manifest(final).get("job") != job:
+            raise FileExistsError(f"stage {final} exists for another job")
+        return final
     final.parent.mkdir(parents=True, exist_ok=True)
     tmp = Path(tempfile.mkdtemp(dir=final.parent, prefix=f".{run_id}-"))
     try:
@@ -534,3 +537,23 @@ def stage_shareholding(
         for cat, vals in sorted(parsed.categories.items())
     ]
     return write_stage(stage_root, "shareholding", fid, tables)
+
+
+def stage_raw_only(
+    vault: Vault,
+    stage_root: Path,
+    *,
+    data: bytes,
+    ext: str,
+    media_type: str,
+    category: str,
+    source_url: str,
+    fetched_at: datetime,
+    exchange: str = "NSE",
+) -> Path:
+    """Vault a download that feeds another job (e.g. the shareholding master JSON) so it stays evidence."""
+    blob = vault.put(data, ext=ext, media_type=media_type, fetched_at=fetched_at)
+    filing = make_filing(blob, exchange=exchange, category=category, source_url=source_url, fetched_at=fetched_at)
+    return write_stage(
+        stage_root, "raw_only", filing.filing_id, {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)]}
+    )

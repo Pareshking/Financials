@@ -48,3 +48,24 @@ def test_registry_covers_every_element_of_committed_filings(path):
     registered = set(REGISTRY["profiles"].get(profile, {}))
     assert elements - registered == set(), path.name
     assert path.name in REGISTRY["files"]
+
+
+SHP_FILES = sorted(XBRL_DIR.glob("SHP_*.xml"))
+
+
+@pytest.mark.parametrize("path", SHP_FILES, ids=lambda p: p.stem)
+def test_registry_covers_every_reg31_element_axis_and_category(path):
+    """Reg. 31 is dimensional: every element (any context), axis and CategoryOfShareholders member is registered."""
+    inst = parse_instance(path.read_bytes())
+    elements = {f.name for f in inst.facts}
+    axes = {a.split(":")[-1] for c in inst.contexts.values() for a, _ in c.dimensions}
+    members = {
+        m.split(":")[-1]
+        for c in inst.contexts.values()
+        for a, m in c.dimensions
+        if a.split(":")[-1] == "CategoryOfShareholdersAxis"
+    }
+    assert elements - set(REGISTRY["profiles"]["REG31_SHP"]) == set()
+    assert axes - set(REGISTRY["axes"]["REG31_SHP"]) == set()
+    assert members - set(REGISTRY["members"]["REG31_SHP"]["CategoryOfShareholdersAxis"]) == set()
+    assert path.name in REGISTRY["files"]

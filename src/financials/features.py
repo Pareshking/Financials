@@ -141,18 +141,91 @@ def _delivery(bars) -> dict[str, float | None]:
     }
 
 
+SHAREHOLDING_COLUMNS = (
+    "promoter_holding_pct", "promoter_pledge_pct", "promoter_encumbered_pct", "fii_holding_pct",
+    "fpi_holding_pct", "dii_holding_pct", "public_holding_pct", "non_promoter_non_public_pct",
+    "fii_dii_qoq_change_pct",
+)  # fmt: skip
+
+
+def _stated(cats: dict, cat: str) -> float | None:
+    return _f(cats.get(cat, (None, None))[0])
+
+
+def _quarter_before(d: date) -> date:
+    """Quarter end immediately before quarter end `d` (2026-09-30 -> 2026-06-30, 2026-03-31 -> 2025-12-31)."""
+    m = d.month - 2  # first day of the quarter's first month, minus one day
+    return (date(d.year, m, 1) if m >= 1 else date(d.year - 1, m + 12, 1)) - timedelta(days=1)
+
+
+def shareholding_columns(shp: dict) -> dict:
+    """Reg. 31 holdings as filed fractions [SHP9]; pledge and encumbrance as fractions of promoter shares
+    [SHP10]. fii_dii_qoq_change_pct needs the filing for the immediately preceding quarter end, both
+    visible at the as-of; otherwise NULL (never a longer-gap change)."""
+    out = dict.fromkeys(SHAREHOLDING_COLUMNS)
+    if "TOTAL" not in shp:
+        return out
+    promoter_shares = shp.get("PROMOTER", (None, None))[1]
+
+    def of_promoter(qty):
+        if qty is None or promoter_shares is None or promoter_shares <= 0:
+            return None
+        return float(Decimal(qty) / Decimal(promoter_shares))
+
+    fpi = [shp[c][0] for c in ("FPI_CAT1", "FPI_CAT2") if c in shp and shp[c][0] is not None]
+    total, npnp = shp["TOTAL"][1], shp.get("NON_PROMOTER_NON_PUBLIC", (None, 0))[1] or 0
+    out.update(
+        promoter_holding_pct=_stated(shp, "PROMOTER"),
+        promoter_pledge_pct=of_promoter(shp.get("_pledged")),
+        promoter_encumbered_pct=of_promoter(shp.get("_encumbered")),
+        fii_holding_pct=_stated(shp, "FII"),
+        # FPI = Category I + II only; Institutions (Foreign) also holds FDI and overseas depositories [SHP13].
+        fpi_holding_pct=float(sum(Decimal(str(x)) for x in fpi)) if fpi and "FII" in shp else None,
+        dii_holding_pct=_stated(shp, "DII"),
+        public_holding_pct=_stated(shp, "PUBLIC"),
+        # Share of total issued shares (NPNP rows carry no filed percentage [SHP9]).
+        non_promoter_non_public_pct=float(Decimal(npnp) / Decimal(total)) if total else None,
+    )
+    prev = shp.get("_prev", {})
+    now_inst = [_stated(shp, "FII"), _stated(shp, "DII")]
+    prev_inst = [_stated(prev, "FII"), _stated(prev, "DII")]
+    if (
+        shp.get("_prev_as_of") is not None
+        and shp["_prev_as_of"] == _quarter_before(shp["_as_of"])
+        and None not in now_inst + prev_inst
+    ):
+        out["fii_dii_qoq_change_pct"] = round(sum(now_inst) - sum(prev_inst), 6)
+    return out
+
+
 def _preload(con, as_of_ts: datetime):
     """Bulk point-in-time lookups keyed by entity (avoids per-security queries)."""
+    # One filing per (entity, as_of): the latest visible revision. Then the two latest as_of dates
+    # (the second feeds the quarter-on-quarter change).
     shp_rows = con.execute(
-        """SELECT entity_id, as_of_date, category, pct, shares FROM (
-               SELECT *, dense_rank() OVER (PARTITION BY entity_id ORDER BY as_of_date DESC) AS r
-               FROM shareholding_observations WHERE visible_from_ts <= ?) WHERE r = 1""",
+        """WITH f AS (
+               SELECT entity_id, as_of_date, filing_id, parser_version FROM (
+                   SELECT entity_id, as_of_date, filing_id, parser_version, row_number() OVER (
+                       PARTITION BY entity_id, as_of_date ORDER BY visible_from_ts DESC, parser_version DESC,
+                       filing_id DESC) AS rn
+                   FROM shareholding_meta WHERE visible_from_ts <= ?) WHERE rn = 1),
+           r AS (SELECT *, row_number() OVER (PARTITION BY entity_id ORDER BY as_of_date DESC) AS r FROM f)
+           SELECT r.entity_id, r.as_of_date, r.r, o.category, o.pct, o.shares,
+                  m.promoter_pledged_shares, m.promoter_encumbered_shares
+           FROM r JOIN shareholding_observations o USING (filing_id, parser_version)
+           JOIN shareholding_meta m USING (filing_id, parser_version)
+           WHERE r.r <= 2""",
         [as_of_ts],
     ).fetchall()
     shp: dict[str, dict] = defaultdict(dict)
-    for ent, d, cat, pct, shares in shp_rows:
-        shp[ent][cat] = (pct, shares)
-        shp[ent]["_as_of"] = d
+    for ent, d, rank, cat, pct, shares, pledged, encumbered in shp_rows:
+        if rank == 1:
+            shp[ent][cat] = (pct, shares)
+            shp[ent]["_as_of"] = d
+            shp[ent]["_pledged"], shp[ent]["_encumbered"] = pledged, encumbered
+        else:
+            shp[ent].setdefault("_prev", {})[cat] = (pct, shares)
+            shp[ent]["_prev_as_of"] = d
     paid_up = dict(
         (ent, (Decimal(v), d))
         for ent, v, d in con.execute(
@@ -285,6 +358,7 @@ def compute_rows(con, as_of: date, exchange: str = "NSE") -> list[dict]:
             "fii_pct": _f(shp.get("FII", (None, None))[0]),
             "dii_pct": _f(shp.get("DII", (None, None))[0]),
             "shp_as_of": shp.get("_as_of"),
+            **shareholding_columns(shp),
         })  # fmt: skip
         archetype = arch_override.get(ent) or (
             curated.get(symbol) if fund.get("_archetype") == "INDUSTRIAL_SERVICES" and symbol in curated else None

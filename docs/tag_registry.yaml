@@ -1,5 +1,83 @@
-# Every XBRL element seen in non-dimensional contexts, per profile. Generated and merged by
+# Every XBRL element seen in non-dimensional contexts, per profile (REG31_SHP: every context, with its
+# axes; `axes`/`members` list dimensional structure). Generated and merged by
 # scripts/inspect_xbrl_exhaustive.py; mapped_to = canonical tag in the production parser (null = unmapped).
+axes:
+  REG31_SHP:
+    CategoryOfShareholdersAxis:
+      first_batch: '8'
+      mapped_to: category
+    DetailsOfSharesHeldByAlternativeInvestmentFundsAxis:
+      first_batch: '8'
+      mapped_to: major_holder.AIF
+    DetailsOfSharesHeldByBodiesCorporateAxis:
+      first_batch: '8'
+      mapped_to: major_holder.BODIES_CORPORATE
+    DetailsOfSharesHeldByCentralGovernmentOrStateGovernmentsAxis:
+      first_batch: '8'
+      mapped_to: null
+    DetailsOfSharesHeldByCustodianOrDRHolderAxis:
+      first_batch: '8'
+      mapped_to: null
+    DetailsOfSharesHeldByForeignCompaniesAxis:
+      first_batch: '8'
+      mapped_to: major_holder.FOREIGN_COMPANIES
+    DetailsOfSharesHeldByForeignDirectInvestmentAxis:
+      first_batch: '8'
+      mapped_to: major_holder.FDI
+    DetailsOfSharesHeldByInstitutionsForeignPortfolioInvestorOneAxis:
+      first_batch: '8'
+      mapped_to: major_holder.FPI_CAT1
+    DetailsOfSharesHeldByInsuranceCompaniesAxis:
+      first_batch: '8'
+      mapped_to: major_holder.INSURANCE
+    DetailsOfSharesHeldByMutualFundsOrUTIAxis:
+      first_batch: '8'
+      mapped_to: major_holder.MUTUAL_FUNDS
+    DetailsOfSharesHeldByNonResidentIndividualsOrForeignIndividualsAxis:
+      first_batch: '8'
+      mapped_to: null
+    DetailsOfSharesHeldByOtherFinancialInstitutionsAxis:
+      first_batch: '8'
+      mapped_to: major_holder.OTHER_FINANCIAL_INSTITUTIONS
+    DetailsOfSharesHeldByOtherForeignShareholdersAxis:
+      first_batch: '8'
+      mapped_to: null
+    DetailsOfSharesHeldByOtherInstitutionsDomesticAxis:
+      first_batch: '8'
+      mapped_to: null
+    DetailsOfSharesHeldByOtherInstitutionsForeignAxis:
+      first_batch: '8'
+      mapped_to: null
+    DetailsOfSharesHeldByOtherNonInstitutionsAxis:
+      first_batch: '8'
+      mapped_to: null
+    DetailsOfSharesHeldByOthersIndianShareholdersAxis:
+      first_batch: '8'
+      mapped_to: null
+    DetailsOfSharesHeldByOverseasDepositoriesAxis:
+      first_batch: '8'
+      mapped_to: major_holder.OVERSEAS_DEPOSITORIES
+    DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis:
+      first_batch: '8'
+      mapped_to: major_holder.PENSION_FUNDS
+    DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis:
+      first_batch: '8'
+      mapped_to: major_holder.RESIDENT_INDIVIDUALS_ABOVE_2L
+    DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis:
+      first_batch: '8'
+      mapped_to: major_holder.RESIDENT_INDIVIDUALS_UPTO_2L
+    DetailsOfSharesWhichRemainUnclaimedForPublicShareholdersAxis:
+      first_batch: '8'
+      mapped_to: null
+    DetailsOfTheShareholdersActingAsPersonsInConcertForPublicAxis:
+      first_batch: '8'
+      mapped_to: null
+    DetailsSharesHeldByIndividualsOrHUFAxis:
+      first_batch: '8'
+      mapped_to: null
+    SignificantBeneficialOwnersAxis:
+      first_batch: '8'
+      mapped_to: null
 files:
 - IF_INS_COM_IND_AS_19799_WebXMLFile_20261027_212749295.xml
 - IF_INS_COM_IND_AS_19799_WebXMLFile_20261027_212811965.xml
@@ -102,6 +180,23 @@ files:
 - INTEGRATED_FILING_NBFC_INDAS_1753151_04112026082408_WEB.xml
 - INTEGRATED_FILING_NBFC_INDAS_1756983_12112026083425_WEB.xml
 - INTEGRATED_FILING_NBFC_INDAS_1757118_13112026023256_WEB.xml
+- SHP_1687801_03072026023346_WEB.xml
+- SHP_1690795_10072026081131_WEB.xml
+- SHP_1698632_21072026062045_WEB.xml
+- SHP_1733480_06102026050037_WEB.xml
+- SHP_1733654_07102026112959_WEB.xml
+- SHP_1736151_12102026041358_WEB.xml
+- SHP_1736411_12102026064817_WEB.xml
+- SHP_1737048_13102026050138_WEB.xml
+- SHP_1738462_15102026105915_WEB.xml
+- SHP_1739068_15102026051415_WEB.xml
+- SHP_1739151_15102026054406_WEB.xml
+- SHP_1740148_16102026052137_WEB.xml
+- SHP_1741974_19102026071903_WEB.xml
+- SHP_1742713_21102026021326_WEB.xml
+- SHP_1742991_21102026042504_WEB.xml
+- SHP_1743210_21102026055808_WEB.xml
+- SHP_1743956_22102026042725_WEB.xml
 label_rules:
   EXCISE_DUTY:
     amount_element: OtherExpenses
@@ -124,6 +219,213 @@ label_rules:
     evidence: X39
     label_pattern: ^\s*lease\s+liab (case-insensitive)
     seen: 12/12 Batch 1 INDAS_CORP filings incl. ONGC typo "Lease Liabilties"
+members:
+  REG31_SHP:
+    CategoryOfShareholdersAxis:
+      AlternativeInvestmentFundsMember:
+        filings: 16
+        first_batch: '8'
+        mapped_to: null
+      AssetReconstructionCompaniesMember:
+        filings: 6
+        first_batch: '8'
+        mapped_to: null
+      AssociateCompaniesOrSubsidiariesMember:
+        filings: 9
+        first_batch: '8'
+        mapped_to: null
+      BanksMember:
+        filings: 15
+        first_batch: '8'
+        mapped_to: null
+      BodiesCorporateMember:
+        filings: 17
+        first_batch: '8'
+        mapped_to: null
+      CentralGovernmentOrPresidentOfIndiaMember:
+        filings: 11
+        first_batch: '8'
+        mapped_to: null
+      CentralGovernmentOrStateGovernmentSMember:
+        filings: 2
+        first_batch: '8'
+        mapped_to: null
+      CustodianOrDRHolderMember:
+        filings: 8
+        first_batch: '8'
+        mapped_to: DR_CUSTODIAN
+      DirectorsAndDirectorsRelativesMember:
+        filings: 13
+        first_batch: '8'
+        mapped_to: null
+      EmployeeBenefitsTrustsMember:
+        filings: 7
+        first_batch: '8'
+        mapped_to: EMPLOYEE_TRUSTS
+      ForeignCompaniesMember:
+        filings: 13
+        first_batch: '8'
+        mapped_to: null
+      ForeignDirectInvestmentMember:
+        filings: 9
+        first_batch: '8'
+        mapped_to: FDI
+      ForeignMember:
+        filings: 7
+        first_batch: '8'
+        mapped_to: null
+      ForeignNationalsMember:
+        filings: 13
+        first_batch: '8'
+        mapped_to: null
+      ForeignVentureCapitalInvestorsMember:
+        filings: 6
+        first_batch: '8'
+        mapped_to: null
+      GovernmentsMember:
+        filings: 14
+        first_batch: '8'
+        mapped_to: null
+      IndianMember:
+        filings: 13
+        first_batch: '8'
+        mapped_to: null
+      IndividualsOrHinduUndividedFamilyMember:
+        filings: 13
+        first_batch: '8'
+        mapped_to: null
+      InstitutionsDomesticMember:
+        filings: 17
+        first_batch: '8'
+        mapped_to: DII
+      InstitutionsForeignMember:
+        filings: 17
+        first_batch: '8'
+        mapped_to: FII
+      InstitutionsForeignPortfolioInvestorCategoryOneMember:
+        filings: 17
+        first_batch: '8'
+        mapped_to: FPI_CAT1
+      InstitutionsForeignPortfolioInvestorCategoryTwoMember:
+        filings: 17
+        first_batch: '8'
+        mapped_to: FPI_CAT2
+      InsuranceCompaniesMember:
+        filings: 16
+        first_batch: '8'
+        mapped_to: null
+      InvestorEducationAndProtectionFundMember:
+        filings: 15
+        first_batch: '8'
+        mapped_to: null
+      KeyManagerialPersonnelMember:
+        filings: 16
+        first_batch: '8'
+        mapped_to: null
+      MutualFundsOrUTIMember:
+        filings: 17
+        first_batch: '8'
+        mapped_to: MUTUAL_FUNDS
+      NBFCsRegisteredWithRBIMember:
+        filings: 16
+        first_batch: '8'
+        mapped_to: null
+      NonInstitutionsMember:
+        filings: 17
+        first_batch: '8'
+        mapped_to: NON_INSTITUTIONS
+      NonResidentIndiansMember:
+        filings: 17
+        first_batch: '8'
+        mapped_to: null
+      NonResidentIndividualsOrForeignIndividualsMember:
+        filings: 3
+        first_batch: '8'
+        mapped_to: null
+      OtherFinancialInstitutionsMember:
+        filings: 12
+        first_batch: '8'
+        mapped_to: null
+      OtherForeignShareholdersMember:
+        filings: 7
+        first_batch: '8'
+        mapped_to: null
+      OtherIndianShareholdersMember:
+        filings: 13
+        first_batch: '8'
+        mapped_to: null
+      OtherInstitutionsDomesticMember:
+        filings: 6
+        first_batch: '8'
+        mapped_to: null
+      OtherInstitutionsForeignMember:
+        filings: 13
+        first_batch: '8'
+        mapped_to: null
+      OtherNonInstitutionsMember:
+        filings: 17
+        first_batch: '8'
+        mapped_to: null
+      OverseasDepositoriesMember:
+        filings: 6
+        first_batch: '8'
+        mapped_to: OVERSEAS_DEPOSITORIES
+      ProvidentFundsOrPensionFundsMember:
+        filings: 14
+        first_batch: '8'
+        mapped_to: null
+      PublicShareholdingMember:
+        filings: 17
+        first_batch: '8'
+        mapped_to: PUBLIC
+      RelativesOfPromotersOtherThanPromoterGroupMember:
+        filings: 7
+        first_batch: '8'
+        mapped_to: null
+      ResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhMember:
+        filings: 17
+        first_batch: '8'
+        mapped_to: null
+      ResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhMember:
+        filings: 17
+        first_batch: '8'
+        mapped_to: null
+      ShareholdingByCompaniesOrBodiesCorporateWhereCentralOrStateGovernmentIsPromoterMember:
+        filings: 12
+        first_batch: '8'
+        mapped_to: null
+      ShareholdingOfPromoterAndPromoterGroupMember:
+        filings: 13
+        first_batch: '8'
+        mapped_to: PROMOTER
+      ShareholdingPatternMember:
+        filings: 17
+        first_batch: '8'
+        mapped_to: TOTAL
+      SharesHeldByNonPromoterNonPublicShareholdersMember:
+        filings: 9
+        first_batch: '8'
+        mapped_to: NON_PROMOTER_NON_PUBLIC
+      SovereignWealthFundsDomesticMember:
+        filings: 9
+        first_batch: '8'
+        mapped_to: null
+      SovereignWealthFundsForeignMember:
+        filings: 6
+        first_batch: '8'
+        mapped_to: null
+      StateGovernmentsOrGovernorsMember:
+        filings: 11
+        first_batch: '8'
+        mapped_to: null
+      TrustsWhereAnyPersonBelongingToPromoterAndPromoterGroupIsTrusteeOrBeneficiaryOrAuthorOfTrustMember:
+        filings: 6
+        first_batch: '8'
+        mapped_to: null
+      VentureCapitalFundsMember:
+        filings: 5
+        first_batch: '8'
+        mapped_to: null
 profiles:
   IGAAP_BANK:
     AdditionalTier1Ratio:
@@ -12100,6 +12402,1271 @@ profiles:
       mapped_to: null
       numeric: false
       seen_negative: false
+  REG31_SHP:
+    CategoryOfOtherForeignShareholders:
+      context_kinds:
+      - duration_3m@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      filings: 7
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    CategoryOfOtherIndianShareholders:
+      context_kinds:
+      - duration_3m@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      filings: 13
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    CategoryOfOtherInstitutions:
+      context_kinds:
+      - duration_3m@DetailsOfSharesHeldByOtherInstitutionsDomesticAxis
+      - duration_3m@DetailsOfSharesHeldByOtherInstitutionsForeignAxis
+      filings: 11
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    CategoryOfOtherNonInstitutions:
+      context_kinds:
+      - duration_3m@DetailsOfSharesHeldByOtherNonInstitutionsAxis
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    ClassOfSecurity:
+      context_kinds:
+      - duration_3m
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfCreationOrAcquisitionOfSignificantBeneficialInterest:
+      context_kinds:
+      - instant@SignificantBeneficialOwnersAxis
+      filings: 12
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfReport:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: meta.as_of_date
+      numeric: false
+      seen_negative: false
+    DescriptionOfOtherNationalityOfRegisteredOwner:
+      context_kinds:
+      - duration_3m@SignificantBeneficialOwnersAxis
+      filings: 1
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DescriptionOfOtherNationalityOfSignificantBeneficialOwners:
+      context_kinds:
+      - duration_3m@SignificantBeneficialOwnersAxis
+      filings: 3
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DetailsOfHoldingExerciseOfRightOfTheSBOInTheReportingCompanyWhetherByVirtueOfExerciseOfControl:
+      context_kinds:
+      - instant@SignificantBeneficialOwnersAxis
+      filings: 12
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DetailsOfHoldingExerciseOfRightOfTheSBOInTheReportingCompanyWhetherByVirtueOfExerciseOfSignificantInfluence:
+      context_kinds:
+      - instant@SignificantBeneficialOwnersAxis
+      filings: 12
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    ? DetailsOfHoldingExerciseOfRightOfTheSBOInTheReportingCompanyWhetherByVirtueOfRightsOnDistributableDividendOrAnyOtherDistribution
+    : context_kinds:
+      - instant@SignificantBeneficialOwnersAxis
+      filings: 6
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    DetailsOfHoldingExerciseOfRightOfTheSBOInTheReportingCompanyWhetherByVirtueOfShares:
+      context_kinds:
+      - instant@SignificantBeneficialOwnersAxis
+      filings: 11
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    DetailsOfHoldingExerciseOfRightOfTheSBOInTheReportingCompanyWhetherByVirtueOfVotingRights:
+      context_kinds:
+      - instant@SignificantBeneficialOwnersAxis
+      filings: 9
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    DisclosureOfNotesInCaseOfPromoterHoldingInDematerializedFormIsLessThan100PercentageExplanatoryTextBlock:
+      context_kinds:
+      - instant
+      filings: 2
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DisclosureOfNotesOnReasonForNotProvidingPANExplanatoryTextBlock:
+      context_kinds:
+      - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - instant@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 5
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DisclosureOfNotesOnShareholdingPatternExplanatoryTextBlock:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DisclosureOfNotesOnShareholdingPatternForCompanyRemarksExplanatoryTextBlock:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DisclosureOfNotesOnSharesWhichRemainUnclaimedForPublicShareholdersExplanatoryTextBlock:
+      context_kinds:
+      - instant@DetailsOfSharesWhichRemainUnclaimedForPublicShareholdersAxis
+      filings: 1
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    EncumberedShareUnderNonDisposalUndertakingAsPercentageOfTotalNumberOfShares:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - instant@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 1
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    EncumberedShareUnderOtherEncumbrancesAsPercentageOfTotalNumberOfShares:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - instant@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 1
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    EncumberedShareUnderPledgedAsPercentageOfTotalNumberOfShares:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByCentralGovernmentOrStateGovernmentsAxis
+      - instant@DetailsOfSharesHeldByNonResidentIndividualsOrForeignIndividualsAxis
+      - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - instant@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 9
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    EncumberedSharesHeldAsPercentageOfTotalNumberOfShares:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByCentralGovernmentOrStateGovernmentsAxis
+      - instant@DetailsOfSharesHeldByNonResidentIndividualsOrForeignIndividualsAxis
+      - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - instant@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 10
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    ISIN:
+      context_kinds:
+      - duration_3m
+      filings: 17
+      first_batch: '8'
+      mapped_to: meta.stated_isin
+      numeric: false
+      seen_negative: false
+    LockedInSharesAsAPercentageOfTotalNumberOfShares:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByInsuranceCompaniesAxis
+      - instant@DetailsOfSharesHeldByMutualFundsOrUTIAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsForeignAxis
+      - instant@DetailsOfSharesHeldByOtherNonInstitutionsAxis
+      - instant@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
+      filings: 1
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    MSEISymbol:
+      context_kinds:
+      - duration_3m
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NameOfRegisteredOwner:
+      context_kinds:
+      - duration_3m@SignificantBeneficialOwnersAxis
+      filings: 12
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NameOfSignificantBeneficialOwners:
+      context_kinds:
+      - duration_3m@SignificantBeneficialOwnersAxis
+      filings: 12
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NameOfTheBank:
+      context_kinds:
+      - duration_3m@DetailsOfSharesHeldByCustodianOrDRHolderAxis
+      filings: 3
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NameOfTheCompany:
+      context_kinds:
+      - duration_3m
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NameOfThePAC:
+      context_kinds:
+      - duration_3m@DetailsOfTheShareholdersActingAsPersonsInConcertForPublicAxis
+      filings: 2
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NameOfTheShareholder:
+      context_kinds:
+      - duration_3m@DetailsOfSharesHeldByAlternativeInvestmentFundsAxis
+      - duration_3m@DetailsOfSharesHeldByBodiesCorporateAxis
+      - duration_3m@DetailsOfSharesHeldByCentralGovernmentOrStateGovernmentsAxis
+      - duration_3m@DetailsOfSharesHeldByCustodianOrDRHolderAxis
+      - duration_3m@DetailsOfSharesHeldByForeignCompaniesAxis
+      - duration_3m@DetailsOfSharesHeldByForeignDirectInvestmentAxis
+      - duration_3m@DetailsOfSharesHeldByInstitutionsForeignPortfolioInvestorOneAxis
+      - duration_3m@DetailsOfSharesHeldByInsuranceCompaniesAxis
+      - duration_3m@DetailsOfSharesHeldByMutualFundsOrUTIAxis
+      - duration_3m@DetailsOfSharesHeldByNonResidentIndividualsOrForeignIndividualsAxis
+      - duration_3m@DetailsOfSharesHeldByOtherFinancialInstitutionsAxis
+      - duration_3m@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - duration_3m@DetailsOfSharesHeldByOtherInstitutionsDomesticAxis
+      - duration_3m@DetailsOfSharesHeldByOtherInstitutionsForeignAxis
+      - duration_3m@DetailsOfSharesHeldByOtherNonInstitutionsAxis
+      - duration_3m@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - duration_3m@DetailsOfSharesHeldByOverseasDepositoriesAxis
+      - duration_3m@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
+      - duration_3m@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
+      - duration_3m@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
+      - duration_3m@DetailsOfTheShareholdersActingAsPersonsInConcertForPublicAxis
+      - duration_3m@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 17
+      first_batch: '8'
+      mapped_to: major_holder.holder_name
+      numeric: false
+      seen_negative: false
+    NationalityOfRegisteredOwner:
+      context_kinds:
+      - duration_3m@SignificantBeneficialOwnersAxis
+      filings: 12
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NationalityOfSignificantBeneficialOwners:
+      context_kinds:
+      - duration_3m@SignificantBeneficialOwnersAxis
+      filings: 12
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NumberOfEquitySharesHeldInDematerializedForm:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByAlternativeInvestmentFundsAxis
+      - instant@DetailsOfSharesHeldByBodiesCorporateAxis
+      - instant@DetailsOfSharesHeldByCentralGovernmentOrStateGovernmentsAxis
+      - instant@DetailsOfSharesHeldByCustodianOrDRHolderAxis
+      - instant@DetailsOfSharesHeldByForeignCompaniesAxis
+      - instant@DetailsOfSharesHeldByForeignDirectInvestmentAxis
+      - instant@DetailsOfSharesHeldByInstitutionsForeignPortfolioInvestorOneAxis
+      - instant@DetailsOfSharesHeldByInsuranceCompaniesAxis
+      - instant@DetailsOfSharesHeldByMutualFundsOrUTIAxis
+      - instant@DetailsOfSharesHeldByNonResidentIndividualsOrForeignIndividualsAxis
+      - instant@DetailsOfSharesHeldByOtherFinancialInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsDomesticAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsForeignAxis
+      - instant@DetailsOfSharesHeldByOtherNonInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - instant@DetailsOfSharesHeldByOverseasDepositoriesAxis
+      - instant@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
+      - instant@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 17
+      first_batch: '8'
+      mapped_to: category.demat_shares
+      numeric: true
+      seen_negative: false
+    NumberOfFullyPaidUpEquityShares:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByAlternativeInvestmentFundsAxis
+      - instant@DetailsOfSharesHeldByBodiesCorporateAxis
+      - instant@DetailsOfSharesHeldByCentralGovernmentOrStateGovernmentsAxis
+      - instant@DetailsOfSharesHeldByCustodianOrDRHolderAxis
+      - instant@DetailsOfSharesHeldByForeignCompaniesAxis
+      - instant@DetailsOfSharesHeldByForeignDirectInvestmentAxis
+      - instant@DetailsOfSharesHeldByInstitutionsForeignPortfolioInvestorOneAxis
+      - instant@DetailsOfSharesHeldByInsuranceCompaniesAxis
+      - instant@DetailsOfSharesHeldByMutualFundsOrUTIAxis
+      - instant@DetailsOfSharesHeldByNonResidentIndividualsOrForeignIndividualsAxis
+      - instant@DetailsOfSharesHeldByOtherFinancialInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsDomesticAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsForeignAxis
+      - instant@DetailsOfSharesHeldByOtherNonInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - instant@DetailsOfSharesHeldByOverseasDepositoriesAxis
+      - instant@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
+      - instant@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    NumberOfPartlyPaidUpEquityShares:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByForeignCompaniesAxis
+      - instant@DetailsOfSharesHeldByInstitutionsForeignPortfolioInvestorOneAxis
+      - instant@DetailsOfSharesHeldByInsuranceCompaniesAxis
+      - instant@DetailsOfSharesHeldByMutualFundsOrUTIAxis
+      - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - instant@DetailsOfSharesHeldByOtherNonInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - instant@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 2
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    NumberOfShareholders:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByAlternativeInvestmentFundsAxis
+      - instant@DetailsOfSharesHeldByBodiesCorporateAxis
+      - instant@DetailsOfSharesHeldByCentralGovernmentOrStateGovernmentsAxis
+      - instant@DetailsOfSharesHeldByCustodianOrDRHolderAxis
+      - instant@DetailsOfSharesHeldByForeignCompaniesAxis
+      - instant@DetailsOfSharesHeldByForeignDirectInvestmentAxis
+      - instant@DetailsOfSharesHeldByInstitutionsForeignPortfolioInvestorOneAxis
+      - instant@DetailsOfSharesHeldByInsuranceCompaniesAxis
+      - instant@DetailsOfSharesHeldByMutualFundsOrUTIAxis
+      - instant@DetailsOfSharesHeldByNonResidentIndividualsOrForeignIndividualsAxis
+      - instant@DetailsOfSharesHeldByOtherFinancialInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsDomesticAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsForeignAxis
+      - instant@DetailsOfSharesHeldByOtherNonInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - instant@DetailsOfSharesHeldByOverseasDepositoriesAxis
+      - instant@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
+      - instant@DetailsOfSharesWhichRemainUnclaimedForPublicShareholdersAxis
+      - instant@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 17
+      first_batch: '8'
+      mapped_to: category.holders
+      numeric: true
+      seen_negative: false
+    NumberOfShares:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByAlternativeInvestmentFundsAxis
+      - instant@DetailsOfSharesHeldByBodiesCorporateAxis
+      - instant@DetailsOfSharesHeldByCentralGovernmentOrStateGovernmentsAxis
+      - instant@DetailsOfSharesHeldByCustodianOrDRHolderAxis
+      - instant@DetailsOfSharesHeldByForeignCompaniesAxis
+      - instant@DetailsOfSharesHeldByForeignDirectInvestmentAxis
+      - instant@DetailsOfSharesHeldByInstitutionsForeignPortfolioInvestorOneAxis
+      - instant@DetailsOfSharesHeldByInsuranceCompaniesAxis
+      - instant@DetailsOfSharesHeldByMutualFundsOrUTIAxis
+      - instant@DetailsOfSharesHeldByNonResidentIndividualsOrForeignIndividualsAxis
+      - instant@DetailsOfSharesHeldByOtherFinancialInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsDomesticAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsForeignAxis
+      - instant@DetailsOfSharesHeldByOtherNonInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - instant@DetailsOfSharesHeldByOverseasDepositoriesAxis
+      - instant@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
+      - instant@DetailsOfTheShareholdersActingAsPersonsInConcertForPublicAxis
+      - instant@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 17
+      first_batch: '8'
+      mapped_to: category.shares
+      numeric: true
+      seen_negative: false
+    NumberOfSharesEncumbered:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByCentralGovernmentOrStateGovernmentsAxis
+      - instant@DetailsOfSharesHeldByNonResidentIndividualsOrForeignIndividualsAxis
+      - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - instant@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 10
+      first_batch: '8'
+      mapped_to: encumbrance.total
+      numeric: true
+      seen_negative: false
+    NumberOfSharesEncumberedUnderNonDisposalUndertaking:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - instant@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 1
+      first_batch: '8'
+      mapped_to: encumbrance.ndu
+      numeric: true
+      seen_negative: false
+    NumberOfSharesEncumberedUnderOtherEncumbrances:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - instant@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 1
+      first_batch: '8'
+      mapped_to: encumbrance.other
+      numeric: true
+      seen_negative: false
+    NumberOfSharesEncumberedUnderPledged:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByCentralGovernmentOrStateGovernmentsAxis
+      - instant@DetailsOfSharesHeldByNonResidentIndividualsOrForeignIndividualsAxis
+      - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - instant@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 9
+      first_batch: '8'
+      mapped_to: encumbrance.pledged
+      numeric: true
+      seen_negative: false
+    NumberOfSharesOnFullyDilutedBasisIncludingWarrantsESOPAndConvertibleSecurities:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByAlternativeInvestmentFundsAxis
+      - instant@DetailsOfSharesHeldByBodiesCorporateAxis
+      - instant@DetailsOfSharesHeldByCentralGovernmentOrStateGovernmentsAxis
+      - instant@DetailsOfSharesHeldByCustodianOrDRHolderAxis
+      - instant@DetailsOfSharesHeldByForeignCompaniesAxis
+      - instant@DetailsOfSharesHeldByForeignDirectInvestmentAxis
+      - instant@DetailsOfSharesHeldByInstitutionsForeignPortfolioInvestorOneAxis
+      - instant@DetailsOfSharesHeldByInsuranceCompaniesAxis
+      - instant@DetailsOfSharesHeldByMutualFundsOrUTIAxis
+      - instant@DetailsOfSharesHeldByNonResidentIndividualsOrForeignIndividualsAxis
+      - instant@DetailsOfSharesHeldByOtherFinancialInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsDomesticAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsForeignAxis
+      - instant@DetailsOfSharesHeldByOtherNonInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - instant@DetailsOfSharesHeldByOverseasDepositoriesAxis
+      - instant@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
+      - instant@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    NumberOfSharesOutstandingESOPGranted:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByAlternativeInvestmentFundsAxis
+      - instant@DetailsOfSharesHeldByBodiesCorporateAxis
+      - instant@DetailsOfSharesHeldByForeignCompaniesAxis
+      - instant@DetailsOfSharesHeldByForeignDirectInvestmentAxis
+      - instant@DetailsOfSharesHeldByInstitutionsForeignPortfolioInvestorOneAxis
+      - instant@DetailsOfSharesHeldByInsuranceCompaniesAxis
+      - instant@DetailsOfSharesHeldByMutualFundsOrUTIAxis
+      - instant@DetailsOfSharesHeldByOtherFinancialInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsDomesticAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsForeignAxis
+      - instant@DetailsOfSharesHeldByOtherNonInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOverseasDepositoriesAxis
+      - instant@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
+      filings: 8
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    NumberOfSharesUnderSubCategoryOne:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByAlternativeInvestmentFundsAxis
+      - instant@DetailsOfSharesHeldByBodiesCorporateAxis
+      - instant@DetailsOfSharesHeldByForeignCompaniesAxis
+      - instant@DetailsOfSharesHeldByForeignDirectInvestmentAxis
+      - instant@DetailsOfSharesHeldByInstitutionsForeignPortfolioInvestorOneAxis
+      - instant@DetailsOfSharesHeldByInsuranceCompaniesAxis
+      - instant@DetailsOfSharesHeldByMutualFundsOrUTIAxis
+      - instant@DetailsOfSharesHeldByOtherFinancialInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsDomesticAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsForeignAxis
+      - instant@DetailsOfSharesHeldByOtherNonInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOverseasDepositoriesAxis
+      - instant@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    NumberOfSharesUnderSubCategoryThree:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByAlternativeInvestmentFundsAxis
+      - instant@DetailsOfSharesHeldByBodiesCorporateAxis
+      - instant@DetailsOfSharesHeldByForeignCompaniesAxis
+      - instant@DetailsOfSharesHeldByForeignDirectInvestmentAxis
+      - instant@DetailsOfSharesHeldByInstitutionsForeignPortfolioInvestorOneAxis
+      - instant@DetailsOfSharesHeldByInsuranceCompaniesAxis
+      - instant@DetailsOfSharesHeldByMutualFundsOrUTIAxis
+      - instant@DetailsOfSharesHeldByOtherFinancialInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsDomesticAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsForeignAxis
+      - instant@DetailsOfSharesHeldByOtherNonInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOverseasDepositoriesAxis
+      - instant@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    NumberOfSharesUnderSubCategoryTwo:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByAlternativeInvestmentFundsAxis
+      - instant@DetailsOfSharesHeldByBodiesCorporateAxis
+      - instant@DetailsOfSharesHeldByForeignCompaniesAxis
+      - instant@DetailsOfSharesHeldByForeignDirectInvestmentAxis
+      - instant@DetailsOfSharesHeldByInstitutionsForeignPortfolioInvestorOneAxis
+      - instant@DetailsOfSharesHeldByInsuranceCompaniesAxis
+      - instant@DetailsOfSharesHeldByMutualFundsOrUTIAxis
+      - instant@DetailsOfSharesHeldByOtherFinancialInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsDomesticAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsForeignAxis
+      - instant@DetailsOfSharesHeldByOtherNonInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOverseasDepositoriesAxis
+      - instant@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    NumberOfSharesUnderlyingOutstandingConvertibleSecurities:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - instant@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 1
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    NumberOfSharesUnderlyingOutstandingConvertibleSecuritiesWarrantsAndESOP:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByAlternativeInvestmentFundsAxis
+      - instant@DetailsOfSharesHeldByBodiesCorporateAxis
+      - instant@DetailsOfSharesHeldByForeignCompaniesAxis
+      - instant@DetailsOfSharesHeldByForeignDirectInvestmentAxis
+      - instant@DetailsOfSharesHeldByInstitutionsForeignPortfolioInvestorOneAxis
+      - instant@DetailsOfSharesHeldByInsuranceCompaniesAxis
+      - instant@DetailsOfSharesHeldByMutualFundsOrUTIAxis
+      - instant@DetailsOfSharesHeldByOtherFinancialInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsDomesticAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsForeignAxis
+      - instant@DetailsOfSharesHeldByOtherNonInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - instant@DetailsOfSharesHeldByOverseasDepositoriesAxis
+      - instant@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
+      - instant@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 9
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    NumberOfSharesUnderlyingOutstandingDepositoryReceipts:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByCustodianOrDRHolderAxis
+      - instant@DetailsOfSharesHeldByInstitutionsForeignPortfolioInvestorOneAxis
+      - instant@DetailsOfSharesHeldByInsuranceCompaniesAxis
+      - instant@DetailsOfSharesHeldByMutualFundsOrUTIAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsForeignAxis
+      - instant@DetailsOfSharesHeldByOtherNonInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOverseasDepositoriesAxis
+      - instant@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
+      filings: 5
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    NumberOfTheLockedInShares:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByInsuranceCompaniesAxis
+      - instant@DetailsOfSharesHeldByMutualFundsOrUTIAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsForeignAxis
+      - instant@DetailsOfSharesHeldByOtherNonInstitutionsAxis
+      - instant@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
+      filings: 1
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    NumberOfVotingRights:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByAlternativeInvestmentFundsAxis
+      - instant@DetailsOfSharesHeldByBodiesCorporateAxis
+      - instant@DetailsOfSharesHeldByCentralGovernmentOrStateGovernmentsAxis
+      - instant@DetailsOfSharesHeldByCustodianOrDRHolderAxis
+      - instant@DetailsOfSharesHeldByForeignCompaniesAxis
+      - instant@DetailsOfSharesHeldByForeignDirectInvestmentAxis
+      - instant@DetailsOfSharesHeldByInstitutionsForeignPortfolioInvestorOneAxis
+      - instant@DetailsOfSharesHeldByInsuranceCompaniesAxis
+      - instant@DetailsOfSharesHeldByMutualFundsOrUTIAxis
+      - instant@DetailsOfSharesHeldByNonResidentIndividualsOrForeignIndividualsAxis
+      - instant@DetailsOfSharesHeldByOtherFinancialInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsDomesticAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsForeignAxis
+      - instant@DetailsOfSharesHeldByOtherNonInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - instant@DetailsOfSharesHeldByOverseasDepositoriesAxis
+      - instant@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
+      - instant@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 17
+      first_batch: '8'
+      mapped_to: category.voting_rights
+      numeric: true
+      seen_negative: false
+    NumberOfVotingRightsHeldBySameClassOfSecurities:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByAlternativeInvestmentFundsAxis
+      - instant@DetailsOfSharesHeldByBodiesCorporateAxis
+      - instant@DetailsOfSharesHeldByCentralGovernmentOrStateGovernmentsAxis
+      - instant@DetailsOfSharesHeldByCustodianOrDRHolderAxis
+      - instant@DetailsOfSharesHeldByForeignCompaniesAxis
+      - instant@DetailsOfSharesHeldByForeignDirectInvestmentAxis
+      - instant@DetailsOfSharesHeldByInstitutionsForeignPortfolioInvestorOneAxis
+      - instant@DetailsOfSharesHeldByInsuranceCompaniesAxis
+      - instant@DetailsOfSharesHeldByMutualFundsOrUTIAxis
+      - instant@DetailsOfSharesHeldByNonResidentIndividualsOrForeignIndividualsAxis
+      - instant@DetailsOfSharesHeldByOtherFinancialInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsDomesticAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsForeignAxis
+      - instant@DetailsOfSharesHeldByOtherNonInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - instant@DetailsOfSharesHeldByOverseasDepositoriesAxis
+      - instant@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
+      - instant@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    OutstandingSharesHeldInDematOrUnclaimedSuspenseAccount:
+      context_kinds:
+      - instant@DetailsOfSharesWhichRemainUnclaimedForPublicShareholdersAxis
+      filings: 12
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    PANOfRegisteredOwner:
+      context_kinds:
+      - duration_3m@SignificantBeneficialOwnersAxis
+      filings: 12
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    PANOfSignificantBeneficialOwners:
+      context_kinds:
+      - duration_3m@SignificantBeneficialOwnersAxis
+      filings: 12
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    PercentageOfBoardApprovedLimits:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    PercentageOfLimitsUtilized:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    PercentageOfShareholdingByPAC:
+      context_kinds:
+      - instant@DetailsOfTheShareholdersActingAsPersonsInConcertForPublicAxis
+      filings: 2
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    PercentageOfTotalVotingRights:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByAlternativeInvestmentFundsAxis
+      - instant@DetailsOfSharesHeldByBodiesCorporateAxis
+      - instant@DetailsOfSharesHeldByCentralGovernmentOrStateGovernmentsAxis
+      - instant@DetailsOfSharesHeldByCustodianOrDRHolderAxis
+      - instant@DetailsOfSharesHeldByForeignCompaniesAxis
+      - instant@DetailsOfSharesHeldByForeignDirectInvestmentAxis
+      - instant@DetailsOfSharesHeldByInstitutionsForeignPortfolioInvestorOneAxis
+      - instant@DetailsOfSharesHeldByInsuranceCompaniesAxis
+      - instant@DetailsOfSharesHeldByMutualFundsOrUTIAxis
+      - instant@DetailsOfSharesHeldByNonResidentIndividualsOrForeignIndividualsAxis
+      - instant@DetailsOfSharesHeldByOtherFinancialInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsDomesticAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsForeignAxis
+      - instant@DetailsOfSharesHeldByOtherNonInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - instant@DetailsOfSharesHeldByOverseasDepositoriesAxis
+      - instant@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
+      - instant@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    PermanentAccountNumberOfShareholder:
+      context_kinds:
+      - duration_3m@DetailsOfSharesHeldByAlternativeInvestmentFundsAxis
+      - duration_3m@DetailsOfSharesHeldByBodiesCorporateAxis
+      - duration_3m@DetailsOfSharesHeldByCentralGovernmentOrStateGovernmentsAxis
+      - duration_3m@DetailsOfSharesHeldByCustodianOrDRHolderAxis
+      - duration_3m@DetailsOfSharesHeldByForeignCompaniesAxis
+      - duration_3m@DetailsOfSharesHeldByForeignDirectInvestmentAxis
+      - duration_3m@DetailsOfSharesHeldByInstitutionsForeignPortfolioInvestorOneAxis
+      - duration_3m@DetailsOfSharesHeldByInsuranceCompaniesAxis
+      - duration_3m@DetailsOfSharesHeldByMutualFundsOrUTIAxis
+      - duration_3m@DetailsOfSharesHeldByNonResidentIndividualsOrForeignIndividualsAxis
+      - duration_3m@DetailsOfSharesHeldByOtherFinancialInstitutionsAxis
+      - duration_3m@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - duration_3m@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - duration_3m@DetailsOfSharesHeldByOverseasDepositoriesAxis
+      - duration_3m@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
+      - duration_3m@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
+      - duration_3m@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
+      - duration_3m@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    ScripCode:
+      context_kinds:
+      - duration_3m
+      filings: 17
+      first_batch: '8'
+      mapped_to: meta.stated_scrip_code
+      numeric: false
+      seen_negative: false
+    ShareholdingAsAPercentageAssumingFullConversionOfConvertibleSecuritiesWarrantsAndESOP:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByAlternativeInvestmentFundsAxis
+      - instant@DetailsOfSharesHeldByBodiesCorporateAxis
+      - instant@DetailsOfSharesHeldByCentralGovernmentOrStateGovernmentsAxis
+      - instant@DetailsOfSharesHeldByForeignCompaniesAxis
+      - instant@DetailsOfSharesHeldByForeignDirectInvestmentAxis
+      - instant@DetailsOfSharesHeldByInstitutionsForeignPortfolioInvestorOneAxis
+      - instant@DetailsOfSharesHeldByInsuranceCompaniesAxis
+      - instant@DetailsOfSharesHeldByMutualFundsOrUTIAxis
+      - instant@DetailsOfSharesHeldByNonResidentIndividualsOrForeignIndividualsAxis
+      - instant@DetailsOfSharesHeldByOtherFinancialInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsDomesticAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsForeignAxis
+      - instant@DetailsOfSharesHeldByOtherNonInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - instant@DetailsOfSharesHeldByOverseasDepositoriesAxis
+      - instant@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
+      - instant@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    ShareholdingAsAPercentageOfTotalNumberOfShares:
+      context_kinds:
+      - instant@CategoryOfShareholdersAxis
+      - instant@DetailsOfSharesHeldByAlternativeInvestmentFundsAxis
+      - instant@DetailsOfSharesHeldByBodiesCorporateAxis
+      - instant@DetailsOfSharesHeldByCentralGovernmentOrStateGovernmentsAxis
+      - instant@DetailsOfSharesHeldByForeignCompaniesAxis
+      - instant@DetailsOfSharesHeldByForeignDirectInvestmentAxis
+      - instant@DetailsOfSharesHeldByInstitutionsForeignPortfolioInvestorOneAxis
+      - instant@DetailsOfSharesHeldByInsuranceCompaniesAxis
+      - instant@DetailsOfSharesHeldByMutualFundsOrUTIAxis
+      - instant@DetailsOfSharesHeldByNonResidentIndividualsOrForeignIndividualsAxis
+      - instant@DetailsOfSharesHeldByOtherFinancialInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsDomesticAxis
+      - instant@DetailsOfSharesHeldByOtherInstitutionsForeignAxis
+      - instant@DetailsOfSharesHeldByOtherNonInstitutionsAxis
+      - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - instant@DetailsOfSharesHeldByOverseasDepositoriesAxis
+      - instant@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
+      - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
+      - instant@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 17
+      first_batch: '8'
+      mapped_to: category.pct
+      numeric: true
+      seen_negative: false
+    ShareholdingPatternFiledUnder:
+      context_kinds:
+      - duration_3m
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    Symbol:
+      context_kinds:
+      - duration_3m
+      filings: 17
+      first_batch: '8'
+      mapped_to: meta.stated_symbol
+      numeric: false
+      seen_negative: false
+    TypeOfDepositoryReceipts:
+      context_kinds:
+      - duration_3m@DetailsOfSharesHeldByCustodianOrDRHolderAxis
+      filings: 3
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    TypeOfPromoterShareholding:
+      context_kinds:
+      - duration_3m@DetailsOfSharesHeldByCentralGovernmentOrStateGovernmentsAxis
+      - duration_3m@DetailsOfSharesHeldByNonResidentIndividualsOrForeignIndividualsAxis
+      - duration_3m@DetailsOfSharesHeldByOtherForeignShareholdersAxis
+      - duration_3m@DetailsOfSharesHeldByOthersIndianShareholdersAxis
+      - duration_3m@DetailsSharesHeldByIndividualsOrHUFAxis
+      filings: 13
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    TypeOfReport:
+      context_kinds:
+      - duration_3m
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    VotingRightsWhichAreFrozen:
+      context_kinds:
+      - instant@DetailsOfSharesWhichRemainUnclaimedForPublicShareholdersAxis
+      filings: 9
+      first_batch: '8'
+      mapped_to: null
+      numeric: true
+      seen_negative: false
+    WhetherACategoryOrMoreThan1PercentageOfShareholding:
+      context_kinds:
+      - duration_3m@DetailsOfSharesHeldByOtherInstitutionsDomesticAxis
+      - duration_3m@DetailsOfSharesHeldByOtherInstitutionsForeignAxis
+      - duration_3m@DetailsOfSharesHeldByOtherNonInstitutionsAxis
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherAnySharesHeldByPromotersAreEncumberedOtherThanByWayOfPledgeOrNDU:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: meta.flag_other
+      numeric: false
+      seen_negative: false
+    WhetherAnySharesHeldByPromotersAreEncumberedOtherThanByWayOfPledgeOrNDUForPromoterAndPromoterGroup:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherAnySharesHeldByPromotersAreEncumberedUnderNonDisposalUndertaking:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: meta.flag_ndu
+      numeric: false
+      seen_negative: false
+    WhetherAnySharesHeldByPromotersAreEncumberedUnderNonDisposalUndertakingForPromoterAndPromoterGroup:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherAnySharesHeldByPromotersAreEncumberedUnderPledged:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: meta.flag_pledged
+      numeric: false
+      seen_negative: false
+    WhetherAnySharesHeldByPromotersAreEncumberedUnderPledgedForPromoterAndPromoterGroup:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherCompanyHasEquitySharesWithDifferentialVotingRights:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherCompanyHasEquitySharesWithDifferentialVotingRightsForNonPromoterNonPublic:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherCompanyHasEquitySharesWithDifferentialVotingRightsForPromoterAndPromoterGroup:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherCompanyHasEquitySharesWithDifferentialVotingRightsForPublicShareholder:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherCompanyIsSME:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasAnySharesAgainstWhichDepositoryReceiptsAreIssued:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasAnySharesAgainstWhichDepositoryReceiptsAreIssuedForNonPromoterNonPublic:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasAnySharesAgainstWhichDepositoryReceiptsAreIssuedForPromoterAndPromoterGroup:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasAnySharesAgainstWhichDepositoryReceiptsAreIssuedForPublicShareholder:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasAnySharesInLockedIn:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasAnySharesInLockedInForNonPromoterNonPublic:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasAnySharesInLockedInForPromoterAndPromoterGroup:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasAnySharesInLockedInForPublicShareholder:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasAnySignificantBeneficialOwner:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasGrantedAnyESOPWhichAreOutstanding:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasGrantedAnyESOPWhichAreOutstandingForNonPromoterNonPublic:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasGrantedAnyESOPWhichAreOutstandingForPromoterAndPromoterGroup:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasGrantedAnyESOPWhichAreOutstandingForPublicShareholder:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasIssuedAnyConvertibleSecurities:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasIssuedAnyConvertibleSecuritiesForNonPromoterNonPublic:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasIssuedAnyConvertibleSecuritiesForPromoterAndPromoterGroup:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasIssuedAnyConvertibleSecuritiesForPublicShareholder:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasIssuedAnyPartlyPaidUpShares:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: meta.has_partly_paid
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasIssuedAnyPartlyPaidUpSharesForNonPromoterNonPublic:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasIssuedAnyPartlyPaidUpSharesForPromoterAndPromoterGroup:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasIssuedAnyPartlyPaidUpSharesForPublicShareholder:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasIssuedAnyWarrants:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasIssuedAnyWarrantsForNonPromoterNonPublic:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasIssuedAnyWarrantsForPromoterAndPromoterGroup:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityHasIssuedAnyWarrantsForPublicShareholder:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheListedEntityIsPublicSectorUndertaking:
+      context_kinds:
+      - instant
+      filings: 17
+      first_batch: '8'
+      mapped_to: null
+      numeric: false
+      seen_negative: false
   UNKNOWN:
     AdministrationExpenses:
       context_kinds:
@@ -14678,6 +16245,36 @@ profiles:
       numeric: true
       seen_negative: false
 quirks:
+  NO_PROMOTER_CATEGORY:
+    handling: 'named rule: no promoter facts + public + NPNP = total + no encumbrance -> promoter 0'
+    profiles:
+    - REG31_SHP
+    refs: SHP11
+    seen:
+    - HDFCBANK 2026-06-30 and 2026-09-30
+    - ICICIBANK 2026-09-30
+    - ITC 2026-09-30
+  DR_SHARES_OUTSIDE_PCT_DENOMINATOR:
+    handling: 'use filed percentages; NPNP share of total computed from quantities'
+    profiles:
+    - REG31_SHP
+    refs: SHP9
+    seen:
+    - HDFCBANK, ITC, RELIANCE 2026-09-30
+  ADR_BUCKET_DIVERGENCE:
+    handling: 'ADRs in Institutions (Foreign) for ICICI Bank, NPNP for HDFC Bank: expose fpi_holding_pct'
+    profiles:
+    - REG31_SHP
+    refs: SHP13
+    seen:
+    - ICICIBANK vs HDFCBANK 2026-09-30
+  ENCUMBRANCE_NOT_PLEDGE:
+    handling: 'promoter_pledge_pct (pledge only) and promoter_encumbered_pct (all kinds) kept separate'
+    profiles:
+    - REG31_SHP
+    refs: SHP10
+    seen:
+    - VEDL 2026-09-30
   BANK_NO_DEPRECIATION_LINE:
     handling: Depreciation row NULL for banks
     profiles:

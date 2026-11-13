@@ -926,8 +926,25 @@ def _promote_shareholding(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
                 "has_partly_paid": meta["has_partly_paid"],
                 "promoter_pledge_flag": meta["promoter_pledge_flag"],
                 "promoter_pledged_shares": meta["promoter_pledged_shares"],
+                "promoter_encumbered_shares": meta.get("promoter_encumbered_shares"),
+                "rules_applied": meta.get("rules_applied"),
                 "visible_from_ts": visible,
             }
+        ],
+    )
+    holders = read_table(con, stage_dir, "stg_shp_holders")  # [] for stages written before 0.4.0
+    insert_rows(
+        con,
+        "shareholding_major_holders",
+        [
+            {
+                **{k: h[k] for k in ("filing_id", "holder_category", "row_member", "holder_name", "shares", "pct")},
+                "parser_version": meta["parser_version"],
+                "entity_id": entity_id,
+                "as_of_date": meta["as_of_date"],
+                "visible_from_ts": visible,
+            }
+            for h in holders
         ],
     )
     insert_rows(

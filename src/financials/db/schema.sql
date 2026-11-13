@@ -213,9 +213,26 @@ CREATE TABLE IF NOT EXISTS shareholding_meta (
     as_of_date              DATE NOT NULL,
     has_partly_paid         BOOLEAN,
     promoter_pledge_flag    BOOLEAN,
-    promoter_pledged_shares BIGINT,              -- NULL when pledged but quantity tag unverified
+    promoter_pledged_shares BIGINT,              -- NULL when a pledge is declared but no quantity is filed
     visible_from_ts         TIMESTAMP NOT NULL,
+    promoter_encumbered_shares BIGINT,           -- pledge + NDU + other encumbrances [SHP10]
+    rules_applied           VARCHAR,             -- comma-separated named rules (e.g. NO_PROMOTER_CATEGORY)
     PRIMARY KEY (filing_id, parser_version)
+);
+
+-- Named public holders above 1% (Reg. 31 detail tables) [SHP12].
+CREATE TABLE IF NOT EXISTS shareholding_major_holders (
+    filing_id       VARCHAR NOT NULL REFERENCES filings(filing_id),
+    parser_version  VARCHAR NOT NULL,
+    entity_id       VARCHAR NOT NULL REFERENCES entity_master(entity_id),
+    as_of_date      DATE NOT NULL,
+    holder_category VARCHAR NOT NULL,           -- MUTUAL_FUNDS | INSURANCE | FPI_CAT1 | FDI | BODIES_CORPORATE | ...
+    row_member      VARCHAR NOT NULL,           -- the filing's own typed-member id for the row
+    holder_name     VARCHAR NOT NULL,
+    shares          BIGINT NOT NULL,
+    pct             DOUBLE,                     -- fraction, as filed
+    visible_from_ts TIMESTAMP NOT NULL,
+    PRIMARY KEY (filing_id, parser_version, holder_category, row_member)
 );
 
 CREATE TABLE IF NOT EXISTS shareholding_observations (
@@ -223,10 +240,10 @@ CREATE TABLE IF NOT EXISTS shareholding_observations (
     parser_version  VARCHAR NOT NULL,
     entity_id       VARCHAR NOT NULL REFERENCES entity_master(entity_id),
     as_of_date      DATE NOT NULL,
-    category        VARCHAR NOT NULL,           -- TOTAL | PROMOTER | PUBLIC | FII | DII | MUTUAL_FUNDS | NON_INSTITUTIONS
+    category        VARCHAR NOT NULL,           -- parsers/shareholding.py CATEGORIES (TOTAL, PROMOTER, PUBLIC, FII, ...)
     shares          BIGINT,
     holders         BIGINT,
-    pct             DOUBLE,                     -- fraction of total shares
+    pct             DOUBLE,                     -- fraction, as filed (denominator excludes DR shares [SHP9])
     demat_shares    BIGINT,
     voting_rights   BIGINT,
     visible_from_ts TIMESTAMP NOT NULL,
@@ -396,6 +413,15 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     cash_runway_months  DOUBLE,              -- liquid cash / monthly burn, only when FCF < 0
     esop_adj_fcf        DECIMAL(24,2),       -- FCF - ESOP cost
     liquid_cash         DECIMAL(24,2),       -- cash + other bank balances + current investments
+    promoter_holding_pct DOUBLE,             -- Reg. 31 fractions as filed; denominator excludes DR shares [SHP9]
+    promoter_pledge_pct DOUBLE,              -- pledged / promoter shares [SHP10]
+    promoter_encumbered_pct DOUBLE,          -- (pledge + NDU + other encumbrance) / promoter shares [SHP10]
+    fii_holding_pct     DOUBLE,              -- SEBI "Institutions (Foreign)": includes FDI and overseas depositories
+    fpi_holding_pct     DOUBLE,              -- FPI Category I + II only [SHP13]
+    dii_holding_pct     DOUBLE,              -- SEBI "Institutions (Domestic)"
+    public_holding_pct  DOUBLE,
+    non_promoter_non_public_pct DOUBLE,      -- DR custodian + employee trusts, of total issued shares
+    fii_dii_qoq_change_pct DOUBLE,           -- (FII + DII) now minus previous quarter end; fraction points
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -515,6 +541,15 @@ CREATE TABLE IF NOT EXISTS screener_features (
     cash_runway_months  DOUBLE,              -- liquid cash / monthly burn, only when FCF < 0
     esop_adj_fcf        DECIMAL(24,2),       -- FCF - ESOP cost
     liquid_cash         DECIMAL(24,2),       -- cash + other bank balances + current investments
+    promoter_holding_pct DOUBLE,             -- Reg. 31 fractions as filed; denominator excludes DR shares [SHP9]
+    promoter_pledge_pct DOUBLE,              -- pledged / promoter shares [SHP10]
+    promoter_encumbered_pct DOUBLE,          -- (pledge + NDU + other encumbrance) / promoter shares [SHP10]
+    fii_holding_pct     DOUBLE,              -- SEBI "Institutions (Foreign)": includes FDI and overseas depositories
+    fpi_holding_pct     DOUBLE,              -- FPI Category I + II only [SHP13]
+    dii_holding_pct     DOUBLE,              -- SEBI "Institutions (Domestic)"
+    public_holding_pct  DOUBLE,
+    non_promoter_non_public_pct DOUBLE,      -- DR custodian + employee trusts, of total issued shares
+    fii_dii_qoq_change_pct DOUBLE,           -- (FII + DII) now minus previous quarter end; fraction points
     PRIMARY KEY (as_of_date, security_id)
 );
 

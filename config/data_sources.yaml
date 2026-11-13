@@ -131,8 +131,8 @@ feeds:
     unlocked_metrics: [shares outstanding, promoter/FII/DII/MF holdings, pledge, float turnover]
     phase: 1
     verification_status: VERIFIED
-    evidence: [SHP1, SHP2, SHP3, SHP4, SHP6, SHP7]
-    notes: Visibility from master broadcastDate. Pledge percentage is relative to the row (SHP7). Pledge quantity not yet parsed.
+    evidence: [SHP1, SHP2, SHP3, SHP4, SHP6, SHP7, SHP8, SHP9, SHP10, SHP11, SHP12, SHP13, SHP14]
+    notes: Visibility from master broadcastDate. Pledge and encumbrance quantities, NPNP, >1% public holders parsed (SHP8-SHP14). Percentages exclude DR shares (SHP9).
 
   - feed_id: F09
     name: Reg. 76 reconciliation of share capital audit XBRL

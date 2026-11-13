@@ -155,6 +155,31 @@ output); `tests/test_index_backfill.py::test_derived_text_matches_pdf` regenerat
 
 Source URL pattern for all forty-nine: `https://nsearchives.nseindia.com/corporate/xbrl/<file>`.
 
+## Batch 8 Reg. 31 shareholding (fetched 2026-11-13 via the NSE master JSON [SHP6], one file per request)
+
+| File | Why it is here | Source URL | SHA-256 |
+|---|---|---|---|
+| `xbrl/SHP_1733480_06102026050037_WEB.xml` | B8: HDFC Bank 2026-09-30. No promoter category (SHP11); DR custodian + EBT in NPNP (SHP8, SHP9) | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_1733480_06102026050037_WEB.xml` | `c80d08919f28aaa72c760befd872a9ffb2b4f1bc34197238fcaa100c72af3e74` |
+| `xbrl/SHP_1687801_03072026023346_WEB.xml` | B8: HDFC Bank 2026-06-30. Previous quarter for fii_dii_qoq_change_pct (SHP14) | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_1687801_03072026023346_WEB.xml` | `61753bad377afabb41daad2740027f6e1a4bc918bd8ee0a0176bfebf02847d1a` |
+| `xbrl/SHP_1743956_22102026042725_WEB.xml` | B8: ICICI Bank 2026-09-30. No promoter; ADRs as overseas depositories inside Institutions (Foreign) (SHP13) | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_1743956_22102026042725_WEB.xml` | `c92a1b37d78bac1a36f9c74547201bc78f78f5fdf90ec43d068fab5ff4aa0b7f` |
+| `xbrl/SHP_1740148_16102026052137_WEB.xml` | B8: Vedanta 2026-09-30. NDU + other encumbrance, no pledge (SHP10); EBT in NPNP | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_1740148_16102026052137_WEB.xml` | `e1f98ab9a4db78a1b21f2e7b9f90d9cfd7e47e5fd5ec72e9525a9e0630d5eda5` |
+| `xbrl/SHP_1743210_21102026055808_WEB.xml` | B8: JSW Steel 2026-09-30. Promoter pledge 12.25%; FDI (JFE) 15% (SHP10, SHP13) | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_1743210_21102026055808_WEB.xml` | `5a53b46441c60727a6a855b78aeed0a68921201b32ec8661daf86e58541f6bd0` |
+| `xbrl/SHP_1733654_07102026112959_WEB.xml` | B8: Apollo Hospitals 2026-09-30. Promoter pledge 2.91%; >1% public holders (SHP10, SHP12) | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_1733654_07102026112959_WEB.xml` | `4686100c7f9c77b5491aa1576e9a4be3a4d8ddcc988caa05ea628a0615ea0228` |
+
+Inspected for Batch 8 but not committed (registered in docs/tag_registry.yaml):
+
+| File | Company / why | SHA-256 |
+|---|---|---|
+| `SHP_1736411_12102026064817_WEB.xml` (https://nsearchives.nseindia.com/corporate/xbrl/SHP_1736411_12102026064817_WEB.xml) | ADANIENT 2026-09-30 (pledge) | `8e0b38f78edf839f987461979869a1b7504a05c815637389080ac9a521591c61` |
+| `SHP_1690795_10072026081131_WEB.xml` (https://nsearchives.nseindia.com/corporate/xbrl/SHP_1690795_10072026081131_WEB.xml) | ADANIENT 2026-06-30 (share-count change, SHP14) | `6d199e3c2ce88c06a937b423c6a3459d3ce7f99bc028686bd69de84054736aa1` |
+| `SHP_1738462_15102026105915_WEB.xml` (https://nsearchives.nseindia.com/corporate/xbrl/SHP_1738462_15102026105915_WEB.xml) | SUNPHARMA 2026-09-30 (pledge) | `dca3e32c0b7595ce0cf2eb14f494c03bd89453234b87bde829aa2805552c1f7f` |
+| `SHP_1736151_12102026041358_WEB.xml` (https://nsearchives.nseindia.com/corporate/xbrl/SHP_1736151_12102026041358_WEB.xml) | MFSL 2026-09-30 (pledge, FDI 21.86%) | `12b056da659c4033bd654662a93519b8ea3c0fc2ee459d10d8566dd7298d5397` |
+| `SHP_1739068_15102026051415_WEB.xml` (https://nsearchives.nseindia.com/corporate/xbrl/SHP_1739068_15102026051415_WEB.xml) | SUZLON 2026-09-30 (no pledge) | `aabe7121abaecc90effb207bff2b3959388eca82944cb80b00055246903ee0f5` |
+| `SHP_1741974_19102026071903_WEB.xml` (https://nsearchives.nseindia.com/corporate/xbrl/SHP_1741974_19102026071903_WEB.xml) | GMRAIRPORT 2026-09-30 (pledge 16.47%) | `d0d1b9a8bd3bcae6d656bc00c004d0bfc7ac780ccc88b1b4c3401ae2569f4854` |
+| `SHP_1742991_21102026042504_WEB.xml` (https://nsearchives.nseindia.com/corporate/xbrl/SHP_1742991_21102026042504_WEB.xml) | RELIANCE 2026-09-30 (DR custodian in NPNP) | `323f273fd5267a7c8c3558920b8756d8c54b828cc42f35fc6507561824031f9e` |
+| `SHP_1737048_13102026050138_WEB.xml` (https://nsearchives.nseindia.com/corporate/xbrl/SHP_1737048_13102026050138_WEB.xml) | ITC 2026-09-30 (no promoter, DR in NPNP) | `7c40d58e00a5597c7250602fcdc561e9fafb499ad5c86f7860ab641335aea0b8` |
+| `SHP_1698632_21072026062045_WEB.xml` (https://nsearchives.nseindia.com/corporate/xbrl/SHP_1698632_21072026062045_WEB.xml) | JSWSTEEL 2026-06-30 | `d9a2f392f9221f2d1867f6fdd9ca4f6515f0f6213d1677b664afe9e648ea2b65` |
+
 ## Screener goldens (local only, not committed)
 
 The repository is public, so the user-supplied Screener Excel exports (2026-11-13; 42 distinct files, some uploaded twice)

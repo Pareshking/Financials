@@ -59,7 +59,12 @@ CREATE TABLE stg_holidays (
 CREATE TABLE stg_shp_meta (
     filing_id VARCHAR PRIMARY KEY, parser_version VARCHAR NOT NULL, as_of_date DATE NOT NULL,
     stated_isin VARCHAR NOT NULL, stated_symbol VARCHAR, has_partly_paid BOOLEAN, promoter_pledge_flag BOOLEAN,
-    promoter_pledged_shares BIGINT
+    promoter_pledged_shares BIGINT, promoter_encumbered_shares BIGINT, rules_applied VARCHAR
+);
+CREATE TABLE stg_shp_holders (
+    filing_id VARCHAR NOT NULL, holder_category VARCHAR NOT NULL, row_member VARCHAR NOT NULL,
+    holder_name VARCHAR NOT NULL, shares BIGINT NOT NULL, pct DOUBLE,
+    PRIMARY KEY (filing_id, holder_category, row_member)
 );
 CREATE TABLE stg_shp_categories (
     filing_id VARCHAR NOT NULL, category VARCHAR NOT NULL, shares BIGINT, holders BIGINT, pct DOUBLE,
@@ -81,6 +86,7 @@ TABLE_ORDER = (
     "stg_holidays",
     "stg_shp_meta",
     "stg_shp_categories",
+    "stg_shp_holders",
     "stg_xbrl_filing",
     "stg_xbrl_facts",
     "stg_corp_actions",
@@ -461,6 +467,10 @@ def stage_index_snapshot(
     )
 
 
+def _int_or_none(v) -> int | None:
+    return None if v is None else int(v)
+
+
 def stage_shareholding(
     vault: Vault,
     stage_root: Path,
@@ -520,10 +530,21 @@ def stage_shareholding(
             "stated_symbol": m["stated_symbol"],
             "has_partly_paid": m["has_partly_paid"],
             "promoter_pledge_flag": m["promoter_pledge_flag"],
-            "promoter_pledged_shares": None
-            if m["promoter_pledged_shares"] is None
-            else int(m["promoter_pledged_shares"]),
+            "promoter_pledged_shares": _int_or_none(m["promoter_pledged_shares"]),
+            "promoter_encumbered_shares": _int_or_none(m["promoter_encumbered_shares"]),
+            "rules_applied": ",".join(m["rules_applied"]) or None,
         }
+    ]
+    tables["stg_shp_holders"] = [
+        {
+            "filing_id": fid,
+            "holder_category": h["holder_category"],
+            "row_member": h["row_member"],
+            "holder_name": h["holder_name"],
+            "shares": int(h["shares"]),
+            "pct": None if h["pct"] is None else float(h["pct"]),
+        }
+        for h in parsed.major_holders
     ]
     tables["stg_shp_categories"] = [
         {

@@ -27,7 +27,32 @@ from financials.parsers.indas_corp import DURATION_TAGS, IMPLEMENTED_PROFILES, I
 from financials.parsers.indas_nbfc import NBFC_DURATION_TAGS, NBFC_INSTANT_TAGS
 from financials.parsers.integrated import parse_integrated_results
 from financials.parsers.irdai_insurance import SPECS as INSURER_SPECS
+from financials.parsers.shareholding import (
+    CATEGORIES,
+    CATEGORY_AXIS,
+    ENCUMBRANCE,
+    ENCUMBRANCE_FLAGS,
+    MEASURES,
+    PUBLIC_HOLDER_AXES,
+    SHP_NS_FRAGMENT,
+    parse_shareholding,
+)
 from financials.parsers.xbrl import parse_instance
+
+SHP_PROFILE = "REG31_SHP"
+# Reg. 31 is dimensional: every element is registered with the axes it was seen on (not only
+# non-dimensional ones), and CategoryOfShareholdersAxis members are registered separately.
+SHP_MAPPED = {
+    **{k: f"category.{v}" for k, v in MEASURES.items()},
+    **{k: f"encumbrance.{v}" for k, v in ENCUMBRANCE.items()},
+    **{v: f"meta.flag_{k}" for k, v in ENCUMBRANCE_FLAGS.items()},
+    "DateOfReport": "meta.as_of_date",
+    "ISIN": "meta.stated_isin",
+    "Symbol": "meta.stated_symbol",
+    "ScripCode": "meta.stated_scrip_code",
+    "WhetherTheListedEntityHasIssuedAnyPartlyPaidUpShares": "meta.has_partly_paid",
+    "NameOfTheShareholder": "major_holder.holder_name",
+}
 
 
 def _mapped(duration: dict, instant: dict) -> dict[str, str]:
@@ -39,6 +64,11 @@ MAPPED_BY_PROFILE = {
     "INDAS_NBFC": _mapped(NBFC_DURATION_TAGS, NBFC_INSTANT_TAGS),
     "IGAAP_BANK": _mapped(BANK_DURATION_TAGS, BANK_INSTANT_TAGS),
     **{p: _mapped(spec.duration_tags, spec.instant_tags) for p, spec in INSURER_SPECS.items()},
+    SHP_PROFILE: SHP_MAPPED,
+}
+MEMBERS_BY_AXIS = {SHP_PROFILE: {CATEGORY_AXIS: CATEGORIES}}
+AXES_MAPPED = {
+    SHP_PROFILE: {CATEGORY_AXIS: "category", **{a: f"major_holder.{v}" for a, v in PUBLIC_HOLDER_AXES.items()}}
 }
 MAPPED = MAPPED_BY_PROFILE["INDAS_CORP"]
 
@@ -53,7 +83,8 @@ def ctx_kind(c) -> str:
 def inspect(path: Path, dump_dir: Path | None) -> dict:
     data = path.read_bytes()
     inst = parse_instance(data)
-    profile = detect_profile(inst.entity_namespace) or "UNKNOWN"
+    is_shp = any(SHP_NS_FRAGMENT in u and u.endswith("/in-bse-shp") for u in inst.namespaces.values())
+    profile = SHP_PROFILE if is_shp else detect_profile(inst.entity_namespace) or "UNKNOWN"
     if dump_dir is not None:
         dump_dir.mkdir(parents=True, exist_ok=True)
         with (dump_dir / f"{path.stem}.facts.jsonl").open("w", encoding="utf-8") as fh:
@@ -68,14 +99,17 @@ def inspect(path: Path, dump_dir: Path | None) -> dict:
 
     elements: dict[str, dict] = {}
     axes = Counter()
+    members: dict[str, set] = defaultdict(set)
     for f in inst.facts:
         c = inst.contexts[f.context_id]
-        for axis, _ in c.dimensions:
+        for axis, member in c.dimensions:
             axes[axis.split(":")[-1]] += 1
-        if c.dimensions:
+            if axis.split(":")[-1] == CATEGORY_AXIS:
+                members[CATEGORY_AXIS].add(member.split(":")[-1])
+        if c.dimensions and not is_shp:
             continue
         e = elements.setdefault(f.name, {"kinds": set(), "numeric": f.is_numeric, "negative": False})
-        e["kinds"].add(ctx_kind(c))
+        e["kinds"].add(ctx_kind(c) + "".join(f"@{a.split(':')[-1]}" for a, _ in c.dimensions))
         if f.is_numeric and f.value_text.strip().startswith("-"):
             e["negative"] = True
 
@@ -93,7 +127,10 @@ def inspect(path: Path, dump_dir: Path | None) -> dict:
             others.append({"axis": dims[0][0].split(":")[-1], "member": dims[0][1], "labels": sorted(set(labels)),
                            "amounts": amounts})  # fmt: skip
 
-    parsed = parse_integrated_results(data) if profile in IMPLEMENTED_PROFILES else None
+    if is_shp:
+        parsed = parse_shareholding(data)
+    else:
+        parsed = parse_integrated_results(data) if profile in IMPLEMENTED_PROFILES else None
     mapped = MAPPED_BY_PROFILE.get(profile, {})
     unmapped = sorted(n for n, e in elements.items() if e["numeric"] and n not in mapped)
     return {
@@ -109,6 +146,7 @@ def inspect(path: Path, dump_dir: Path | None) -> dict:
         "axes": dict(axes),
         "others": others,
         "_elements": elements,
+        "_members": {k: sorted(v) for k, v in members.items()},
     }
 
 
@@ -129,6 +167,21 @@ def merge_registry(registry_path: Path, reports: list[dict], batch: str) -> dict
             entry["filings"] += 1
             entry["context_kinds"] = sorted(set(entry["context_kinds"]) | e["kinds"])
             entry["seen_negative"] = entry["seen_negative"] or e["negative"]
+        for axis, ms in r.get("_members", {}).items():
+            ax = reg.setdefault("members", {}).setdefault(r["profile"], {}).setdefault(axis, {})
+            for m in ms:
+                ax.setdefault(m, {"filings": 0, "mapped_to": None, "first_batch": batch})["filings"] += 1
+        for axis in r["axes"]:
+            reg.setdefault("axes", {}).setdefault(r["profile"], {}).setdefault(
+                axis, {"mapped_to": None, "first_batch": batch}
+            )
+    for profile, axes_ in reg.get("members", {}).items():
+        for axis, ms in axes_.items():
+            for m, entry in ms.items():
+                entry["mapped_to"] = MEMBERS_BY_AXIS.get(profile, {}).get(axis, {}).get(m)
+    for profile, axes_ in reg.get("axes", {}).items():
+        for axis, entry in axes_.items():
+            entry["mapped_to"] = AXES_MAPPED.get(profile, {}).get(axis)
     # mapped_to always reflects the current parser, including for elements first seen in earlier batches
     for profile, entries in profiles.items():
         mapped = MAPPED_BY_PROFILE.get(profile, {})
@@ -136,7 +189,8 @@ def merge_registry(registry_path: Path, reports: list[dict], batch: str) -> dict
             entry["mapped_to"] = mapped.get(name)
     reg["files"] = sorted(seen_files)
     registry_path.write_text(
-        "# Every XBRL element seen in non-dimensional contexts, per profile. Generated and merged by\n"
+        "# Every XBRL element seen in non-dimensional contexts, per profile (REG31_SHP: every context, with its\n"
+        "# axes; `axes`/`members` list dimensional structure). Generated and merged by\n"
         "# scripts/inspect_xbrl_exhaustive.py; mapped_to = canonical tag in the production parser (null = unmapped).\n"
         + yaml.safe_dump(reg, sort_keys=True, allow_unicode=True, width=120),
         encoding="utf-8",

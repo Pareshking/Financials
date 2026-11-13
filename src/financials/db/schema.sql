@@ -378,6 +378,24 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     cost_of_debt        DOUBLE,              -- TTM finance costs / avg (borrowings + leases)
     dol                 DOUBLE,              -- EBIT YoY / revenue YoY, only if |revenue YoY| >= 5% (needs 8 quarters)
     gross_ebitda_spread DOUBLE,              -- (gross profit - EBITDA) / revenue; COGS >= 10% guard (C6)
+    reverse_dcf_implied_g  DOUBLE,           -- 5Y FCFF growth implied by EV [C20]
+    reverse_dcf_wacc_used  DOUBLE,           -- assumption stored with the result (0.12)
+    reverse_dcf_terminal_g DOUBLE,           -- assumption stored with the result (0.04)
+    pe_percentile       DOUBLE,              -- rank vs own prior quarter-end values, >= 4 quarters [C20]
+    ev_ebitda_percentile DOUBLE,
+    valuation_archetype VARCHAR,             -- INDUSTRIAL_SERVICES | FINANCIAL_LENDING | INSURANCE | NEW_GEN_TECH [C21]
+    ev_to_gross_profit  DOUBLE,
+    ex_cash_pe          DOUBLE,              -- (mcap - liquid cash) / (continuing owners' PAT - OI x (1 - ETR))
+    ev_to_billings      DOUBLE,              -- EV / (TTM revenue + YoY change in contract liabilities)
+    ev_to_esop_adj_ebitda DOUBLE,            -- EV / (EBITDA + ESOP cost), cash-flow window
+    price_to_cfo        DOUBLE,
+    rule_of_40          DOUBLE,              -- revenue YoY + EBITDA margin (needs 8 quarters)
+    billings_growth_pct DOUBLE,              -- billings YoY (needs 8 quarters and labelled contract liabilities)
+    neg_working_capital_float_pct DOUBLE,    -- ((payables + contract liabilities) - (receivables + inventory)) / revenue
+    net_burn_multiple   DOUBLE,              -- cash burn / incremental revenue, only when FCF < 0 (needs 8 quarters)
+    cash_runway_months  DOUBLE,              -- liquid cash / monthly burn, only when FCF < 0
+    esop_adj_fcf        DECIMAL(24,2),       -- FCF - ESOP cost
+    liquid_cash         DECIMAL(24,2),       -- cash + other bank balances + current investments
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -479,6 +497,24 @@ CREATE TABLE IF NOT EXISTS screener_features (
     cost_of_debt        DOUBLE,              -- TTM finance costs / avg (borrowings + leases)
     dol                 DOUBLE,              -- EBIT YoY / revenue YoY, only if |revenue YoY| >= 5% (needs 8 quarters)
     gross_ebitda_spread DOUBLE,              -- (gross profit - EBITDA) / revenue; COGS >= 10% guard (C6)
+    reverse_dcf_implied_g  DOUBLE,           -- 5Y FCFF growth implied by EV [C20]
+    reverse_dcf_wacc_used  DOUBLE,           -- assumption stored with the result (0.12)
+    reverse_dcf_terminal_g DOUBLE,           -- assumption stored with the result (0.04)
+    pe_percentile       DOUBLE,              -- rank vs own prior quarter-end values, >= 4 quarters [C20]
+    ev_ebitda_percentile DOUBLE,
+    valuation_archetype VARCHAR,             -- INDUSTRIAL_SERVICES | FINANCIAL_LENDING | INSURANCE | NEW_GEN_TECH [C21]
+    ev_to_gross_profit  DOUBLE,
+    ex_cash_pe          DOUBLE,              -- (mcap - liquid cash) / (continuing owners' PAT - OI x (1 - ETR))
+    ev_to_billings      DOUBLE,              -- EV / (TTM revenue + YoY change in contract liabilities)
+    ev_to_esop_adj_ebitda DOUBLE,            -- EV / (EBITDA + ESOP cost), cash-flow window
+    price_to_cfo        DOUBLE,
+    rule_of_40          DOUBLE,              -- revenue YoY + EBITDA margin (needs 8 quarters)
+    billings_growth_pct DOUBLE,              -- billings YoY (needs 8 quarters and labelled contract liabilities)
+    neg_working_capital_float_pct DOUBLE,    -- ((payables + contract liabilities) - (receivables + inventory)) / revenue
+    net_burn_multiple   DOUBLE,              -- cash burn / incremental revenue, only when FCF < 0 (needs 8 quarters)
+    cash_runway_months  DOUBLE,              -- liquid cash / monthly burn, only when FCF < 0
+    esop_adj_fcf        DECIMAL(24,2),       -- FCF - ESOP cost
+    liquid_cash         DECIMAL(24,2),       -- cash + other bank balances + current investments
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -524,4 +560,12 @@ CREATE TABLE IF NOT EXISTS entity_scope_override (
     annual_scope    VARCHAR NOT NULL,
     reason          VARCHAR NOT NULL,
     recorded_at     TIMESTAMP NOT NULL
+);
+
+-- Manual valuation-archetype override (C21): written only by admin.set_archetype_override, audited in company_overrides.
+CREATE TABLE IF NOT EXISTS entity_archetype_override (
+    entity_id           VARCHAR PRIMARY KEY REFERENCES entity_master(entity_id),
+    valuation_archetype VARCHAR NOT NULL,
+    reason              VARCHAR NOT NULL,
+    recorded_at         TIMESTAMP NOT NULL
 );

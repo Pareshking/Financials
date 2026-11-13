@@ -50,7 +50,8 @@ def test_cash_conversion_ratios():
     assert b["cfo"] == D(260) and b["fcf"] == D(170)  # TTM via H1 / FY bridge: 120 + 250 - 110; capex 90
     cfi = D(-50) + D(-90) - D(-40)
     assert c["sloan_accrual"] == (D(240) - D(260) - cfi) / ((D(2000) + D(1800)) / 2)
-    assert c["cfo_to_ebitda"] == D(260) / b["ebitda"]
+    assert b["cf_as_of"] == END  # here the cash-flow window and the TTM window coincide
+    assert c["cfo_to_ebitda"] == D(260) / b["ebitda"]  # no taxes-paid fact in this book: pre-tax CFO = CFO
     assert c["fcf_to_pat"] == D(170) / D(240)
     assert c["working_capital_intensity"] == (D(300) + D(200) - D(150)) / D(4000)
     assert c["net_debt_to_fcf"] == b["net_debt"] / D(170)
@@ -87,3 +88,20 @@ def test_gross_spread_needs_material_cogs(tag):
     for p in book.durations[tag]:
         book.durations[tag][p] = D(10)  # 1% of revenue: below the 10% materiality guard (C6)
     assert cash_conversion_blocks(book, END, building_blocks(book, END))["gross_ebitda_spread"] is None
+
+
+def test_cash_ratios_align_to_the_cash_flow_window():
+    """A Dec as-of: CFO ends at Sep (H1), so EBITDA / PAT / assets for these ratios are taken at Sep, not Dec."""
+    book = _book()
+    dec = date(2026, 12, 31)
+    for tag in list(book.durations):
+        if tag not in ("cfo", "cfi", "capex_ppe"):
+            book.durations[tag][(date(2026, 10, 1), dec)] = book.durations[tag][(date(2026, 7, 1), END)] * 3
+    book.durations["income_taxes_paid"] = {(date(2026, 4, 1), END): D(30), (date(2025, 4, 1), date(2026, 3, 31)): D(55),
+                                           (date(2025, 4, 1), OPEN): D(25)}  # fmt: skip
+    b = building_blocks(book, dec)
+    c = cash_conversion_blocks(book, dec, b)
+    at_sep = building_blocks(book, END)
+    assert b["cf_as_of"] == END
+    assert c["cfo_to_ebitda"] == (D(260) + D(60)) / at_sep["ebitda"]  # pre-tax CFO = CFO + taxes paid (TTM 60)
+    assert c["fcf_to_pat"] == D(170) / at_sep["pat"]

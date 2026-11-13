@@ -34,6 +34,7 @@ class QuarterStatement:
     period: tuple[date, date]
     rows: dict[str, Row]
     divergences: list[str] = field(default_factory=list)
+    scope_used: str | None = None  # CONSOLIDATED | STANDALONE, from the filing [C18]
 
     def crore(self, name: str) -> Decimal | None:
         v = self.rows[name].value
@@ -111,7 +112,7 @@ def corp_quarter(result, start: date, end: date) -> QuarterStatement:
         },
     )
     rows["EPS"] = eps_row(result, start, end)
-    st = QuarterStatement("INDAS_CORP", (start, end), rows)
+    st = QuarterStatement("INDAS_CORP", (start, end), rows, scope_used=result.meta.get("scope"))
     _eps_divergence(st, result)
     assoc = v("share_of_associates_jv")
     if assoc:
@@ -189,7 +190,7 @@ def bank_quarter(result, start: date, end: date) -> QuarterStatement:
         "PCR": Row("PCR", None if gnpa is None or nnpa is None or not gnpa else (gnpa - nnpa) / gnpa),
         "EPS": eps_row(result, start, end),
     }  # fmt: skip
-    st = QuarterStatement("IGAAP_BANK", (start, end), rows)
+    st = QuarterStatement("IGAAP_BANK", (start, end), rows, scope_used=result.meta.get("scope"))
     if v("exceptional_items"):
         st.divergences.append(
             "BANK_EXCEPTIONAL: our PBT is after exceptional items; Screener's PBT is Revenue - Interest - Expenses "
@@ -251,7 +252,7 @@ def nbfc_quarter(result, start: date, end: date) -> QuarterStatement:
         "Credit cost": Row("Credit cost", v("impairment_financial_instruments")),
         "EPS": eps_row(result, start, end),
     }  # fmt: skip
-    st = QuarterStatement("INDAS_NBFC", (start, end), rows)
+    st = QuarterStatement("INDAS_NBFC", (start, end), rows, scope_used=result.meta.get("scope"))
     if v("share_of_associates_jv"):
         st.divergences.append(
             "ASSOCIATES_PLACEMENT: share of associates/JVs is after PBT here; Screener adds it to Other Income "
@@ -321,7 +322,7 @@ def life_quarter(result, start: date, end: date) -> QuarterStatement:
         "Net surplus (policyholders)": Row("Net surplus (policyholders)", v("net_surplus")),
         "EPS": eps_row(result, start, end),
     }  # fmt: skip
-    st = QuarterStatement("IRDAI_LIFE", (start, end), rows)
+    st = QuarterStatement("IRDAI_LIFE", (start, end), rows, scope_used=result.meta.get("scope"))
     st.divergences.append(
         "LIFE_TRANSFER_GROSSUP: the shareholders->policyholders transfer sits in both Other Income and Expenses "
         "(nets to zero); Screener PBT adds back policyholder-account tax [S6]"
@@ -358,7 +359,7 @@ def general_quarter(result, start: date, end: date) -> QuarterStatement:
         "Underwriting result": Row("Underwriting result", v("underwriting_result")),
         "EPS": eps_row(result, start, end),
     }  # fmt: skip
-    return QuarterStatement("IRDAI_GENERAL", (start, end), rows)
+    return QuarterStatement("IRDAI_GENERAL", (start, end), rows, scope_used=result.meta.get("scope"))
 
 
 def indas_insurance_quarter(result, start: date, end: date) -> QuarterStatement:
@@ -386,7 +387,7 @@ def indas_insurance_quarter(result, start: date, end: date) -> QuarterStatement:
         "Net Profit": Row("Net Profit", v("pat")),
         "EPS": eps_row(result, start, end),
     }  # fmt: skip
-    return QuarterStatement("INDAS_INSURANCE", (start, end), rows)
+    return QuarterStatement("INDAS_INSURANCE", (start, end), rows, scope_used=result.meta.get("scope"))
 
 
 def indas_insurance_tie_out(st: QuarterStatement) -> Decimal | None:

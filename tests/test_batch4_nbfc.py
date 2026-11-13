@@ -79,14 +79,28 @@ def test_pnb_housing_negative_credit_cost_and_zero_attribution_rule():
     assert nbfc_quarter(r, *Q).rows["Net Profit"].value == Decimal("6165500000")
 
 
-def test_chola_owners_tagged_as_total_comprehensive_income_is_quarantined():
-    """[X56] Cholamandalam tags TCI (1,763.61 Cr) as owners' profit; PAT is 1,630.34 Cr. One observation: quarantine,
-    no rule (CLAUDE.md data invariant 9)."""
+def test_chola_owners_tagged_as_tci_is_fixed_by_the_named_rule():
+    """[X56, X67] Cholamandalam tags TCI (1,763.61 Cr) as owners' profit; PAT is 1,630.34 Cr and NCI is 0. Quarantined
+    until a second filing showed the pattern (Delhivery Q2 FY27); since then the NCI = 0 case is fixed by
+    OWNERS_TAGGED_AS_TCI (owners = PAT, exact when NCI = 0). Screener shows 1,630.34 too (S17)."""
     r = parse_indas_nbfc_results(CHOLA.read_bytes())
-    assert not r.ok
-    assert {i.reason_code for i in r.issues} == {"OWNERS_PLUS_NCI"}
-    q = next(i for i in r.issues if i.details["period"] == [str(Q[0]), str(Q[1])])
-    assert (Decimal(q.details["lhs"]), Decimal(q.details["rhs"])) == (Decimal("17636100000"), Decimal("16303400000"))
+    assert r.ok, r.issues
+    assert r.meta["rules_applied"][0]["rule"] == "OWNERS_TAGGED_AS_TCI"
+    assert r.value("pat_owners", *Q) == r.value("pat", *Q) == Decimal("16303400000")
+    owners = next(f for f in r.facts if f.canonical_tag == "pat_owners" and (f.period_start, f.period_end) == Q)
+    assert owners.source_element == "RULE:OWNERS_TAGGED_AS_TCI"
+
+
+def test_owners_tci_rule_needs_zero_nci():
+    """With a non-zero NCI the replacement would not be exact: the filing must still fail OWNERS_PLUS_NCI."""
+    data = CHOLA.read_bytes()
+    marker = b"ProfitOrLossAttributableToNonControllingInterests"
+    i = data.index(marker)
+    j = data.index(b">", i) + 1
+    k = data.index(b"<", j)
+    tampered = data[:j] + b"1000000" + data[k:]  # in memory only; the fixture is untouched
+    r = parse_indas_nbfc_results(tampered)
+    assert "OWNERS_PLUS_NCI" in {x.reason_code for x in r.issues}
 
 
 def test_investment_holding_company_is_not_a_lender():

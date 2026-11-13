@@ -25,14 +25,20 @@ from financials.fundamentals import (
     CASH_CONVERSION_COLUMNS,
     INSURER_COLUMNS,
     NBFC_COLUMNS,
+    REVERSE_DCF_TERMINAL_G,
+    REVERSE_DCF_WACC,
     altman_z_double_prime,
     bank_blocks,
     building_blocks,
     cash_conversion_blocks,
+    insurer_basis,
     insurer_blocks,
     load_factbook,
     nbfc_blocks,
+    newgen_inputs,
+    percentile_rank,
     resolve_scope,
+    reverse_dcf_implied_growth,
     safe_div,
     yoy_growth,
 )
@@ -165,6 +171,53 @@ def _preload(con, as_of_ts: datetime):
     return shp, paid_up, quarter_end
 
 
+ARCHETYPES = ("INDUSTRIAL_SERVICES", "FINANCIAL_LENDING", "INSURANCE", "NEW_GEN_TECH")
+
+
+def _curated_archetypes() -> dict[str, str]:
+    """reference/valuation_archetypes.csv: symbols classified NEW_GEN_TECH by decision (C21); XBRL cannot tell."""
+    import csv
+
+    from financials.sources import ROOT
+
+    path = ROOT / "reference" / "valuation_archetypes.csv"
+    if not path.exists():
+        return {}
+    with path.open(encoding="utf-8") as fh:
+        return {r["symbol"]: r["valuation_archetype"] for r in csv.DictReader(fh)}
+
+
+def derived_archetype(book) -> str:
+    """Profile-derived archetype: insurers INSURANCE; banks and lending NBFCs FINANCIAL_LENDING; otherwise
+    INDUSTRIAL_SERVICES (NEW_GEN_TECH only by the curated list or an override, C21)."""
+    if insurer_basis(book) is not None:
+        return "INSURANCE"
+    if "interest_expended" in book.durations:
+        return "FINANCIAL_LENDING"
+    if "interest_earned" in book.durations:
+        from financials.fundamentals import nbfc_blocks
+
+        return "FINANCIAL_LENDING" if nbfc_blocks(book, max(e for (_, e) in book.durations["interest_earned"]))[
+            "is_lending_nbfc"] else "INDUSTRIAL_SERVICES"  # fmt: skip
+    return "INDUSTRIAL_SERVICES"
+
+
+def _valuation_history(con, as_of: date) -> dict[str, dict[str, list[float]]]:
+    """Each security's PE and EV/EBITDA at the last materialised date of every prior quarter (one query) [C20]."""
+    rows = con.execute(
+        """SELECT security_id, arg_max(pe, as_of_date), arg_max(ev_ebitda, as_of_date)
+           FROM screener_features_history
+           WHERE as_of_date < date_trunc('quarter', CAST(? AS DATE))
+           GROUP BY security_id, date_trunc('quarter', as_of_date)""",
+        [as_of],
+    ).fetchall()
+    out: dict[str, dict[str, list[float]]] = defaultdict(lambda: {"pe": [], "ev_ebitda": []})
+    for sec, pe, eve in rows:
+        out[sec]["pe"].append(pe)
+        out[sec]["ev_ebitda"].append(eve)
+    return out
+
+
 def compute_rows(con, as_of: date, exchange: str = "NSE") -> list[dict]:
     as_of_ts = ist_to_utc(as_of + timedelta(days=1), time(0, 0))  # end of as_of day, IST
     universe = _universe(con, exchange, as_of)
@@ -178,6 +231,9 @@ def compute_rows(con, as_of: date, exchange: str = "NSE") -> list[dict]:
         ).fetchall()
     }
     shp_all, paid_up, quarter_end = _preload(con, as_of_ts)
+    history = _valuation_history(con, as_of)
+    curated = _curated_archetypes()
+    arch_override = dict(con.execute("SELECT entity_id, valuation_archetype FROM entity_archetype_override").fetchall())
     fundamentals_cache: dict[str, dict] = {}
     rows = []
     for sec, ent, symbol, series in universe:
@@ -230,6 +286,23 @@ def compute_rows(con, as_of: date, exchange: str = "NSE") -> list[dict]:
             "dii_pct": _f(shp.get("DII", (None, None))[0]),
             "shp_as_of": shp.get("_as_of"),
         })  # fmt: skip
+        archetype = arch_override.get(ent) or (
+            curated.get(symbol) if fund.get("_archetype") == "INDUSTRIAL_SERVICES" and symbol in curated else None
+        ) or fund.get("_archetype")  # fmt: skip
+        row["valuation_archetype"] = archetype
+        row.update(_newgen_columns(fund.get("_newgen"), mcap, ev, fund))
+        hist = history.get(sec, {"pe": [], "ev_ebitda": []})
+        fcff = _f(fund["_fcff"]) if fund["_fcff"] is not None else None
+        implied_g = reverse_dcf_implied_growth(_f(ev), fcff) if ev is not None and not fund.get("_lender") else None
+        row.update(
+            {
+                "pe_percentile": percentile_rank(row["pe"], hist["pe"]),
+                "ev_ebitda_percentile": percentile_rank(row["ev_ebitda"], hist["ev_ebitda"]),
+                "reverse_dcf_implied_g": implied_g,
+                "reverse_dcf_wacc_used": REVERSE_DCF_WACC if implied_g is not None else None,
+                "reverse_dcf_terminal_g": REVERSE_DCF_TERMINAL_G if implied_g is not None else None,
+            }
+        )
         public = shp.get("PUBLIC", (None, None))[1]
         a5 = row["deliv_avg_5d"]
         row["float_turnover_pct"] = a5 / public * 100 if a5 is not None and public else None
@@ -252,6 +325,36 @@ _EMPTY_FUNDAMENTALS: dict = {
 _NOT_FOR_LENDERS = (
     "ebitda_ttm", "opm", "roce", "roic", "croic", "debt_to_equity", "altman_z_dd", "fcf_ttm", *CASH_CONVERSION_COLUMNS,
 )  # fmt: skip
+
+
+NEWGEN_COLUMNS = (
+    "ev_to_gross_profit", "ex_cash_pe", "ev_to_billings", "ev_to_esop_adj_ebitda", "price_to_cfo", "rule_of_40",
+    "billings_growth_pct", "neg_working_capital_float_pct", "net_burn_multiple", "cash_runway_months", "esop_adj_fcf",
+    "liquid_cash",
+)  # fmt: skip
+
+
+def _pos_div(a, b):
+    return _f(safe_div(a, b)) if b is not None and b > 0 else None
+
+
+def _newgen_columns(ng: dict | None, mcap, ev, fund: dict) -> dict:
+    """New-gen tech ratios [C21]; inputs from fundamentals.newgen_inputs, NULL for lenders and insurers."""
+    out = dict.fromkeys(NEWGEN_COLUMNS)
+    if not ng or fund.get("_lender"):
+        return out
+    out["ev_to_gross_profit"] = _pos_div(ev, fund.get("_gross_profit"))
+    if mcap is not None and ng["liquid_cash"] is not None:
+        out["ex_cash_pe"] = _pos_div(mcap - ng["liquid_cash"], ng["ex_cash_earnings"])
+    out["ev_to_billings"] = _pos_div(ev, ng["billings_ttm"])
+    out["ev_to_esop_adj_ebitda"] = _pos_div(ev, ng["esop_adj_ebitda"])
+    out["price_to_cfo"] = _pos_div(mcap, fund.get("_cfo"))
+    for k in ("rule_of_40", "billings_growth_pct", "neg_working_capital_float_pct", "net_burn_multiple",
+              "cash_runway_months"):  # fmt: skip
+        out[k] = _f(ng[k])
+    out["esop_adj_fcf"] = ng["esop_adj_fcf"]
+    out["liquid_cash"] = ng["liquid_cash"]
+    return out
 
 
 def _eps(profit: Decimal | None, shares: Decimal | None) -> Decimal | None:
@@ -278,6 +381,10 @@ def _fundamentals(con, entity_id: str, as_of_ts: datetime, end: date) -> dict:
     if scope == "CONSOLIDATED" and "interest_expended" in book.durations:
         regulatory = load_factbook(con, entity_id, "STANDALONE", as_of_ts)  # standalone disclosures [X60]
     cash = {k: _f(v) for k, v in cash_conversion_blocks(book, end, b).items()}
+    scope_cols["_archetype"] = derived_archetype(book)
+    scope_cols["_newgen"] = newgen_inputs(book, end, b)
+    scope_cols["_gross_profit"] = b["gross_profit"]
+    scope_cols["_cfo"] = b["cfo"]
     return scope_cols | cash | _lender_columns(book, end, regulatory) | _insurer_columns(book, end) | {
         "sales_ttm": b["rev_ops"], "ebitda_ttm": b["ebitda"], "pat_ttm": b["pat"], "fcf_ttm": b["fcf"],
         "net_debt": b["net_debt"], "total_equity": eq,

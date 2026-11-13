@@ -209,6 +209,18 @@ LABEL_RULES: tuple[tuple[str, str, str, str, str, re.Pattern[str]], ...] = (
      re.compile(r"^\s*power\s*(?:and|&|,)\s*fuel", re.I)),
     ("FREIGHT", "DetailsOfOtherExpensesAxis", "OtherExpenses", "freight", "DURATION",
      re.compile(r"^\s*freight", re.I)),
+    # New-gen tech [X68]: contract liabilities only as labelled "other liabilities" members (Swiggy, Paytm, IndiaMART,
+    # Nykaa, RateGain); advertising only as a labelled other-expenses line (7/10 of Batch 7). Absent = NULL.
+    ("CONTRACT_LIABILITIES_CURRENT", "OtherCurrentLiabilitiesAxis", "OtherCurrentLiabilities",
+     "contract_liabilities_current", "INSTANT",
+     re.compile(r"^\s*(?:contract\s+liabilit|advances?\s+(?:received\s+)?from\s+customers|deferred\s+revenue|"
+                r"unearned\s+revenue|income\s+received\s+in\s+advance)", re.I)),
+    ("CONTRACT_LIABILITIES_NONCURRENT", "OtherNoncurrentLiabilitiesAxis", "OtherNoncurrentLiabilities",
+     "contract_liabilities_noncurrent", "INSTANT",
+     re.compile(r"^\s*(?:contract\s+liabilit|advances?\s+(?:received\s+)?from\s+customers|deferred\s+revenue|"
+                r"unearned\s+revenue|income\s+received\s+in\s+advance)", re.I)),
+    ("ADVERTISING", "DetailsOfOtherExpensesAxis", "OtherExpenses", "advertising_promotion", "DURATION",
+     re.compile(r"^\s*(?:advertis|marketing\s+and\s+(?:advertis|promotion)|sales\s+promotion)", re.I)),
     ("EXCISE_DUTY", "DetailsOfOtherExpensesAxis", "OtherExpenses", "excise_duty", "DURATION",
      re.compile(r"^\s*excise\s+dut", re.I)),
 )  # fmt: skip
@@ -480,6 +492,7 @@ def _map_facts(inst: Instance, result: ParsedResults, spec: ProfileSpec | None =
             )
         )
     _apply_zero_attribution_rule(result)
+    _apply_owners_tci_rule(result)
     result.meta["interest_paid_cfo_class"] = _classify(
         result, "interest_paid_operating", "interest_paid_financing", "FINANCING"
     )
@@ -510,6 +523,31 @@ def _apply_zero_attribution_rule(result: ParsedResults) -> None:
     ]
     result.meta.setdefault("rules_applied", []).append(
         {"rule": "ZERO_ATTRIBUTION_PLACEHOLDER", "periods": [[str(a), str(b)] for a, b in sorted(dropped)]}
+    )
+
+
+def _apply_owners_tci_rule(result: ParsedResults) -> None:
+    """Named rule OWNERS_TAGGED_AS_TCI [X56, X67]: the owners' profit element carries total comprehensive income
+    (Cholamandalam Q2 FY27, Delhivery Q2 FY27). Applied only when the NCI share is exactly 0, because then owners'
+    profit must equal PAT and the replacement is exact; with a non-zero NCI the filing still fails OWNERS_PLUS_NCI
+    and is quarantined (decision 2026-11-13). Raw facts stay; the canonical owners fact becomes PAT."""
+    tol = identity_tolerance(result.meta["level_of_rounding"], 3)
+    fixed = []
+    for f in [f for f in result.facts if f.canonical_tag == "pat_owners"]:
+        p = (f.period_start, f.period_end)
+        pat, nci, tci = (result.value(t, *p) for t in ("pat", "pat_nci", "total_comprehensive_income"))
+        if None in (pat, nci, tci) or nci != 0:
+            continue
+        if abs(f.value - tci) <= tol and abs(f.value - pat) > tol:
+            fixed.append((f, pat))
+    if not fixed:
+        return
+    for f, pat in fixed:
+        result.facts.remove(f)
+        result.facts.append(CanonicalFact("pat_owners", f.period_type, f.period_start, f.period_end, f.period_months,
+                                          f.unit, pat, "RULE:OWNERS_TAGGED_AS_TCI"))  # fmt: skip
+    result.meta.setdefault("rules_applied", []).append(
+        {"rule": "OWNERS_TAGGED_AS_TCI", "periods": [[str(f.period_start), str(f.period_end)] for f, _ in fixed]}
     )
 
 

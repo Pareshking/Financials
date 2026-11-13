@@ -88,7 +88,7 @@ def cashflow(result, start: date, end: date) -> QuarterStatement | None:
     rows["Net Cash Flow"] = Row(
         "Net Cash Flow", after_fx, {"Operating": cfo, "Investing": cfi, "Financing": cff, "FX effect on cash": fx}
     )
-    st = QuarterStatement("INDAS_CORP", (start, end), rows)
+    st = QuarterStatement("INDAS_CORP", (start, end), rows, scope_used=result.meta.get("scope"))
     if fx:
         st.divergences.append("FX_IN_INVESTING: Screener's CFI includes the FX effect on cash [S12]")
     return st

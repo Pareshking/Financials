@@ -71,4 +71,4 @@ def balance_sheet(result, end: date) -> QuarterStatement | None:
         {"Receivables": recv, "Inventory": stock, "Cash & Bank": cash, "Other asset items": oa - recv - stock - cash},
     )
     rows["Total Assets"] = Row("Total Assets", total, {"Deferred tax netted": -netting})
-    return QuarterStatement("INDAS_CORP", (end, end), rows)
+    return QuarterStatement("INDAS_CORP", (end, end), rows, scope_used=result.meta.get("scope"))

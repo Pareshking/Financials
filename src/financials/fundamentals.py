@@ -164,21 +164,35 @@ def scope_policy(con, entity_id: str, as_of: datetime) -> ScopePolicy:
     ).fetchone()
     if row:
         return ScopePolicy(row[0], row[1], "OVERRIDE")
-    latest = {
-        (months, scope): end
-        for months, scope, end in con.execute(
-            """SELECT period_months, scope, max(period_end) FROM fact_observations
-               WHERE entity_id = ? AND canonical_tag = ? AND period_type = 'DURATION' AND period_months IN (3, 12)
-                 AND visible_from_ts <= ? GROUP BY period_months, scope""",
-            [entity_id, ANCHOR_TAG, as_of],
-        ).fetchall()
-    }
+    rows = con.execute(
+        """SELECT period_months, scope, period_end FROM fact_observations
+           WHERE entity_id = ? AND canonical_tag = ? AND period_type = 'DURATION' AND period_months IN (3, 12)
+             AND visible_from_ts <= ? GROUP BY period_months, scope, period_end""",
+        [entity_id, ANCHOR_TAG, as_of],
+    ).fetchall()
+    ends: dict[tuple[int, str], set[date]] = {}
+    for months, scope, end in rows:
+        ends.setdefault((months, scope), set()).add(end)
+
+    def complete_quarters(scope: str) -> bool:
+        """All 4 trailing quarters (ending at the scope's latest quarter) filed in this scope, as 3-month facts
+        or as Q4 = FY - 9M (a 12-month fact closing the year)."""
+        q = ends.get((3, scope), set())
+        if not q:
+            return False
+        last = max(q)
+        need = [_add_months(last, -3 * i) for i in range(4)]
+        fy = ends.get((12, scope), set())
+        return all(e in q or e in fy for e in need)
 
     def pick(months: int) -> str | None:
-        cons, stand = latest.get((months, "CONSOLIDATED")), latest.get((months, "STANDALONE"))
-        if cons is None and stand is None:
+        cons, stand = ends.get((months, "CONSOLIDATED")), ends.get((months, "STANDALONE"))
+        if not cons and not stand:
             return None
-        return "CONSOLIDATED" if cons is not None and (stand is None or cons >= stand) else "STANDALONE"
+        if months == 3 and cons and stand and not complete_quarters("CONSOLIDATED") and complete_quarters("STANDALONE"):
+            # Cadence mismatch: consolidated only at H1 / FY, standalone every quarter -> quarterly default STANDALONE
+            return "STANDALONE"
+        return "CONSOLIDATED" if cons and (not stand or max(cons) >= max(stand)) else "STANDALONE"
 
     quarterly = pick(3)
     annual = pick(12) or quarterly
@@ -404,16 +418,21 @@ def cash_conversion_blocks(book: FactBook, end: date, b: dict) -> dict:
     8 in-scope quarters (C9) and stay NULL until then."""
     out = dict.fromkeys(CASH_CONVERSION_COLUMNS)
     t = lambda tag: book.ttm(tag, end)  # noqa: E731
-    rev, pat, ebitda, cfo, fcf = b["rev_ops"], b["pat"], b["ebitda"], b["cfo"], b["fcf"]
+    rev, ebitda, cfo, fcf = b["rev_ops"], b["ebitda"], b["cfo"], b["fcf"]
     cf_end = b["cf_as_of"]
-    cfi = book.ttm_from_ytd("cfi", cf_end) if cf_end else None
-    avg_assets, _, _ = average_instant(book, "total_assets", end)
-    if None not in (pat, cfo, cfi, avg_assets) and avg_assets:
-        out["sloan_accrual"] = (pat - cfo - cfi) / avg_assets
-    if ebitda is not None and ebitda > 0:
-        out["cfo_to_ebitda"] = safe_div(cfo, ebitda)
-    if pat is not None and pat > 0:
-        out["fcf_to_pat"] = safe_div(fcf, pat)
+    # Cash flow is filed only at H1 / FY: align P&L numerators to the same 12-month window ending at cf_end, so a
+    # Q1 / Q3 as-of never divides a Sep-ending CFO by a Dec-ending EBITDA [C19].
+    cfw = building_blocks(book, cf_end) if cf_end else None
+    if cfw is not None:
+        cfi = book.ttm_from_ytd("cfi", cf_end)
+        taxes = book.ttm_from_ytd("income_taxes_paid", cf_end) or Decimal(0)
+        avg_assets, _, _ = average_instant(book, "total_assets", cf_end)
+        if None not in (cfw["pat"], cfo, cfi, avg_assets) and avg_assets:
+            out["sloan_accrual"] = (cfw["pat"] - cfo - cfi) / avg_assets
+        if cfw["ebitda"] is not None and cfw["ebitda"] > 0 and cfo is not None:
+            out["cfo_to_ebitda"] = (cfo + taxes) / cfw["ebitda"]  # pre-tax CFO vs EBITDA (both before tax)
+        if cfw["pat"] is not None and cfw["pat"] > 0:
+            out["fcf_to_pat"] = safe_div(fcf, cfw["pat"])
     bs = b["bs_as_of"]
     stock = lambda tag, d=bs: book.instants.get(tag, {}).get(d) if d else None  # noqa: E731
     recv, inv, pay = stock("trade_receivables_current"), stock("inventories"), stock("trade_payables_current")
@@ -430,13 +449,118 @@ def cash_conversion_blocks(book: FactBook, end: date, b: dict) -> dict:
     if quarters_available_since(end, 8):
         prev = building_blocks(book, _add_months(end, -12))
         rev0, ebit0, ebit = prev["rev_ops"], prev["ebit"], b["ebit"]
-        if None not in (rev, rev0, ebit, ebit0) and rev0 > 0 and ebit0 > 0 and ebit > 0:
+        if None not in (rev, rev0, ebit, ebit0) and rev0 > 0 and ebit0 > 0:  # EBIT_{t-4} > 0 guard
             drev = rev / rev0 - 1
             if abs(drev) >= DOL_MIN_REVENUE_CHANGE:  # guard: DOL explodes when revenue barely moves
                 out["dol"] = (ebit / ebit0 - 1) / drev
         recv0 = book.instants.get("trade_receivables_current", {}).get(_add_months(bs, -12)) if bs else None
         if None not in (recv, recv0, rev, rev0) and recv0 > 0 and rev0 > 0:
             out["receivables_sales_divergence"] = (recv / recv0 - 1) - (rev / rev0 - 1)
+    return out
+
+
+REVERSE_DCF_WACC = 0.12
+REVERSE_DCF_TERMINAL_G = 0.04
+REVERSE_DCF_YEARS = 5
+
+
+def reverse_dcf_implied_growth(
+    ev: float | None,
+    fcff: float | None,
+    *,
+    wacc: float = REVERSE_DCF_WACC,
+    terminal_g: float = REVERSE_DCF_TERMINAL_G,
+    years: int = REVERSE_DCF_YEARS,
+) -> float | None:
+    """Growth g of FCFF over `years` that makes the DCF value equal EV [C20]:
+    EV = sum_{t=1..n} F(1+g)^t / (1+w)^t + F(1+g)^n (1+tg) / ((w - tg)(1+w)^n).
+    NULL when FCFF <= 0 or EV <= 0, or when no g in [-95%, +300%] reproduces EV. Ratios, so floats are fine."""
+    if ev is None or fcff is None or ev <= 0 or fcff <= 0 or wacc <= terminal_g:
+        return None
+
+    def value(g: float) -> float:
+        pv = sum(fcff * (1 + g) ** t / (1 + wacc) ** t for t in range(1, years + 1))
+        return pv + fcff * (1 + g) ** years * (1 + terminal_g) / ((wacc - terminal_g) * (1 + wacc) ** years)
+
+    lo, hi = -0.95, 3.0
+    if not value(lo) <= ev <= value(hi):
+        return None
+    for _ in range(200):  # value(g) is increasing in g for F > 0: bisection
+        mid = (lo + hi) / 2
+        lo, hi = (mid, hi) if value(mid) < ev else (lo, mid)
+    return round((lo + hi) / 2, 6)
+
+
+def percentile_rank(current: float | None, history: list[float], *, min_periods_required: int = 4) -> float | None:
+    """Share of the security's own prior quarter-end values <= current [C20]; positive values only (a negative PE
+    or EV/EBITDA has no valuation meaning); NULL with fewer than `min_periods_required` prior quarters."""
+    if current is None or current <= 0:
+        return None
+    hist = [h for h in history if h is not None and h > 0]
+    if len(hist) < min_periods_required:
+        return None
+    return sum(h <= current for h in hist) / len(hist)
+
+
+NEWGEN_INPUT_KEYS = (
+    "liquid_cash", "ex_cash_earnings", "billings_ttm", "billings_growth_pct", "esop_ttm", "esop_adj_ebitda",
+    "rule_of_40", "neg_working_capital_float_pct", "net_burn_multiple", "cash_runway_months", "esop_adj_fcf",
+)  # fmt: skip
+
+
+def contract_liabilities_at(book: FactBook, d: date | None) -> Decimal | None:
+    if d is None:
+        return None
+    c = book.instants.get("contract_liabilities_current", {}).get(d)
+    n = book.instants.get("contract_liabilities_noncurrent", {}).get(d)
+    return None if c is None and n is None else (c or Decimal(0)) + (n or Decimal(0))
+
+
+def newgen_inputs(book: FactBook, end: date, b: dict) -> dict:
+    """Ingredients for the new-gen tech ratios (architecture §10.8) [C21]; EV / market-cap ratios finish in features.
+
+    Liquid cash = cash + other bank balances + current investments: non-current investments are excluded because
+    holding stakes dominate them (Info Edge 50,773 Cr of listed Zomato / PB Fintech shares, X68). ESOP cost exists only
+    as the H1 / FY cash-flow add-back (X68), so ESOP-based ratios use the cash-flow window. Contract liabilities exist
+    only where labelled (5/10 of Batch 7); billings ratios are NULL otherwise."""
+    out = dict.fromkeys(NEWGEN_INPUT_KEYS)
+    bs = b["bs_as_of"]
+    g = lambda tag: book.instants.get(tag, {}).get(bs) if bs else None  # noqa: E731
+    cash = [g("cash_and_equivalents"), g("bank_balances_other"), g("current_investments")]
+    out["liquid_cash"] = None if all(v is None for v in cash) else sum((v or Decimal(0)) for v in cash)
+    cont, oi = b["pat_owners_continuing"], b["other_income"]
+    if cont is not None and oi is not None:
+        out["ex_cash_earnings"] = cont - oi * (1 - b["etr"])
+    rev, fcf = b["rev_ops"], b["fcf"]
+    cl, cl0 = contract_liabilities_at(book, bs), contract_liabilities_at(book, _add_months(bs, -12) if bs else None)
+    if None not in (rev, cl, cl0):
+        out["billings_ttm"] = rev + (cl - cl0)
+    cf_end = b["cf_as_of"]
+    esop = book.ttm_from_ytd("share_based_payments_addback", cf_end) if cf_end else None
+    out["esop_ttm"] = esop
+    if esop is not None:
+        cfw = building_blocks(book, cf_end)
+        if cfw["ebitda"] is not None:
+            out["esop_adj_ebitda"] = cfw["ebitda"] + esop
+        if fcf is not None:
+            out["esop_adj_fcf"] = fcf - esop
+    pay, recv, inv = g("trade_payables_current"), g("trade_receivables_current"), g("inventories")
+    if None not in (pay, recv) and rev:
+        out["neg_working_capital_float_pct"] = ((pay + (cl or Decimal(0))) - (recv + (inv or Decimal(0)))) / rev
+    if fcf is not None and fcf < 0 and out["liquid_cash"] is not None:
+        out["cash_runway_months"] = out["liquid_cash"] / (-fcf / 12)
+    if quarters_available_since(end, 8):
+        prev = building_blocks(book, _add_months(end, -12))
+        rev0 = prev["rev_ops"]
+        if rev is not None and rev0 and rev0 > 0 and b["ebitda"] is not None:
+            out["rule_of_40"] = (rev / rev0 - 1) + b["ebitda"] / rev
+            if fcf is not None and fcf < 0 and rev > rev0:
+                out["net_burn_multiple"] = -fcf / (rev - rev0)
+            cl_2y = contract_liabilities_at(book, _add_months(bs, -24) if bs else None)
+            if None not in (cl0, cl_2y, out["billings_ttm"]):
+                billings0 = rev0 + (cl0 - cl_2y)
+                if billings0 > 0:
+                    out["billings_growth_pct"] = out["billings_ttm"] / billings0 - 1
     return out
 
 

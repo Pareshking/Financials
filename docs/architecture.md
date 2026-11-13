@@ -333,6 +333,25 @@ new-gen tech KPIs. Each row is point in time (`visible_from_ts` = publication of
 yet (Phase 3). Persistency for listed life insurers comes from XBRL, so the table is only needed for unlisted
 comparisons or other periods.
 
+### 10.8 New-gen tech (`NEW_GEN_TECH`, C21) and valuation bands (C20)
+
+| Column | Formula | Guard |
+|---|---|---|
+| `valuation_archetype` | profile-derived; NEW_GEN_TECH by curated list / override | — |
+| `ev_to_gross_profit` | EV / TTM gross profit | gross profit exists (COGS ≥ 10%) |
+| `ex_cash_pe` | (mcap − liquid cash) / (continuing owners' PAT − OI × (1 − ETR)) | denominator > 0 |
+| `ev_to_billings` | EV / (TTM revenue + Δ contract liabilities over 12 months) | labelled contract liabilities, opening BS |
+| `ev_to_esop_adj_ebitda` | EV / (EBITDA + ESOP), cash-flow window | ESOP add-back present |
+| `price_to_cfo` | mcap / TTM CFO | CFO > 0 |
+| `rule_of_40` | revenue YoY + EBITDA margin | 8 quarters |
+| `billings_growth_pct` | billings YoY | 8 quarters + contract liabilities 24 months back |
+| `neg_working_capital_float_pct` | ((payables + contract liabilities) − (receivables + inventory)) / revenue | latest BS |
+| `net_burn_multiple` | −FCF / revenue increase | FCF < 0, revenue up, 8 quarters |
+| `cash_runway_months` | liquid cash / (−FCF / 12) | FCF < 0 |
+| `esop_adj_fcf`, `liquid_cash` | FCF − ESOP; cash + bank + current investments | — |
+| `reverse_dcf_implied_g` | g such that 5-year DCF (WACC 12%, terminal 4%) = EV | FCFF > 0, EV > 0 |
+| `pe_percentile`, `ev_ebitda_percentile` | rank vs own prior quarter-end values | ≥ 4 prior quarters |
+
 ### 10.7 `screener_features` columns in Phase 1
 
 Source of truth: `screener_features_history` in `schema.sql`; aliases in `financials.dsl.ALIASES`.

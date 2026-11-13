@@ -685,6 +685,133 @@ WAVE2 = {  # name: (fixture, kind, quarter end, Screener rows in Rs crore)
             "Net Profit": "462.00",
         },
     ),
+    # Batch 7 new-gen tech exports [S20]
+    "DELHIVERY": (
+        "INTEGRATED_FILING_INDAS_1750274_30102026064310_WEB.xml",
+        "corp",
+        "2026-09-30",
+        {
+            "Sales": "3066.38",
+            "Expenses": "2862.51",
+            "Operating Profit": "203.87",
+            "Other Income": "66.63",
+            "Depreciation": "197.49",
+            "Interest": "34.02",
+            "Profit before tax": "38.99",
+            "Tax": "-1.65",
+            "Net Profit": "40.64",
+        },
+    ),
+    "NYKAA": (
+        "INTEGRATED_FILING_INDAS_1752762_04112026053637_WEB.xml",
+        "corp",
+        "2026-09-30",
+        {
+            "Sales": "3006.04",
+            "Expenses": "2743.48",
+            "Operating Profit": "262.56",
+            "Other Income": "9.52",
+            "Depreciation": "93.05",
+            "Interest": "30.52",
+            "Profit before tax": "148.51",
+            "Tax": "47.32",
+            "Net Profit": "100.81",
+        },
+    ),
+    "NAUKRI": (
+        "INTEGRATED_FILING_INDAS_1747783_28102026044327_WEB.xml",
+        "corp",
+        "2026-09-30",
+        {
+            "Sales": "903.88",
+            "Expenses": "549.89",
+            "Operating Profit": "353.99",
+            "Other Income": "432.49",
+            "Depreciation": "32.94",
+            "Interest": "5.81",
+            "Profit before tax": "747.73",
+            "Tax": "97.96",
+            "Net Profit": "479.72",
+        },
+    ),
+    "NAUKRI_STANDALONE": (
+        "INTEGRATED_FILING_INDAS_1747782_28102026044245_WEB.xml",
+        "corp",
+        "2026-09-30",
+        {
+            "Sales": "841.66",
+            "Expenses": "464.41",
+            "Operating Profit": "377.25",
+            "Other Income": "84.96",
+            "Depreciation": "25.06",
+            "Interest": "4.85",
+            "Profit before tax": "432.30",
+            "Tax": "98.40",
+            "Net Profit": "333.90",
+        },
+    ),
+    "OLAELEC": (
+        "INTEGRATED_FILING_INDAS_1756932_12112026075230_WEB.xml",
+        "corp",
+        "2026-09-30",
+        {
+            "Sales": "421.00",
+            "Expenses": "639.00",
+            "Operating Profit": "-218.00",
+            "Other Income": "27.00",
+            "Depreciation": "108.00",
+            "Interest": "63.00",
+            "Profit before tax": "-362.00",
+            "Net Profit": "-362.00",
+        },
+    ),
+    "PAYTM": (
+        "INTEGRATED_FILING_INDAS_1746348_26102026105317_WEB.xml",
+        "corp",
+        "2026-09-30",
+        {
+            "Sales": "2648.00",
+            "Expenses": "2381.00",
+            "Operating Profit": "267.00",
+            "Other Income": "178.00",
+            "Depreciation": "146.00",
+            "Interest": "7.00",
+            "Profit before tax": "292.00",
+            "Tax": "67.00",
+            "Net Profit": "226.00",
+        },
+    ),
+    "POLICYBZR": (
+        "INTEGRATED_FILING_INDAS_1750589_30102026112529_WEB.xml",
+        "corp",
+        "2026-09-30",
+        {
+            "Sales": "2177.71",
+            "Expenses": "2016.70",
+            "Operating Profit": "161.01",
+            "Other Income": "99.85",
+            "Depreciation": "43.78",
+            "Interest": "11.67",
+            "Profit before tax": "205.41",
+            "Tax": "13.02",
+            "Net Profit": "192.45",
+        },
+    ),
+    "SWIGGY": (
+        "INTEGRATED_FILING_INDAS_1744176_22102026064114_WEB.xml",
+        "corp",
+        "2026-09-30",
+        {
+            "Sales": "7571.00",
+            "Expenses": "8343.00",
+            "Operating Profit": "-772.00",
+            "Other Income": "212.00",
+            "Depreciation": "308.00",
+            "Interest": "54.00",
+            "Profit before tax": "-922.00",
+            "Net Profit": "-922.00",
+        },
+    ),
 }
 
 
@@ -703,12 +830,19 @@ WAVE2_DIVERGENT = {
                     "Other Income": ("LABEL_RECLASS", Decimal("-2027")),
                     "Operating Profit": ("LABEL_RECLASS", Decimal("2015")),
                     "Profit before tax": ("ASSOCIATES_PLACEMENT", (ASSOC,))},
-    # Screener moves the labelled "Other Income" member (123.59 Cr) out of revenue, adds associates, and shows PAT
-    # (1,630.34) where Chola mis-tagged TCI as owners' profit (X56) [S17]
+    # Screener moves the labelled "Other Income" member (123.59 Cr) out of revenue and adds associates [S17]; Net
+    # Profit now matches (1,630.34) because OWNERS_TAGGED_AS_TCI fixes the mis-tagged owners' profit (X67)
     "CHOLAFIN": {"Revenue": ("LABEL_RECLASS", Decimal("-123.59")), "Other Income": ("LABEL_RECLASS", Decimal("124.92")),
-                 "Profit before tax": ("ASSOCIATES_PLACEMENT", (ASSOC,)),
-                 "Net Profit": ("OWNERS_TAGGED_AS_TCI", Decimal("-133.27"))},
+                 "Profit before tax": ("ASSOCIATES_PLACEMENT", (ASSOC,))},
     "NIACL": {"Net Profit": ("UNEXPLAINED", Decimal("9.26"))},  # = ProfitLossCarriedToBalanceSheet - PAT [S18]
+    # Associates LOSS: Screener books it in Expenses and PBT, not Other Income [S20]; "-" negates the element
+    **{k: {"Expenses": ("ASSOCIATES_PLACEMENT", ("-" + ASSOC,)),
+           "Operating Profit": ("ASSOCIATES_PLACEMENT", (ASSOC,)),
+           "Profit before tax": ("ASSOCIATES_PLACEMENT", (ASSOC,))}
+       for k in ("DELHIVERY", "PAYTM", "POLICYBZR", "SWIGGY")},
+    "NAUKRI": {"Other Income": ("ASSOCIATES_PLACEMENT", (ASSOC,)),
+               "Profit before tax": ("ASSOCIATES_PLACEMENT", (ASSOC,))},
+    "OLAELEC": {"Sales": ("UNEXPLAINED", Decimal("1")), "Expenses": ("UNEXPLAINED", Decimal("1"))},  # Rs-crore filer
 }  # fmt: skip
 
 WAVE2_PARSERS = {
@@ -746,7 +880,13 @@ def test_second_wave_exports_match_or_documented_divergence(name):
             assert abs(gap - ref) <= TOL, (name, row, gap, ref)
         else:
             assert any(d.startswith(code) for d in st.divergences), (name, code, st.divergences)
-            expected = sum((facts.get(e, Decimal(0)) for e in ref), Decimal(0)) / CR
+            expected = (
+                sum(
+                    (-facts.get(e[1:], Decimal(0)) if e.startswith("-") else facts.get(e, Decimal(0)) for e in ref),
+                    Decimal(0),
+                )
+                / CR
+            )
             assert abs(gap - expected) <= TOL, (name, row, gap, expected)
 
 

@@ -142,12 +142,22 @@ output); `tests/test_index_backfill.py::test_derived_text_matches_pdf` regenerat
 | `xbrl/INTEGRATED_FILING_GI_1750334_30102026070831_WEB.xml` | S18: New India Assurance Q2 FY27 consolidated (NP residual) | `5f91d2500070f665aadb838eb6c51fe4473329422a16ab9af65a0cd31f5150fb` |
 | `xbrl/INTEGRATED_FILING_BANKING_1699401_22072026052845_WEB.xml` | S19: IndusInd Bank Q1 FY27 consolidated (Screener parity) | `f06b27fbb453b90c297854563c56cfe7eba232ed9a9f88fbf50c175481ef4030` |
 | `xbrl/INTEGRATED_FILING_INDAS_1750535_30102026093155_WEB.xml` | S19: Reliance Q2 FY27 standalone (Screener standalone view) | `9c426dd82ce4a59cb55bcb25f0f19799e1d1250a80aa6b07efd0562a3e897a27` |
+| `xbrl/INTEGRATED_FILING_INDAS_1750274_30102026064310_WEB.xml` | X67: Delhivery Q2 FY27 consolidated (owners tagged as TCI, 2nd observation) | `8c235397849928abe102bdd483362fea7f5c4b96d84b007bfe82d06a3541cc34` |
+| `xbrl/INTEGRATED_FILING_INDAS_1752762_04112026053637_WEB.xml` | S20: Nykaa (FSN) Q2 FY27 consolidated | `4fe1d98c814a9d04c9c929041c256cfa7b28f246f481ff35aa2fc9279a112373` |
+| `xbrl/INTEGRATED_FILING_INDAS_1747783_28102026044327_WEB.xml` | S20: Info Edge Q2 FY27 consolidated | `ab0c46ba76a34a5ea116c2e982cc920be02300ad5a4bd407ddefa2b2eb71beaf` |
+| `xbrl/INTEGRATED_FILING_INDAS_1747782_28102026044245_WEB.xml` | S20: Info Edge Q2 FY27 standalone | `0859c66044f13557a26a9b43cdcc8149732d769b90d758559209134f20649d96` |
+| `xbrl/INTEGRATED_FILING_INDAS_1756932_12112026075230_WEB.xml` | X67: Ola Electric Q2 FY27 consolidated (owners sign flip: quarantined) | `1f1860ffdb293db57aa9b172d74eedb752920817b2bd3a440993f61d0a323b66` |
+| `xbrl/INTEGRATED_FILING_INDAS_1746348_26102026105317_WEB.xml` | X68: Paytm (One 97) Q2 FY27 consolidated (ESOP, contract liabilities, marketing) | `28a86c6dd1a88f4b53945b08b7ccdbb9065c599362b31f90503feb0346369775` |
+| `xbrl/INTEGRATED_FILING_INDAS_1750589_30102026112529_WEB.xml` | S20: PB Fintech Q2 FY27 consolidated | `323ac0869089a8306d94eae266294af5cbaff249394b96974237305f4f279cf4` |
+| `xbrl/INTEGRATED_FILING_INDAS_1744176_22102026064114_WEB.xml` | S20: Swiggy Q2 FY27 consolidated | `746a497cc2fe310fbe9055d0c0af865837487a95c918a14b91279f76b564f5b3` |
+| `xbrl/INTEGRATED_FILING_INDAS_1747309_27102026112939_WEB.xml` | X68: IndiaMART Q2 FY27 consolidated (contract liabilities) | `7207e7cc4e93a69e34a7ab33d21bf728022a19ad67a5ebfa30102c7c13f0b0c1` |
+| `xbrl/INTEGRATED_FILING_LI_1736933_13102026040430_WEB.xml` | X66: ICICI Prudential Life (ICICILIFE) Q2 FY27 standalone | `9a072928dc9d4c0167e0c8d4428216b35a9d429382face5ed7bc64065d67fcda` |
 
-Source URL pattern for all thirty-nine: `https://nsearchives.nseindia.com/corporate/xbrl/<file>`.
+Source URL pattern for all forty-nine: `https://nsearchives.nseindia.com/corporate/xbrl/<file>`.
 
 ## Screener goldens (local only, not committed)
 
-The repository is public, so the user-supplied Screener Excel exports (2026-11-13; 34 distinct files, some uploaded twice)
+The repository is public, so the user-supplied Screener Excel exports (2026-11-13; 42 distinct files, some uploaded twice)
 and their extracted Data Sheets are **not** committed. Re-create them with
 `python scripts/extract_screener_golden.py EXPORT.xlsx ... --out data/screener_golden` (`data/` is gitignored). The
 parity harness carries only the specific figures it asserts. Hashes:
@@ -160,9 +170,11 @@ parity harness carries only the specific figures it asserts. Hashes:
 | `900eda586df60fedc895b3336081a597a387673a479f499dd28dea06be986ce6` | `31d7c70760658e97553e83273f288389180ed56ef32c783694cd61524bc6605e` | `Bajaj_Finance_2.json` |
 | `3298a53759b988a442fc3f876f215e592b55ce66484fbd7817ebb0d9141c19ac` | `4503c96403ee248da64372739b9078c6db41346b72bbc618650dfccab6f3fe69` | `Cholaman_Inv_Fn.json` |
 | `2a8181ec598b0f113d96f6ce911b14ce98a4ec9c787d85ce817f7ba8bbc7392a` | `687d82317b0ac359ecfc7f4b1d39d172d0e9d4c1684ac6156d7f87d2edb973f5` | `Cummins_India.json` |
+| `8759231e253cdd15b056e3d4d0ce91eedc07acbc491845e554daa17d3b62f409` | `649ecb2dda5cd142c6f2a41529507b4c7c1e7d430fb87857068a3fb6e900b4b9` | `Delhivery.json` |
 | `08a48ee253914da355241b8022a7cc8db98a3725f4339575862421d1dc19182b` | `b5c833ba3a63f737a14a867c930b6985604de88e07db53456116ae05f4ec3d2e` | `Elin_Electronics.json` |
 | `dfecc6734e311f2304969d516169e203be11d83b70358774478ce8627189a40f` | `9e93caa38f3ff3133059544bfde31374cb882048cbf7216d48878549a6fecdb8` | `Elin_Electronics_1.json` |
 | `a3987966d0824c6b96439e0daefe75d114d9947fd12750082268763d8824bc21` | `97c07878e56b14d32d210016c30892684196c5aa949c397b64ec1184dafbf839` | `Eternal.json` |
+| `36f05105f05d15a994dde21de2595fbde778dffecbe5d322c69032ee209c4a05` | `060bb987c7e50325e58bf0eac36bcefb8136f98aca3138d46692b804e3821ef1` | `FSN_E_Commerce.json` |
 | `e047fb373a15866a2e5541228275c2142c5f2c42046d7094fe953f1ec49f8230` | `2e36ebf3a8eabefd54f3852240e09a0972cbf26d36ad02960f8a9dcc39026597` | `HDFC_Bank_1.json` |
 | `6a08a43037234a7db10ac8b9ab50d6b8d44b1e63b3cdeb711f09bfcf0e9389d2` | `dd165ddb04cbff08569dba0ae32979dc202928cbff0b9da082c959d2d7b0e1fe` | `HDFC_Bank_2.json` |
 | `67d37e45fa0c5daf478f4a868ac7055df8303e0d1906bd9c79eae458f1c8a829` | `e2737a83e14713ac99ffef3e08d6ce56e7aaa015ba4ebfad6bc65c1e63e7cf12` | `HDFC_Life_Insur.json` |
@@ -170,11 +182,16 @@ parity harness carries only the specific figures it asserts. Hashes:
 | `99ef74f02f51cc2c40218d824b9dfc6a668e836e931364a70b4a46a4a0d8ca79` | `bac1d0d7702d34e1d6af37f3ef181a0c60f29defb802c9304dfefdebfb596bc5` | `ITC_1_1.json` |
 | `bdb7a4bd9da67e0769765a989cac0f3eb5f66fb23af5b3dbcea0302a938ef765` | `4106892d90dec9f5dfb4d9259e5f3a7016a4c0882e50b4deadd79adcbfc311db` | `ITC_1_2.json` |
 | `ccc560c4c6ef4c89058d68bf9ec5807c566ece52135da84910ce6a1e574eb0cd` | `23d62376ced6348ccae63f94554ceefbe0126a250d4692ba7b0846c42b21a240` | `IndusInd_Bank.json` |
+| `18a155ba09b5dd20185bcc47d71300833c3c05d72a73d784f6ec023be2a1c3a6` | `1f86d7871bfecd18dcf5820246268d5212523838d39e0582214c766d3bc2ec87` | `Info_Edg_India.json` |
+| `dfba6e2d4527547106e98ecedff158a2d1300ef0e6c9eb3e74c980992b1fb94f` | `e2cc08fe3c88ffe9aae4640ed613ffb4a798894508a46c811bc1cb872cdd9962` | `Info_Edg_India_1.json` |
 | `37dc13b4ed610031f85cdb37b4afa08fc21419711398dd4f3738b214a0d1ba88` | `3b54aa578c4bb80a0881aea183757aa27579854847232ca14294213661c9078a` | `Kotak_Mah__Bank.json` |
 | `35f025cd7524d03d72a9113b2e6d1b7134c58062dda378c3053862cdcb5aa717` | `a9441cc6a4d30c73e932b8fd5eec7317e32ddb6fa3692cb04d08697c3da2ec23` | `Kotak_Mah__Bank_1.json` |
 | `dc230881529f462543d22a69e63d8ca96c4cdf869619574d21c80ddac7da9f41` | `a4e98bbb5ce78a618b3b0740bc84dfed189b4ea52ea894bee1a392c88b621787` | `Muthoot_Finance.json` |
 | `01292620bb31f9fe63b28ae30f57c0954fd833a5513aec7a43d49470c8c4d8ab` | `23a5512c3ad0404c788f9d7d55017a1d6f20fd1064cae8b7d2b756b1f1638d8e` | `New_India_Assura.json` |
 | `6b235aec6651b9f1b3208217f784960d955a1b68eff0c4d00ffade0bf32ceef1` | `defd3abc95d50d7f01cad8302fe7168096ca26657503657c1a40d2249c03668d` | `New_India_Assura_1.json` |
+| `5e8025a618bcdad60a7bb829c8227b0d08478c1700062b2bd5258b36e71bbc08` | `e95504cfed6c9007dc8d90c87a63e696b0fe630c52e15f9b5a3b9e3dd25957e5` | `Ola_Electric.json` |
+| `8641011769db531a16d94a7b51547ea5f4d4b90625f0336e5a78a0a210621c9d` | `8af1accce08dd5fe3ad88214fcdf7be541922fff1f649c7aaa3b0162dc0b2a9b` | `One_97.json` |
+| `a0b649d4675b4f3dbaea0ec64bb5f75867a485ea4712e73f16b8c8d767888c2d` | `2142392ce779f91fe420b6116dc4f8c329641e325c88601829160dcaed85f947` | `PB_Fintech.json` |
 | `996005ef6d9dcd5603fd94a523cd9e4d8bc4d32dd6738684533967e76b8949da` | `5606d224261d1493bc455ef667bb13572d59607531d46b8964a878d44ccefa8c` | `PNB_Housing.json` |
 | `7918de5163a0e99a0ed0b389e25c2eb25563554c0894a853076241424b53b9f6` | `894b0084b5d271d88af22fe2b0dc995d9287ddb3aeff5a69a56382945f5373c6` | `Punjab_Natl_Bank.json` |
 | `1a99912e5271dd687b6f26e7eee7614cb4ea9a6a412098d0e4a34fcd9dd93d9f` | `d57ef167c9f2b491ab70fef2b00f67c94b0ecfaa5dbf6994796fab19f89ae115` | `Punjab_Natl_Bank_1.json` |
@@ -183,6 +200,7 @@ parity harness carries only the specific figures it asserts. Hashes:
 | `73a0e2fb27c3c52871219fa33d0299bc7c11b766a4047a3a6a6bc06c5c6b27fe` | `a5e4ac05f7e7a86a77043c5a608503f48e9ea7a69fcc5b0a711d7b531685fafe` | `SBI_Life_Insuran.json` |
 | `216a5c26c25dfa28b5a269a03171203414b20e0d4f7d2db5b27b1f24a265f978` | `cf70b14a9e92eca42ae0446e7da35a95e95a05e202b8b4b071486051a98b0321` | `SRF.json` |
 | `75e82a7bb887382e94d44dcb9609fce829b17da55680f7d7adae6861d151eeeb` | `5efd6240d6d4d9e8128be1bf03634d67a0043f239bc1a9e0c8738c1bc3407dd3` | `Star_Health_Insu.json` |
+| `80402f62f0989fe5cdfb2396b09c8a29a66b2a28f342f826acc2aa9ebb0d4593` | `f86e49194ad782a2f9dc35aadc05795e1fda9988aba78c91db8a4626ea6f40eb` | `Swiggy.json` |
 | `1ecda3744f11079c2fad5b00f458efc576da42a1f7a2c3259e133d5715cc686b` | `bdd7e4b2d370ef6f1183dee5c3ddb397ed3b5ee405824ee47ef5e90adc4b7dc3` | `TCS_1_1.json` |
 | `c4bac255a4bda4f329da9006503be15d9108da123a3a8a9457e3a99fad20446c` | `785856a89daffa802ef36c08371c58f479a0267d06872cc92a5f87b78b0685d0` | `Tata_Motors_1.json` |
 | `14163f4d412e18c51d3f45cf169701effd596f7da62dbb7f6df4e06ef086ed05` | `0d5f39c0d92834c4c5f37ed2f9e476fe1b676d289ba198b8b5dd8f482de02b45` | `Tata_Motors_PVeh_1.json` |

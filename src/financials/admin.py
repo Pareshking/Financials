@@ -331,3 +331,32 @@ def _set_scope(con, entity_id: str, quarterly: str | None, annual: str | None, r
         "created_at": now,
     }])  # fmt: skip
     return {"entity_id": entity_id, "scope_policy": value}
+
+
+ARCHETYPE_VALUES = ("INDUSTRIAL_SERVICES", "FINANCIAL_LENDING", "INSURANCE", "NEW_GEN_TECH")
+
+
+def set_archetype_override(con, entity_id: str, *, archetype: str | None, reason: str) -> dict:
+    """Pin (or clear with archetype=None) a company's valuation archetype (C21); audited in company_overrides."""
+    if not reason.strip():
+        raise AdminError("a reason is required")
+    if archetype is not None and archetype not in ARCHETYPE_VALUES:
+        raise AdminError(f"archetype must be one of {ARCHETYPE_VALUES}")
+    return _transaction(con, _set_archetype, entity_id, archetype, reason.strip())
+
+
+def _set_archetype(con, entity_id: str, archetype: str | None, reason: str) -> dict:
+    if con.execute("SELECT 1 FROM entity_master WHERE entity_id = ?", [entity_id]).fetchone() is None:
+        raise AdminError(f"unknown entity {entity_id}")
+    now = utc_now()
+    con.execute("DELETE FROM entity_archetype_override WHERE entity_id = ?", [entity_id])
+    if archetype:
+        insert_rows(con, "entity_archetype_override", [{"entity_id": entity_id, "valuation_archetype": archetype,
+                                                        "reason": reason, "recorded_at": now}])  # fmt: skip
+    body = archetype or "CLEARED"
+    insert_rows(con, "company_overrides", [{
+        "override_id": stable_id("ovr", entity_id, "valuation_archetype", body, now), "entity_id": entity_id,
+        "field": "valuation_archetype", "value": body, "valid_from": now.date(), "valid_to": None, "reason": reason,
+        "created_at": now,
+    }])  # fmt: skip
+    return {"entity_id": entity_id, "valuation_archetype": body}

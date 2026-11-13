@@ -117,6 +117,11 @@ def build_parser() -> argparse.ArgumentParser:
     so.add_argument("--annual", choices=("CONSOLIDATED", "STANDALONE"))
     so.add_argument("--clear", action="store_true")
     so.add_argument("--reason", required=True)
+    ao = sub.add_parser("archetype-override", help="pin (or --clear) a company's valuation archetype (audited)")
+    ao.add_argument("--entity", required=True)
+    ao.add_argument("--archetype", choices=("INDUSTRIAL_SERVICES", "FINANCIAL_LENDING", "INSURANCE", "NEW_GEN_TECH"))
+    ao.add_argument("--clear", action="store_true")
+    ao.add_argument("--reason", required=True)
     sc = sub.add_parser("screen")
     sc.add_argument("query")
     sc.add_argument("--as-of", type=_date)
@@ -207,6 +212,18 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
             try:
                 print(json.dumps(set_scope_override(con, args.entity, quarterly=q, annual=an, reason=args.reason)),
                       file=out)  # fmt: skip
+            except AdminError as exc:
+                print(f"error: {exc}", file=out)
+                return 2
+            return 0
+        if args.cmd == "archetype-override":
+            from financials.admin import AdminError, set_archetype_override
+
+            try:
+                result = set_archetype_override(
+                    con, args.entity, archetype=None if args.clear else args.archetype, reason=args.reason
+                )
+                print(json.dumps(result), file=out)
             except AdminError as exc:
                 print(f"error: {exc}", file=out)
                 return 2

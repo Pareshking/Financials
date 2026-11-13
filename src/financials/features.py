@@ -21,10 +21,12 @@ from decimal import Decimal
 from financials.corp_actions import ACCEPTED_STATUSES
 from financials.db import insert_rows, table_columns
 from financials.fundamentals import (
+    NBFC_COLUMNS,
     altman_z_double_prime,
     building_blocks,
     choose_scope,
     load_factbook,
+    nbfc_blocks,
     safe_div,
     yoy_growth,
 )
@@ -204,7 +206,7 @@ def compute_rows(con, as_of: date, exchange: str = "NSE") -> list[dict]:
         mcap = close * shares if close is not None and shares is not None else None
         ev = (
             mcap + fund["_net_debt"] + (fund["_minority"] or 0)
-            if mcap is not None and fund["_net_debt"] is not None
+            if mcap is not None and fund["_net_debt"] is not None and not fund.get("_lender")
             else None
         )
         row.update({
@@ -212,6 +214,8 @@ def compute_rows(con, as_of: date, exchange: str = "NSE") -> list[dict]:
             "market_cap": None if mcap is None else mcap.quantize(Decimal("0.01")),
             "enterprise_value": None if ev is None else ev.quantize(Decimal("0.01")),
             "pe": _f(safe_div(mcap, fund["_pe_earnings"])),
+            "eps_ttm": _eps(fund["_pat_owners_total"], shares),
+            "eps_continuing_ttm": _eps(fund["_pe_earnings"], shares),
             "pb": _f(safe_div(mcap, fund["_equity_owners"])),
             "ev_ebitda": _f(safe_div(ev, fund["ebitda_ttm"])),
             "fcff_yield": _f(safe_div(fund["_fcff"], ev)),
@@ -233,8 +237,18 @@ _EMPTY_FUNDAMENTALS: dict = {
     "roce": None, "roic": None, "croic": None, "debt_to_equity": None, "other_income_to_pbt": None,
     "altman_z_dd": None, "scope_used": None, "fundamentals_end": None, "bs_as_of": None, "cf_as_of": None,
     "_net_debt": None, "_fcff": None, "_pat_owners": None, "_pe_earnings": None, "_equity_owners": None,
-    "_minority": None,
+    "_minority": None, "roe_continuing": None, "core_profit_ttm": None, "_pat_owners_total": None,
+    **dict.fromkeys(NBFC_COLUMNS),
 }  # fmt: skip
+
+# Industrial ratios that do not apply to lenders (architecture §10): NULL for INDAS_NBFC books.
+_NOT_FOR_LENDERS = ("ebitda_ttm", "opm", "roce", "roic", "croic", "debt_to_equity", "altman_z_dd", "fcf_ttm")
+
+
+def _eps(profit: Decimal | None, shares: Decimal | None) -> Decimal | None:
+    if profit is None or not shares:
+        return None
+    return (profit / shares).quantize(Decimal("0.0001"))
 
 
 def _fundamentals(con, entity_id: str, as_of_ts: datetime, end: date) -> dict:
@@ -253,7 +267,7 @@ def _fundamentals(con, entity_id: str, as_of_ts: datetime, end: date) -> dict:
     b = building_blocks(book, end)
     eq, debt = b["total_equity"], b["total_debt"]
     capital = eq + debt if eq is not None and debt is not None else None
-    return {
+    return _lender_columns(book, end) | {
         "sales_ttm": b["rev_ops"], "ebitda_ttm": b["ebitda"], "pat_ttm": b["pat"], "fcf_ttm": b["fcf"],
         "net_debt": b["net_debt"], "total_equity": eq,
         "opm": _f(safe_div(b["ebitda"], b["rev_ops"])),
@@ -268,9 +282,27 @@ def _fundamentals(con, entity_id: str, as_of_ts: datetime, end: date) -> dict:
         "altman_z_dd": _f(altman_z_double_prime(b)),
         "scope_used": scope, "fundamentals_end": end, "bs_as_of": b["bs_as_of"], "cf_as_of": b["cf_as_of"],
         "_net_debt": b["net_debt"], "_fcff": b["fcff"], "_pat_owners": b["pat_owners"],
-        "_pe_earnings": b["pat_owners_continuing"],
+        "_pe_earnings": b["pat_owners_continuing"], "_pat_owners_total": b["pat_owners"],
+        "roe_continuing": _f(safe_div(b["pat_owners_continuing"], b["equity_owners"])),
+        "core_profit_ttm": b["core_continuing_profit"],
         "_equity_owners": b["equity_owners"], "_minority": b["minority_interest"],
-    }  # fmt: skip
+    } | _lender_overrides(book, end)  # fmt: skip
+
+
+_AMOUNTS = ("nii_ttm", "ppop_ttm", "loans")
+
+
+def _lender_columns(book, end: date) -> dict:
+    """NBFC lending columns (all NULL for non-NBFC books)."""
+    nb = nbfc_blocks(book, end)
+    return {k: (_f(v) if isinstance(v, Decimal) and k not in _AMOUNTS else v) for k, v in nb.items()}
+
+
+def _lender_overrides(book, end: date) -> dict:
+    """Industrial ratios are NULL for NBFC books; `_lender` also suppresses EV in compute_rows."""
+    if "interest_earned" not in book.durations:
+        return {}
+    return {**dict.fromkeys(_NOT_FOR_LENDERS), "_lender": True}
 
 
 def _null_rates(rows: list[dict]) -> dict[str, float]:

@@ -128,8 +128,11 @@ output); `tests/test_index_backfill.py::test_derived_text_matches_pdf` regenerat
 | `xbrl/INTEGRATED_FILING_INDAS_1751861_03112026045154_WEB.xml` | B3: AIA Engineering Q2 FY27 consolidated (power & fuel, freight labels) (X50) | `fbaf195682b0c97792869addd546571f29436b4f9280662eb677d644ad543069` |
 | `xbrl/INTEGRATED_FILING_INDAS_1574923_14112025041850_WEB.xml` | X52: TMPV Q2 FY26 consolidated (demerger scheme gain tagged discontinued) | `0b15b25ebbd5de3e662d5305b9890f931dd6c5b7a951717eb8f88fc43d401d32` |
 | `xbrl/INTEGRATED_FILING_INDAS_1574016_13112025070452_WEB.xml` | X52/C12: Tata Motors Ltd (CV) Q2 FY26 consolidated, first filing after listing | `c2d5beb1a142ec1769eef2189af5d86ddd6e7b4738863bab30f1fe15ef516c7c` |
+| `xbrl/INTEGRATED_FILING_NBFC_INDAS_1750814_31102026080404_WEB.xml` | B4: Muthoot Finance Q2 FY27 consolidated (gold-loan NBFC; leases labelled) (X54, X57) | `c59af915c0c3fc83eb57a7859332daae9d39b2628c2562491240fcb0a49ca8e2` |
+| `xbrl/INTEGRATED_FILING_NBFC_INDAS_1748226_28102026075925_WEB.xml` | B4: PNB Housing Finance Q2 FY27 consolidated (HFC; deposits; impairment write-back; zero-attribution 2nd observation) (X55, X56) | `93df5e99ffadd01d618de9409d92e868ff11a800a9cf65a3dd2daa5692c5066b` |
+| `xbrl/INTEGRATED_FILING_NBFC_INDAS_1748395_28102026112856_WEB.xml` | B4: Cholamandalam Q2 FY27 consolidated (owners profit tagged as TCI: quarantined) (X56) | `5c89348137ac6f3fa16d8b7fa3b2097f9b5954047f399810680479038c262493` |
 
-Source URL pattern for all twenty-five: `https://nsearchives.nseindia.com/corporate/xbrl/<file>`.
+Source URL pattern for all twenty-eight: `https://nsearchives.nseindia.com/corporate/xbrl/<file>`.
 
 ## Screener goldens (local only, not committed)
 

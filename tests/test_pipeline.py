@@ -8,7 +8,7 @@ from decimal import Decimal
 import pytest
 from conftest import FETCHED_AT, bhav_bytes, bhav_url
 
-from _fixture_helpers import CORP, NBFC
+from _fixture_helpers import BANK, CORP, NBFC
 from financials.corp_actions import CorpAction
 from financials.promoter import adjusted_closes, pit_fact, promote, record_corp_action, verify_pending_actions
 from financials.staging import stage_market_day, stage_results_xbrl
@@ -236,14 +236,35 @@ def test_results_filing_for_unknown_issuer_is_quarantined(market):
 
 
 def test_unimplemented_profile_is_quarantined_with_raw_kept(market):
+    """Banks are not implemented yet (Batch 5). Until Batch 4 this test used the NBFC fixture."""
+    stage = stage_results_xbrl(
+        market.vault,
+        market.stage_root,
+        data=BANK.read_bytes(),
+        source_url=XBRL_URL + BANK.name,
+        fetched_at=FETCHED_AT,
+    )
+    result = promote(market.con, stage)
+    assert result.status == "QUARANTINED"
+    assert market.con.execute("SELECT reason_code FROM quarantine_queue").fetchall() == [("PROFILE_NOT_IMPLEMENTED",)]
+    assert count(market, "SELECT count(*) FROM raw_xbrl_facts") == 117  # bank fixture, all raw facts kept
+
+
+def test_nbfc_filing_is_parsed_then_stops_at_the_identity_gate(market):
+    """Batch 4: INDAS_NBFC is implemented; the routing test above moved to the (still unimplemented) bank profile."""
     stage = stage_results_xbrl(
         market.vault,
         market.stage_root,
         data=NBFC.read_bytes(),
         source_url=XBRL_URL + NBFC.name,
         fetched_at=FETCHED_AT,
+        broadcast_ts=datetime(2026, 11, 13, 8),
+        broadcast_ts_source="RSS_PUBDATE",
     )
     result = promote(market.con, stage)
+    # Parsing now succeeds; the filing then stops at the next gate (issuer not in this test's security master).
     assert result.status == "QUARANTINED"
-    assert market.con.execute("SELECT reason_code FROM quarantine_queue").fetchall() == [("PROFILE_NOT_IMPLEMENTED",)]
+    assert market.con.execute("SELECT stage, reason_code FROM quarantine_queue").fetchall() == [
+        ("IDENTITY", "UNKNOWN_ISIN")
+    ]
     assert count(market, "SELECT count(*) FROM raw_xbrl_facts") == 359

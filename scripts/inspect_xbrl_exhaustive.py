@@ -22,10 +22,21 @@ from pathlib import Path
 
 import yaml
 
-from financials.parsers.indas_corp import DURATION_TAGS, INSTANT_TAGS, detect_profile, parse_indas_corp_results
+from financials.parsers.indas_corp import DURATION_TAGS, IMPLEMENTED_PROFILES, INSTANT_TAGS, detect_profile
+from financials.parsers.indas_nbfc import NBFC_DURATION_TAGS, NBFC_INSTANT_TAGS
+from financials.parsers.integrated import parse_integrated_results
 from financials.parsers.xbrl import parse_instance
 
-MAPPED = {**{k: v[0] for k, v in DURATION_TAGS.items()}, **{k: v[0] for k, v in INSTANT_TAGS.items()}}
+
+def _mapped(duration: dict, instant: dict) -> dict[str, str]:
+    return {**{k: v[0] for k, v in duration.items()}, **{k: v[0] for k, v in instant.items()}}
+
+
+MAPPED_BY_PROFILE = {
+    "INDAS_CORP": _mapped(DURATION_TAGS, INSTANT_TAGS),
+    "INDAS_NBFC": _mapped(NBFC_DURATION_TAGS, NBFC_INSTANT_TAGS),
+}
+MAPPED = MAPPED_BY_PROFILE["INDAS_CORP"]
 
 
 def ctx_kind(c) -> str:
@@ -78,8 +89,9 @@ def inspect(path: Path, dump_dir: Path | None) -> dict:
             others.append({"axis": dims[0][0].split(":")[-1], "member": dims[0][1], "labels": sorted(set(labels)),
                            "amounts": amounts})  # fmt: skip
 
-    parsed = parse_indas_corp_results(data) if profile == "INDAS_CORP" else None
-    unmapped = sorted(n for n, e in elements.items() if e["numeric"] and n not in MAPPED)
+    parsed = parse_integrated_results(data) if profile in IMPLEMENTED_PROFILES else None
+    mapped = MAPPED_BY_PROFILE.get(profile, {})
+    unmapped = sorted(n for n, e in elements.items() if e["numeric"] and n not in mapped)
     return {
         "file": path.name,
         "profile": profile,
@@ -108,16 +120,16 @@ def merge_registry(registry_path: Path, reports: list[dict], batch: str) -> dict
         prof = profiles.setdefault(r["profile"], {})
         for name, e in r["_elements"].items():
             entry = prof.setdefault(name, {"filings": 0, "context_kinds": [], "numeric": e["numeric"],
-                                           "mapped_to": MAPPED.get(name), "seen_negative": False,
+                                           "mapped_to": None, "seen_negative": False,
                                            "first_batch": batch})  # fmt: skip
             entry["filings"] += 1
             entry["context_kinds"] = sorted(set(entry["context_kinds"]) | e["kinds"])
             entry["seen_negative"] = entry["seen_negative"] or e["negative"]
-            entry["mapped_to"] = MAPPED.get(name)
     # mapped_to always reflects the current parser, including for elements first seen in earlier batches
-    for entries in profiles.values():
+    for profile, entries in profiles.items():
+        mapped = MAPPED_BY_PROFILE.get(profile, {})
         for name, entry in entries.items():
-            entry["mapped_to"] = MAPPED.get(name)
+            entry["mapped_to"] = mapped.get(name)
     reg["files"] = sorted(seen_files)
     registry_path.write_text(
         "# Every XBRL element seen in non-dimensional contexts, per profile. Generated and merged by\n"

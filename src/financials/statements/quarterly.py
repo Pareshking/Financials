@@ -110,8 +110,9 @@ def corp_quarter(result, start: date, end: date) -> QuarterStatement:
             "Non-controlling interests": None if v("pat_nci") is None else -v("pat_nci"),
         },
     )
-    rows["EPS"] = Row("EPS", v("eps_basic"))
+    rows["EPS"] = eps_row(result, start, end)
     st = QuarterStatement("INDAS_CORP", (start, end), rows)
+    _eps_divergence(st, result)
     assoc = v("share_of_associates_jv")
     if assoc:
         st.divergences.append(
@@ -173,29 +174,94 @@ def bank_quarter(facts: dict[str, Decimal]) -> QuarterStatement:
     return st
 
 
-def _owners_or_total(facts: dict[str, Decimal]) -> str:
-    owners = "ProfitOrLossAttributableToOwnersOfParent"
-    return owners if owners in facts else "ProfitLossForPeriod"
+def nbfc_quarter(result, start: date, end: date) -> QuarterStatement:
+    """INDAS_NBFC rows from the Division III parser (canonical tags) [S5, X55]. Screener-compatible top rows plus
+    lender rows: NII, PPOP and credit cost (impairment on financial instruments)."""
 
+    def v(tag: str) -> Decimal | None:
+        return result.value(tag, start, end)
 
-def nbfc_quarter(facts: dict[str, Decimal]) -> QuarterStatement:
-    """IntegratedFinance_NBFC [S5]: same shape as INDAS_CORP, revenue = RevenueFromOperations."""
+    def z(tag: str) -> Decimal:
+        return v(tag) or ZERO
+
+    exp, fin, dep = v("total_expenses"), z("finance_costs"), z("depreciation_amortisation")
+    oi = {"Other income (reported)": v("other_income"), "Exceptional items": v("exceptional_items")}
+    rev_parts = {
+        "Interest earned": v("interest_earned"), "Fees and commission": v("fee_commission_income"),
+        "Net gain on fair value changes": v("net_gain_fair_value"), "Dividend": v("dividend_income"),
+        "Rental": v("rental_income"), "Gain on derecognition": v("net_gain_derecognition"),
+        "Sale of products": v("sale_of_products"), "Sale of services": v("sale_of_services"),
+        "Other operating revenue": v("other_operating_revenue"),
+    }  # fmt: skip
+    opex_parts = {
+        "Fees and commission expense": v("fee_commission_expense"),
+        "Net loss on fair value changes": v("net_loss_fair_value"),
+        "Loss on derecognition": v("net_loss_derecognition"),
+        "Impairment on financial instruments": v("impairment_financial_instruments"),
+        "Employee cost": v("employee_benefit_expense"),
+        "Materials / inventory": _sum({"m": v("cost_of_materials_consumed"), "p": v("purchases_of_stock_in_trade"),
+                                       "c": v("changes_in_inventories")}),
+        "Other expenses": v("other_expenses"),
+    }  # fmt: skip
+    interest, rev, other = v("interest_earned"), v("revenue_from_operations"), z("other_income")
+    imp = z("impairment_financial_instruments")
+    nii = None if interest is None else interest - fin
+    opex = None if exp is None else exp - fin - imp
+    ppop = None if None in (rev, opex) else rev + other - fin - opex
+    pat = v("pat")
     rows = {
-        "Revenue": _row("Revenue", facts, ("RevenueFromOperations",)),
-        "Interest": _row("Interest", facts, ("FinanceCosts",)),
-        "Expenses": _row(
-            "Expenses", facts, ("Expenses",), ("FinanceCosts", "DepreciationDepletionAndAmortisationExpense")
-        ),
-        "Other Income": _row("Other Income", facts, ("OtherIncome", "ExceptionalItemsBeforeTax")),
-        "Depreciation": _row("Depreciation", facts, ("DepreciationDepletionAndAmortisationExpense",)),
-        "Profit before tax": _row("Profit before tax", facts, ("ProfitBeforeTax",)),
-        "Tax": _row("Tax", facts, ("TaxExpense",)),
-        "Net Profit": _row("Net Profit", facts, (_owners_or_total(facts),)),
-    }
-    st = QuarterStatement("INDAS_NBFC", (None, None), rows)
-    if facts.get("ShareOfProfitLossOfAssociatesAndJointVenturesAccountedForUsingEquityMethod"):
-        st.divergences.append("ASSOCIATES_PLACEMENT [S3]")
+        "Revenue": Row("Revenue", rev, rev_parts),
+        "Interest": Row("Interest", v("finance_costs")),
+        "Expenses": Row("Expenses", None if exp is None else exp - fin - dep, opex_parts),
+        "Other Income": Row("Other Income", _sum(oi), oi),
+        "Depreciation": Row("Depreciation", v("depreciation_amortisation")),
+        "Profit before tax": Row("Profit before tax", v("pbt")),
+        "Tax": Row("Tax", v("tax_expense"), {"Current": v("current_tax"), "Deferred": v("deferred_tax")}),
+        "Net Profit": Row("Net Profit", v("pat_owners") if v("pat_owners") is not None else pat,
+                          {"Profit for the period": pat, "Share of associates / JVs": v("share_of_associates_jv"),
+                           "Non-controlling interests": None if v("pat_nci") is None else -v("pat_nci")}),
+        "NII": Row("NII", nii, {"Interest earned": interest, "Less: finance costs": -fin}),
+        "PPOP": Row("PPOP", ppop, {"Net total income": None if rev is None else rev + other - fin,
+                                   "Less: operating expenses": None if opex is None else -opex}),
+        "Credit cost": Row("Credit cost", v("impairment_financial_instruments")),
+        "EPS": eps_row(result, start, end),
+    }  # fmt: skip
+    st = QuarterStatement("INDAS_NBFC", (start, end), rows)
+    if v("share_of_associates_jv"):
+        st.divergences.append(
+            "ASSOCIATES_PLACEMENT: share of associates/JVs is after PBT here; Screener adds it to Other Income "
+            "and PBT [S3]"
+        )
+    _eps_divergence(st, result)
     return st
+
+
+def eps_row(result, start: date, end: date) -> Row:
+    """Effective EPS [X53, C15]: COALESCE(NULLIF(filed, 0), owners' profit / period-end shares). Filed values are
+    kept as sub-rows; period-end shares (paid-up / face value) differ from weighted-average shares, so the computed
+    value is an approximation used only when the filing has no usable EPS."""
+
+    def v(tag: str) -> Decimal | None:
+        return result.value(tag, start, end)
+
+    shares = result.value("shares_from_paid_up", end, end)
+    owners = v("pat_owners") if v("pat_owners") is not None else v("pat")
+    continuing = None if owners is None else owners - (v("pat_discontinued") or ZERO)
+    computed = None if owners is None or not shares else owners / shares
+    computed_cont = None if continuing is None or not shares else continuing / shares
+    filed, filed_cont = v("eps_basic"), v("eps_basic_continuing")
+    effective = filed if filed else computed
+    effective_cont = filed_cont if filed_cont else computed_cont
+    return Row("EPS", effective, {
+        "Filed EPS": filed, "Computed (owners' profit / period-end shares)": computed,
+        "Filed continuing EPS": filed_cont, "Continuing EPS (effective)": effective_cont,
+    })  # fmt: skip
+
+
+def _eps_divergence(st: QuarterStatement, result) -> None:
+    for w in result.meta.get("warnings", []):
+        if w["code"] == "EPS_INCONSISTENT":
+            st.divergences.append(f"EPS_INCONSISTENT: filed {w['filed']} vs computed {w['computed']} [X53]")
 
 
 def life_quarter(facts: dict[str, Decimal]) -> QuarterStatement:

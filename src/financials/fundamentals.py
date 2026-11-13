@@ -240,6 +240,9 @@ def building_blocks(book: FactBook, end: date) -> dict[str, Decimal | date | Non
         "pat_owners": t(book.coalesced("pat_owners", "pat")),
         # PE earnings: owners' profit from continuing operations (excludes Ind AS 105 / demerger gains) [C10]
         "pat_owners_continuing": t(book.continuing_owners()),
+        # Core earnings: continuing owners' profit less exceptional items net of tax (at the TTM effective rate,
+        # since the filing does not tag the tax on exceptional items) [C14]
+        "core_continuing_profit": _core(t(book.continuing_owners()), t(book.coalesced("exceptional_items", None)), etr),
         "other_income": oth,
         "pbt": pbt,
         "etr": etr,
@@ -273,6 +276,81 @@ def building_blocks(book: FactBook, end: date) -> dict[str, Decimal | date | Non
         "bs_as_of": bs_as_of,
         "cf_as_of": cf_end if cfo is not None else None,
     }
+
+
+def _core(continuing: Decimal | None, exceptional: Decimal | None, etr: Decimal) -> Decimal | None:
+    if continuing is None or exceptional is None:
+        return None
+    return continuing - exceptional * (1 - etr)
+
+
+def average_instant(book: FactBook, tag: str, end: date) -> tuple[Decimal | None, date | None, date | None]:
+    """(opening + closing) / 2 over the 12 months to `end`: needs both balance sheets, else NULL.
+    Returns (average, opening date, closing date) for provenance."""
+    closing = book.instants.get(tag, {}).get(end)
+    opening_date = _add_months(end, -12)
+    opening = book.instants.get(tag, {}).get(opening_date)
+    if closing is None or opening is None:
+        return None, None, end if closing is not None else None
+    return (opening + closing) / 2, opening_date, end
+
+
+def nbfc_blocks(book: FactBook, end: date) -> dict:
+    """Lending ratios for INDAS_NBFC books (architecture §10.5) [X55, C13]. All flows TTM; averages need the
+    balance sheet 12 months earlier. GNPA / NNPA / PCR are NULL: the NBFC taxonomy has no such elements [X54]."""
+    from financials.parsers.indas_nbfc import INTEREST_TO_REVENUE_MIN, LOANS_TO_ASSETS_MIN
+
+    empty = dict.fromkeys(NBFC_COLUMNS)
+    if "interest_earned" not in book.durations:
+        return empty
+    t = lambda tag: book.ttm(tag, end)  # noqa: E731
+    interest, fin, rev = t("interest_earned"), t("finance_costs"), t("revenue_from_operations")
+    other, exp, imp = (
+        t("other_income"),
+        t("total_expenses"),
+        t(book.coalesced("impairment_financial_instruments", None)),
+    )
+    nii = None if None in (interest, fin) else interest - fin
+    opex = None if None in (exp, fin, imp) else exp - fin - imp
+    income_net = None if None in (rev, other, fin) else rev + other - fin  # net total income
+    ppop = None if None in (income_net, opex) else income_net - opex
+    bs = book.latest_instant("total_assets", end)
+    bs_date = bs[0] if bs else None
+    loans = book.instants.get("loans", {}).get(bs_date) if bs_date else None
+    if loans is not None and bs and bs[1]:
+        lending = loans / bs[1] >= LOANS_TO_ASSETS_MIN
+    elif interest is not None and rev:
+        lending = interest / rev >= INTEREST_TO_REVENUE_MIN
+    else:
+        lending = None
+    avg_loans, loans_from, loans_to = average_instant(book, "loans", end)
+    avg_assets, _, _ = average_instant(book, "total_assets", end)
+    owners = t(book.coalesced("pat_owners", "pat"))
+    out = {
+        "is_lending_nbfc": lending,
+        "nii_ttm": nii,
+        "ppop_ttm": ppop,
+        "cost_to_income": safe_div(opex, income_net),
+        "credit_cost": safe_div(imp, avg_loans),
+        "nim_asset_proxy": safe_div(nii, avg_assets),
+        "roa": safe_div(owners, avg_assets),
+        "loans": loans,
+        "loans_as_of": loans_to,
+        "loans_avg_from": loans_from,
+        "gnpa_pct": None,
+        "nnpa_pct": None,
+        "pcr": None,
+    }
+    if lending is False:  # investment holding company: lending ratios do not apply [C13]
+        for k in ("nii_ttm", "ppop_ttm", "cost_to_income", "credit_cost", "nim_asset_proxy"):
+            out[k] = None
+    return out
+
+
+NBFC_COLUMNS = (
+    "is_lending_nbfc", "nii_ttm", "ppop_ttm", "cost_to_income", "credit_cost", "nim_asset_proxy", "roa", "loans",
+    "loans_as_of", "loans_avg_from", "gnpa_pct", "nnpa_pct", "pcr",
+)  # fmt: skip
 
 
 def quarters_available_since(end: date, quarters: int) -> bool:

@@ -334,6 +334,23 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     cf_as_of            DATE,
     shp_as_of           DATE,
     in_nifty500         BOOLEAN,
+    eps_ttm             DECIMAL(18,4),       -- TTM owners' profit / current shares [X53]
+    eps_continuing_ttm  DECIMAL(18,4),       -- TTM continuing owners' profit / current shares [C10]
+    roe_continuing      DOUBLE,              -- same denominator as roe [C14]
+    core_profit_ttm     DECIMAL(24,2),       -- continuing owners' profit less exceptional items net of tax [C14]
+    is_lending_nbfc     BOOLEAN,             -- INDAS_NBFC only [C13]; NULL for other profiles
+    nii_ttm             DECIMAL(24,2),       -- lenders: interest earned - finance costs
+    ppop_ttm            DECIMAL(24,2),       -- lenders: pre-provision operating profit
+    cost_to_income      DOUBLE,
+    credit_cost         DOUBLE,              -- TTM impairment / avg loans (opening + closing)
+    nim_asset_proxy     DOUBLE,              -- TTM NII / avg total assets
+    roa                 DOUBLE,              -- TTM owners' profit / avg total assets (lenders)
+    loans               DECIMAL(24,2),
+    loans_as_of         DATE,
+    loans_avg_from      DATE,                -- opening balance-sheet date of the average
+    gnpa_pct            DOUBLE,              -- NULL for NBFCs: no taxonomy element [X54]
+    nnpa_pct            DOUBLE,
+    pcr                 DOUBLE,
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -391,6 +408,23 @@ CREATE TABLE IF NOT EXISTS screener_features (
     cf_as_of            DATE,
     shp_as_of           DATE,
     in_nifty500         BOOLEAN,
+    eps_ttm             DECIMAL(18,4),       -- TTM owners' profit / current shares [X53]
+    eps_continuing_ttm  DECIMAL(18,4),       -- TTM continuing owners' profit / current shares [C10]
+    roe_continuing      DOUBLE,              -- same denominator as roe [C14]
+    core_profit_ttm     DECIMAL(24,2),       -- continuing owners' profit less exceptional items net of tax [C14]
+    is_lending_nbfc     BOOLEAN,             -- INDAS_NBFC only [C13]; NULL for other profiles
+    nii_ttm             DECIMAL(24,2),       -- lenders: interest earned - finance costs
+    ppop_ttm            DECIMAL(24,2),       -- lenders: pre-provision operating profit
+    cost_to_income      DOUBLE,
+    credit_cost         DOUBLE,              -- TTM impairment / avg loans (opening + closing)
+    nim_asset_proxy     DOUBLE,              -- TTM NII / avg total assets
+    roa                 DOUBLE,              -- TTM owners' profit / avg total assets (lenders)
+    loans               DECIMAL(24,2),
+    loans_as_of         DATE,
+    loans_avg_from      DATE,                -- opening balance-sheet date of the average
+    gnpa_pct            DOUBLE,              -- NULL for NBFCs: no taxonomy element [X54]
+    nnpa_pct            DOUBLE,
+    pcr                 DOUBLE,
     PRIMARY KEY (as_of_date, security_id)
 );
 

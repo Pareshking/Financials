@@ -68,6 +68,20 @@ ALIASES: dict[str, tuple[str, str]] = {
     "fii holding": ("(fii_pct * 100)", "%"),
     "dii holding": ("(dii_pct * 100)", "%"),
     "in nifty 500": ("CAST(in_nifty500 AS INTEGER)", "1/0"),
+    "eps": ("eps_ttm", "INR per share, TTM owners' profit / current shares"),
+    "eps continuing": ("eps_continuing_ttm", "INR per share, TTM, ex discontinued"),
+    "roe continuing": ("(roe_continuing * 100)", "%, ex discontinued"),
+    "core profit": ("(core_profit_ttm / 10000000)", "INR crore, TTM, ex discontinued and exceptional (net of tax)"),
+    "lending nbfc": ("CAST(is_lending_nbfc AS INTEGER)", "1/0 (NULL if not an NBFC)"),
+    "nii": ("(nii_ttm / 10000000)", "INR crore, TTM, lenders"),
+    "ppop": ("(ppop_ttm / 10000000)", "INR crore, TTM, lenders"),
+    "cost to income": ("(cost_to_income * 100)", "%, lenders"),
+    "credit cost": ("(credit_cost * 100)", "% of avg loans, TTM"),
+    "nim": ("(nim_asset_proxy * 100)", "% of avg total assets (proxy), TTM"),
+    "roa": ("(roa * 100)", "%, lenders, avg total assets"),
+    "gnpa": ("(gnpa_pct * 100)", "% (NULL for NBFCs: not in taxonomy)"),
+    "nnpa": ("(nnpa_pct * 100)", "% (NULL for NBFCs: not in taxonomy)"),
+    "pcr": ("(pcr * 100)", "% (NULL for NBFCs: not in taxonomy)"),
 }
 
 KEYWORDS = {"and", "or", "not"}

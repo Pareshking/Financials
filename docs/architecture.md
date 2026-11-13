@@ -232,6 +232,7 @@ Notation: `avg(x)` = mean of opening and closing balance; `ttm(x)` = trailing 4 
 | Contingent liabilities / net worth | annual notes | 2 |
 | RPT leak % | `(RPT purchases + loans given + royalties) / rev_ops` from RPT contexts [X19] | 2 |
 | PE | `market_cap / ttm(COALESCE(owners, PAT) − discontinued)`, per filing before TTM [C10] | 1 |
+| ROE (continuing), core profit, EPS | C14, C15: `roe_continuing`, `core_profit_ttm`, `eps_ttm`, `eps_continuing_ttm` | 1 |
 | PB, EV/EBITDA, EV/Sales, P/CFO | standard, using §8 blocks (PB on owners' equity; EV adds minority interest) | 1 |
 
 ### 10.2 Forensic (stored as separate columns, never summed)
@@ -259,19 +260,21 @@ All three are NULL for `FINANCIAL_LENDING` and `INSURANCE`; Beneish additionally
 
 ### 10.5 Lenders (`INDAS_NBFC`, `IGAAP_BANK`)
 
-| Ratio | Formula | Status |
+NBFC columns are built from the Division III parser (`parsers/indas_nbfc.py`, X54-X57). Bank rows stay as designed until Batch 5.
+Industrial ratios (EBITDA, OPM, ROCE, ROIC, CROIC, D/E, Altman, FCF, EV) are NULL for NBFC books.
+
+| Column | NBFC formula (built) | Bank (Batch 5) |
 |---|---|---|
-| NII | bank `InterestEarned − InterestExpended`; NBFC `InterestEarned − FinanceCosts` | tags VERIFIED |
-| NIM (proxy) | `annualised NII / avg(total assets)`, labelled `nim_asset_proxy` | H1/FY only |
-| PPOP | bank `OperatingProfitBeforeProvisionAndContingencies` | VERIFIED |
-| Cost / income | `OperatingExpenses / (NII + OtherIncome)` | VERIFIED tags |
-| Credit cost | `annualised ProvisionsOtherThanTaxAndContingencies / avg(advances)` | advances H1/FY only |
-| GNPA %, NNPA % | `PercentageOfGrossNpa`, `PercentageOfNpa` (fractions) | VERIFIED |
-| PCR | `(GrossNonPerformingAssets − NonPerformingAssets) / GrossNonPerformingAssets` | VERIFIED tags |
-| CET1, AT1 | tagged | VERIFIED; total CRAR UNVERIFIED |
-| RoA | tagged `ReturnOnAssets` (annualisation UNVERIFIED) or `ttm(PAT)/avg(assets)` | — |
-| P/B | `market_cap / Equity` | — |
-| CASA % | `supplemental_kpis` | not in XBRL [X23] |
+| `nii_ttm` | TTM `InterestEarned − FinanceCosts` | `InterestEarned − InterestExpended` |
+| `ppop_ttm` | TTM net total income − opex = PBEIT + impairment (X55) | `OperatingProfitBeforeProvisionAndContingencies` |
+| `cost_to_income` | opex / (revenue + other income − finance costs); opex = expenses − finance costs − impairment | `OperatingExpenses / (NII + OtherIncome)` |
+| `credit_cost` | TTM impairment / avg(loans) (opening + closing, 12 months; NULL without opening); `loans_avg_from`, `loans_as_of` | provisions / avg(advances) |
+| `nim_asset_proxy` | TTM NII / avg(total assets) | same |
+| `roa` | TTM owners' profit / avg(total assets) | same, or tagged `ReturnOnAssets` |
+| `gnpa_pct`, `nnpa_pct`, `pcr` | **NULL**: no element in the NBFC taxonomy (X54) | `PercentageOfGrossNpa`, `PercentageOfNpa`, PCR from amounts |
+| `is_lending_nbfc` | C13 | — |
+| `pb` | market cap / owners' equity | same |
+| CASA % | — | `supplemental_kpis` (not in XBRL [X23]) |
 
 ### 10.6 Insurers
 - General: claims ratio `NetClaimsIncurred / PremiumEarned`; combined ratio = claims ratio + `(NetCommission + OperatingExpensesRelatedToInsuranceBusiness) / NetPremiumWritten`; solvency (tag UNVERIFIED).

@@ -23,7 +23,7 @@ from financials.ids import stable_id
 from financials.money import to_inr
 from financials.parsers import ParseError
 from financials.parsers.delivery import parse_sec_bhavdata_full
-from financials.parsers.indas_corp import parse_indas_corp_results
+from financials.parsers.integrated import parse_integrated_results
 from financials.parsers.nse_corp_actions import parse_nse_corp_actions_json
 from financials.parsers.udiff import parse_udiff_cm
 from financials.parsers.xbrl import parse_instance
@@ -269,7 +269,7 @@ def stage_results_xbrl(
     ]
 
     try:
-        parsed = parse_indas_corp_results(data)
+        parsed = parse_integrated_results(data)
     except ParseError as exc:
         tables["stg_issues"] = [
             {

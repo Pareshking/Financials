@@ -70,6 +70,7 @@ DURATION_TAGS: dict[str, tuple[str, str]] = {
     "PaidUpValueOfEquityShareCapital": ("paid_up_equity_capital", "INR"),
     "FaceValueOfEquityShareCapital": ("face_value_per_share", "INR_PER_SHARE"),
     "BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations": ("eps_basic", "INR_PER_SHARE"),
+    "BasicEarningsLossPerShareFromContinuingOperations": ("eps_basic_continuing", "INR_PER_SHARE"),
     "DilutedEarningsLossPerShareFromContinuingAndDiscontinuedOperations": ("eps_diluted", "INR_PER_SHARE"),
     # Cash flow (H1/FY, YTD context only [X13]); outflow lines are positive magnitudes [X15].
     "CashFlowsFromUsedInOperations": ("cash_generated_from_operations", "INR"),
@@ -184,6 +185,8 @@ EXPENSE_COMPONENTS = (
 
 SCOPES = {"standalone": "STANDALONE", "consolidated": "CONSOLIDATED"}
 
+IMPLEMENTED_PROFILES = ("INDAS_CORP", "INDAS_NBFC")
+
 # Named label rules [references X39, X40]: some lines exist only as a free-text label on a dimensional
 # "Others"/detail member (Description* fact) paired with an amount in contexts with the same member.
 # Each rule fixes the axis, the amount element and an anchored label pattern; nothing is fuzzy-matched.
@@ -236,7 +239,7 @@ class ParsedResults:
 
     @property
     def ok(self) -> bool:
-        return self.profile == "INDAS_CORP" and not self.issues
+        return self.profile in IMPLEMENTED_PROFILES and not self.issues
 
     def value(self, tag: str, start: date, end: date) -> Decimal | None:
         for f in self.facts:
@@ -286,6 +289,11 @@ def _family(context_id: str) -> str | None:
 
 
 def parse_indas_corp_results(data: bytes) -> ParsedResults:
+    """Corporate (Schedule III Division II) filings only; other profiles are routed, not parsed."""
+    return parse_with_spec(data, CORP_SPEC)
+
+
+def parse_with_spec(data: bytes, spec: ProfileSpec) -> ParsedResults:
     inst = parse_instance(data)
     ns = inst.entity_namespace
     profile = detect_profile(ns)
@@ -293,17 +301,20 @@ def parse_indas_corp_results(data: bytes) -> ParsedResults:
     if profile is None:
         result.issues.append(Issue("PARSE", "UNKNOWN_TAXONOMY", {"entity_namespace": ns}))
         return result
-    if profile != "INDAS_CORP":
+    if profile != spec.profile:
         result.issues.append(Issue("PARSE", "PROFILE_NOT_IMPLEMENTED", {"profile": profile}))
         return result
 
     _parse_meta(inst, result)
     if result.issues:
         return result
-    _map_facts(inst, result)
+    _map_facts(inst, result, spec)
     if not result.issues:
-        _check_critical(result)
-        _check_identities(result)
+        _check_critical(result, spec)
+        _check_identities(result, spec)
+        _check_eps(result)
+        if spec.post_process is not None:
+            spec.post_process(result)
     return result
 
 
@@ -377,7 +388,8 @@ def _parse_meta(inst: Instance, result: ParsedResults) -> None:
     )
 
 
-def _map_facts(inst: Instance, result: ParsedResults) -> None:
+def _map_facts(inst: Instance, result: ParsedResults, spec: ProfileSpec | None = None) -> None:
+    spec = spec or CORP_SPEC
     declared = {"One": result.meta["quarter_period"], "Four": result.meta["ytd_period"]}
     period_end: date = result.meta["period_end"]
     seen: dict[tuple[str, date, date], CanonicalFact] = {}
@@ -389,14 +401,14 @@ def _map_facts(inst: Instance, result: ParsedResults) -> None:
         if ctx.dimensions:
             continue  # raw-only (RPT detail, segment, OCI breakdowns)
         if ctx.is_instant:
-            mapping = INSTANT_TAGS.get(fact.name)
+            mapping = spec.instant_tags.get(fact.name)
             if mapping is None or ctx.instant != period_end:
                 continue  # e.g. PY_I opening cash: raw-only [X2]
             start = end = ctx.instant
             months = None
             ptype = "INSTANT"
         else:
-            mapping = DURATION_TAGS.get(fact.name)
+            mapping = spec.duration_tags.get(fact.name)
             if mapping is None:
                 continue
             family = _family(ctx.id)
@@ -440,7 +452,7 @@ def _map_facts(inst: Instance, result: ParsedResults) -> None:
         seen[key] = cf
         result.facts.append(cf)
 
-    _apply_label_rules(inst, result, declared, period_end)
+    _apply_label_rules(inst, result, declared, period_end, spec.label_rules)
 
     # Derived per-filing facts.
     q_start, q_end = result.meta["quarter_period"]
@@ -510,9 +522,9 @@ def _classify(result: ParsedResults, op_tag: str, other_tag: str, other_label: s
     return "NONE"
 
 
-def _check_critical(result: ParsedResults) -> None:
+def _check_critical(result: ParsedResults, spec: ProfileSpec | None = None) -> None:
     q = result.meta["quarter_period"]
-    missing = [t for t in CRITICAL_QUARTER_TAGS if result.value(t, *q) is None]
+    missing = [t for t in (spec or CORP_SPEC).critical if result.value(t, *q) is None]
     if missing:
         result.issues.append(Issue("PARSE", "MISSING_CRITICAL", {"tags": missing}))
 
@@ -529,7 +541,8 @@ def _check(result: ParsedResults, name: str, lhs: Decimal, rhs: Decimal, n_terms
         )
 
 
-def _check_identities(result: ParsedResults) -> None:
+def _check_identities(result: ParsedResults, spec: ProfileSpec | None = None) -> None:
+    spec = spec or CORP_SPEC
     periods = {result.meta["quarter_period"], result.meta["ytd_period"]}
     for p in periods:
         v = lambda tag, p=p: result.value(tag, *p)  # noqa: E731
@@ -564,9 +577,19 @@ def _check_identities(result: ParsedResults) -> None:
         cfo, cfi, cff, net = v("cfo"), v("cfi"), v("cff"), v("net_cash_flow")
         if None not in (cfo, cfi, cff, net):
             _check(result, "CF_NET", cfo + cfi + cff, net, 4, p)
-        comps = [v(t) for t in EXPENSE_COMPONENTS]
+        comps = [v(t) for t in spec.expense_components]
+        if spec.missing_component_is_zero:  # Division III: every component is filed, absent = not applicable
+            comps = [c or Decimal(0) for c in comps]
         if exp is not None and None not in comps:
             _check(result, "EXPENSE_COMPONENTS", sum(comps, Decimal(0)), exp, len(comps) + 1, p)
+        if spec.revenue_components:
+            rev = v("revenue_from_operations")
+            parts = [v(t) or Decimal(0) for t in spec.revenue_components]
+            if rev is not None:
+                _check(result, "REVENUE_COMPONENTS", sum(parts, Decimal(0)), rev, len(parts) + 1, p)
+            oth, inc = v("other_income"), v("total_income")
+            if None not in (rev, oth, inc):
+                _check(result, "TOTAL_INCOME", rev + oth, inc, 3, p)
     end = result.meta["period_end"]
     assets, eq_liab = (
         result.value("total_assets", end, end),
@@ -574,9 +597,15 @@ def _check_identities(result: ParsedResults) -> None:
     )
     if None not in (assets, eq_liab):
         _check(result, "BALANCE_SHEET", assets, eq_liab, 2, (end,))
+    equity, liab = result.value("total_equity", end, end), result.value("total_liabilities", end, end)
+    if None not in (assets, equity, liab):
+        _check(result, "ASSETS_EQ_EQUITY_PLUS_LIABILITIES", equity + liab, assets, 3, (end,))
 
 
-def _apply_label_rules(inst: Instance, result: ParsedResults, declared: dict, period_end: date) -> None:
+def _apply_label_rules(
+    inst: Instance, result: ParsedResults, declared: dict, period_end: date, rules: tuple | None = None
+) -> None:
+    rules = LABEL_RULES if rules is None else rules
     """Sum amounts of members whose Description* label matches a rule; same period checks as other facts."""
     labelled: dict[str, set[tuple]] = {}  # rule -> set of dimension tuples whose label matched
     for f in inst.facts:
@@ -586,10 +615,10 @@ def _apply_label_rules(inst: Instance, result: ParsedResults, declared: dict, pe
         if len(dims) != 1:
             continue
         axis = dims[0][0].split(":")[-1]
-        for rule, rule_axis, _, _, _, rx in LABEL_RULES:
+        for rule, rule_axis, _, _, _, rx in rules:
             if axis == rule_axis and rx.match(f.value_text):
                 labelled.setdefault(rule, set()).add(dims)
-    for rule, _, element, tag, ptype, _ in LABEL_RULES:
+    for rule, _, element, tag, ptype, _ in rules:
         dims_set = labelled.get(rule)
         if not dims_set:
             continue
@@ -617,3 +646,44 @@ def _apply_label_rules(inst: Instance, result: ParsedResults, declared: dict, pe
         for (start, end), value in totals.items():
             months = None if ptype == "INSTANT" else period_months(start, end)
             result.facts.append(CanonicalFact(tag, ptype, start, end, months, "INR", value, f"LABEL:{rule}"))
+
+
+@dataclass(frozen=True)
+class ProfileSpec:
+    """What one accounting profile maps and checks. Machinery (contexts, periods, rules) is shared."""
+
+    profile: str
+    duration_tags: dict[str, tuple[str, str]]
+    instant_tags: dict[str, tuple[str, str]]
+    critical: tuple[str, ...]
+    expense_components: tuple[str, ...]
+    revenue_components: tuple[str, ...] = ()
+    label_rules: tuple = ()
+    missing_component_is_zero: bool = False
+    post_process: Any = None
+
+
+CORP_SPEC = ProfileSpec(
+    "INDAS_CORP", DURATION_TAGS, INSTANT_TAGS, CRITICAL_QUARTER_TAGS, EXPENSE_COMPONENTS, label_rules=LABEL_RULES
+)
+
+EPS_TOLERANCE = Decimal("0.05")
+
+
+def _check_eps(result: ParsedResults) -> None:
+    """Filed EPS vs owners' profit / period-end shares [X53]. A warning, not an issue: weighted-average shares
+    legitimately differ from period-end shares, so only a gross mismatch (> 5% and > Rs 0.50) is recorded."""
+    q = result.meta["quarter_period"]
+    filed = result.value("eps_basic", *q)
+    profit = result.value("pat_owners", *q)
+    if profit is None:
+        profit = result.value("pat", *q)
+    shares = result.value("shares_from_paid_up", q[1], q[1])
+    if None in (filed, profit, shares) or not shares:
+        return
+    computed = profit / shares
+    gap = abs(filed - computed)
+    if gap > Decimal("0.50") and gap > EPS_TOLERANCE * abs(computed):
+        result.meta.setdefault("warnings", []).append(
+            {"code": "EPS_INCONSISTENT", "filed": str(filed), "computed": str(computed.quantize(Decimal("0.01")))}
+        )

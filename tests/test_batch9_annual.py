@@ -285,6 +285,9 @@ def test_annual_ratios_reach_screener_features(tcs_market):
         (65487 + 1227) * 2 / ((362 + 94394 + 9392) + (362 + 106878 + 11283)), rel=1e-3
     )
     assert row["debtor_days"] == pytest.approx(67714 / (267021 / 365), rel=1e-3)
+    assert row["cash_conversion_cycle"] == pytest.approx(
+        (67714 + 29 - 14808) / (267021 / 365), abs=0.05
+    )  # materialised for the screen, not only computed
 
 
 # Screener export formulas (template v2.1) applied to the Screener Data Sheet of the TCS and Eternal exports, FY26
@@ -310,6 +313,69 @@ def test_screener_convention_ratios_match_the_export_formulas(path):
     assert float(out["debtor_days"]) == pytest.approx(want["debtor_days"], rel=1e-3)
     assert float(out["inventory_turnover"]) == pytest.approx(want["inventory_turnover"], rel=1e-3)
     assert float(out["working_capital"] / CR) == pytest.approx(want["working_capital_cr"], abs=0.5)
+
+
+# Days ratios [S23]: our definitions on the export's Sales denominator. Debtors, inventory and Sales are the
+# exports' figures (Rs Cr); trade payables are the filed TradePayablesCurrent (the export has no payables line).
+DAYS_GOLDEN = {
+    TCS26: {"sales": 267021, "debtors": 67714, "inventory": 29, "payables": 14808, "working_capital": 50527},
+    ETERNAL26: {"sales": 54364, "debtors": 1764, "inventory": 2181, "payables": 3010, "working_capital": 7928},
+}
+
+
+@pytest.mark.parametrize("path", list(DAYS_GOLDEN), ids=lambda p: p.stem)
+def test_days_ratios_and_cash_conversion_cycle(path):
+    from financials.fundamentals import screener_convention_ratios
+
+    out = screener_convention_ratios(_book(parse_reg34_annual(path.read_bytes(), path.name)), date(2026, 9, 30))
+    g = DAYS_GOLDEN[path]
+    per_day = g["sales"] / 365
+    debtor, inventory, payable = g["debtors"] / per_day, g["inventory"] / per_day, g["payables"] / per_day
+    assert float(out["inventory_days"]) == pytest.approx(inventory, abs=0.02)
+    assert float(out["days_payable"]) == pytest.approx(payable, abs=0.02)
+    assert float(out["cash_conversion_cycle"]) == pytest.approx(debtor + inventory - payable, abs=0.05)
+    assert out["working_capital_days"] is not None
+    assert out["cash_conversion_cycle"] == out["debtor_days"] + out["inventory_days"] - out["days_payable"]
+
+
+# Screener website Ratios table, TCS consolidated (pasted by the user, 13-Nov-2026; not scraped, not committed):
+# Debtor Days FY25 84 / FY26 93, Working Capital Days 34 / 38, Inventory Days and Days Payable blank, Cash
+# Conversion Cycle 84 / 93 [S23].
+TCS_WEBSITE = {
+    2025: {"debtor_days": 84, "working_capital_days": 34},
+    2026: {"debtor_days": 93, "working_capital_days": 38},
+}
+
+
+@pytest.mark.parametrize("year", [2025, 2026])
+def test_tcs_debtor_and_working_capital_days_match_the_website(year):
+    from financials.fundamentals import screener_convention_ratios
+
+    path = TCS26 if year == 2026 else TCS25
+    out = screener_convention_ratios(_book(parse_reg34_annual(path.read_bytes(), path.name)), date(year, 9, 30))
+    for k, want in TCS_WEBSITE[year].items():
+        assert round(float(out[k])) == want, k
+
+
+def test_tcs_cash_conversion_cycle_is_known_to_differ_from_the_website(tcs26):
+    """Ours counts sales-based payable days (20.2), so 72 vs the website's 93: the website's inventory / payable
+    days rule is not yet identified (blank for TCS, not COGS-based either: COGS is Rs 41 Cr) [S23]."""
+    from financials.fundamentals import screener_convention_ratios
+
+    out = screener_convention_ratios(_book(tcs26), date(2026, 9, 30))
+    assert round(float(out["cash_conversion_cycle"])) == 72 and round(float(out["debtor_days"])) == 93
+
+
+def test_days_ratios_without_inventory_or_payables_lines_are_zero_days(tcs26):
+    """Schedule III omits nil lines [C23]: no inventory / payables line on a filed balance sheet is 0 days."""
+    from financials.fundamentals import screener_convention_ratios
+
+    book = _book(tcs26)
+    for tag in ("inventories", "trade_payables_current"):
+        book.instants.pop(tag, None)
+    out = screener_convention_ratios(book, date(2026, 9, 30))
+    assert out["inventory_days"] == 0 and out["days_payable"] == 0 and out["inventory_turnover"] is None
+    assert out["cash_conversion_cycle"] == out["debtor_days"]
 
 
 def test_screener_roce_differs_from_our_roce_by_definition(tcs26):

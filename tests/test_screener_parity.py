@@ -200,6 +200,7 @@ ANNUAL_GOLDEN = {
                      "Profit before tax": "65487", "Tax": "16033", "Net Profit": "49210"}, {}),
     ("FY", "ITC"): ({"Sales": "78868.40", "Other Income": "2523.09", "Depreciation": "1710.53", "Interest": "85.17",
                      "Profit before tax": "28033.39", "Tax": "7015.24", "Net Profit": "20689.47"},
+                    # 388.99 = associates 377.08 + the ITC expense-netting 11.91; same on the FY26 annual [S21]
                     {"Other Income": ("UNEXPLAINED", Decimal("388.99")),
                      "Profit before tax": ("ASSOCIATES_PLACEMENT", ASSOC)}),
     ("FY", "RELIANCE"): ({"Sales": "1055780", "Other Income": "28846", "Depreciation": "57688", "Interest": "27061",

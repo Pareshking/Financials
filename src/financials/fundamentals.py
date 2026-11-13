@@ -905,7 +905,10 @@ def annual_ratios(book: FactBook, on_or_before: date) -> dict:
 
 
 # ── Screener export conventions [S22] ────────────────────────────────────────────────────────────────
-SCREENER_CONVENTION_COLUMNS = ("roce_screener", "debtor_days", "inventory_turnover", "working_capital")
+SCREENER_CONVENTION_COLUMNS = (
+    "roce_screener", "debtor_days", "inventory_turnover", "working_capital",
+    "inventory_days", "days_payable", "cash_conversion_cycle", "working_capital_days",
+)  # fmt: skip
 
 
 class _BookAsResult:
@@ -926,7 +929,15 @@ def screener_convention_ratios(book: FactBook, on_or_before: date) -> dict:
     ROCE = (PBT + Interest) x 2 / (opening + closing (Equity Capital + Reserves + Borrowings));
     Debtor Days = closing Debtors / (Sales / 365); Inventory Turnover = Sales / closing Inventory;
     Working Capital = Other Assets - Other Liabilities (rupees). Kept beside our own ratios, not instead of them:
-    `roce` excludes other income and uses closing capital."""
+    `roce` excludes other income and uses closing capital.
+
+    Days ratios on the same Sales denominator as the export's Debtor Days [S23, our definitions; the website's
+    are UNVERIFIED]: Inventory Days = closing Inventory / (Sales / 365); Days Payable = closing trade payables /
+    (Sales / 365); Cash Conversion Cycle = Debtor + Inventory - Payable days (differs from the website for TCS:
+    72 vs 93, the website leaves inventory and payable days blank); Working Capital Days = (current assets - cash &
+    bank - current investments - current liabilities) / (Sales / 365), observed to match the website on TCS.
+    Schedule III omits nil lines, so a filed balance sheet without an inventory or payables line means 0 days
+    [C23]."""
     from financials.statements.balance_sheet import balance_sheet
     from financials.statements.quarterly import corp_quarter
 
@@ -946,6 +957,24 @@ def screener_convention_ratios(book: FactBook, on_or_before: date) -> dict:
         recv, stock = oa.parts.get("Receivables"), oa.parts.get("Inventory")
         out["debtor_days"] = recv / (sales / 365) if recv is not None else None
         out["inventory_turnover"] = sales / stock if stock else None
+        per_day = sales / 365
+        payables = bs.rows["Other Liabilities"].parts.get("Trade payables")
+        out["inventory_days"] = stock / per_day if stock is not None else None
+        out["days_payable"] = payables / per_day if payables is not None else None
+        parts = (out["debtor_days"], out["inventory_days"], out["days_payable"])
+        if None not in parts:
+            out["cash_conversion_cycle"] = parts[0] + parts[1] - parts[2]
+        ca, cl = (
+            book.instants.get("current_assets", {}).get(fy[1]),
+            book.instants.get("current_liabilities", {}).get(fy[1]),
+        )
+        if ca is not None and cl is not None:
+            # (current assets - cash & bank - current investments - current liabilities): fits Screener's website
+            # Working Capital Days for TCS FY25 (34.1 vs 34) and FY26 (38.4 vs 38) [S23]
+            liquid = oa.parts.get("Cash & Bank", Decimal(0)) + bs.rows["Investments"].parts.get(
+                "Current investments", Decimal(0)
+            )
+            out["working_capital_days"] = (ca - liquid - cl) / per_day
 
     def capital(b):
         vals = [b.rows[k].value for k in ("Equity Capital", "Reserves", "Borrowings")]

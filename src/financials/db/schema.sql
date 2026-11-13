@@ -491,6 +491,10 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     debtor_days         DOUBLE,              -- Screener export: closing debtors / (sales / 365) [S22]
     inventory_turnover  DOUBLE,              -- Screener export: sales / closing inventory [S22]
     working_capital     DECIMAL(24,2),       -- Screener export: Other Assets - Other Liabilities (rupees) [S22]
+    inventory_days      DOUBLE,              -- closing inventory / (sales / 365) [S23]
+    days_payable        DOUBLE,              -- closing trade payables / (sales / 365) [S23]
+    cash_conversion_cycle DOUBLE,            -- debtor + inventory - payable days [S23]
+    working_capital_days DOUBLE,             -- (CA - cash & bank - current investments - CL) / (sales / 365) [S23]
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -635,6 +639,10 @@ CREATE TABLE IF NOT EXISTS screener_features (
     debtor_days         DOUBLE,              -- Screener export: closing debtors / (sales / 365) [S22]
     inventory_turnover  DOUBLE,              -- Screener export: sales / closing inventory [S22]
     working_capital     DECIMAL(24,2),       -- Screener export: Other Assets - Other Liabilities (rupees) [S22]
+    inventory_days      DOUBLE,              -- closing inventory / (sales / 365) [S23]
+    days_payable        DOUBLE,              -- closing trade payables / (sales / 365) [S23]
+    cash_conversion_cycle DOUBLE,            -- debtor + inventory - payable days [S23]
+    working_capital_days DOUBLE,             -- (CA - cash & bank - current investments - CL) / (sales / 365) [S23]
     PRIMARY KEY (as_of_date, security_id)
 );
 

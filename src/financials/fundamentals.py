@@ -87,6 +87,19 @@ class FactBook:
             self.durations[key] = out
         return key
 
+    def continuing_owners(self) -> str:
+        """Derived tag: COALESCE(owners, total) - discontinued, per period (per filing) [C10, X52].
+
+        Discontinued operations (Ind AS 105, incl. demerger scheme gains such as TMPV's 82,616 Cr in Q2 FY26)
+        are assumed attributable to owners: the XBRL does not split NCI between continuing and discontinued.
+        """
+        key = "pat_owners_continuing"
+        if key not in self.durations:
+            owners = self.durations[self.coalesced("pat_owners", "pat")]
+            disc = self.durations.get("pat_discontinued", {})
+            self.durations[key] = {p: v - disc.get(p, Decimal(0)) for p, v in owners.items()}
+        return key
+
     def latest_flow_end(self, tag: str) -> date | None:
         ends = [e for (_, e) in self.durations.get(tag, {})]
         return max(ends) if ends else None
@@ -225,6 +238,8 @@ def building_blocks(book: FactBook, end: date) -> dict[str, Decimal | date | Non
         # Profit for PE / ROE: owners' share when the filing attributes profit (consolidated) [X42]
         # COALESCE(owners, total) per filing before the 4-quarter roll-up, so a mixed window stays non-NULL
         "pat_owners": t(book.coalesced("pat_owners", "pat")),
+        # PE earnings: owners' profit from continuing operations (excludes Ind AS 105 / demerger gains) [C10]
+        "pat_owners_continuing": t(book.continuing_owners()),
         "other_income": oth,
         "pbt": pbt,
         "etr": etr,

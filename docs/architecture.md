@@ -231,7 +231,8 @@ Notation: `avg(x)` = mean of opening and closing balance; `ttm(x)` = trailing 4 
 | Effective cost of debt | `ttm(FinanceCosts) / avg(total_debt)` (includes lease interest while debt excludes leases [L4], so overstated for lease-heavy firms) | 1 |
 | Contingent liabilities / net worth | annual notes | 2 |
 | RPT leak % | `(RPT purchases + loans given + royalties) / rev_ops` from RPT contexts [X19] | 2 |
-| PE, PB, EV/EBITDA, EV/Sales, P/CFO | standard, using §8 blocks | 1 |
+| PE | `market_cap / ttm(COALESCE(owners, PAT) − discontinued)`, per filing before TTM [C10] | 1 |
+| PB, EV/EBITDA, EV/Sales, P/CFO | standard, using §8 blocks (PB on owners' equity; EV adds minority interest) | 1 |
 
 ### 10.2 Forensic (stored as separate columns, never summed)
 - `piotroski_f` (0..9)

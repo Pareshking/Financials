@@ -211,7 +211,7 @@ def compute_rows(con, as_of: date, exchange: str = "NSE") -> list[dict]:
             "shares": None if shares is None else int(shares), "shares_source": source,
             "market_cap": None if mcap is None else mcap.quantize(Decimal("0.01")),
             "enterprise_value": None if ev is None else ev.quantize(Decimal("0.01")),
-            "pe": _f(safe_div(mcap, fund["_pat_owners"])),
+            "pe": _f(safe_div(mcap, fund["_pe_earnings"])),
             "pb": _f(safe_div(mcap, fund["_equity_owners"])),
             "ev_ebitda": _f(safe_div(ev, fund["ebitda_ttm"])),
             "fcff_yield": _f(safe_div(fund["_fcff"], ev)),
@@ -232,7 +232,8 @@ _EMPTY_FUNDAMENTALS: dict = {
     "total_equity": None, "opm": None, "sales_growth_yoy": None, "profit_growth_yoy": None, "roe": None,
     "roce": None, "roic": None, "croic": None, "debt_to_equity": None, "other_income_to_pbt": None,
     "altman_z_dd": None, "scope_used": None, "fundamentals_end": None, "bs_as_of": None, "cf_as_of": None,
-    "_net_debt": None, "_fcff": None, "_pat_owners": None, "_equity_owners": None, "_minority": None,
+    "_net_debt": None, "_fcff": None, "_pat_owners": None, "_pe_earnings": None, "_equity_owners": None,
+    "_minority": None,
 }  # fmt: skip
 
 
@@ -267,6 +268,7 @@ def _fundamentals(con, entity_id: str, as_of_ts: datetime, end: date) -> dict:
         "altman_z_dd": _f(altman_z_double_prime(b)),
         "scope_used": scope, "fundamentals_end": end, "bs_as_of": b["bs_as_of"], "cf_as_of": b["cf_as_of"],
         "_net_debt": b["net_debt"], "_fcff": b["fcff"], "_pat_owners": b["pat_owners"],
+        "_pe_earnings": b["pat_owners_continuing"],
         "_equity_owners": b["equity_owners"], "_minority": b["minority_interest"],
     }  # fmt: skip
 

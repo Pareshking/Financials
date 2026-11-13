@@ -126,8 +126,10 @@ output); `tests/test_index_backfill.py::test_derived_text_matches_pdf` regenerat
 | `xbrl/INTEGRATED_FILING_INDAS_1753292_04112026105837_WEB.xml` | B3: Cummins India Q2 FY27 consolidated (segment totals differ from P&L; associates in segment PBT) (X49) | `eef0b34d138851d2b8f32af4167c830288484a316eaae5db1673706f47b6bbd5` |
 | `xbrl/INTEGRATED_FILING_INDAS_1746046_26102026055540_WEB.xml` | B3: APL Apollo Q2 FY27 consolidated (zero-attribution placeholder) (X48) | `11d50f34e32dbb0c81a0493a5152f25149395ad2f0d92bf2a8dbe4eaffcc33ba` |
 | `xbrl/INTEGRATED_FILING_INDAS_1751861_03112026045154_WEB.xml` | B3: AIA Engineering Q2 FY27 consolidated (power & fuel, freight labels) (X50) | `fbaf195682b0c97792869addd546571f29436b4f9280662eb677d644ad543069` |
+| `xbrl/INTEGRATED_FILING_INDAS_1574923_14112025041850_WEB.xml` | X52: TMPV Q2 FY26 consolidated (demerger scheme gain tagged discontinued) | `0b15b25ebbd5de3e662d5305b9890f931dd6c5b7a951717eb8f88fc43d401d32` |
+| `xbrl/INTEGRATED_FILING_INDAS_1574016_13112025070452_WEB.xml` | X52/C12: Tata Motors Ltd (CV) Q2 FY26 consolidated, first filing after listing | `c2d5beb1a142ec1769eef2189af5d86ddd6e7b4738863bab30f1fe15ef516c7c` |
 
-Source URL pattern for all twenty-three: `https://nsearchives.nseindia.com/corporate/xbrl/<file>`.
+Source URL pattern for all twenty-five: `https://nsearchives.nseindia.com/corporate/xbrl/<file>`.
 
 ## Screener goldens (local only, not committed)
 

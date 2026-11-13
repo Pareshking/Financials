@@ -65,9 +65,7 @@ def test_same_blob_on_two_exchanges_is_two_filings(tmp_path):
         broadcast_ts=NOW,
         broadcast_ts_source="RSS_PUBDATE",
     )
-    bse = make_filing(
-        blob, exchange="BSE", category="RESULTS_XBRL", source_url="https://b/x.xml", fetched_at=NOW
-    )
+    bse = make_filing(blob, exchange="BSE", category="RESULTS_XBRL", source_url="https://b/x.xml", fetched_at=NOW)
     assert nse.sha256 == bse.sha256
     assert nse.filing_id != bse.filing_id
 

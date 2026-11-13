@@ -343,9 +343,7 @@ def _map_facts(inst: Instance, result: ParsedResults) -> None:
             months = period_months(start, end)
             if months is None or not 1 <= months <= 18:
                 result.issues.append(
-                    Issue(
-                        "PERIOD", "IRREGULAR_PERIOD", {"context_id": ctx.id, "dates": [str(start), str(end)]}
-                    )
+                    Issue("PERIOD", "IRREGULAR_PERIOD", {"context_id": ctx.id, "dates": [str(start), str(end)]})
                 )
                 continue
             ptype = "DURATION"

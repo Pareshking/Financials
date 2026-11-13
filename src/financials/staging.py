@@ -24,6 +24,7 @@ from financials.money import to_inr
 from financials.parsers import ParseError
 from financials.parsers.delivery import parse_sec_bhavdata_full
 from financials.parsers.indas_corp import parse_indas_corp_results
+from financials.parsers.nse_corp_actions import parse_nse_corp_actions_json
 from financials.parsers.udiff import parse_udiff_cm
 from financials.parsers.xbrl import parse_instance
 from financials.timeutil import ist_to_utc
@@ -43,6 +44,14 @@ CREATE TABLE stg_xbrl_facts (
     period_end DATE NOT NULL, period_months INTEGER, unit VARCHAR NOT NULL, value_inr DECIMAL(20,2),
     value_other DECIMAL(28,8), source_element VARCHAR NOT NULL
 );
+CREATE TABLE stg_corp_actions (
+    filing_id VARCHAR NOT NULL, seq INTEGER NOT NULL, component INTEGER NOT NULL, exchange VARCHAR NOT NULL,
+    symbol VARCHAR NOT NULL, series VARCHAR NOT NULL, isin VARCHAR NOT NULL, ex_date DATE NOT NULL,
+    record_date DATE, face_value DECIMAL(18,4), subject VARCHAR NOT NULL, parse_status VARCHAR NOT NULL,
+    parse_reason VARCHAR, action_type VARCHAR, ratio_num DECIMAL(18,6), ratio_den DECIMAL(18,6),
+    issue_price DECIMAL(18,4), cash_per_share DECIMAL(18,4),
+    PRIMARY KEY (filing_id, seq, component)
+);
 CREATE TABLE stg_issues (
     filing_id VARCHAR, stage VARCHAR NOT NULL, reason_code VARCHAR NOT NULL, details JSON NOT NULL
 );
@@ -57,6 +66,7 @@ TABLE_ORDER = (
     "raw_xbrl_facts",
     "stg_xbrl_filing",
     "stg_xbrl_facts",
+    "stg_corp_actions",
     "stg_issues",
 )
 
@@ -315,3 +325,58 @@ def _assert_exact(rows: list[dict[str, Any]], parsed) -> None:
 
 def quarantine_id(*parts: object) -> str:
     return stable_id("q", *parts)
+
+
+def stage_corp_actions(
+    vault: Vault,
+    stage_root: Path,
+    *,
+    data: bytes,
+    source_url: str,
+    fetched_at: datetime,
+    exchange: str = "NSE",
+) -> Path:
+    """Vault + parse an NSE corporate-actions API response (one row per parsed component)."""
+    records = parse_nse_corp_actions_json(data)
+    blob = vault.put(data, ext="json", media_type="application/json", fetched_at=fetched_at)
+    filing = make_filing(blob, exchange=exchange, category="CORP_ACTIONS", source_url=source_url, fetched_at=fetched_at)
+    rows: list[dict[str, Any]] = []
+    for r in records:
+        base = {
+            "filing_id": filing.filing_id,
+            "seq": r.seq,
+            "exchange": exchange,
+            "symbol": r.symbol,
+            "series": r.series,
+            "isin": r.isin,
+            "ex_date": r.ex_date,
+            "record_date": r.record_date,
+            "face_value": r.face_value,
+            "subject": r.subject,
+            "parse_status": r.parse_status,
+            "parse_reason": r.parse_reason,
+        }
+        empty = {"action_type": None, "ratio_num": None, "ratio_den": None, "issue_price": None, "cash_per_share": None}
+        if not r.components:
+            rows.append(
+                {**base, "component": 0, **empty, "action_type": "UNKNOWN" if r.parse_status == "UNPARSED" else None}
+            )
+        for i, c in enumerate(r.components):
+            rows.append(
+                {
+                    **base,
+                    "component": i,
+                    "action_type": c.action_type,
+                    "ratio_num": c.ratio_num,
+                    "ratio_den": c.ratio_den,
+                    "issue_price": c.issue_price,
+                    "cash_per_share": c.cash_per_share,
+                }
+            )
+    return write_stage(
+        stage_root,
+        "corp_actions",
+        filing.filing_id,
+        {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)], "stg_corp_actions": rows},
+        extra={"exchange": exchange},
+    )

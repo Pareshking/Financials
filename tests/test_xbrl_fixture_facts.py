@@ -77,8 +77,7 @@ def test_corp_pnl_identities_and_exceptional_sign(ctx):
         == n[("ProfitBeforeTax", ctx)]
     )
     assert (
-        n[("ProfitBeforeTax", ctx)] - n[("TaxExpense", ctx)]
-        == n[("ProfitLossForPeriodFromContinuingOperations", ctx)]
+        n[("ProfitBeforeTax", ctx)] - n[("TaxExpense", ctx)] == n[("ProfitLossForPeriodFromContinuingOperations", ctx)]
     )
 
 
@@ -154,6 +153,4 @@ def test_general_insurer_fourd_context_dates_are_wrong_but_values_are_ytd():
     one, four = inst.contexts["OneD"], inst.contexts["FourD"]
     assert (four.start, four.end) == (one.start, one.end) == ("2024-10-01", "2024-12-31")
     assert inst.text[("DateOfStartOfReportingPeriod", "FourI")] == "2024-04-01"
-    assert (
-        inst.numeric[("GrossPremiumsWritten", "FourD")] > 3 * inst.numeric[("GrossPremiumsWritten", "OneD")]
-    )
+    assert inst.numeric[("GrossPremiumsWritten", "FourD")] > 3 * inst.numeric[("GrossPremiumsWritten", "OneD")]

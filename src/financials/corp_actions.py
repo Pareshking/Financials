@@ -13,7 +13,7 @@ from datetime import date
 from decimal import Decimal
 
 SHARE_COUNT_TYPES = frozenset({"SPLIT", "CONSOLIDATION", "BONUS", "RIGHTS"})
-ACTION_TYPES = SHARE_COUNT_TYPES | {"DEMERGER", "MERGER", "DIVIDEND"}
+ACTION_TYPES = SHARE_COUNT_TYPES | {"DEMERGER", "MERGER", "DIVIDEND", "UNKNOWN"}  # UNKNOWN = unparsed purpose
 ACCEPTED_STATUSES = frozenset({"VERIFIED", "UNOBSERVABLE", "VERIFIED_MANUAL"})
 
 VERIFY_TOLERANCE = Decimal("0.10")  # |observed/theoretical - 1|
@@ -80,28 +80,55 @@ def theoretical_factors(action: CorpAction, close_prev: Decimal | None) -> tuple
         return f, f
     if t == "DEMERGER":
         return None, Decimal(1)
+    if t == "UNKNOWN":
+        raise ValueError(f"{action.action_id}: unparsed corporate action cannot be factored")
     return Decimal(1), Decimal(1)  # MERGER (acquirer), DIVIDEND: never adjust prices [C2]
 
 
-def verify_action(action: CorpAction, open_ex: Decimal | None, close_prev: Decimal | None) -> Verification:
-    observed = open_ex / close_prev if open_ex is not None and close_prev else None
-    try:
-        price_f, eps_f = theoretical_factors(action, close_prev)
-    except ValueError as exc:
-        return Verification("QUARANTINED", None, None, observed, str(exc))
+def verify_group(actions: list[CorpAction], open_ex: Decimal | None, close_prev: Decimal | None) -> list[Verification]:
+    """Verify all actions of one security on one ex-date together (e.g. NAZARA split + bonus).
 
-    if action.action_type == "DEMERGER":
-        if observed is None:
-            return Verification("QUARANTINED", None, eps_f, None, "no ex-date open/prior close")
-        return Verification("VERIFIED", observed, eps_f, observed, "factor defined by observed gap [C3]")
-    assert price_f is not None
-    if abs(price_f - 1) < UNOBSERVABLE_BAND:
-        return Verification("UNOBSERVABLE", price_f, eps_f, observed, "factor within noise band")
+    The observed gap reflects the product of every factor that day, so members are judged on
+    the combined factor. A DEMERGER absorbs whatever the other members do not explain [C3].
+    One unfactorable member (UNKNOWN or bad ratios) quarantines the whole group.
+    """
+    observed = open_ex / close_prev if open_ex is not None and close_prev else None
+    factors: list[tuple[Decimal | None, Decimal]] = []
+    try:
+        for a in actions:
+            factors.append(theoretical_factors(a, close_prev))
+    except ValueError as exc:
+        return [Verification("QUARANTINED", None, None, observed, str(exc)) for _ in actions]
+
+    known = Decimal(1)
+    for price_f, _ in factors:
+        if price_f is not None:
+            known *= price_f
+    demergers = [i for i, a in enumerate(actions) if a.action_type == "DEMERGER"]
+
+    if demergers:
+        if observed is None or len(demergers) > 1:
+            reason = "no ex-date open/prior close" if observed is None else "several demergers on one date"
+            return [Verification("QUARANTINED", f, e, observed, reason) for f, e in factors]
+        out = []
+        for i, (price_f, eps_f) in enumerate(factors):
+            pf = observed / known if i in demergers else price_f
+            out.append(Verification("VERIFIED", pf, eps_f, observed, "demerger absorbs residual gap [C3]"))
+        return out
+
+    if abs(known - 1) < UNOBSERVABLE_BAND:
+        return [Verification("UNOBSERVABLE", f, e, observed, "combined factor within noise band") for f, e in factors]
     if observed is None:
-        return Verification("QUARANTINED", price_f, eps_f, None, "no ex-date open/prior close")
-    if abs(observed / price_f - 1) <= VERIFY_TOLERANCE:
-        return Verification("VERIFIED", price_f, eps_f, observed, "observed gap matches factor")
-    return Verification("QUARANTINED", price_f, eps_f, observed, "observed gap does not match factor")
+        return [Verification("QUARANTINED", f, e, None, "no ex-date open/prior close") for f, e in factors]
+    if abs(observed / known - 1) <= VERIFY_TOLERANCE:
+        return [Verification("VERIFIED", f, e, observed, "observed gap matches combined factor") for f, e in factors]
+    return [
+        Verification("QUARANTINED", f, e, observed, "observed gap does not match combined factor") for f, e in factors
+    ]
+
+
+def verify_action(action: CorpAction, open_ex: Decimal | None, close_prev: Decimal | None) -> Verification:
+    return verify_group([action], open_ex, close_prev)[0]
 
 
 @dataclass(frozen=True)
@@ -120,16 +147,25 @@ def audit_day(
     actions_on_date: Iterable[CorpAction],
     isin_changed: bool,
 ) -> list[GapFinding]:
-    """Unconditional gap auditor for one security-day (architecture §11.3)."""
+    """Unconditional gap auditor for one security-day (architecture §11.3).
+
+    A gap is explained only if dividing out the accepted price factors of that day leaves a
+    residual within the threshold. A dividend (factor 1) therefore never explains a large gap.
+    """
     actions = list(actions_on_date)
-    explained = any(a.status in ACCEPTED_STATUSES for a in actions)
+    accepted = [a for a in actions if a.status in ACCEPTED_STATUSES]
+    combined = Decimal(1)
+    for a in accepted:
+        if a.price_factor is None:
+            raise ValueError(f"accepted action {a.action_id} has no price factor")
+        combined *= a.price_factor
     findings: list[GapFinding] = []
     gap = open_t / close_prev - 1 if open_t is not None and close_prev else None
-    if gap is not None and abs(gap) > GAP_THRESHOLD and not explained:
-        findings.append(GapFinding(security_id, trade_date, "UNEXPLAINED_GAP", gap))
-    if isin_changed and not any(
-        a.action_type in ("SPLIT", "CONSOLIDATION") and a.status in ACCEPTED_STATUSES for a in actions
-    ):
+    if gap is not None:
+        residual = open_t / (close_prev * combined) - 1
+        if abs(residual) > GAP_THRESHOLD:
+            findings.append(GapFinding(security_id, trade_date, "UNEXPLAINED_GAP", gap))
+    if isin_changed and not any(a.action_type in ("SPLIT", "CONSOLIDATION") for a in accepted):
         findings.append(GapFinding(security_id, trade_date, "ISIN_CHANGE_WITHOUT_ACTION", gap))
     return findings
 

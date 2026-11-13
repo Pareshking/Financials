@@ -8,7 +8,7 @@ import pytest
 from _fixture_helpers import FIXTURES
 
 MANIFEST = FIXTURES / "MANIFEST.md"
-ROW = re.compile(r"^\|\s*`(?P<path>(?:xbrl|bhavcopy)/[^`]+)`.*`(?P<sha>[0-9a-f]{64})`\s*\|\s*$")
+ROW = re.compile(r"^\|\s*`(?P<path>[a-z_]+/[^`]+)`.*`(?P<sha>[0-9a-f]{64})`\s*\|\s*$")
 
 
 def manifest_entries() -> list[tuple[str, str]]:
@@ -22,9 +22,7 @@ def manifest_entries() -> list[tuple[str, str]]:
 
 def test_manifest_lists_every_fixture_file():
     listed = {p for p, _ in manifest_entries()}
-    on_disk = {
-        str(p.relative_to(FIXTURES)) for p in FIXTURES.rglob("*") if p.is_file() and p.parent != FIXTURES
-    }
+    on_disk = {str(p.relative_to(FIXTURES)) for p in FIXTURES.rglob("*") if p.is_file() and p.parent != FIXTURES}
     assert listed == on_disk
 
 

@@ -104,9 +104,7 @@ class SecurityRegistry:
             fid = row.fin_instrm_id
             if not fid:
                 out.issues.append(
-                    IdentityIssue(
-                        "MISSING_FIN_INSTRM_ID", row.trade_date, {"symbol": row.symbol, "isin": row.isin}
-                    )
+                    IdentityIssue("MISSING_FIN_INSTRM_ID", row.trade_date, {"symbol": row.symbol, "isin": row.isin})
                 )
                 continue
             by_fid = self._fid_owner.get(fid)
@@ -116,9 +114,7 @@ class SecurityRegistry:
                 last = self._last_seen.get(sec_id)
                 if last is not None and row.trade_date < last:
                     out.issues.append(
-                        IdentityIssue(
-                            "OUT_OF_ORDER", row.trade_date, {"security_id": sec_id, "last_seen": str(last)}
-                        )
+                        IdentityIssue("OUT_OF_ORDER", row.trade_date, {"security_id": sec_id, "last_seen": str(last)})
                     )
                     continue
             if by_fid and by_isin and by_fid != by_isin:
@@ -190,9 +186,7 @@ class SecurityRegistry:
                     if cur.isin:  # a real open interval
                         out.closed.append(replace(cur, valid_to=row.trade_date))
                         self._isin_owner.pop(cur.isin, None)
-                        out.events.extend(
-                            IdentityEvent(k, sec_id, row.trade_date, o, n) for k, o, n in changes
-                        )
+                        out.events.extend(IdentityEvent(k, sec_id, row.trade_date, o, n) for k, o, n in changes)
                     out.opened.append(new_iv)
                     self._current[sec_id] = new_iv
             self._fid_owner[fid] = sec_id

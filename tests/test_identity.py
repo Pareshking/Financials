@@ -63,9 +63,7 @@ def test_reload_from_intervals_is_equivalent():
     reloaded = SecurityRegistry("NSE", out.opened)
     again = reloaded.observe(day("20250922"))
     assert again.resolved[("ADANIPOWER", "EQ")] == out.resolved[("ADANIPOWER", "EQ")]
-    assert not again.new_securities or all(
-        s.security_id not in out.resolved.values() for s in again.new_securities
-    )
+    assert not again.new_securities or all(s.security_id not in out.resolved.values() for s in again.new_securities)
 
 
 def test_series_change_with_new_fin_instrm_id_keeps_security():

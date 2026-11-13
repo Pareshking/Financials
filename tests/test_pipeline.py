@@ -65,8 +65,7 @@ def test_split_with_recorded_action_verifies_and_is_not_quarantined(market):
     assert (status, factor) == ("VERIFIED", 0.2)
     assert gap_quarantines(market, "ADANIPOWER", date(2025, 9, 22)) == []
     history = market.con.execute(
-        "SELECT isin, valid_from, valid_to FROM security_identifier_history WHERE security_id = ? "
-        "ORDER BY valid_from",
+        "SELECT isin, valid_from, valid_to FROM security_identifier_history WHERE security_id = ? ORDER BY valid_from",
         [adani],
     ).fetchall()
     assert history == [
@@ -123,13 +122,9 @@ def test_demerger_ex_date(market):
     promote_day(market, "20251013")
     tm = market.security_id("TATAMOTORS")
     filing = market.con.execute("SELECT filing_id FROM filings LIMIT 1").fetchone()[0]
-    record_corp_action(
-        market.con, CorpAction("ca-tm", tm, "DEMERGER", date(2025, 10, 14)), source_filing_id=filing
-    )
+    record_corp_action(market.con, CorpAction("ca-tm", tm, "DEMERGER", date(2025, 10, 14)), source_filing_id=filing)
     promote_day(market, "20251014")
-    status, pf, ef = market.con.execute(
-        "SELECT status, price_factor, eps_factor FROM corp_actions"
-    ).fetchone()
+    status, pf, ef = market.con.execute("SELECT status, price_factor, eps_factor FROM corp_actions").fetchone()
     assert status == "VERIFIED" and ef == 1.0
     assert pf == pytest.approx(400 / 660.75)
     assert gap_quarantines(market, "TATAMOTORS", date(2025, 10, 14)) == []
@@ -195,9 +190,7 @@ def stage_corp(market, **kw):
 def test_results_filing_with_broadcast_is_point_in_time(market):
     promote_day(market, "20251014")
     broadcast = datetime(2026, 11, 5, 10, 0)  # UTC
-    result = promote(
-        market.con, stage_corp(market, broadcast_ts=broadcast, broadcast_ts_source="RSS_PUBDATE")
-    )
+    result = promote(market.con, stage_corp(market, broadcast_ts=broadcast, broadcast_ts_source="RSS_PUBDATE"))
     assert result.status == "PROMOTED", result
     entity = market.con.execute("SELECT entity_id FROM filing_meta").fetchone()[0]
     args = (entity, "STANDALONE", "revenue_from_operations", date(2026, 7, 1), date(2026, 9, 30))
@@ -205,9 +198,7 @@ def test_results_filing_with_broadcast_is_point_in_time(market):
     assert pit_fact(market.con, *args, as_of=broadcast) == Decimal("2895440000.00")
     assert count(market, "SELECT count(*) FROM raw_xbrl_facts") == 620
     assert count(market, "SELECT count(*) FROM fact_observations") > 90
-    meta = market.con.execute(
-        "SELECT visible_from_source, interest_paid_cfo_class FROM filing_meta"
-    ).fetchone()
+    meta = market.con.execute("SELECT visible_from_source, interest_paid_cfo_class FROM filing_meta").fetchone()
     assert meta == ("BROADCAST", "FINANCING")
 
 
@@ -228,9 +219,7 @@ def test_results_filing_board_meeting_rule(market):
     )
     result = promote(market.con, stage_corp(market))
     assert result.status == "PROMOTED", result
-    visible, source = market.con.execute(
-        "SELECT visible_from_ts, visible_from_source FROM filing_meta"
-    ).fetchone()
+    visible, source = market.con.execute("SELECT visible_from_ts, visible_from_source FROM filing_meta").fetchone()
     assert source == "BOARD_MEETING_RULE"
     assert visible == datetime(2026, 11, 5, 18, 30)  # 2026-11-06 00:00 IST
 
@@ -256,7 +245,5 @@ def test_unimplemented_profile_is_quarantined_with_raw_kept(market):
     )
     result = promote(market.con, stage)
     assert result.status == "QUARANTINED"
-    assert market.con.execute("SELECT reason_code FROM quarantine_queue").fetchall() == [
-        ("PROFILE_NOT_IMPLEMENTED",)
-    ]
+    assert market.con.execute("SELECT reason_code FROM quarantine_queue").fetchall() == [("PROFILE_NOT_IMPLEMENTED",)]
     assert count(market, "SELECT count(*) FROM raw_xbrl_facts") == 359

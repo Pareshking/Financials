@@ -92,15 +92,11 @@ def test_gap_auditor():
     assert audit_day(s, d, D("105"), D("100"), [], False) == []
     (f,) = audit_day(s, d, D("1534"), D("3038"), [], False)
     assert f.reason_code == "UNEXPLAINED_GAP"
-    ok = [act("BONUS", 1, 1, status="VERIFIED")]
+    ok = [act("BONUS", 1, 1, status="VERIFIED", price_factor=D("0.5"))]
     assert audit_day(s, d, D("1534"), D("3038"), ok, False) == []
     pending = [act("BONUS", 1, 1)]
-    assert [f.reason_code for f in audit_day(s, d, D("1534"), D("3038"), pending, False)] == [
-        "UNEXPLAINED_GAP"
-    ]
-    assert [f.reason_code for f in audit_day(s, d, D("100"), D("100"), [], True)] == [
-        "ISIN_CHANGE_WITHOUT_ACTION"
-    ]
+    assert [f.reason_code for f in audit_day(s, d, D("1534"), D("3038"), pending, False)] == ["UNEXPLAINED_GAP"]
+    assert [f.reason_code for f in audit_day(s, d, D("100"), D("100"), [], True)] == ["ISIN_CHANGE_WITHOUT_ACTION"]
 
 
 def test_adjustment_applies_only_before_ex_date_and_respects_freeze():
@@ -128,3 +124,27 @@ def test_adjustment_applies_only_before_ex_date_and_respects_freeze():
     assert cumulative_factor([split], date(2025, 9, 19), kind="eps") == D("0.2")
     pending = CorpAction("b", "s", "SPLIT", date(2025, 9, 22), D(2), D(10))
     assert cumulative_factor([pending], date(2025, 9, 19)) == 1
+
+
+def test_same_day_split_and_bonus_verify_on_combined_factor():
+    """NAZARA 26-Sep-2025: FV 4 -> 2 split and 1:1 bonus, combined factor 0.25."""
+    from financials.corp_actions import verify_group
+
+    split, bonus = act("SPLIT", 2, 4), act("BONUS", 1, 1)
+    assert verify_action(split, D("291.00"), D("1116.00")).status == "QUARANTINED"  # alone: 0.5 vs 0.26
+    results = verify_group([split, bonus], D("291.00"), D("1116.00"))
+    assert [r.status for r in results] == ["VERIFIED", "VERIFIED"]
+    assert [r.price_factor for r in results] == [D("0.5"), D("0.5")]
+
+
+def test_unknown_member_quarantines_group():
+    from financials.corp_actions import verify_group
+
+    results = verify_group([act("BONUS", 1, 1), act("UNKNOWN")], D("1534"), D("3038"))
+    assert {r.status for r in results} == {"QUARANTINED"}
+
+
+def test_dividend_does_not_explain_a_large_gap():
+    div = act("DIVIDEND", cash_per_share=D("160"), status="UNOBSERVABLE", price_factor=D(1))
+    (f,) = audit_day("s", date(2025, 9, 22), D("80"), D("100"), [div], False)
+    assert f.reason_code == "UNEXPLAINED_GAP"

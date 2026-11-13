@@ -65,7 +65,21 @@ Last reviewed: 2026-11-13.
 | P9 | `FinInstrmId` is never reused for a different security | UNVERIFIED | |
 | P10 | `sec_bhavdata_full_DDMMYYYY.csv` has `PREV_CLOSE`, OHLC, `TTL_TRD_QNTY`, `DELIV_QTY`, `DELIV_PER`; **no ISIN**; `PREV_CLOSE` unadjusted on ex-date. Leading spaces after commas. | VERIFIED | 2025-10-14 fixture |
 | P11 | Time of day the bhavcopy and delivery files become available | UNVERIFIED | |
-| P12 | Source for corporate-action records (ratios, ex-dates) | UNVERIFIED | Likely `www.nseindia.com` API → local fetcher |
+| P12 | Source for corporate-action records: `www.nseindia.com/api/corporates-corporateActions?index=equities&from_date=DD-MM-YYYY&to_date=DD-MM-YYYY` (JSON list: `symbol, series, isin, exDate, recDate, faceVal, subject, caBroadcastDate, …`). | VERIFIED | `corp_actions/` fixture, `tests/test_nse_corp_actions.py` |
+
+## 2b. Corporate actions (fixture: 2025-09-15..2025-10-17 API response, 265 records)
+
+| # | Claim | Status | Evidence |
+|---|---|---|---|
+| CA1 | API `symbol` is the **current** symbol: Tata Motors' 2025-10-14 demerger is listed under `TMPV`. | VERIFIED | test |
+| CA2 | API `isin` is usually the ISIN in force before the action (ADANIPOWER `INE814H01011` on its split). | VERIFIED | test |
+| CA3 | `faceVal` is the **current** face value (ADANIPOWER shows 2 on its 10→2 split record). | VERIFIED | test |
+| CA4 | Rights are quoted `Rights A:B @ Premium Rs X/-`; issue price = face value + premium. CAPTRUST 1:1 @ 4 (FV 10) opened at 0.689 × prior close vs theoretical 0.656. | VERIFIED (formula against one real gap) | test |
+| CA5 | Bonus `A:B` = A new per B held (GODFRYPHLP 2:1 opened at 0.342 × prior close; theory 1/3). Split + bonus on one day are two records (NAZARA, combined 0.25, observed 0.261). | VERIFIED | tests |
+| CA6 | The `Corporate_action.xml` RSS has company name, ex-date, purpose, face value, record date, but **no symbol or ISIN**, so it can only trigger an API fetch. | VERIFIED | test |
+| CA7 | API ISIN is **stale** for ~25% of records: 60 of 237 resolvable records in 28 trading days carried an older ISIN than bhavcopy (e.g. DIXON `INE935N01012` vs `INE935N01020`). Old and new ISINs share the 4-char issuer code (chars 4-7), except PREMIERPOL (`INE247401016` vs `INE309M01020`). | VERIFIED (DIXON, PREMIERPOL in test); counts OBSERVED | Resolution: ISIN, then symbol with same issuer code, else quarantine |
+| CA8 | `caBroadcastDate` is `null` on every record in the fixture, so action visibility time is unknown. | VERIFIED | fixture |
+| CA9 | All 256 EQ records in the window match one of five purpose patterns (dividend, bonus, face-value split, rights with premium, demerger); 9 GS records are interest payments. | VERIFIED | test |
 
 ## 2a. Implementation facts (DuckDB 1.3.2, pyarrow 26)
 
@@ -81,7 +95,7 @@ Last reviewed: 2026-11-13.
 
 | # | Claim | Status | Evidence |
 |---|---|---|---|
-| A1 | `nsearchives.nseindia.com` returns 200 from a cloud container; `www.nseindia.com` and `api.bseindia.com` return 403. | OBSERVED | 2026-11-13 |
+| A1 | `nsearchives.nseindia.com` returns 200 from a cloud container. The `www.nseindia.com/` HTML page and `api.bseindia.com` return 403, but `www.nseindia.com/api/` endpoints (corporate actions, shareholding master, holiday master) returned 200 with a browser User-Agent and no cookie warm-up. | OBSERVED | 2026-11-13 |
 | A2 | `content/RSS/Financial_Results.xml` items carry no file links (period/scope description only). | OBSERVED | 2026-11-13 |
 | A3 | `content/RSS/Online_announcements.xml` carries direct `corporate/xbrl/*.xml` links for Reg. 30 event filings (54 of ~300 items: analyst meets, KMP changes, orders, board outcomes, demerger, acquisitions). | OBSERVED | 2026-11-13 |
 | A4 | RSS `pubDate` has second precision (`13-Nov-2026 00:25:25`), IST. IST is assumed, not stated in the feed. | OBSERVED | 2026-11-13 |

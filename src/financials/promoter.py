@@ -18,7 +18,7 @@ from typing import Any
 
 import duckdb
 
-from financials.corp_actions import ACCEPTED_STATUSES, CorpAction, adjust_closes, audit_day, verify_action
+from financials.corp_actions import ACCEPTED_STATUSES, CorpAction, adjust_closes, audit_day, verify_group
 from financials.db import fetch_dicts, insert_rows
 from financials.identity import UNIVERSE_SERIES, Interval, SecurityRegistry
 from financials.ids import stable_id
@@ -49,7 +49,11 @@ class PromotionResult:
 def promote(con: duckdb.DuckDBPyConnection, stage_dir: Path) -> PromotionResult:
     manifest = read_manifest(stage_dir)
     job = manifest["job"]
-    handler = {"market_day": _promote_market_day, "results_xbrl": _promote_results_xbrl}.get(job)
+    handler = {
+        "market_day": _promote_market_day,
+        "results_xbrl": _promote_results_xbrl,
+        "corp_actions": _promote_corp_actions,
+    }.get(job)
     if handler is None:
         raise ValueError(f"unknown job {job!r}")
     con.execute("BEGIN TRANSACTION")
@@ -192,10 +196,7 @@ def _promote_market_day(con, stage_dir: Path, manifest: dict[str, Any]) -> Promo
     insert_rows(
         con,
         "securities",
-        [
-            {"security_id": s.security_id, "entity_id": s.entity_id, "share_class": "COMMON"}
-            for s in obs.new_securities
-        ],
+        [{"security_id": s.security_id, "entity_id": s.entity_id, "share_class": "COMMON"} for s in obs.new_securities],
         or_ignore=True,
     )
     for iv in obs.closed:
@@ -285,9 +286,7 @@ def _audit_gaps(con, exchange: str, trade_date: date, obs) -> list[str]:
     isin_changed = {e.security_id for e in obs.events if e.kind == "ISIN_CHANGE"}
     out = []
     for sec, open_t in opens.items():
-        for finding in audit_day(
-            sec, trade_date, open_t, prev.get(sec), by_sec.get(sec, ()), sec in isin_changed
-        ):
+        for finding in audit_day(sec, trade_date, open_t, prev.get(sec), by_sec.get(sec, ()), sec in isin_changed):
             out.append(
                 _quarantine(
                     con,
@@ -329,9 +328,16 @@ def _actions(con, where: str, params: list[Any]) -> list[CorpAction]:
 
 
 def record_corp_action(
-    con, action: CorpAction, *, source_filing_id: str, entity_id: str | None = None
+    con,
+    action: CorpAction,
+    *,
+    source_filing_id: str,
+    entity_id: str | None = None,
+    status: str = "PENDING",
 ) -> None:
-    """Ledger insert. Callers own the transaction; status always starts PENDING."""
+    """Ledger insert (idempotent on action_id). Callers own the transaction."""
+    if status not in ("PENDING", "QUARANTINED"):
+        raise ValueError("new actions start PENDING (or QUARANTINED when unparseable)")
     insert_rows(
         con,
         "corp_actions",
@@ -346,57 +352,185 @@ def record_corp_action(
                 "ratio_den": action.ratio_den,
                 "issue_price": action.issue_price,
                 "cash_per_share": action.cash_per_share,
-                "status": "PENDING",
+                "status": status,
                 "source_filing_id": source_filing_id,
             }
         ],
+        or_ignore=True,
     )
 
 
 def verify_pending_actions(con, exchange: str) -> int:
-    """Verify every PENDING action whose ex-date bar and prior bar exist."""
-    n = 0
-    for a in _actions(con, "status = 'PENDING'", []):
+    """Verify PENDING actions, grouped per (security, ex_date), once both bars exist.
+
+    Returns the number of actions decided. Earlier GAP quarantines on that date are resolved
+    only if the accepted factors now explain the gap (residual re-audit).
+    """
+    pending = _actions(con, "status = 'PENDING'", [])
+    keys = sorted({(a.security_id, a.ex_date) for a in pending})
+    decided = 0
+    for sec, ex in keys:
+        group = _actions(con, "security_id = ? AND ex_date = ? AND status IN ('PENDING', 'QUARANTINED')", [sec, ex])
         bar = con.execute(
-            "SELECT open FROM ohlcv WHERE security_id = ? AND exchange = ? AND trade_date = ?",
-            [a.security_id, exchange, a.ex_date],
+            "SELECT open FROM ohlcv WHERE security_id = ? AND exchange = ? AND trade_date = ?", [sec, exchange, ex]
         ).fetchone()
         prev = con.execute(
-            "SELECT arg_max(close, trade_date) FROM ohlcv WHERE security_id = ? AND exchange = ? "
-            "AND trade_date < ?",
-            [a.security_id, exchange, a.ex_date],
+            "SELECT arg_max(close, trade_date) FROM ohlcv WHERE security_id = ? AND exchange = ? AND trade_date < ?",
+            [sec, exchange, ex],
         ).fetchone()
         if bar is None or prev is None or prev[0] is None:
             continue
-        v = verify_action(a, bar[0], prev[0])
-        con.execute(
-            "UPDATE corp_actions SET status = ?, price_factor = ?, eps_factor = ?, observed_gap = ? "
-            "WHERE action_id = ?",
-            [v.status, _f(v.price_factor), _f(v.eps_factor), _f(v.observed_gap), a.action_id],
-        )
-        if v.status in ACCEPTED_STATUSES:
-            # The missing explanation for an earlier gap has arrived: resolve it, keep the record.
+        results = verify_group(group, bar[0], prev[0])
+        for a, v in zip(group, results, strict=True):
             con.execute(
-                "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', "
-                "resolution_note = ? WHERE stage = 'GAP' AND security_id = ? AND resolved_at IS NULL "
+                "UPDATE corp_actions SET status = ?, price_factor = ?, eps_factor = ?, observed_gap = ? "
+                "WHERE action_id = ?",
+                [v.status, _f(v.price_factor), _f(v.eps_factor), _f(v.observed_gap), a.action_id],
+            )
+            if v.status == "QUARANTINED" and a.status == "PENDING":
+                _quarantine(
+                    con,
+                    stage="CORP_ACTION",
+                    reason_code="VERIFY_FAILED",
+                    security_id=sec,
+                    details={
+                        "action_id": a.action_id,
+                        "reason": v.reason,
+                        "observed_gap": v.observed_gap,
+                        "price_factor": v.price_factor,
+                    },
+                )
+            decided += a.status == "PENDING"
+        accepted = [
+            a for a in _actions(con, "security_id = ? AND ex_date = ?", [sec, ex]) if a.status in ACCEPTED_STATUSES
+        ]
+        if accepted and not [
+            f for f in audit_day(sec, ex, bar[0], prev[0], accepted, False) if f.reason_code == "UNEXPLAINED_GAP"
+        ]:
+            con.execute(
+                "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ? "
+                "WHERE stage = 'GAP' AND reason_code = 'UNEXPLAINED_GAP' AND security_id = ? AND resolved_at IS NULL "
                 "AND CAST(json_extract_string(details, '$.trade_date') AS DATE) = ?",
-                [utc_now(), f"explained by {a.action_type} {a.action_id}", a.security_id, a.ex_date],
+                [utc_now(), "explained by " + ", ".join(f"{a.action_type} {a.action_id}" for a in accepted), sec, ex],
             )
-        if v.status == "QUARANTINED":
-            _quarantine(
-                con,
-                stage="CORP_ACTION",
-                reason_code="VERIFY_FAILED",
-                security_id=a.security_id,
-                details={
-                    "action_id": a.action_id,
-                    "reason": v.reason,
-                    "observed_gap": v.observed_gap,
-                    "price_factor": v.price_factor,
-                },
+        if any(a.action_type in ("SPLIT", "CONSOLIDATION") for a in accepted):
+            con.execute(
+                "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ? "
+                "WHERE stage = 'GAP' AND reason_code = 'ISIN_CHANGE_WITHOUT_ACTION' AND security_id = ? "
+                "AND resolved_at IS NULL AND CAST(json_extract_string(details, '$.trade_date') AS DATE) = ?",
+                [utc_now(), "explained by recorded split/consolidation", sec, ex],
             )
-        n += 1
-    return n
+    return decided
+
+
+def resolve_security_by_isin(con, exchange: str, isin: str, on_date: date) -> list[str]:
+    """Securities holding `isin` on `on_date`; falls back to any interval with that ISIN."""
+    rows = con.execute(
+        "SELECT DISTINCT security_id FROM security_identifier_history WHERE exchange = ? AND isin = ? "
+        "AND valid_from <= ? AND (valid_to IS NULL OR valid_to > ?)",
+        [exchange, isin, on_date, on_date],
+    ).fetchall()
+    if not rows:
+        rows = con.execute(
+            "SELECT DISTINCT security_id FROM security_identifier_history WHERE exchange = ? AND isin = ?",
+            [exchange, isin],
+        ).fetchall()
+    return [r[0] for r in rows]
+
+
+def isin_issuer_code(isin: str) -> str:
+    """Characters 4-7 of an Indian ISIN identify the issuer; splits keep them [CA7]."""
+    return isin[3:7]
+
+
+def resolve_corp_action_security(con, exchange: str, isin: str, symbol: str, on_date: date) -> tuple[list[str], str]:
+    """(candidates, method). The API ISIN is often stale [CA7], so after the ISIN, try the symbol
+    but only accept holders whose ISIN has the same issuer code (PREMIERPOL changed issuer code)."""
+    secs = resolve_security_by_isin(con, exchange, isin, on_date)
+    if secs:
+        return secs, "ISIN"
+    rows = (
+        con.execute(
+            "SELECT DISTINCT security_id, isin FROM security_identifier_history WHERE exchange = ? AND symbol = ? "
+            "AND valid_from <= ? AND (valid_to IS NULL OR valid_to > ?)",
+            [exchange, symbol, on_date, on_date],
+        ).fetchall()
+        or con.execute(
+            "SELECT DISTINCT security_id, isin FROM security_identifier_history WHERE exchange = ? AND symbol = ?",
+            [exchange, symbol],
+        ).fetchall()
+    )
+    same_issuer = sorted({sec for sec, held in rows if isin_issuer_code(held) == isin_issuer_code(isin)})
+    if same_issuer:
+        return same_issuer, "SYMBOL_SAME_ISSUER"
+    return [], "STALE_ISIN_OTHER_ISSUER" if rows else "UNKNOWN_ISIN"
+
+
+def _promote_corp_actions(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
+    """Record staged actions; the API ISIN is the pre-action ISIN, so resolve on ex_date - 1 [CA2]."""
+    from datetime import timedelta
+
+    exchange = manifest["exchange"]
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings"))
+    quarantined: list[str] = []
+    recorded = 0
+    for r in read_table(con, stage_dir, "stg_corp_actions"):
+        if r["parse_status"] == "IGNORED":
+            continue
+        secs, method = resolve_corp_action_security(
+            con, exchange, r["isin"], r["symbol"], r["ex_date"] - timedelta(days=1)
+        )
+        if len(secs) != 1:
+            quarantined.append(
+                _quarantine(
+                    con,
+                    stage="CORP_ACTION",
+                    reason_code=method if not secs else "AMBIGUOUS_SECURITY",
+                    filing_id=r["filing_id"],
+                    details={
+                        "isin": r["isin"],
+                        "symbol": r["symbol"],
+                        "ex_date": r["ex_date"],
+                        "subject": r["subject"],
+                    },
+                )
+            )
+            continue
+        sec = secs[0]
+        entity = con.execute("SELECT entity_id FROM securities WHERE security_id = ?", [sec]).fetchone()[0]
+        action = CorpAction(
+            action_id=stable_id("ca", exchange, r["isin"], r["ex_date"], r["subject"], r["component"]),
+            security_id=sec,
+            action_type=r["action_type"],
+            ex_date=r["ex_date"],
+            ratio_num=r["ratio_num"],
+            ratio_den=r["ratio_den"],
+            issue_price=r["issue_price"],
+            cash_per_share=r["cash_per_share"],
+        )
+        unparsed = r["parse_status"] == "UNPARSED"
+        record_corp_action(
+            con,
+            action,
+            source_filing_id=r["filing_id"],
+            entity_id=entity,
+            status="QUARANTINED" if unparsed else "PENDING",
+        )
+        if unparsed:
+            quarantined.append(
+                _quarantine(
+                    con,
+                    stage="CORP_ACTION",
+                    reason_code="UNPARSED_PURPOSE",
+                    security_id=sec,
+                    entity_id=entity,
+                    filing_id=r["filing_id"],
+                    details={"subject": r["subject"], "reason": r["parse_reason"], "ex_date": r["ex_date"]},
+                )
+            )
+        recorded += 1
+    verify_pending_actions(con, exchange)
+    return PromotionResult("PROMOTED", "corp_actions", message=f"{recorded} actions", quarantined=quarantined)
 
 
 def _f(x: Decimal | None) -> float | None:
@@ -483,9 +617,7 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
 
     board_end = meta["board_meeting_end_ts"]
     board_ist_date = utc_to_ist_date(board_end) if board_end is not None else None
-    visible, source = _visible_from(
-        con, filing["exchange"], filing["broadcast_ts"], board_end, board_ist_date
-    )
+    visible, source = _visible_from(con, filing["exchange"], filing["broadcast_ts"], board_end, board_ist_date)
     if visible is None:
         q = _quarantine(
             con,
@@ -523,9 +655,7 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
         ],
     )
     facts = read_table(con, stage_dir, "stg_xbrl_facts")
-    insert_rows(
-        con, "fact_observations", [{**f, "entity_id": entity_id, "visible_from_ts": visible} for f in facts]
-    )
+    insert_rows(con, "fact_observations", [{**f, "entity_id": entity_id, "visible_from_ts": visible} for f in facts])
     return PromotionResult("PROMOTED", "results_xbrl", message=fid)
 
 

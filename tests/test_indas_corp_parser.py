@@ -85,9 +85,7 @@ def test_dimensional_facts_are_not_mapped(parsed):
     assert len(rpt) == 1 and rpt[0].value == Decimal("891230000")
 
 
-@pytest.mark.parametrize(
-    ("path", "profile"), [(NBFC, "INDAS_NBFC"), (BANK, "IGAAP_BANK"), (GEN_INS, "IRDAI_GENERAL")]
-)
+@pytest.mark.parametrize(("path", "profile"), [(NBFC, "INDAS_NBFC"), (BANK, "IGAAP_BANK"), (GEN_INS, "IRDAI_GENERAL")])
 def test_other_profiles_are_routed_not_parsed(path, profile):
     r = parse_indas_corp_results(path.read_bytes())
     assert r.profile == profile

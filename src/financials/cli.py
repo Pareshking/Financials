@@ -82,6 +82,8 @@ def build_parser() -> argparse.ArgumentParser:
     fs = sub.add_parser("fetch-shareholding")
     fs.add_argument("symbols", nargs="+")
     fs.add_argument("--all-history", action="store_true")
+    fe = sub.add_parser("fetch-events", help="Reg. 30 structured event XBRL from the announcements RSS")
+    fe.add_argument("--limit", type=int)
     fa = sub.add_parser("fetch-annual", help="Reg. 34 annual report XBRL (FY ending 2025 onwards)")
     fa.add_argument("symbols", nargs="+")
     fr = sub.add_parser("fetch-results", help="results XBRL by URL")
@@ -152,6 +154,8 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
         elif args.cmd == "fetch-shareholding":
             for sym in args.symbols:
                 staged += jobs.shareholding(sym, latest_only=not args.all_history)
+        elif args.cmd == "fetch-events":
+            staged += jobs.reg30_events(limit=args.limit)
         elif args.cmd == "fetch-annual":
             for sym in args.symbols:
                 staged += jobs.annual_reports(sym)

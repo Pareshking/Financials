@@ -40,6 +40,7 @@ REASONS = {
 }
 INSURERS = frozenset({"IRDAI_LIFE", "IRDAI_GENERAL", "INDAS_INSURANCE"})
 ANNUAL = frozenset({"REG34_ANNUAL"})
+EVENTS = frozenset({"REG30_EVENT"})
 
 # (regex, reason, profiles or None = every profile). Order matters: more specific first.
 RULES: tuple[tuple[str, str, frozenset | None], ...] = (
@@ -209,6 +210,8 @@ RULES: tuple[tuple[str, str, frozenset | None], ...] = (
         "BALANCE_SHEET_DETAIL",
         ANNUAL,
     ),
+    # Reg. 30 event filings: counts, terms and capital figures that the event rows do not need [E6]
+    (r"(^NumberOf|TermOfAppointment|^PaidUpShareCapital(Pre|Post))", "NON_FINANCIAL_COUNT", EVENTS),
     # cash-flow components
     (
         r"(^Adjustments|ClassifiedAs(Operating|Investing|Financing)Activities|^ProceedsFrom|^PaymentsFor|^PaymentsOf"

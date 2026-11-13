@@ -200,6 +200,38 @@ def shareholding_columns(shp: dict) -> dict:
     return out
 
 
+EVENT_COLUMNS = (
+    "order_wins_90d", "order_value_90d", "kmp_resignations_90d", "auditor_resignations_90d", "fraud_or_default_90d",
+    "penalties_90d",
+)  # fmt: skip
+
+
+def _event_counts(con, as_of: date, as_of_ts: datetime) -> dict[str, dict]:
+    """Reg. 30 events [E3-E7] visible at the as-of and disclosed (DateOfReport) in the 90 days to as-of; one batched
+    query. The disclosure date, not the effective date: a resignation effective next month is news today [E5].
+    KMP resignations: Key Managerial Personnel or directors leaving by resignation; auditors are counted apart.
+    penalties_90d stays NULL: no penalty / regulatory-action filing has been observed (UNVERIFIED [E7])."""
+    rows = con.execute(
+        """SELECT entity_id,
+                  count(*) FILTER (WHERE event_type = 'ORDER_WIN'),
+                  sum(amount_inr) FILTER (WHERE event_type = 'ORDER_WIN'),
+                  count(*) FILTER (WHERE event_type = 'MANAGEMENT_CHANGE' AND cessation_category = 'Resignation'
+                                   AND (person_category = 'Key Managerial Personnel'
+                                        OR person_category ILIKE 'Director%')),
+                  count(*) FILTER (WHERE event_type = 'AUDITOR_CHANGE' AND cessation_category = 'Resignation'),
+                  count(*) FILTER (WHERE event_type = 'FRAUD_OR_DEFAULT')
+           FROM corporate_events
+           WHERE visible_from_ts <= ? AND report_date > ? AND report_date <= ?
+           GROUP BY entity_id""",
+        [as_of_ts, as_of - timedelta(days=90), as_of],
+    ).fetchall()
+    return {
+        ent: {"order_wins_90d": wins, "order_value_90d": value, "kmp_resignations_90d": kmp,
+              "auditor_resignations_90d": aud, "fraud_or_default_90d": fraud, "penalties_90d": None}
+        for ent, wins, value, kmp, aud, fraud in rows
+    }  # fmt: skip
+
+
 def _preload(con, as_of_ts: datetime):
     """Bulk point-in-time lookups keyed by entity (avoids per-security queries)."""
     # One filing per (entity, as_of): the latest visible revision. Then the two latest as_of dates
@@ -306,6 +338,7 @@ def compute_rows(con, as_of: date, exchange: str = "NSE") -> list[dict]:
         ).fetchall()
     }
     shp_all, paid_up, quarter_end = _preload(con, as_of_ts)
+    events = _event_counts(con, as_of, as_of_ts)
     history = _valuation_history(con, as_of)
     curated = _curated_archetypes()
     arch_override = dict(con.execute("SELECT entity_id, valuation_archetype FROM entity_archetype_override").fetchall())
@@ -318,6 +351,10 @@ def compute_rows(con, as_of: date, exchange: str = "NSE") -> list[dict]:
             "as_of_date": as_of, "security_id": sec, "entity_id": ent, "symbol": symbol, "series": series,
             "price_date": price_date, "close": close, "in_nifty500": sec in nifty,
         }  # fmt: skip
+        # No event visible in the window = 0 (an absence of filings), except penalties (no verified source).
+        row.update(
+            events.get(ent) or {**dict.fromkeys(EVENT_COLUMNS, 0), "order_value_90d": None, "penalties_90d": None}
+        )
         row.update(_momentum(b, factors.get(sec, []), frozen.get(sec)))
         row.update(_delivery(b))
 

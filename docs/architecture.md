@@ -352,6 +352,19 @@ comparisons or other periods.
 | `reverse_dcf_implied_g` | g such that 5-year DCF (WACC 12%, terminal 4%) = EV | FCFF > 0, EV > 0 |
 | `pe_percentile`, `ev_ebitda_percentile` | rank vs own prior quarter-end values | ≥ 4 prior quarters |
 
+### 10.9 Annual-statement ratios (Reg. 34, C23) and Reg. 30 event counts (E3-E7)
+
+| Column | Definition |
+|---|---|
+| `piotroski_f` | Piotroski F-score 0..9 for the latest 12-month FY in the row's scope; year-end total assets (C23); NULL without a post-cutoff prior FY |
+| `beneish_m` | Beneish 8-variable M-score (SG&A proxy = `OtherExpenses`); NULL without a post-cutoff prior FY |
+| `capex_to_depreciation`, `cwip_to_gross_block`, `rote`, `rnd_and_royalty_intensity`, `contingent_liabilities_to_net_worth`, `annual_fy_end` | FY ratios from the Reg. 34 notes (PPE schedule X71, notes X73) |
+| `order_wins_90d`, `order_value_90d`, `kmp_resignations_90d`, `auditor_resignations_90d`, `fraud_or_default_90d` | Reg. 30 events visible at the as-of and disclosed in the 90 days to it (`corporate_events`) |
+| `penalties_90d` | NULL: no penalty / regulatory-action filing observed (UNVERIFIED, E7) |
+
+Revisions (E9, E10): `filing_revisions` links a filing to the one it supersedes (REVISION or byte-identical RESEND);
+PIT reads already take the latest version visible at the as-of, so the link is provenance, not a read path.
+
 ### 10.7 `screener_features` columns in Phase 1
 
 Source of truth: `screener_features_history` in `schema.sql`; aliases in `financials.dsl.ALIASES`.

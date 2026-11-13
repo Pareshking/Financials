@@ -37,7 +37,7 @@ CREATE TABLE stg_xbrl_filing (
     fy_start DATE NOT NULL, fy_end DATE NOT NULL, period_end DATE NOT NULL, reporting_quarter VARCHAR,
     audited BOOLEAN, board_meeting_end_ts TIMESTAMP, interest_paid_cfo_class VARCHAR,
     interest_recd_cfo_class VARCHAR, stated_isin VARCHAR, stated_symbol VARCHAR, company_name VARCHAR,
-    stated_cin VARCHAR, auditor_qualified BOOLEAN
+    stated_cin VARCHAR, auditor_qualified BOOLEAN, audit_opinion VARCHAR
 );
 CREATE TABLE stg_xbrl_facts (
     filing_id VARCHAR NOT NULL, parser_version VARCHAR NOT NULL, scope VARCHAR NOT NULL,
@@ -71,6 +71,13 @@ CREATE TABLE stg_shp_categories (
     filing_id VARCHAR NOT NULL, category VARCHAR NOT NULL, shares BIGINT, holders BIGINT, pct DOUBLE,
     demat_shares BIGINT, voting_rights BIGINT, PRIMARY KEY (filing_id, category)
 );
+CREATE TABLE stg_events (
+    filing_id VARCHAR NOT NULL, record_key VARCHAR NOT NULL, family VARCHAR NOT NULL, event_type VARCHAR NOT NULL,
+    event_subtype VARCHAR, occurred_on DATE, report_date DATE NOT NULL, counterparty VARCHAR,
+    amount_inr DECIMAL(20,2), person_name VARCHAR, person_category VARCHAR, change_type VARCHAR,
+    cessation_category VARCHAR, details JSON, stated_symbol VARCHAR, stated_isin VARCHAR,
+    PRIMARY KEY (filing_id, record_key)
+);
 CREATE TABLE stg_issues (
     filing_id VARCHAR, stage VARCHAR NOT NULL, reason_code VARCHAR NOT NULL, details JSON NOT NULL
 );
@@ -91,6 +98,7 @@ TABLE_ORDER = (
     "stg_xbrl_filing",
     "stg_xbrl_facts",
     "stg_corp_actions",
+    "stg_events",
     "stg_issues",
 )
 
@@ -303,6 +311,7 @@ def stage_results_xbrl(
             "company_name": m["company_name"],
             "stated_cin": m.get("stated_cin"),
             "auditor_qualified": m.get("auditor_qualified"),
+            "audit_opinion": m.get("audit_opinion"),
         }
     ]
     tables["stg_xbrl_facts"] = [
@@ -568,6 +577,81 @@ def stage_shareholding(
         for cat, vals in sorted(parsed.categories.items())
     ]
     return write_stage(stage_root, "shareholding", fid, tables)
+
+
+def stage_reg30_event(
+    vault: Vault,
+    stage_root: Path,
+    *,
+    data: bytes,
+    source_url: str,
+    fetched_at: datetime,
+    broadcast_ts: datetime | None = None,
+    broadcast_ts_source: str = "UNKNOWN",
+    exchange: str = "NSE",
+) -> Path:
+    """Vault + parse one Reg. 30 structured event XBRL [E1-E7]; broadcast time from the announcements RSS."""
+    from financials.parsers.reg30_events import parse_reg30_event
+
+    blob = vault.put(data, ext="xml", media_type="application/xml", fetched_at=fetched_at)
+    filing = make_filing(
+        blob,
+        exchange=exchange,
+        category="REG30_EVENT",
+        source_url=source_url,
+        fetched_at=fetched_at,
+        broadcast_ts=broadcast_ts,
+        broadcast_ts_source=broadcast_ts_source,
+    )
+    fid = filing.filing_id
+    tables: dict[str, list[dict[str, Any]]] = {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)]}
+    try:
+        tables["raw_xbrl_facts"] = _raw_fact_rows(fid, parse_instance(data))
+        parsed = parse_reg30_event(data)
+    except ParseError as exc:
+        tables["stg_issues"] = [
+            {
+                "filing_id": fid,
+                "stage": "PARSE",
+                "reason_code": "PARSE_ERROR",
+                "details": json.dumps({"error": str(exc)}),
+            }
+        ]
+        return write_stage(stage_root, "reg30_event", fid, tables)
+    if parsed.issues:
+        tables["stg_issues"] = [
+            {
+                "filing_id": fid,
+                "stage": i.stage,
+                "reason_code": i.reason_code,
+                "details": json.dumps(i.details, default=str, sort_keys=True),
+            }
+            for i in parsed.issues
+        ]
+        return write_stage(stage_root, "reg30_event", fid, tables)
+    m = parsed.meta
+    tables["stg_events"] = [
+        {
+            "filing_id": fid,
+            "record_key": e["record_key"],
+            "family": parsed.family,
+            "event_type": e["event_type"],
+            "event_subtype": e.get("event_subtype"),
+            "occurred_on": e.get("occurred_on"),
+            "report_date": m["report_date"],
+            "counterparty": e.get("counterparty"),
+            "amount_inr": e.get("amount_inr"),
+            "person_name": e.get("person_name"),
+            "person_category": e.get("person_category"),
+            "change_type": e.get("change_type"),
+            "cessation_category": e.get("cessation_category"),
+            "details": json.dumps(e.get("details") or {}, default=str, sort_keys=True),
+            "stated_symbol": m["stated_symbol"],
+            "stated_isin": m["stated_isin"],
+        }
+        for e in parsed.events
+    ]
+    return write_stage(stage_root, "reg30_event", fid, tables, extra={"family": parsed.family})
 
 
 def stage_raw_only(

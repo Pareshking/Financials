@@ -2,7 +2,7 @@
 
 <!-- GENERATED from config/data_sources.yaml by `python -m financials.sources --write`. Do not edit. -->
 
-26 feeds: 9 VERIFIED, 10 OBSERVED, 5 UNVERIFIED, 2 PLANNED. Status meanings and runtime labels are defined in `config/data_sources.yaml`; evidence IDs point to `docs/references.md`.
+26 feeds: 10 VERIFIED, 9 OBSERVED, 5 UNVERIFIED, 2 PLANNED. Status meanings and runtime labels are defined in `config/data_sources.yaml`; evidence IDs point to `docs/references.md`.
 
 | ID | Feed | Phase | Status | Runtime | Evidence |
 |---|---|---|---|---|---|
@@ -26,7 +26,7 @@
 | F18 | MWPL and F&O ban list | 3 | OBSERVED | CONTAINER_DIRECT | FD18 |
 | F19 | SLBM bhavcopy | 3 | OBSERVED | CONTAINER_DIRECT | FD19 |
 | F20 | ASM/GSM surveillance, price bands, VaR/ELM margins | 3 | OBSERVED | CONTAINER_DIRECT | FD20 |
-| F21 | Reg. 30 structured event XBRL and announcements RSS | 3 | OBSERVED | CONTAINER_DIRECT | A3, A4 |
+| F21 | Reg. 30 structured event XBRL and announcements RSS | 2 | VERIFIED | CONTAINER_DIRECT | A3, A4, E1, E2, E3, E4, E5, E6, E7 |
 | F22 | Credit rating disclosures and Reg. 50/52/57 debt XBRL | 3 | UNVERIFIED | UNKNOWN | — |
 | F23 | Governance, voting results, fund deviation, secretarial compliance XBRL | 3 | OBSERVED | CONTAINER_DIRECT | A7 |
 | F24 | Reg. 34(2)(f) BRSR XBRL | 3 | UNVERIFIED | UNKNOWN | — |
@@ -383,12 +383,12 @@
 | cadence | Intraday / event |
 | fetch_runtime | CONTAINER_DIRECT |
 | join_keys | company, broadcast time |
-| target_tables | (planned) corporate_events |
-| unlocked_metrics | order wins, KMP/auditor exits, fund raising, red-flag counts |
-| phase | 3 |
-| verification_status | OBSERVED |
-| evidence | A3, A4 |
-| notes | 54 of ~300 RSS items carried XBRL links (analyst meets, KMP changes, orders, demerger, acquisitions). Event XBRL schemas not inspected. |
+| target_tables | raw_xbrl_facts, corporate_events |
+| unlocked_metrics | order_wins_90d, order_value_90d, kmp_resignations_90d, auditor_resignations_90d, fraud_or_default_90d |
+| phase | 2 |
+| verification_status | VERIFIED |
+| evidence | A3, A4, E1, E2, E3, E4, E5, E6, E7 |
+| notes | fetch-events: Para B (orders, litigation), changes in management, allotments, fraud/default parsed; other families vaulted raw. Penalty / regulatory-action events not observed (E7): penalties_90d NULL. |
 
 ## F22 — Credit rating disclosures and Reg. 50/52/57 debt XBRL
 

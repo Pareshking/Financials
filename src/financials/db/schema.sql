@@ -181,7 +181,43 @@ CREATE TABLE IF NOT EXISTS filing_meta (
     interest_paid_cfo_class VARCHAR,
     interest_recd_cfo_class VARCHAR,
     auditor_qualified       BOOLEAN,            -- Reg. 34: WhetherAuditorsReportHasBeenQualified... [X76]
+    audit_opinion           VARCHAR,            -- Integrated Filing declaration: UNMODIFIED | NOT_APPLICABLE | raw text [E8]
     PRIMARY KEY (filing_id, parser_version)
+);
+
+-- Revision chains (append-only link table; filings rows are never updated) [E9]. A later filing of the same
+-- entity, profile, scope and period end supersedes the earlier one: REVISION when the bytes differ, RESEND when
+-- the blob is byte-identical.
+CREATE TABLE IF NOT EXISTS filing_revisions (
+    filing_id             VARCHAR NOT NULL REFERENCES filings(filing_id),
+    supersedes_filing_id  VARCHAR NOT NULL REFERENCES filings(filing_id),
+    entity_id             VARCHAR NOT NULL REFERENCES entity_master(entity_id),
+    period_end            DATE NOT NULL,
+    scope                 VARCHAR NOT NULL,
+    relation              VARCHAR NOT NULL,     -- REVISION | RESEND
+    PRIMARY KEY (filing_id, supersedes_filing_id)
+);
+
+-- Reg. 30 structured events [E1-E7]. One row per record (an order, a person, an allotment). event_id derives from
+-- the blob sha256 + record, so byte-identical re-sends are one event.
+CREATE TABLE IF NOT EXISTS corporate_events (
+    event_id           VARCHAR PRIMARY KEY,
+    filing_id          VARCHAR NOT NULL REFERENCES filings(filing_id),
+    parser_version     VARCHAR NOT NULL,
+    entity_id          VARCHAR NOT NULL REFERENCES entity_master(entity_id),
+    family             VARCHAR NOT NULL,        -- PARA_B | CHANGE_IN_MANAGEMENT | FUND_RAISING | FRAUD_OR_DEFAULT
+    event_type         VARCHAR NOT NULL,        -- ORDER_WIN | LITIGATION | MANAGEMENT_CHANGE | AUDITOR_CHANGE | ...
+    event_subtype      VARCHAR,                 -- as filed
+    occurred_on        DATE,
+    report_date        DATE NOT NULL,
+    counterparty       VARCHAR,
+    amount_inr         DECIMAL(20,2),           -- absolute rupees as filed; NULL when not a number
+    person_name        VARCHAR,
+    person_category    VARCHAR,                 -- as filed (Key Managerial Personnel, Auditors, ...)
+    change_type        VARCHAR,                 -- Appointment | Cessation
+    cessation_category VARCHAR,                 -- Resignation | Superannuation or retirement | Cessation | ...
+    details            JSON,
+    visible_from_ts    TIMESTAMP NOT NULL       -- broadcast (RSS pubDate, IST -> UTC)
 );
 
 CREATE TABLE IF NOT EXISTS fact_observations (
@@ -429,6 +465,12 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     rnd_and_royalty_intensity DOUBLE,        -- (R&D + royalty) / revenue; NULL when neither is disclosed [X73]
     contingent_liabilities_to_net_worth DOUBLE, -- contingent liabilities / owners' equity [X73]
     annual_fy_end       DATE,                -- fiscal year the annual ratios (incl. Piotroski/Beneish) use
+    order_wins_90d      INTEGER,             -- Reg. 30 order wins visible, occurred in the 90 days to as-of [E3]
+    order_value_90d     DECIMAL(24,2),       -- sum of their filed amounts (rupees)
+    kmp_resignations_90d INTEGER,            -- KMP / director cessations by resignation [E5]
+    auditor_resignations_90d INTEGER,        -- auditor cessations by resignation [E5]
+    fraud_or_default_90d INTEGER,            -- fraud / default disclosures [E7]
+    penalties_90d       INTEGER,             -- NULL: no penalty / regulatory-action event observed (UNVERIFIED) [E7]
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -563,6 +605,12 @@ CREATE TABLE IF NOT EXISTS screener_features (
     rnd_and_royalty_intensity DOUBLE,        -- (R&D + royalty) / revenue; NULL when neither is disclosed [X73]
     contingent_liabilities_to_net_worth DOUBLE, -- contingent liabilities / owners' equity [X73]
     annual_fy_end       DATE,                -- fiscal year the annual ratios (incl. Piotroski/Beneish) use
+    order_wins_90d      INTEGER,             -- Reg. 30 order wins visible, occurred in the 90 days to as-of [E3]
+    order_value_90d     DECIMAL(24,2),       -- sum of their filed amounts (rupees)
+    kmp_resignations_90d INTEGER,            -- KMP / director cessations by resignation [E5]
+    auditor_resignations_90d INTEGER,        -- auditor cessations by resignation [E5]
+    fraud_or_default_90d INTEGER,            -- fraud / default disclosures [E7]
+    penalties_90d       INTEGER,             -- NULL: no penalty / regulatory-action event observed (UNVERIFIED) [E7]
     PRIMARY KEY (as_of_date, security_id)
 );
 

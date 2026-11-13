@@ -204,6 +204,25 @@ Inspected for Batch 9 but not committed (3-8 MB each; registered in docs/tag_reg
 | `AR_XBRL_SUNPHARMA_30102026194751.xml` (https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_SUNPHARMA_30102026194751.xml) | SUNPHARMA annual XBRL | `2bc3400f673f83c4b721847fcf11146f1a92057b6cab7956c33b1b57801ee1e1` |
 | `AR_XBRL_TATAPOWER_06082025142114.xml` (https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_TATAPOWER_06082025142114.xml) | TATAPOWER annual XBRL | `ff29b910b96886f8fb675b67ab6259793d2e433916d78810e595ad47861f8379` |
 
+## Batch 10 Reg. 30 events and edge cases (fetched 2026-11-13; one file per request)
+
+| File | Why it is here | Source URL | SHA-256 |
+|---|---|---|---|
+| `events/ALTERATION_OF_CAPITAL_AND_FUND_RAISING_818_WebXMLFile_20261113_152039711.xml` | B10: ITC ESOP allotment (E6) | `https://nsearchives.nseindia.com/corporate/xbrl/ALTERATION_OF_CAPITAL_AND_FUND_RAISING_818_WebXMLFile_20261113_152039711.xml` | `9b72b0ed3608ad42276debcc6a1e8478565da5122f5a563f3e69e889a03de311` |
+| `events/ANN_FRAUD_22342_WebXMLFile_20261113_211505185.xml` | B10: Shanthala fraud/default disclosure: no ISIN, text amount, SME (E7) | `https://nsearchives.nseindia.com/corporate/xbrl/ANN_FRAUD_22342_WebXMLFile_20261113_211505185.xml` | `39a39c2e7ad98f74434f4e86cde283aae92ab7aef96367eb84ca6665e5a60445` |
+| `events/CIM_17080_WebXMLFile_20261113_201057828.xml` | B10: Shriram Properties: statutory auditor resignations (E5) | `https://nsearchives.nseindia.com/corporate/xbrl/CIM_17080_WebXMLFile_20261113_201057828.xml` | `71742e003ffb6a8841d6bf6a8a4b1078d5f54e0fdb18b947e8e2d3891dc8167d` |
+| `events/CIM_19883_WebXMLFile_20261113_215018364.xml` | B10: CMS Info: KMP (company secretary) resignation (E5) | `https://nsearchives.nseindia.com/corporate/xbrl/CIM_19883_WebXMLFile_20261113_215018364.xml` | `358613fe16cdcf49a72328724f507651746ca664965c6c20ef808744e9a2f505` |
+| `events/REG30_PARA_B_1254_WebXMLFile_20261113_183420254.xml` | B10: BEL order win, cumulative, amount INR (E3) | `https://nsearchives.nseindia.com/corporate/xbrl/REG30_PARA_B_1254_WebXMLFile_20261113_183420254.xml` | `bdbb6a4184922beaa76f5f7a06fdbcd0ddc93a7fcb5452a7a41633472f4abc60` |
+| `events/REG30_PARA_B_2010_WebXMLFile_20261113_133459972.xml` | B10: Aptech order win (first of two byte-identical re-sends, E4) | `https://nsearchives.nseindia.com/corporate/xbrl/REG30_PARA_B_2010_WebXMLFile_20261113_133459972.xml` | `34eb9d686d6d7ab017c2bd2f1c2358de611ee045d80a7c80d1e6c204e0767c84` |
+| `events/REG30_PARA_B_2010_WebXMLFile_20261113_133619258.xml` | B10: Aptech order win (second, byte-identical, E4) | `https://nsearchives.nseindia.com/corporate/xbrl/REG30_PARA_B_2010_WebXMLFile_20261113_133619258.xml` | `34eb9d686d6d7ab017c2bd2f1c2358de611ee045d80a7c80d1e6c204e0767c84` |
+| `events/REG30_PARA_B_21978_WebXMLFile_20261113_182712819.xml` | B10: JSW Infra order win, named counterparty (E3) | `https://nsearchives.nseindia.com/corporate/xbrl/REG30_PARA_B_21978_WebXMLFile_20261113_182712819.xml` | `8ff50e31fb96bf03eea07e16fa8ab894801945c1bb68903732df4ae18184bb18` |
+| `events/REG30_PARA_B_490_WebXMLFile_20261113_204423166.xml` | B10: Jindal Poly litigation update (E4) | `https://nsearchives.nseindia.com/corporate/xbrl/REG30_PARA_B_490_WebXMLFile_20261113_204423166.xml` | `95a69d45b2d045b5df3bf9e5f55a1b758a63c156ce83337a9f5c3b1e356f5044` |
+| `events/nse_Online_announcements_20261113.xml` | E1: announcements RSS, 13-Nov-2026 21:52 IST (broadcast times) | `https://nsearchives.nseindia.com/content/RSS/Online_announcements.xml` | `adfdfcee3c71d3eacdf0cc87b5c1fdc150c557264ec365fa494785392e4af330` |
+| `xbrl/INTEGRATED_FILING_GI_1738196_14102026103636_WEB.xml` | B10: ICICI Lombard Q2 FY27 original of 1740432 (revision chain, E9) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_GI_1738196_14102026103636_WEB.xml` | `8b27eb7fec52e875a8eb79f384b0733b46e3d50d794849804ffa4dc81ea80205` |
+| `xbrl/IF_INS_COM_IND_AS_21009_WebXMLFile_20261105_192422730.xml` | B10: Go Digit Q2 FY27 (byte-identical to the 12-Nov file: RESEND, E10) | `https://nsearchives.nseindia.com/corporate/xbrl/IF_INS_COM_IND_AS_21009_WebXMLFile_20261105_192422730.xml` | `b431634f9aae204ac71c8babc0e8ff93d3de3e7f0c3499384d347e28aafc1cb0` |
+
+Inspected for Batch 10 but not committed: the other Reg. 30 files listed in docs/tag_registry.yaml (REG30_EVENT).
+
 ## Screener goldens (local only, not committed)
 
 The repository is public, so the user-supplied Screener Excel exports (2026-11-13; 42 distinct files, some uploaded twice)

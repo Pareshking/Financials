@@ -395,7 +395,17 @@ def _parse_meta(inst: Instance, result: ParsedResults) -> None:
         c = inst.contexts[f.context_id]
         if f.name == "WhetherResultsAreAuditedOrUnaudited" and not c.dimensions and c.instant is None:
             audit_by_period[(c.start, c.end)] = {"audited": True, "unaudited": False}.get(f.value_text.strip().lower())
+    # Audit opinion declaration [E8]: only the two values below are observed; anything else is kept verbatim.
+    opinions = {
+        f.value_text.strip()
+        for f in inst.facts
+        if f.name == "DeclarationOfUnmodifiedOpinionOrStatementOnImpactOfAuditQualification"
+        and not inst.contexts[f.context_id].dimensions
+    }
+    known = {"declaration of unmodified opinion": "UNMODIFIED", "not applicable": "NOT_APPLICABLE"}
+    audit_opinion = ",".join(sorted(known.get(o.lower(), o) for o in opinions)) or None
     result.meta.update(
+        audit_opinion=audit_opinion,
         scope=scope,
         level_of_rounding=rounding,
         fy_start=fy_start,

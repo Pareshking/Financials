@@ -27,6 +27,8 @@ from financials.parsers.indas_corp import DURATION_TAGS, IMPLEMENTED_PROFILES, I
 from financials.parsers.indas_nbfc import NBFC_DURATION_TAGS, NBFC_INSTANT_TAGS
 from financials.parsers.integrated import parse_integrated_results
 from financials.parsers.irdai_insurance import SPECS as INSURER_SPECS
+from financials.parsers.reg30_events import FAMILIES as EVENT_FAMILIES
+from financials.parsers.reg30_events import parse_reg30_event
 from financials.parsers.reg34_annual import ANNUAL_DURATION_TAGS, ANNUAL_INSTANT_TAGS, is_reg34
 from financials.parsers.shareholding import (
     CATEGORIES,
@@ -67,6 +69,12 @@ MAPPED_BY_PROFILE = {
     "IGAAP_BANK": _mapped(BANK_DURATION_TAGS, BANK_INSTANT_TAGS),
     **{p: _mapped(spec.duration_tags, spec.instant_tags) for p, spec in INSURER_SPECS.items()},
     SHP_PROFILE: SHP_MAPPED,
+    # Reg. 30 events: numeric elements read by parsers/reg30_events.py [E3-E7]
+    "REG30_EVENT": {
+        "AmountOfTheOrdersOrContracts": "event.amount_inr",
+        "NumberOfSharesPaidUpPreAllotmentOfSecurities": "event.details.shares_pre",
+        "NumberOfSharesPaidUpPostAllotmentOfSecurities": "event.details.shares_post",
+    },
     "REG34_ANNUAL": {
         **_mapped(DURATION_TAGS, INSTANT_TAGS),
         **_mapped(ANNUAL_DURATION_TAGS, ANNUAL_INSTANT_TAGS),
@@ -93,7 +101,12 @@ def inspect(path: Path, dump_dir: Path | None) -> dict:
     data = path.read_bytes()
     inst = parse_instance(data)
     is_shp = any(SHP_NS_FRAGMENT in u and u.endswith("/in-bse-shp") for u in inst.namespaces.values())
-    if is_shp:
+    ent_ns = next((u for u in inst.namespaces.values() if u.endswith("/in-capmkt-ent")), "")
+    is_event = any(f"/{seg}/" in ent_ns for seg in EVENT_FAMILIES)
+    is_shp = is_shp or is_event  # both dimensional: register every element with its axes
+    if is_event:
+        profile = "REG30_EVENT"
+    elif is_shp:
         profile = SHP_PROFILE
     elif is_reg34(inst):
         profile = "REG34_ANNUAL"
@@ -141,7 +154,9 @@ def inspect(path: Path, dump_dir: Path | None) -> dict:
             others.append({"axis": dims[0][0].split(":")[-1], "member": dims[0][1], "labels": sorted(set(labels)),
                            "amounts": amounts})  # fmt: skip
 
-    if is_shp:
+    if is_event:
+        parsed = parse_reg30_event(data)
+    elif is_shp:
         parsed = parse_shareholding(data)
     else:
         parsed = parse_integrated_results(data, path.name) if profile in IMPLEMENTED_PROFILES else None

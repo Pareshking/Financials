@@ -34,5 +34,5 @@ def test_unverified_feeds_do_not_claim_concrete_endpoints():
 
 def test_verified_feeds_have_a_parser_phase():
     assert {f["feed_id"] for f in load() if f["verification_status"] == "VERIFIED"} == {
-        "F01", "F02", "F03", "F04", "F05", "F06", "F07", "F08", "F10",
+        "F01", "F02", "F03", "F04", "F05", "F06", "F07", "F08", "F10", "F21",
     }  # fmt: skip

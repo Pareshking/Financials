@@ -26,7 +26,9 @@ def test_every_evidence_id_cited_in_code_exists():
     cited: set[str] = set()
     for p in list((ROOT / "src").rglob("*.py")) + list((ROOT / "scripts").glob("*.py")):
         cited |= _cited(p.read_text(encoding="utf-8"))
-    missing = sorted(c for c in cited if c not in KNOWN and re.fullmatch(r"(X|S|C|P|CA|A|I|R|L|FD|SHP|IDX|CAL)\d+", c))
+    missing = sorted(
+        c for c in cited if c not in KNOWN and re.fullmatch(r"(X|S|C|P|CA|A|I|R|L|FD|SHP|IDX|CAL|E)\d+", c)
+    )
     assert missing == []
 
 
@@ -100,4 +102,17 @@ def test_registry_covers_every_element_of_committed_annual_filings(path):
     inst = parse_instance(path.read_bytes())
     elements = {f.name for f in inst.facts if not inst.contexts[f.context_id].dimensions}
     assert elements - set(REGISTRY["profiles"]["REG34_ANNUAL"]) == set()
+    assert path.name in REGISTRY["files"]
+
+
+EVENT_FILES = sorted((XBRL_DIR.parent / "events").glob("*_WebXMLFile_*.xml"))
+
+
+@pytest.mark.parametrize("path", EVENT_FILES, ids=lambda p: p.stem[:40])
+def test_registry_covers_every_element_of_committed_event_filings(path):
+    """Reg. 30 events [E2]: every element (any context) and axis is registered under REG30_EVENT."""
+    inst = parse_instance(path.read_bytes())
+    assert {f.name for f in inst.facts} - set(REGISTRY["profiles"]["REG30_EVENT"]) == set()
+    axes = {a.split(":")[-1] for c in inst.contexts.values() for a, _ in c.dimensions}
+    assert axes - set(REGISTRY["axes"]["REG30_EVENT"]) == set()
     assert path.name in REGISTRY["files"]

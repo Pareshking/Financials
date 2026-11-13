@@ -9,6 +9,7 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 
 from financials.fetch.http import PoliteFetcher
+from financials.parsers.reg30_events import parse_announcements_rss
 from financials.parsers.reg34_annual import parse_annual_listing
 from financials.parsers.shareholding import parse_shp_master
 from financials.staging import (
@@ -17,10 +18,11 @@ from financials.staging import (
     stage_index_snapshot,
     stage_market_day,
     stage_raw_only,
+    stage_reg30_event,
     stage_results_xbrl,
     stage_shareholding,
 )
-from financials.timeutil import utc_now
+from financials.timeutil import ist_to_utc, utc_now
 from financials.vault import Vault
 
 ARCHIVE = "https://nsearchives.nseindia.com"
@@ -46,6 +48,11 @@ def holidays_url() -> str:
 
 def index_list_url(file_stub: str = "nifty500") -> str:
     return f"{ARCHIVE}/content/indices/ind_{file_stub}list.csv"
+
+
+ANNOUNCEMENTS_RSS = "https://nsearchives.nseindia.com/content/RSS/Online_announcements.xml"
+# XBRL file-name prefixes of the parsed Reg. 30 families [E2]
+EVENT_PREFIXES = ("REG30_PARA_B_", "CIM_", "ALTERATION_OF_CAPITAL_AND_FUND_RAISING_", "ANN_FRAUD_")
 
 
 def annual_listing_url(symbol: str) -> str:
@@ -127,6 +134,26 @@ class Jobs:
                     broadcast_ts=e.broadcast_ts_ist.astimezone(UTC).replace(tzinfo=None),
                     broadcast_ts_source="API_FIELD",
                 )
+            )  # fmt: skip
+        return out
+
+    def reg30_events(self, *, limit: int | None = None) -> list[Path]:
+        """Announcements RSS (vaulted) -> structured event XBRL of the parsed families, one file per request [E1, E2].
+        The RSS pubDate (IST) is the broadcast time."""
+        rss = self.f.get(ANNOUNCEMENTS_RSS)
+        raw = stage_raw_only(
+            self.vault, self.stage_root, data=rss, ext="xml", media_type="application/rss+xml",
+            category="ANNOUNCEMENTS_RSS", source_url=ANNOUNCEMENTS_RSS, fetched_at=utc_now(),
+        )  # fmt: skip
+        out = [raw]
+        items = [i for i in parse_announcements_rss(rss)
+                 if i.xbrl_url and i.xbrl_url.rsplit("/", 1)[-1].startswith(EVENT_PREFIXES)]  # fmt: skip
+        for item in items[:limit]:
+            data = self.f.get(item.xbrl_url)
+            ts = None if item.pub_ts_ist is None else ist_to_utc(item.pub_ts_ist.date(), item.pub_ts_ist.time())
+            out.append(
+                stage_reg30_event(self.vault, self.stage_root, data=data, source_url=item.xbrl_url,
+                                  fetched_at=utc_now(), broadcast_ts=ts, broadcast_ts_source="RSS_PUBDATE")
             )  # fmt: skip
         return out
 

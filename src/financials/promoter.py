@@ -18,6 +18,7 @@ from typing import Any
 
 import duckdb
 
+from financials import PARSER_VERSION
 from financials.corp_actions import ACCEPTED_STATUSES, CorpAction, adjust_closes, audit_day, verify_group
 from financials.db import fetch_dicts, insert_rows
 from financials.identity import UNIVERSE_SERIES, Interval, SecurityRegistry
@@ -57,6 +58,7 @@ def promote(con: duckdb.DuckDBPyConnection, stage_dir: Path) -> PromotionResult:
         "holidays": _promote_holidays,
         "index_snapshot": _promote_index_snapshot,
         "shareholding": _promote_shareholding,
+        "reg30_event": _promote_reg30_event,
         "raw_only": _promote_raw_only,
     }.get(job)
     if handler is None:
@@ -700,13 +702,37 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
                 "interest_paid_cfo_class": meta["interest_paid_cfo_class"],
                 "interest_recd_cfo_class": meta["interest_recd_cfo_class"],
                 "auditor_qualified": meta.get("auditor_qualified"),
+                "audit_opinion": meta.get("audit_opinion"),
             }
         ],
     )
+    _link_revision(con, fid, entity_id, meta, visible)
     facts = read_table(con, stage_dir, "stg_xbrl_facts")
     insert_rows(con, "fact_observations", [{**f, "entity_id": entity_id, "visible_from_ts": visible} for f in facts])
     q = cross_check_shares(con, entity_id, meta["period_end"])
     return PromotionResult("PROMOTED", "results_xbrl", message=fid, quarantined=[q] if q else [])
+
+
+def _link_revision(con, fid: str, entity_id: str, meta: dict, visible: datetime) -> None:
+    """Revision chain [E9]: this filing supersedes the latest filing of the same entity, profile, scope and period end
+    that became visible before it. Byte-identical blobs are RESENDs. Append-only link rows; facts need nothing else,
+    because every PIT read already takes the latest version visible at the as-of."""
+    prior = con.execute(
+        "SELECT m.filing_id, f.sha256 FROM filing_meta m JOIN filings f USING (filing_id) WHERE m.entity_id = ? "
+        "AND m.accounting_profile = ? AND m.scope = ? AND m.period_end = ? AND m.filing_id <> ? "
+        "AND m.visible_from_ts < ? ORDER BY m.visible_from_ts DESC, m.filing_id DESC LIMIT 1",
+        [entity_id, meta["accounting_profile"], meta["scope"], meta["period_end"], fid, visible],
+    ).fetchone()
+    if prior is None:
+        return
+    sha = con.execute("SELECT sha256 FROM filings WHERE filing_id = ?", [fid]).fetchone()[0]
+    insert_rows(
+        con,
+        "filing_revisions",
+        [{"filing_id": fid, "supersedes_filing_id": prior[0], "entity_id": entity_id, "period_end": meta["period_end"],
+          "scope": meta["scope"], "relation": "RESEND" if sha == prior[1] else "REVISION"}],
+        or_ignore=True,
+    )  # fmt: skip
 
 
 def pit_fact(
@@ -988,3 +1014,72 @@ def _promote_shareholding(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
 def _promote_raw_only(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
     _insert_vault_rows(con, stage_dir, ("blobs", "filings"))
     return PromotionResult("PROMOTED", "raw_only", message=read_table(con, stage_dir, "filings")[0]["category"])
+
+
+# ── Reg. 30 structured events [E1-E7] ──────────────────────────────────────
+
+
+def _promote_reg30_event(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_xbrl_facts"))
+    filing = read_table(con, stage_dir, "filings")[0]
+    fid = filing["filing_id"]
+    issues = read_table(con, stage_dir, "stg_issues")
+    if issues:
+        qs = [
+            _quarantine(con, stage=i["stage"], reason_code=i["reason_code"], filing_id=fid,
+                        details=json.loads(i["details"]))
+            for i in issues
+        ]  # fmt: skip
+        return PromotionResult("QUARANTINED", "reg30_event", message=fid, quarantined=qs)
+    events = read_table(con, stage_dir, "stg_events")
+    if not events:  # an event family we do not parse: vaulted raw only [E2]
+        return PromotionResult("PROMOTED", "reg30_event", message=f"{fid} raw only")
+    first = events[0]
+    on = first["report_date"]
+    if first["stated_isin"]:
+        secs = resolve_security_by_isin(con, filing["exchange"], first["stated_isin"], on)
+    else:  # fraud/default disclosures carry the symbol only [E7]
+        secs = [r[0] for r in con.execute(
+            "SELECT DISTINCT security_id FROM security_identifier_history WHERE exchange = ? AND symbol = ? "
+            "AND valid_from <= ? AND (valid_to IS NULL OR valid_to > ?)",
+            [filing["exchange"], first["stated_symbol"], on, on]).fetchall()]  # fmt: skip
+    entities = sorted(
+        {con.execute("SELECT entity_id FROM securities WHERE security_id = ?", [s_]).fetchone()[0] for s_ in secs}
+    )
+    if len(entities) != 1:
+        key = "ISIN" if first["stated_isin"] else "SYMBOL"  # SME symbols are outside the universe (C9 scope)
+        q = _quarantine(
+            con,
+            stage="IDENTITY",
+            reason_code=("UNKNOWN_" if not entities else "AMBIGUOUS_") + key,
+            filing_id=fid,
+            details={"isin": first["stated_isin"], "symbol": first["stated_symbol"]},
+        )
+        return PromotionResult("QUARANTINED", "reg30_event", message=fid, quarantined=[q])
+    if filing["broadcast_ts"] is None:
+        q = _quarantine(
+            con,
+            stage="PERIOD",
+            reason_code="NO_VISIBILITY",
+            filing_id=fid,
+            entity_id=entities[0],
+            details={"report_date": on},
+        )
+        return PromotionResult("QUARANTINED", "reg30_event", message=fid, quarantined=[q])
+    insert_rows(
+        con,
+        "corporate_events",
+        [
+            {
+                "event_id": stable_id("evt", filing["sha256"], e["record_key"]),
+                "filing_id": fid, "parser_version": PARSER_VERSION, "entity_id": entities[0],
+                **{k: e[k] for k in ("family", "event_type", "event_subtype", "occurred_on", "report_date",
+                                     "counterparty", "amount_inr", "person_name", "person_category", "change_type",
+                                     "cessation_category", "details")},
+                "visible_from_ts": filing["broadcast_ts"],
+            }
+            for e in events
+        ],
+        or_ignore=True,  # a byte-identical re-send is the same event [E4]
+    )  # fmt: skip
+    return PromotionResult("PROMOTED", "reg30_event", message=fid)

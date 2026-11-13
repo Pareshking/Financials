@@ -236,6 +236,25 @@ axes:
     SegmentSurplusDeficitAxis:
       first_batch: rebuild
       mapped_to: null
+  REG30_EVENT:
+    AwardingOrBaggingOrReceivingOrAmendmentOrTerminationOfOrdersOrContractsAsPerSubPara4OfParaBAxis:
+      first_batch: B10
+      mapped_to: null
+    ChangeInManagementAxis:
+      first_batch: B10
+      mapped_to: null
+    ResignationOfDirectorOrKeyManagerialPersonnelOrSeniorManagementPersonnelOrComplianceOfficerAxis:
+      first_batch: B10
+      mapped_to: null
+    ResignationOfStatutoryAuditorAxis:
+      first_batch: B10
+      mapped_to: null
+    StageOfTheLitigationIsConcludedOrDisputeIsResolvedAsPerSubPara8OfParaBAxis:
+      first_batch: B10
+      mapped_to: null
+    SubTypeOfEventAsPerRegulation30ParaBOfPartAOfScheduleIIIAxis:
+      first_batch: B10
+      mapped_to: null
   REG31_SHP:
     CategoryOfShareholdersAxis:
       first_batch: '8'
@@ -617,6 +636,10 @@ axes:
       first_batch: B9
       mapped_to: null
 files:
+- ALTERATION_OF_CAPITAL_AND_FUND_RAISING_14347_WebXMLFile_20261113_173653308.xml
+- ALTERATION_OF_CAPITAL_AND_FUND_RAISING_1464_WebXMLFile_20261113_131011536.xml
+- ALTERATION_OF_CAPITAL_AND_FUND_RAISING_818_WebXMLFile_20261113_152039711.xml
+- ANN_FRAUD_22342_WebXMLFile_20261113_211505185.xml
 - AR_XBRL_CUMMINSIND_04092026113506.xml
 - AR_XBRL_ELIN_30092025131606.xml
 - AR_XBRL_ETERNAL_23092026175418.xml
@@ -630,6 +653,12 @@ files:
 - AR_XBRL_TATAPOWER_06082025142114.xml
 - AR_XBRL_TCS_09082026012216.xml
 - AR_XBRL_TCS_14082025184751.xml
+- CIM_17080_WebXMLFile_20261113_201057828.xml
+- CIM_17666_WebXMLFile_20261113_180652696.xml
+- CIM_1884_WebXMLFile_20261113_181912499.xml
+- CIM_19883_WebXMLFile_20261113_215018364.xml
+- CIM_20486_WebXMLFile_20261113_214544166.xml
+- CIM_718_WebXMLFile_20261113_195303121.xml
 - IF_INS_COM_IND_AS_19799_WebXMLFile_20261027_212749295.xml
 - IF_INS_COM_IND_AS_19799_WebXMLFile_20261027_212811965.xml
 - IF_INS_COM_IND_AS_19799_WebXMLFile_20261027_212844922.xml
@@ -731,6 +760,12 @@ files:
 - INTEGRATED_FILING_NBFC_INDAS_1753151_04112026082408_WEB.xml
 - INTEGRATED_FILING_NBFC_INDAS_1756983_12112026083425_WEB.xml
 - INTEGRATED_FILING_NBFC_INDAS_1757118_13112026023256_WEB.xml
+- REG30_PARA_B_1254_WebXMLFile_20261113_183420254.xml
+- REG30_PARA_B_2010_WebXMLFile_20261113_133459972.xml
+- REG30_PARA_B_2010_WebXMLFile_20261113_133619258.xml
+- REG30_PARA_B_21978_WebXMLFile_20261113_182712819.xml
+- REG30_PARA_B_358_WebXMLFile_20261113_160519472.xml
+- REG30_PARA_B_490_WebXMLFile_20261113_204423166.xml
 - SHP_1687801_03072026023346_WEB.xml
 - SHP_1690795_10072026081131_WEB.xml
 - SHP_1698632_21072026062045_WEB.xml
@@ -14167,6 +14202,874 @@ profiles:
       - duration_3m
       filings: 4
       first_batch: B5
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+  REG30_EVENT:
+    AmountOfTheOrdersOrContracts:
+      context_kinds:
+      - instant@AwardingOrBaggingOrReceivingOrAmendmentOrTerminationOfOrdersOrContractsAsPerSubPara4OfParaBAxis
+      filings: 4
+      first_batch: B10
+      mapped_to: event.amount_inr
+      numeric: true
+      seen_negative: false
+    AnyOtherDisclosureWithRespectToComplianceAsPerSEBIRegulationOfCircularOrProvisionForAllotmentOfSecurities:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    AnyOtherFactsRelevantToTheResignation:
+      context_kinds:
+      - instant@ResignationOfStatutoryAuditorAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    AnyOtherInformationRelatedToAllotmentOfSecurities:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    BriefProfile:
+      context_kinds:
+      - duration_1m@ChangeInManagementAxis
+      filings: 3
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    BroadConsiderationForTheOrdersOrContracts:
+      context_kinds:
+      - instant@AwardingOrBaggingOrReceivingOrAmendmentOrTerminationOfOrdersOrContractsAsPerSubPara4OfParaBAxis
+      filings: 4
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    CategoryForChange:
+      context_kinds:
+      - duration_1m@ChangeInManagementAxis
+      filings: 6
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    CategoryOfCessation:
+      context_kinds:
+      - duration_1m@ChangeInManagementAxis
+      filings: 4
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    CategoryOfEntityForWhichDisclosureIsFiledForFraudOrDefaults:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfBaggingOrReceivingOfOrdersOrContracts:
+      context_kinds:
+      - instant@AwardingOrBaggingOrReceivingOrAmendmentOrTerminationOfOrdersOrContractsAsPerSubPara4OfParaBAxis
+      filings: 4
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfBoardMeeting:
+      context_kinds:
+      - duration_1m
+      filings: 4
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfBoardMeetingForApprovalOfIssuanceOfSecurityForAllotmentOfSecurities:
+      context_kinds:
+      - instant
+      filings: 3
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfBoardOrCommitteeForAllotmentOfSecurities:
+      context_kinds:
+      - instant
+      filings: 3
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfOccurrenceOfEvent:
+      context_kinds:
+      - instant
+      filings: 3
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfOccurrenceOfEventOrInformation:
+      context_kinds:
+      - duration_1m
+      - instant
+      filings: 8
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfOriginalLitigationDisclosure:
+      context_kinds:
+      - instant@StageOfTheLitigationIsConcludedOrDisputeIsResolvedAsPerSubPara8OfParaBAxis
+      filings: 2
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfReport:
+      context_kinds:
+      - instant
+      filings: 16
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfSubmissionOfLatestAuditReportOrLimitedReviewReportSubmittedPriorToResignationByTheAuditor:
+      context_kinds:
+      - instant@ResignationOfStatutoryAuditorAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfWhenTheFraudOrDefaultOrArrestWasUnearthingOrOccurred:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOnWhichTheResignationLetterWasReceived:
+      context_kinds:
+      - duration_1m@ResignationOfDirectorOrKeyManagerialPersonnelOrSeniorManagementPersonnelOrComplianceOfficerAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOnWhichTheResignationLetterWasReceivedFromStatutoryAuditor:
+      context_kinds:
+      - duration_1m@ResignationOfStatutoryAuditorAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOnWhichTheStatutoryAuditorWasAppointed:
+      context_kinds:
+      - instant@ResignationOfStatutoryAuditorAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOnWhichTheTermOfTheStatutoryAuditorWasScheduledToExpire:
+      context_kinds:
+      - instant@ResignationOfStatutoryAuditorAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DatesOfDisclosureWasMadeForTheIssuanceOfSecuritiesAsPerSEBILODRAndCircular9ThSeptember2015ForAllotmentOfSecurities:
+      context_kinds:
+      - instant
+      filings: 2
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DesignationOfDesignatedPerson:
+      context_kinds:
+      - duration_1m@ChangeInManagementAxis
+      filings: 6
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DesignationOfDirectorOrKeyManagerialPersonnelOrSeniorManagementPersonnelOrComplianceOfficer:
+      context_kinds:
+      - duration_1m@ResignationOfDirectorOrKeyManagerialPersonnelOrSeniorManagementPersonnelOrComplianceOfficerAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DetailedReasonForResignation:
+      context_kinds:
+      - instant@ResignationOfStatutoryAuditorAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DetailsOfChangeInLitigationStatus:
+      context_kinds:
+      - instant@StageOfTheLitigationIsConcludedOrDisputeIsResolvedAsPerSubPara8OfParaBAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DetailsOfDevelopmentInRelationToTheExistingProceedings:
+      context_kinds:
+      - instant@StageOfTheLitigationIsConcludedOrDisputeIsResolvedAsPerSubPara8OfParaBAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DetailsOfLitigationOrDisputeForWhichDisclosureIsBeingMade:
+      context_kinds:
+      - instant@StageOfTheLitigationIsConcludedOrDisputeIsResolvedAsPerSubPara8OfParaBAxis
+      filings: 2
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DetailsOfOtherLitigationAgainstParty:
+      context_kinds:
+      - instant@StageOfTheLitigationIsConcludedOrDisputeIsResolvedAsPerSubPara8OfParaBAxis
+      filings: 2
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    EffectiveDateOfReasonOfChange:
+      context_kinds:
+      - instant@ChangeInManagementAxis
+      filings: 6
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    EffectiveDateOfResignation:
+      context_kinds:
+      - instant@ResignationOfDirectorOrKeyManagerialPersonnelOrSeniorManagementPersonnelOrComplianceOfficerAxis
+      - instant@ResignationOfStatutoryAuditorAxis
+      filings: 2
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    EffortsMadeByTheAuditorPriorToResignation:
+      context_kinds:
+      - instant@ResignationOfStatutoryAuditorAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    EndTimeOfBoardMeeting:
+      context_kinds:
+      - duration_1m
+      filings: 4
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    EstimatedAmountInvolvedInFraudOrDefaultOrArrestWasUnearthingOrOccurred:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    EstimatedImpactOfFraudOrDefaultOrArrestWasUnearthingOrOccurredOnTheListedEntity:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    ISIN:
+      context_kinds:
+      - instant
+      filings: 15
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    LEIOrCINOrRegistrationNumberOfTheCounterparty:
+      context_kinds:
+      - instant@AwardingOrBaggingOrReceivingOrAmendmentOrTerminationOfOrdersOrContractsAsPerSubPara4OfParaBAxis
+      filings: 4
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    LitigationAgainstParty:
+      context_kinds:
+      - instant@StageOfTheLitigationIsConcludedOrDisputeIsResolvedAsPerSubPara8OfParaBAxis
+      filings: 2
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    MSEISymbol:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NSESymbol:
+      context_kinds:
+      - instant
+      filings: 16
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NameAndDetailsOfAppropriateAuthoritiesToWhomTheFraudOrDefaultOrArrestHasBeenReported:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NameOfDesignatedPerson:
+      context_kinds:
+      - instant@ChangeInManagementAxis
+      filings: 6
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NameOfEntityForWhichTheDisclosureIsFiled:
+      context_kinds:
+      - duration_1m
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NameOfPersonsInvolvedInFraudOrDefaultOrArrestWasUnearthingOrOccurred:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NameOfTheCompany:
+      context_kinds:
+      - instant
+      filings: 16
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NameOfTheCountryInWhichCounterpartyIsExists:
+      context_kinds:
+      - instant@AwardingOrBaggingOrReceivingOrAmendmentOrTerminationOfOrdersOrContractsAsPerSubPara4OfParaBAxis
+      filings: 4
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NameOfTheDirectorOrKeyManagerialPersonnelOrSeniorManagementPersonnelOrComplianceOfficer:
+      context_kinds:
+      - duration_1m@ResignationOfDirectorOrKeyManagerialPersonnelOrSeniorManagementPersonnelOrComplianceOfficerAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NameOfTheEntityAwardingTheOrdersOrContracts:
+      context_kinds:
+      - instant@AwardingOrBaggingOrReceivingOrAmendmentOrTerminationOfOrdersOrContractsAsPerSubPara4OfParaBAxis
+      filings: 4
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NameOfTheStatutoryAuditorOrFirm:
+      context_kinds:
+      - instant@ResignationOfStatutoryAuditorAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NatureOfFraudOrDefaultOrArrest:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NatureOfOrdersOrContracts:
+      context_kinds:
+      - instant@AwardingOrBaggingOrReceivingOrAmendmentOrTerminationOfOrdersOrContractsAsPerSubPara4OfParaBAxis
+      filings: 4
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NumberOfPersonsInvolvedInFraudOrDefaultOrArrestWasUnearthingOrOccurred:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NumberOfPersonsOrEntitiesForWhomChangeIsBeingReported:
+      context_kinds:
+      - instant
+      filings: 6
+      first_batch: B10
+      mapped_to: null
+      numeric: true
+      reason: NON_FINANCIAL_COUNT
+      seen_negative: false
+      status: EXCLUDED
+    NumberOfSharesPaidUpPostAllotmentOfSecurities:
+      context_kinds:
+      - duration_1m
+      filings: 3
+      first_batch: B10
+      mapped_to: event.details.shares_post
+      numeric: true
+      seen_negative: false
+    NumberOfSharesPaidUpPreAllotmentOfSecurities:
+      context_kinds:
+      - duration_1m
+      filings: 3
+      first_batch: B10
+      mapped_to: event.details.shares_pre
+      numeric: true
+      seen_negative: false
+    PaidUpShareCapitalPostAllotmentOfSecurities:
+      context_kinds:
+      - duration_1m
+      filings: 3
+      first_batch: B10
+      mapped_to: null
+      numeric: true
+      reason: NON_FINANCIAL_COUNT
+      seen_negative: false
+      status: EXCLUDED
+    PaidUpShareCapitalPreAllotmentOfSecurities:
+      context_kinds:
+      - duration_1m
+      filings: 3
+      first_batch: B10
+      mapped_to: null
+      numeric: true
+      reason: NON_FINANCIAL_COUNT
+      seen_negative: false
+      status: EXCLUDED
+    ? PeriodForWhichTheResigningAuditorWillIssueTheAuditReportOrLimitedReviewReportAsOnTheDateOfResignationWithReferenceAsPerSEBICircularCIRCFDCMD11142019Dated18October2019
+    : context_kinds:
+      - instant@ResignationOfStatutoryAuditorAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    PlaceOfOccurrenceOfEvent:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    ReasonOfResignationInBrief:
+      context_kinds:
+      - duration_1m@ResignationOfDirectorOrKeyManagerialPersonnelOrSeniorManagementPersonnelOrComplianceOfficerAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    ReasonsForNonDisclosureForTheIssuanceOfSecuritiesAsPerSEBILODRAndCircular9ThSeptember2015ForAllotmentOfSecurities:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    RelationshipWithTheListedEntity:
+      context_kinds:
+      - duration_1m
+      filings: 6
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    RemarksForChangeInManagement:
+      context_kinds:
+      - duration_1m@ChangeInManagementAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    RemarksForWebsiteDissemination:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    RemarksForWebsiteDisseminationForFraudOrDefaultOrArrestWasUnearthingOrOccurredRelatingToInitialDisclosure:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    Salutation:
+      context_kinds:
+      - duration_1m@ResignationOfDirectorOrKeyManagerialPersonnelOrSeniorManagementPersonnelOrComplianceOfficerAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    SalutationOfDesignatedPerson:
+      context_kinds:
+      - duration_1m@ChangeInManagementAxis
+      filings: 6
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    ScripCode:
+      context_kinds:
+      - instant
+      filings: 12
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    SignificantTermsAndConditionsOfOrdersOrContractsIsAwarded:
+      context_kinds:
+      - instant@AwardingOrBaggingOrReceivingOrAmendmentOrTerminationOfOrdersOrContractsAsPerSubPara4OfParaBAxis
+      filings: 4
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    StageOfDisclosureOfLitigationOrDispute:
+      context_kinds:
+      - instant@StageOfTheLitigationIsConcludedOrDisputeIsResolvedAsPerSubPara8OfParaBAxis
+      filings: 2
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    StartTimeOfBoardMeeting:
+      context_kinds:
+      - duration_1m
+      filings: 4
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    SubTypeOfEventAsPerRegulation30ParaBOfPartAOfScheduleIII:
+      context_kinds:
+      - instant@SubTypeOfEventAsPerRegulation30ParaBOfPartAOfScheduleIIIAxis
+      filings: 6
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    TermOfAppointmentInMonths:
+      context_kinds:
+      - duration_1m@ChangeInManagementAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: true
+      reason: NON_FINANCIAL_COUNT
+      seen_negative: false
+      status: EXCLUDED
+    TimeOfOccurrenceOfEvent:
+      context_kinds:
+      - duration_1m
+      filings: 4
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    TimeOfOccurrenceOfEventOrInformation:
+      context_kinds:
+      - duration_1m
+      - instant
+      filings: 8
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    TimeOfWhenTheFraudOrDefaultOrArrestWasUnearthingOrOccurred:
+      context_kinds:
+      - duration_1m
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    TimePeriodByWhichTheOrdersOrContractsIsToBeExecuted:
+      context_kinds:
+      - instant@AwardingOrBaggingOrReceivingOrAmendmentOrTerminationOfOrdersOrContractsAsPerSubPara4OfParaBAxis
+      filings: 4
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    TypeOfAnnouncement:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    TypeOfAnnouncementAsPerRegulation30ParaBOfPartAOfScheduleIII:
+      context_kinds:
+      - instant
+      filings: 6
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    TypeOfChange:
+      context_kinds:
+      - duration_1m@ChangeInManagementAxis
+      filings: 6
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    TypeOfDisclosureInRelationToEventOfFraudOrDefaults:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    TypeOfEvent:
+      context_kinds:
+      - instant
+      filings: 3
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    TypeOfEventAsPerRegulation30ParaBOfPartAOfScheduleIII:
+      context_kinds:
+      - instant
+      filings: 6
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    TypeOfEventOfFraudOrDefaults:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    TypeOfIssuanceForAllotmentOfSecurities:
+      context_kinds:
+      - duration_1m
+      filings: 3
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    TypeOfSecuritiesAllottedForAllotmentOfSecurities:
+      context_kinds:
+      - duration_1m
+      filings: 3
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherAnyDisclosureWasMadeForTheIssuanceOfSecuritiesAsPerSEBILODRAndCircular9ThSeptember2015ForAllotmentOfSecurities:
+      context_kinds:
+      - duration_1m
+      filings: 3
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherDisclosureFiledForListedCompany:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherDisclosureFiledForListedEntity:
+      context_kinds:
+      - duration_1m
+      filings: 6
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherEventOrInformationDisclosedIsAnOutcomeOfTheBoardMeeting:
+      context_kinds:
+      - instant
+      filings: 6
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherEventOrInformationIsAnOutcomeOfBoardMeeting:
+      context_kinds:
+      - duration_1m
+      filings: 6
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherInformationToBeObtainedFromTheStatutoryAuditorUponResignationAsPerSEBICircularCIRCFDCMD11142019Dated18October2019:
+      context_kinds:
+      - duration_1m@ChangeInManagementAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherOrdersOrContractsIsAwardedByDomesticOrInternationalEntity:
+      context_kinds:
+      - instant@AwardingOrBaggingOrReceivingOrAmendmentOrTerminationOfOrdersOrContractsAsPerSubPara4OfParaBAxis
+      filings: 4
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    ? WhetherTheAuditorHasPerformedAlternativeProceduresToObtainAppropriateEvidenceForThePurposesOfAuditOrLimitedReviewAsLaidDownInSa705Revised
+    : context_kinds:
+      - duration_1m@ResignationOfStatutoryAuditorAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    ? WhetherTheAuditorHasProvidedAResignationLetterAlongWithTheNecessaryDetailsAndDeclarationAsPerSEBICircularCIRCFDCMD11142019Dated18October2019
+    : context_kinds:
+      - duration_1m@ResignationOfStatutoryAuditorAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheCounterpartyBelongsToGroupCompaniesOfAnyIndianListedEntity:
+      context_kinds:
+      - instant@AwardingOrBaggingOrReceivingOrAmendmentOrTerminationOfOrdersOrContractsAsPerSubPara4OfParaBAxis
+      filings: 4
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheCounterpartyIsIndianListedEntity:
+      context_kinds:
+      - instant@AwardingOrBaggingOrReceivingOrAmendmentOrTerminationOfOrdersOrContractsAsPerSubPara4OfParaBAxis
+      filings: 4
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    ? WhetherTheFurtherDisclosureForResignationOfStatutoryAuditorOrDirectorOrKMPsOrSMPOrComplianceOfficerIsToBeFiledAlongWithThisDisclosure
+    : context_kinds:
+      - duration_1m@ChangeInManagementAxis
+      filings: 2
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    ? WhetherTheInabilityToObtainSufficientAppropriateAuditEvidenceWasDueToAManagementImposedLimitationOrCircumstancesBeyondTheControlOfTheManagement
+    : context_kinds:
+      - instant@ResignationOfStatutoryAuditorAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    ? WhetherTheLackOfInformationWasPrevalentInThePreviousReportedFinancialStatementsOrResultsAndOnWhatBasisThePreviousAuditOrLimitedReviewReportsWereIssued
+    : context_kinds:
+      - duration_1m@ResignationOfStatutoryAuditorAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    ? WhetherTheLackOfInformationWouldHaveSignificantImpactOnTheFinancialStatementsOrResultsOfListedEntityAsWellAsMaterialSubsidiary
+    : context_kinds:
+      - duration_1m@ResignationOfStatutoryAuditorAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheLetterOfResignationHasTheDetailedReasonForResignation:
+      context_kinds:
+      - instant@ResignationOfDirectorOrKeyManagerialPersonnelOrSeniorManagementPersonnelOrComplianceOfficerAxis
+      filings: 1
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheOrderOrContractWouldFallWithinRelatedPartyTransactions:
+      context_kinds:
+      - instant@AwardingOrBaggingOrReceivingOrAmendmentOrTerminationOfOrdersOrContractsAsPerSubPara4OfParaBAxis
+      filings: 4
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheOrdersOrContractsIsOrdinaryCourseOfBusiness:
+      context_kinds:
+      - instant@AwardingOrBaggingOrReceivingOrAmendmentOrTerminationOfOrdersOrContractsAsPerSubPara4OfParaBAxis
+      filings: 4
+      first_batch: B10
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherThePromoterOrPromoterGroupOrGroupCompaniesHaveAnyInterestInThatEntityToWhomTheOrdersOrContractsIsAwarded:
+      context_kinds:
+      - instant@AwardingOrBaggingOrReceivingOrAmendmentOrTerminationOfOrdersOrContractsAsPerSubPara4OfParaBAxis
+      filings: 4
+      first_batch: B10
       mapped_to: null
       numeric: false
       seen_negative: false

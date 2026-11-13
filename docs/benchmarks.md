@@ -7,12 +7,12 @@ Machine: Linux-6.18.44-fc-v445-x86_64-with-glibc2.39, 4 CPUs, Python 3.13.18, Du
 
 | Day | Raw rows | Delivery rows | Stage (parse + Parquet) ms | Promote ms | Total ms | Rows/s |
 |---|---|---|---|---|---|---|
-| 20250919 | 3,139 | 0 | 247 | 285 | 532 | 5,900 |
-| 20250922 | 3,210 | 0 | 190 | 419 | 609 | 5,272 |
-| 20250923 | 3,144 | 0 | 190 | 366 | 556 | 5,655 |
-| 20251013 | 3,218 | 0 | 206 | 498 | 704 | 4,571 |
-| 20251014 | 3,215 | 3,044 | 251 | 467 | 717 | 8,724 |
-| 20261112 | 3,727 | 3,566 | 282 | 935 | 1217 | 5,992 |
+| 20250919 | 3,139 | 0 | 265 | 271 | 535 | 5,865 |
+| 20250922 | 3,210 | 0 | 204 | 429 | 633 | 5,070 |
+| 20250923 | 3,144 | 0 | 187 | 387 | 574 | 5,479 |
+| 20251013 | 3,218 | 0 | 185 | 503 | 688 | 4,674 |
+| 20251014 | 3,215 | 3,044 | 262 | 491 | 752 | 8,319 |
+| 20261112 | 3,727 | 3,566 | 310 | 1000 | 1310 | 5,569 |
 
 Promote includes identity resolution, G1/G2, `ohlcv`, corporate-action verification and the gap auditor.
 
@@ -20,37 +20,31 @@ Promote includes identity resolution, G1/G2, `ohlcv`, corporate-action verificat
 
 | Filing | p50 ms | p95 ms |
 |---|---|---|
-| INDAS_CORP results (ELIN, 620 facts) | 6.6 | 11.4 |
-| REG31 shareholding (ELIN, 1,436 facts) | 12.4 | 20.1 |
+| INDAS_CORP results (ELIN, 620 facts) | 6.1 | 8.9 |
+| REG31 shareholding (ELIN, 1,436 facts) | 13.1 | 28.1 |
 
 ## 3. Feature materialisation
 
-Full universe for 2026-11-12: **2,981 rows in 226 ms** (PROMOTED), including G4 (null-spike vs 2025-10-14) and G5 (atomic swap).
+Full universe for 2026-11-12: **2,981 rows in 203 ms** (PROMOTED), including G4 (null-spike vs 2025-10-14) and G5 (atomic swap).
 
 ## 4. DSL screen latency (50 runs each, warm)
 
 | Screen | p50 ms | p95 ms |
 |---|---|---|
-| `Market Cap > 100 AND Promoter holding > 30` | 1.72 | 2.07 |
-| `(roe > 15 OR roce > 20) AND NOT debt to equity > 1 AND pe < 40` | 1.87 | 2.22 |
-| `Return 1M > 5 OR price to 200dma > 1.1 OR delivery velocity > 1.5` | 2.05 | 4.21 |
-| `(net profit - 2) / (sales + 1) * 100 > 10 AND In Nifty 500 = 1` | 2.28 | 4.55 |
-| `net cash to mcap > 5 AND market cap > 500` | 2.34 | 4.26 |
-| `In Nifty 500 = 1 AND (fii holding + dii holding) > 20 OR price to book value < 1` | 2.15 | 2.57 |
-| **all screens** | **2.08** | **3.83** |
+| `Market Cap > 100 AND Promoter holding > 30` | 1.99 | 2.34 |
+| `(roe > 15 OR roce > 20) AND NOT debt to equity > 1 AND pe < 40` | 1.99 | 3.23 |
+| `Return 1M > 5 OR price to 200dma > 1.1 OR delivery velocity > 1.5` | 1.92 | 2.19 |
+| `(net profit - 2) / (sales + 1) * 100 > 10 AND In Nifty 500 = 1` | 2.32 | 3.16 |
+| `net cash to mcap > 5 AND market cap > 500` | 2.17 | 3.27 |
+| `In Nifty 500 = 1 AND (fii holding + dii holding) > 20 OR price to book value < 1` | 1.96 | 2.61 |
+| **all screens** | **2.03** | **2.91** |
 
 ## 5. Storage footprint (after all promotions, `CHECKPOINT`)
 
 | Store | Bytes | MB |
 |---|---|---|
 | market.duckdb | 31,731,712 | 31.7 |
-| staging (Parquet) | 2,593,626 | 2.6 |
+| staging (Parquet) | 2,593,732 | 2.6 |
 | vault (raw files) | 2,530,138 | 2.5 |
 
 Regression guards with generous margins live in `tests/test_benchmarks.py`.
-
-## History
-
-| Date | Change | Effect |
-|---|---|---|
-| 2026-11-13 | Bulk-insert gap quarantines; find decidable corporate actions with one join instead of 3 queries per pending action | 2026-11-12 promotion (~2,100 gap findings): **11,210 ms → 935 ms**; 2025-10-13: 2,727 ms → 498 ms |

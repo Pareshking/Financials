@@ -106,5 +106,6 @@ output); `tests/test_index_backfill.py::test_derived_text_matches_pdf` regenerat
 | `xbrl/INTEGRATED_FILING_INDAS_1751354_02112026065539_WEB.xml` | B1: ITC Q2 FY27 standalone. Excise duty only as a labelled other-expenses line (X40) | `2b76303a83671a849b9701cdc03e81e233aedf3075d27f022b1655d717e76005` |
 | `xbrl/INTEGRATED_FILING_INDAS_1748218_28102026075349_WEB.xml` | B1: United Spirits Q2 FY27 standalone. Excise 53% of gross revenue (X40) | `42ba2cdcf272db4e055fbf3430d12b60f3d932fe43b91471ae3b1b48073b3ac3` |
 | `xbrl/INTEGRATED_FILING_INDAS_1753920_05112026063545_WEB.xml` | B1: ONGC Q2 FY27 standalone. Lease label with typo "Lease Liabilties" (X39) | `c63b1484dcf638cd44c80a8a06dd91daf66635ec111ba68f6329f712a9963ab4` |
+| `xbrl/INTEGRATED_FILING_INDAS_1756234_11112026070341_WEB.xml` | B2: Tata Power Q2 FY27 consolidated. Regulatory deferral movement, associates after PAT(continuing), owners/NCI split (X42) | `05f6dfb5a483496b3fc529b3ce8cb916248ecfbe73e7f1b62a84a83a0522d714` |
 
-Source URL pattern for all three: `https://nsearchives.nseindia.com/corporate/xbrl/<file>`.
+Source URL pattern for all four: `https://nsearchives.nseindia.com/corporate/xbrl/<file>`.

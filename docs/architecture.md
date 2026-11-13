@@ -208,7 +208,7 @@ Notation: `avg(x)` = mean of opening and closing balance; `ttm(x)` = trailing 4 
 | Ratio | Formula | Phase |
 |---|---|---|
 | ROCE | `ttm(ebit) / avg(invested_capital + cash_liquid)` | 1 |
-| ROE | `ttm(ProfitLossForPeriod) / avg(Equity)` | 1 |
+| ROE | `ttm(ProfitOrLossAttributableToOwnersOfParent) / avg(EquityAttributableToOwnersOfParent)`; standalone filings fall back to `ProfitLossForPeriod` / `Equity` [X42] | 1 |
 | ROIC | `ttm(nopat) / avg(invested_capital)` | 1 |
 | ROIIC 3Y/5Y | `(nopat_t − nopat_{t−n}) / (IC_t − IC_{t−n})`, FY values | 2 |
 | Reinvestment rate | `(capex − depreciation + Δ(working capital)) / nopat`, FY | 2 |
@@ -394,7 +394,7 @@ ALIAS      := a name in financials.dsl.ALIASES or user_custom_ratios (case-insen
 Status (2026-11-13): **built and tested end to end** on real fixtures, all listed items below, plus index backfill (§11.6), quarantine resolution (D-6) and benchmarks (`docs/benchmarks.md`). Known gaps inside Phase 1:
 - `piotroski_f` / `beneish_m` columns exist but stay NULL: both need year-over-year annual data (Reg. 34, Phase 2).
 - Altman Z'' uses OtherEquity as the retained-earnings proxy; ROCE/ROE use the latest balance sheet, not an average.
-- EV excludes minority interest and preference capital (tags UNVERIFIED [X29]).
+- EV adds minority interest (`NonControllingInterest`, VERIFIED [X34, X42]); preference capital is still excluded (no tag seen). PE and ROE use the owners' share of profit and equity [X42].
 - Results-XBRL discovery API is UNVERIFIED [A7]; `fetch-results` takes URLs.
 - A split and a series change between two promoted days create a second security; the collision is quarantined and resolved with `quarantine resolve --action MERGE_SECURITIES` (SIGMA, Oct 2025).
 - Index backfill covers regular replacement tables only; dummy/spin-off `TEMPORARY` rows are manual.

@@ -201,6 +201,8 @@ def building_blocks(book: FactBook, end: date) -> dict[str, Decimal | date | Non
         "ebitda": ebitda,
         "ebit": ebit,
         "pat": t("pat"),
+        # Profit for PE / ROE: owners' share when the filing attributes profit (consolidated) [X42]
+        "pat_owners": t("pat_owners") if book.durations.get("pat_owners") else t("pat"),
         "other_income": oth,
         "pbt": pbt,
         "etr": etr,
@@ -209,6 +211,8 @@ def building_blocks(book: FactBook, end: date) -> dict[str, Decimal | date | Non
         "cash_liquid": cash,
         "net_debt": net_debt,
         "total_equity": equity,
+        "equity_owners": stock("equity_attributable_to_owners") or equity,
+        "minority_interest": stock("non_controlling_interest") or (Decimal(0) if equity is not None else None),
         "invested_capital": invested,
         "total_assets": stock("total_assets"),
         "current_assets": stock("current_assets"),

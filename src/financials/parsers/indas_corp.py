@@ -58,6 +58,13 @@ DURATION_TAGS: dict[str, tuple[str, str]] = {
         "INR",
     ),
     "ProfitLossForPeriod": ("pat", "INR"),
+    # Consolidated attribution and regulated-utility line [X42]
+    "ProfitOrLossAttributableToOwnersOfParent": ("pat_owners", "INR"),
+    "ProfitOrLossAttributableToNonControllingInterests": ("pat_nci", "INR"),
+    "NetMovementInRegulatoryDeferralAccountBalancesRelatedToProfitOrLossAndTheRelatedDeferredTaxMovement": (
+        "regulatory_deferral_movement",
+        "INR",
+    ),
     "OtherComprehensiveIncomeNetOfTaxes": ("oci_net", "INR"),
     "ComprehensiveIncomeForThePeriod": ("total_comprehensive_income", "INR"),
     "PaidUpValueOfEquityShareCapital": ("paid_up_equity_capital", "INR"),
@@ -101,6 +108,7 @@ INSTANT_TAGS: dict[str, tuple[str, str]] = {
     "OtherEquity": ("other_equity", "INR"),
     "EquityAttributableToOwnersOfParent": ("equity_attributable_to_owners", "INR"),
     "Equity": ("total_equity", "INR"),
+    "NonControllingInterest": ("non_controlling_interest", "INR"),
     "BorrowingsNoncurrent": ("borrowings_noncurrent", "INR"),
     "BorrowingsCurrent": ("borrowings_current", "INR"),
     "TradePayablesCurrent": ("trade_payables_current", "INR"),
@@ -457,7 +465,17 @@ def _check_identities(result: ParsedResults) -> None:
             _check(result, "PBEIT_PLUS_EXCEPTIONAL", pbeit + exc, pbt, 3, p)
         tax, pat_c = v("tax_expense"), v("pat_continuing")
         if None not in (pbt, tax, pat_c):
-            _check(result, "PBT_MINUS_TAX", pbt - tax, pat_c, 3, p)
+            # Regulated utilities: PAT(continuing) = PBT - tax + regulatory deferral movement [X42]
+            regdef = v("regulatory_deferral_movement") or Decimal(0)
+            _check(result, "PBT_MINUS_TAX", pbt - tax + regdef, pat_c, 4, p)
+        pat = v("pat")
+        if None not in (pat_c, pat):
+            # PAT = continuing + discontinued + share of associates/JVs (after PBT) [X42]
+            rest = (v("pat_discontinued") or Decimal(0)) + (v("share_of_associates_jv") or Decimal(0))
+            _check(result, "PAT_CHAIN", pat_c + rest, pat, 4, p)
+        owners, nci = v("pat_owners"), v("pat_nci")
+        if None not in (owners, nci, pat):
+            _check(result, "OWNERS_PLUS_NCI", owners + nci, pat, 3, p)
         comps = [v(t) for t in EXPENSE_COMPONENTS]
         if exp is not None and None not in comps:
             _check(result, "EXPENSE_COMPONENTS", sum(comps, Decimal(0)), exp, len(comps) + 1, p)

@@ -202,13 +202,17 @@ def compute_rows(con, as_of: date, exchange: str = "NSE") -> list[dict]:
                 if shares_as_of < ex <= as_of:
                     shares = shares / ef
         mcap = close * shares if close is not None and shares is not None else None
-        ev = mcap + fund["_net_debt"] if mcap is not None and fund["_net_debt"] is not None else None
+        ev = (
+            mcap + fund["_net_debt"] + (fund["_minority"] or 0)
+            if mcap is not None and fund["_net_debt"] is not None
+            else None
+        )
         row.update({
             "shares": None if shares is None else int(shares), "shares_source": source,
             "market_cap": None if mcap is None else mcap.quantize(Decimal("0.01")),
             "enterprise_value": None if ev is None else ev.quantize(Decimal("0.01")),
-            "pe": _f(safe_div(mcap, fund["pat_ttm"])),
-            "pb": _f(safe_div(mcap, fund["total_equity"])),
+            "pe": _f(safe_div(mcap, fund["_pat_owners"])),
+            "pb": _f(safe_div(mcap, fund["_equity_owners"])),
             "ev_ebitda": _f(safe_div(ev, fund["ebitda_ttm"])),
             "fcff_yield": _f(safe_div(fund["_fcff"], ev)),
             "promoter_pct": _f(shp.get("PROMOTER", (None, None))[0]),
@@ -228,7 +232,7 @@ _EMPTY_FUNDAMENTALS: dict = {
     "total_equity": None, "opm": None, "sales_growth_yoy": None, "profit_growth_yoy": None, "roe": None,
     "roce": None, "roic": None, "croic": None, "debt_to_equity": None, "other_income_to_pbt": None,
     "altman_z_dd": None, "scope_used": None, "fundamentals_end": None, "bs_as_of": None, "cf_as_of": None,
-    "_net_debt": None, "_fcff": None,
+    "_net_debt": None, "_fcff": None, "_pat_owners": None, "_equity_owners": None, "_minority": None,
 }  # fmt: skip
 
 
@@ -254,7 +258,7 @@ def _fundamentals(con, entity_id: str, as_of_ts: datetime, end: date) -> dict:
         "opm": _f(safe_div(b["ebitda"], b["rev_ops"])),
         "sales_growth_yoy": _f(yoy_growth(book, "revenue_from_operations", end)),
         "profit_growth_yoy": _f(yoy_growth(book, "pat", end)),
-        "roe": _f(safe_div(b["pat"], eq)),
+        "roe": _f(safe_div(b["pat_owners"], b["equity_owners"])),
         "roce": _f(safe_div(b["ebit"], capital)),
         "roic": _f(safe_div(b["nopat"], b["invested_capital"])),
         "croic": _f(safe_div(b["fcf"], b["invested_capital"])),
@@ -262,7 +266,8 @@ def _fundamentals(con, entity_id: str, as_of_ts: datetime, end: date) -> dict:
         "other_income_to_pbt": _f(safe_div(b["other_income"], b["pbt"])),
         "altman_z_dd": _f(altman_z_double_prime(b)),
         "scope_used": scope, "fundamentals_end": end, "bs_as_of": b["bs_as_of"], "cf_as_of": b["cf_as_of"],
-        "_net_debt": b["net_debt"], "_fcff": b["fcff"],
+        "_net_debt": b["net_debt"], "_fcff": b["fcff"], "_pat_owners": b["pat_owners"],
+        "_equity_owners": b["equity_owners"], "_minority": b["minority_interest"],
     }  # fmt: skip
 
 

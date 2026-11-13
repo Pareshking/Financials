@@ -260,20 +260,30 @@ All three are NULL for `FINANCIAL_LENDING` and `INSURANCE`; Beneish additionally
 
 ### 10.5 Lenders (`INDAS_NBFC`, `IGAAP_BANK`)
 
-NBFC columns are built from the Division III parser (`parsers/indas_nbfc.py`, X54-X57). Bank rows stay as designed until Batch 5.
-Industrial ratios (EBITDA, OPM, ROCE, ROIC, CROIC, D/E, Altman, FCF, EV) are NULL for NBFC books.
+NBFC columns come from the Division III parser (`parsers/indas_nbfc.py`, X54-X57); bank columns from the RBI-format
+parser (`parsers/igaap_bank.py`, X58-X61). Industrial ratios (EBITDA, OPM, ROCE, ROIC, CROIC, D/E, Altman, FCF, EV) are
+NULL for both. Bank `sales_ttm` = TTM interest earned (Screener's bank "Revenue", S4). Bank regulatory ratios come from
+the standalone book (X60).
 
-| Column | NBFC formula (built) | Bank (Batch 5) |
+**Denominators (C16):** ROE and ROE (continuing) use the latest **closing** owners' equity (Screener's convention,
+available from the first balance sheet). RoA, NIM proxy and credit cost use **(opening + closing) / 2** over 12 months
+and stay NULL until the opening balance sheet exists.
+
+| Column | NBFC formula | Bank formula |
 |---|---|---|
-| `nii_ttm` | TTM `InterestEarned − FinanceCosts` | `InterestEarned − InterestExpended` |
-| `ppop_ttm` | TTM net total income − opex = PBEIT + impairment (X55) | `OperatingProfitBeforeProvisionAndContingencies` |
-| `cost_to_income` | opex / (revenue + other income − finance costs); opex = expenses − finance costs − impairment | `OperatingExpenses / (NII + OtherIncome)` |
-| `credit_cost` | TTM impairment / avg(loans) (opening + closing, 12 months; NULL without opening); `loans_avg_from`, `loans_as_of` | provisions / avg(advances) |
+| `nii_ttm` | TTM `InterestEarned − FinanceCosts` | TTM `InterestEarned − InterestExpended` |
+| `ppop_ttm` | TTM net total income − opex = PBEIT + impairment (X55) | TTM `OperatingProfitBeforeProvisionAndContingencies` (= NII + OI − opex, X58) |
+| `cost_to_income` | opex / (revenue + other income − finance costs) | `OperatingExpenses / (NII + OtherIncome)` |
+| `credit_cost` | TTM impairment / avg(loans) | TTM `ProvisionsOtherThanTaxAndContingencies` / avg(advances) |
+| `loans`, `loans_as_of`, `loans_avg_from` | loans, latest BS date, opening date of the average | advances (same fields) |
 | `nim_asset_proxy` | TTM NII / avg(total assets) | same |
-| `roa` | TTM owners' profit / avg(total assets) | same, or tagged `ReturnOnAssets` |
-| `gnpa_pct`, `nnpa_pct`, `pcr` | **NULL**: no element in the NBFC taxonomy (X54) | `PercentageOfGrossNpa`, `PercentageOfNpa`, PCR from amounts |
-| `is_lending_nbfc` | C13 | — |
-| `pb` | market cap / owners' equity | same |
+| `roa` | TTM owners' profit / avg(total assets) | same; filed RoA in `roa_filed` (annualisation varies, X59) |
+| `gnpa_pct`, `nnpa_pct`, `pcr` | **NULL**: no NBFC element (X54) | `PercentageOfGrossNpa`, `PercentageOfNpa`, `(GNPA − NNPA) / GNPA` (standalone, latest period) |
+| `credit_to_deposit` | — | advances / deposits (latest BS) |
+| `cet1_pct`, `at1_pct` | — | `CET1Ratio`, `AdditionalTier1Ratio` (standalone; no total CRAR element) |
+| `govt_holding_pct` | — | `PercentageOfShareHeldByGovernmentOfIndia` (PSU marker) |
+| `is_lending_nbfc` | C13 | NULL |
+| `pb` | market cap / owners' equity | market cap / (Capital + Reserves and surplus) |
 | CASA % | — | `supplemental_kpis` (not in XBRL [X23]) |
 
 ### 10.6 Insurers

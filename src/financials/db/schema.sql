@@ -351,6 +351,11 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     gnpa_pct            DOUBLE,              -- NULL for NBFCs: no taxonomy element [X54]
     nnpa_pct            DOUBLE,
     pcr                 DOUBLE,
+    credit_to_deposit   DOUBLE,              -- banks: advances / deposits (latest balance sheet)
+    cet1_pct            DOUBLE,              -- banks: filed CET1 ratio (standalone)
+    at1_pct             DOUBLE,              -- banks: filed AT1 ratio (standalone)
+    roa_filed           DOUBLE,              -- banks: filed ReturnOnAssets, annualisation varies by bank [X59]
+    govt_holding_pct    DOUBLE,              -- banks: PercentageOfShareHeldByGovernmentOfIndia (PSU marker)
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -425,6 +430,11 @@ CREATE TABLE IF NOT EXISTS screener_features (
     gnpa_pct            DOUBLE,              -- NULL for NBFCs: no taxonomy element [X54]
     nnpa_pct            DOUBLE,
     pcr                 DOUBLE,
+    credit_to_deposit   DOUBLE,              -- banks: advances / deposits (latest balance sheet)
+    cet1_pct            DOUBLE,              -- banks: filed CET1 ratio (standalone)
+    at1_pct             DOUBLE,              -- banks: filed AT1 ratio (standalone)
+    roa_filed           DOUBLE,              -- banks: filed ReturnOnAssets, annualisation varies by bank [X59]
+    govt_holding_pct    DOUBLE,              -- banks: PercentageOfShareHeldByGovernmentOfIndia (PSU marker)
     PRIMARY KEY (as_of_date, security_id)
 );
 

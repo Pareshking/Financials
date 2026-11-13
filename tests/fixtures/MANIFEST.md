@@ -131,8 +131,11 @@ output); `tests/test_index_backfill.py::test_derived_text_matches_pdf` regenerat
 | `xbrl/INTEGRATED_FILING_NBFC_INDAS_1750814_31102026080404_WEB.xml` | B4: Muthoot Finance Q2 FY27 consolidated (gold-loan NBFC; leases labelled) (X54, X57) | `c59af915c0c3fc83eb57a7859332daae9d39b2628c2562491240fcb0a49ca8e2` |
 | `xbrl/INTEGRATED_FILING_NBFC_INDAS_1748226_28102026075925_WEB.xml` | B4: PNB Housing Finance Q2 FY27 consolidated (HFC; deposits; impairment write-back; zero-attribution 2nd observation) (X55, X56) | `93df5e99ffadd01d618de9409d92e868ff11a800a9cf65a3dd2daa5692c5066b` |
 | `xbrl/INTEGRATED_FILING_NBFC_INDAS_1748395_28102026112856_WEB.xml` | B4: Cholamandalam Q2 FY27 consolidated (owners profit tagged as TCI: quarantined) (X56) | `5c89348137ac6f3fa16d8b7fa3b2097f9b5954047f399810680479038c262493` |
+| `xbrl/INTEGRATED_FILING_BANKING_1740465_16102026082727_WEB.xml` | B5: Punjab National Bank Q2 FY27 standalone (PSU; H1 balance sheet; AT1; GoI 70%) (X58, X59) | `96970acc7a4cd1bcffc5d46d8c10858291c925bfc9370b5434c36cc4a8e29330` |
+| `xbrl/INTEGRATED_FILING_BANKING_1699404_22072026053243_WEB.xml` | B5: IndusInd Bank Q1 FY27 standalone (no balance sheet; AT1 = 0 real) (X58, X59) | `8bbfb8ececb45a687d182deca64f7dfba95312079200feb0c4ee74a86515283d` |
+| `xbrl/INTEGRATED_FILING_BANKING_1745379_24102026050751_WEB.xml` | B5: Kotak Mahindra Bank Q2 FY27 standalone (face value mis-tagged 994.79) (X61) | `a40e30c3ba7d7bd97900783ca4424e57696b4d1dc5601675b6f5a29b81e424b1` |
 
-Source URL pattern for all twenty-eight: `https://nsearchives.nseindia.com/corporate/xbrl/<file>`.
+Source URL pattern for all thirty-one: `https://nsearchives.nseindia.com/corporate/xbrl/<file>`.
 
 ## Screener goldens (local only, not committed)
 

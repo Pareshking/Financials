@@ -82,6 +82,11 @@ ALIASES: dict[str, tuple[str, str]] = {
     "gnpa": ("(gnpa_pct * 100)", "% (NULL for NBFCs: not in taxonomy)"),
     "nnpa": ("(nnpa_pct * 100)", "% (NULL for NBFCs: not in taxonomy)"),
     "pcr": ("(pcr * 100)", "% (NULL for NBFCs: not in taxonomy)"),
+    "credit to deposit": ("(credit_to_deposit * 100)", "%, banks"),
+    "cet1": ("(cet1_pct * 100)", "%, banks (standalone, filed)"),
+    "at1": ("(at1_pct * 100)", "%, banks (standalone, filed)"),
+    "roa filed": ("(roa_filed * 100)", "%, as filed (annualisation varies by bank)"),
+    "government holding": ("(govt_holding_pct * 100)", "%, banks (PSU marker)"),
 }
 
 KEYWORDS = {"and", "or", "not"}

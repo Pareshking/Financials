@@ -99,11 +99,12 @@ def test_investment_holding_company_is_not_a_lender():
 
 
 def test_dispatcher_routes_nbfc_and_keeps_other_profiles_unimplemented():
+    """Banks became implemented in Batch 5; insurers remain unimplemented until Batch 6."""
+    from _fixture_helpers import GEN_INS
+
     assert parse_integrated_results(BAJAJ.read_bytes()).profile == "INDAS_NBFC"
-    bank = parse_integrated_results(
-        (XBRL_DIR / "INTEGRATED_FILING_BANKING_1740912_17102026054806_WEB.xml").read_bytes()
-    )
-    assert {i.reason_code for i in bank.issues} == {"PROFILE_NOT_IMPLEMENTED"}
+    ins = parse_integrated_results(GEN_INS.read_bytes())
+    assert {i.reason_code for i in ins.issues} == {"PROFILE_NOT_IMPLEMENTED"}
 
 
 def test_no_npa_elements_in_nbfc_taxonomy():

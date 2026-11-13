@@ -151,26 +151,51 @@ def _row(name: str, facts: dict[str, Decimal], plus: tuple[str, ...], minus: tup
     return Row(name, (_g(facts, *plus) - _g(facts, *minus)) if present else None, parts)
 
 
-def bank_quarter(facts: dict[str, Decimal]) -> QuarterStatement:
-    """IntegratedFinance_Banking [S4]. Screener's 'Expenses' = operating expenses + provisions."""
+def bank_quarter(result, start: date, end: date) -> QuarterStatement:
+    """IGAAP_BANK rows from the bank parser (canonical tags) [S4, X58]. Screener's 'Expenses' = operating expenses
+    + provisions; our PBT is after exceptional items, which stay a row of their own (BANK_EXCEPTIONAL)."""
+
+    def v(tag: str) -> Decimal | None:
+        return result.value(tag, start, end)
+
+    opex, prov = v("operating_expenses"), v("provisions")
+    interest, expended = v("interest_earned"), v("interest_expended")
+    gnpa, nnpa = v("gross_npa"), v("net_npa")
     rows = {
-        "Revenue": _row("Revenue", facts, ("InterestEarned",)),
-        "Interest": _row("Interest", facts, ("InterestExpended",)),
-        "Expenses": _row("Expenses", facts, ("OperatingExpenses", "ProvisionsOtherThanTaxAndContingencies")),
-        "Other Income": _row("Other Income", facts, ("OtherIncome",)),
-        "Profit before tax": _row("Profit before tax", facts, ("ProfitLossFromOrdinaryActivitiesBeforeTax",)),
-        "Tax": _row("Tax", facts, ("TaxExpense",)),
-        "Net Profit": _row(
-            "Net Profit", facts, ("ProfitLossAfterTaxesMinorityInterestAndShareOfProfitLossOfAssociates",)
-        ),
-        "Exceptional items": _row("Exceptional items", facts, ("ExceptionalItems",)),
-    }
-    st = QuarterStatement("IGAAP_BANK", (None, None), rows)
-    if facts.get("ExceptionalItems"):
+        "Revenue": Row("Revenue", interest, {
+            "Interest on advances / bills": v("interest_on_advances"),
+            "Income on investments": v("income_on_investments"),
+            "Interest on RBI / inter-bank balances": v("interest_on_rbi_interbank"),
+            "Other interest": v("other_interest"),
+        }),
+        "Interest": Row("Interest", expended),
+        "Expenses": Row("Expenses", None if opex is None or prov is None else opex + prov, {
+            "Employee cost": v("employee_benefit_expense"), "Other operating expenses": v("other_operating_expenses"),
+            "Provisions and contingencies": prov,
+        }),
+        "Other Income": Row("Other Income", v("other_income")),
+        "Exceptional items": Row("Exceptional items", v("exceptional_items")),
+        "Profit before tax": Row("Profit before tax", v("pbt")),
+        "Tax": Row("Tax", v("tax_expense")),
+        "Net Profit": Row("Net Profit", v("pat_owners") if v("pat_owners") is not None else v("pat"), {
+            "Profit for the period": v("pat"), "Extraordinary items": v("extraordinary_items"),
+            "Share of associates": v("share_of_associates_jv"),
+            "Minority interest": None if v("pat_nci") is None else -v("pat_nci"),
+        }),
+        "NII": Row("NII", None if None in (interest, expended) else interest - expended),
+        "PPOP": Row("PPOP", v("ppop")),
+        "GNPA %": Row("GNPA %", v("gnpa_pct"), {"Gross NPA": gnpa}),
+        "NNPA %": Row("NNPA %", v("nnpa_pct"), {"Net NPA": nnpa}),
+        "PCR": Row("PCR", None if gnpa is None or nnpa is None or not gnpa else (gnpa - nnpa) / gnpa),
+        "EPS": eps_row(result, start, end),
+    }  # fmt: skip
+    st = QuarterStatement("IGAAP_BANK", (start, end), rows)
+    if v("exceptional_items"):
         st.divergences.append(
             "BANK_EXCEPTIONAL: our PBT is after exceptional items; Screener's PBT is Revenue - Interest - Expenses "
             "+ Other Income (before exceptional) while its Net Profit is after them [S4]"
         )
+    _eps_divergence(st, result)
     return st
 
 

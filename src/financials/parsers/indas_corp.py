@@ -29,6 +29,10 @@ PROFILE_BY_NAMESPACE = (
     ("/IntegratedFinance_NBFC/", "INDAS_NBFC"),
     ("/IntegratedFinance_Banking/", "IGAAP_BANK"),
     ("/GeneralInsurance/", "IRDAI_GENERAL"),
+    # Integrated Filing insurer namespaces, seen in committed fixtures (HDFC Life, ICICI Lombard) [S6, S7];
+    # routed as known profiles, parsed from Batch 6.
+    ("/IntegratedFinance_LI/", "IRDAI_LIFE"),
+    ("/IntegratedFinance_GI/", "IRDAI_GENERAL"),
 )
 
 # Element → canonical tag. Only elements seen in a committed fixture are mapped.
@@ -185,7 +189,7 @@ EXPENSE_COMPONENTS = (
 
 SCOPES = {"standalone": "STANDALONE", "consolidated": "CONSOLIDATED"}
 
-IMPLEMENTED_PROFILES = ("INDAS_CORP", "INDAS_NBFC")
+IMPLEMENTED_PROFILES = ("INDAS_CORP", "INDAS_NBFC", "IGAAP_BANK")
 
 # Named label rules [references X39, X40]: some lines exist only as a free-text label on a dimensional
 # "Others"/detail member (Description* fact) paired with an amount in contexts with the same member.
@@ -311,7 +315,10 @@ def parse_with_spec(data: bytes, spec: ProfileSpec) -> ParsedResults:
     _map_facts(inst, result, spec)
     if not result.issues:
         _check_critical(result, spec)
-        _check_identities(result, spec)
+        if spec.identities is not None:
+            spec.identities(result)
+        else:
+            _check_identities(result, spec)
         _check_eps(result)
         if spec.post_process is not None:
             spec.post_process(result)
@@ -661,6 +668,7 @@ class ProfileSpec:
     label_rules: tuple = ()
     missing_component_is_zero: bool = False
     post_process: Any = None
+    identities: Any = None  # replaces the Ind AS identity set (banks: RBI format)
 
 
 CORP_SPEC = ProfileSpec(
@@ -687,3 +695,22 @@ def _check_eps(result: ParsedResults) -> None:
         result.meta.setdefault("warnings", []).append(
             {"code": "EPS_INCONSISTENT", "filed": str(filed), "computed": str(computed.quantize(Decimal("0.01")))}
         )
+        # A >10x gap cannot come from weighted-average vs period-end shares: the derived share count itself is
+        # wrong (Kotak Q2 FY27 tags FaceValue = 994.79, i.e. paid-up capital in crore) [X61]. Withhold the derived
+        # fact so it never feeds market cap or the Reg. 31 cross-check; raw facts stay untouched.
+        if not _shares_plausible(result, q, profit, shares):
+            result.facts = [f for f in result.facts if f.canonical_tag != "shares_from_paid_up"]
+            result.meta["warnings"].append({"code": "SHARES_FROM_PAID_UP_WITHHELD", "shares": str(shares)})
+
+
+def _shares_plausible(result: ParsedResults, q: tuple, profit: Decimal, shares: Decimal) -> bool:
+    """True if any filed EPS implies a share count within 10x of paid-up / face value. TMPV's wrong total EPS still
+    agrees via continuing EPS (368 Cr shares both ways); Kotak's mis-tagged face value agrees with nothing."""
+    disc = result.value("pat_discontinued", *q) or Decimal(0)
+    bases = [(profit, result.value("eps_basic", *q)), (profit - disc, result.value("eps_basic_continuing", *q))]
+    for basis, eps in bases:
+        if eps and basis:
+            implied = basis / eps
+            if implied > 0 and Decimal("0.1") <= implied / shares <= 10:
+                return True
+    return False

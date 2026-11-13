@@ -14,6 +14,7 @@ from decimal import Decimal
 import pytest
 
 from _fixture_helpers import XBRL_DIR
+from financials.parsers.igaap_bank import parse_igaap_bank_results
 from financials.parsers.indas_corp import parse_indas_corp_results
 from financials.parsers.indas_nbfc import parse_indas_nbfc_results
 from financials.parsers.xbrl import parse_instance
@@ -72,10 +73,11 @@ GOLDEN = {
                  "Tax": "301.01", "Net Profit": "946.40"}, {}),
 }  # fmt: skip
 
-RAW_BUILDERS = {"bank": bank_quarter, "life": life_quarter, "general": general_quarter}  # raw until Batches 5-6
+RAW_BUILDERS = {"life": life_quarter, "general": general_quarter}  # raw until Batch 6
 PARSED_BUILDERS = {
     "corp": lambda data, period: corp_quarter(parse_indas_corp_results(data), *period),
     "nbfc": lambda data, period: nbfc_quarter(parse_indas_nbfc_results(data), *period),  # Batch 4 parser
+    "bank": lambda data, period: bank_quarter(parse_igaap_bank_results(data), *period),  # Batch 5 parser
 }
 
 

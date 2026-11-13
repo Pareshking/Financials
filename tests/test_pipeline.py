@@ -8,10 +8,12 @@ from decimal import Decimal
 import pytest
 from conftest import FETCHED_AT, bhav_bytes, bhav_url
 
-from _fixture_helpers import BANK, CORP, NBFC
+from _fixture_helpers import CORP, NBFC, XBRL_DIR
 from financials.corp_actions import CorpAction
 from financials.promoter import adjusted_closes, pit_fact, promote, record_corp_action, verify_pending_actions
 from financials.staging import stage_market_day, stage_results_xbrl
+
+LIFE = XBRL_DIR / "INTEGRATED_FILING_LI_1739355_15102026072525_WEB.xml"  # HDFC Life Q2 FY27
 
 XBRL_URL = "https://nsearchives.nseindia.com/corporate/xbrl/"
 
@@ -236,18 +238,18 @@ def test_results_filing_for_unknown_issuer_is_quarantined(market):
 
 
 def test_unimplemented_profile_is_quarantined_with_raw_kept(market):
-    """Banks are not implemented yet (Batch 5). Until Batch 4 this test used the NBFC fixture."""
+    """Insurers are not implemented yet (Batch 6). This test used the NBFC fixture until Batch 4, banks until 5."""
     stage = stage_results_xbrl(
         market.vault,
         market.stage_root,
-        data=BANK.read_bytes(),
-        source_url=XBRL_URL + BANK.name,
+        data=LIFE.read_bytes(),
+        source_url=XBRL_URL + LIFE.name,
         fetched_at=FETCHED_AT,
     )
     result = promote(market.con, stage)
     assert result.status == "QUARANTINED"
     assert market.con.execute("SELECT reason_code FROM quarantine_queue").fetchall() == [("PROFILE_NOT_IMPLEMENTED",)]
-    assert count(market, "SELECT count(*) FROM raw_xbrl_facts") == 117  # bank fixture, all raw facts kept
+    assert count(market, "SELECT count(*) FROM raw_xbrl_facts") == 1527  # life-insurer fixture, all raw facts kept
 
 
 def test_nbfc_filing_is_parsed_then_stops_at_the_identity_gate(market):

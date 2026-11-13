@@ -159,9 +159,11 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
     args.data_dir.mkdir(parents=True, exist_ok=True)
     con = connect(db_path)
     try:
-        apply_schema(con)
+        upgraded = apply_schema(con)
         if args.cmd == "init-db":
-            print(f"schema applied to {db_path}", file=out)
+            for stmt in upgraded:
+                print(f"upgraded: {stmt}", file=out)
+            print(f"schema applied to {db_path} ({len(upgraded)} column(s) added)", file=out)
             return 0
         if args.cmd == "promote":
             return 1 if promote_pending(con, stage_root, out) else 0

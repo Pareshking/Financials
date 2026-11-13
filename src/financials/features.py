@@ -21,8 +21,10 @@ from decimal import Decimal
 from financials.corp_actions import ACCEPTED_STATUSES
 from financials.db import insert_rows, table_columns
 from financials.fundamentals import (
+    BANK_COLUMNS,
     NBFC_COLUMNS,
     altman_z_double_prime,
+    bank_blocks,
     building_blocks,
     choose_scope,
     load_factbook,
@@ -238,7 +240,7 @@ _EMPTY_FUNDAMENTALS: dict = {
     "altman_z_dd": None, "scope_used": None, "fundamentals_end": None, "bs_as_of": None, "cf_as_of": None,
     "_net_debt": None, "_fcff": None, "_pat_owners": None, "_pe_earnings": None, "_equity_owners": None,
     "_minority": None, "roe_continuing": None, "core_profit_ttm": None, "_pat_owners_total": None,
-    **dict.fromkeys(NBFC_COLUMNS),
+    **dict.fromkeys(NBFC_COLUMNS + BANK_COLUMNS),
 }  # fmt: skip
 
 # Industrial ratios that do not apply to lenders (architecture §10): NULL for INDAS_NBFC books.
@@ -267,7 +269,10 @@ def _fundamentals(con, entity_id: str, as_of_ts: datetime, end: date) -> dict:
     b = building_blocks(book, end)
     eq, debt = b["total_equity"], b["total_debt"]
     capital = eq + debt if eq is not None and debt is not None else None
-    return _lender_columns(book, end) | {
+    regulatory = None
+    if scope == "CONSOLIDATED" and "interest_expended" in book.durations:
+        regulatory = load_factbook(con, entity_id, "STANDALONE", as_of_ts)  # standalone disclosures [X60]
+    return _lender_columns(book, end, regulatory) | {
         "sales_ttm": b["rev_ops"], "ebitda_ttm": b["ebitda"], "pat_ttm": b["pat"], "fcf_ttm": b["fcf"],
         "net_debt": b["net_debt"], "total_equity": eq,
         "opm": _f(safe_div(b["ebitda"], b["rev_ops"])),
@@ -292,9 +297,10 @@ def _fundamentals(con, entity_id: str, as_of_ts: datetime, end: date) -> dict:
 _AMOUNTS = ("nii_ttm", "ppop_ttm", "loans")
 
 
-def _lender_columns(book, end: date) -> dict:
-    """NBFC lending columns (all NULL for non-NBFC books)."""
-    nb = nbfc_blocks(book, end)
+def _lender_columns(book, end: date, regulatory=None) -> dict:
+    """Lender columns: NBFC (Division III) or bank (RBI format); all NULL for other books."""
+    nb = bank_blocks(book, end, regulatory) if "interest_expended" in book.durations else nbfc_blocks(book, end)
+    nb = {k: nb.get(k) for k in NBFC_COLUMNS + BANK_COLUMNS} | {k: v for k, v in nb.items() if k.startswith("_")}
     return {k: (_f(v) if isinstance(v, Decimal) and k not in _AMOUNTS else v) for k, v in nb.items()}
 
 
@@ -302,7 +308,10 @@ def _lender_overrides(book, end: date) -> dict:
     """Industrial ratios are NULL for NBFC books; `_lender` also suppresses EV in compute_rows."""
     if "interest_earned" not in book.durations:
         return {}
-    return {**dict.fromkeys(_NOT_FOR_LENDERS), "_lender": True}
+    out = {**dict.fromkeys(_NOT_FOR_LENDERS), "_lender": True}
+    if "interest_expended" in book.durations:  # banks: Screener's "Revenue" is interest earned [S4]
+        out["sales_ttm"] = book.ttm("interest_earned", end)
+    return out
 
 
 def _null_rates(rows: list[dict]) -> dict[str, float]:

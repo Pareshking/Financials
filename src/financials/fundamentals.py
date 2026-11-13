@@ -347,6 +347,50 @@ def nbfc_blocks(book: FactBook, end: date) -> dict:
     return out
 
 
+def bank_blocks(book: FactBook, end: date, regulatory: FactBook | None = None) -> dict:
+    """Bank ratios (architecture §10.5) [X58-X61]. `regulatory` is the STANDALONE book: GNPA / NNPA / CET1 / AT1 /
+    filed RoA are standalone disclosures (consolidated filings carry 0 placeholders, dropped by X60)."""
+    empty = dict.fromkeys(NBFC_COLUMNS + BANK_COLUMNS)
+    if "interest_expended" not in book.durations:
+        return empty
+    t = lambda tag: book.ttm(tag, end)  # noqa: E731
+    interest, expended, other = t("interest_earned"), t("interest_expended"), t("other_income")
+    opex, ppop, prov = t("operating_expenses"), t("ppop"), t("provisions")
+    nii = None if None in (interest, expended) else interest - expended
+    avg_adv, adv_from, adv_to = average_instant(book, "advances", end)
+    avg_assets, _, _ = average_instant(book, "total_assets", end)
+    bs = book.latest_instant("total_assets", end)
+    bs_date = bs[0] if bs else None
+    adv = book.instants.get("advances", {}).get(bs_date) if bs_date else None
+    dep = book.instants.get("deposits", {}).get(bs_date) if bs_date else None
+    reg = regulatory or book
+    latest = lambda tag: _latest_period_value(reg, tag, end)  # noqa: E731
+    gnpa, nnpa = latest("gross_npa"), latest("net_npa")
+    out = dict(empty)
+    out.update({
+        "nii_ttm": nii, "ppop_ttm": ppop,
+        "cost_to_income": safe_div(opex, None if None in (nii, other) else nii + other),
+        "credit_cost": safe_div(prov, avg_adv), "nim_asset_proxy": safe_div(nii, avg_assets),
+        "roa": safe_div(t(book.coalesced("pat_owners", "pat")), avg_assets),
+        "loans": adv, "loans_as_of": adv_to if adv_to else bs_date, "loans_avg_from": adv_from,
+        "gnpa_pct": latest("gnpa_pct"), "nnpa_pct": latest("nnpa_pct"),
+        "pcr": None if gnpa is None or nnpa is None or not gnpa else (gnpa - nnpa) / gnpa,
+        "credit_to_deposit": safe_div(adv, dep), "cet1_pct": latest("cet1_ratio"), "at1_pct": latest("at1_ratio"),
+        "roa_filed": latest("roa_filed"), "govt_holding_pct": latest("govt_holding_pct"),
+        "_bank_revenue": interest,
+    })  # fmt: skip
+    return out
+
+
+def _latest_period_value(book: FactBook, tag: str, end: date) -> Decimal | None:
+    """Value for the most recent period ending on/before `end` (quarter context preferred over YTD)."""
+    d = book.durations.get(tag, {})
+    cands = sorted(((e, -(e - s).days, v) for (s, e), v in d.items() if e <= end), reverse=True)
+    return cands[0][2] if cands else None
+
+
+BANK_COLUMNS = ("credit_to_deposit", "cet1_pct", "at1_pct", "roa_filed", "govt_holding_pct")
+
 NBFC_COLUMNS = (
     "is_lending_nbfc", "nii_ttm", "ppop_ttm", "cost_to_income", "credit_cost", "nim_asset_proxy", "roa", "loans",
     "loans_as_of", "loans_avg_from", "gnpa_pct", "nnpa_pct", "pcr",

@@ -22,6 +22,7 @@ from pathlib import Path
 
 import yaml
 
+from financials.parsers.igaap_bank import BANK_DURATION_TAGS, BANK_INSTANT_TAGS
 from financials.parsers.indas_corp import DURATION_TAGS, IMPLEMENTED_PROFILES, INSTANT_TAGS, detect_profile
 from financials.parsers.indas_nbfc import NBFC_DURATION_TAGS, NBFC_INSTANT_TAGS
 from financials.parsers.integrated import parse_integrated_results
@@ -35,6 +36,7 @@ def _mapped(duration: dict, instant: dict) -> dict[str, str]:
 MAPPED_BY_PROFILE = {
     "INDAS_CORP": _mapped(DURATION_TAGS, INSTANT_TAGS),
     "INDAS_NBFC": _mapped(NBFC_DURATION_TAGS, NBFC_INSTANT_TAGS),
+    "IGAAP_BANK": _mapped(BANK_DURATION_TAGS, BANK_INSTANT_TAGS),
 }
 MAPPED = MAPPED_BY_PROFILE["INDAS_CORP"]
 

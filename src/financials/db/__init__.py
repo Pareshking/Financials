@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Mapping, Sequence
 from importlib.resources import files
 from pathlib import Path
@@ -17,8 +18,55 @@ def connect(path: str | Path = ":memory:", *, read_only: bool = False) -> duckdb
     return duckdb.connect(str(path), read_only=read_only)
 
 
-def apply_schema(con: duckdb.DuckDBPyConnection) -> None:
+def apply_schema(con: duckdb.DuckDBPyConnection) -> list[str]:
+    """Create missing tables, then add columns that schema.sql declares but an existing database lacks.
+
+    Idempotent: a second run changes nothing. Only nullable, constraint-free columns are added automatically;
+    a new NOT NULL / PRIMARY KEY / UNIQUE / REFERENCES column needs a deliberate migration and raises.
+    Returns the statements executed by the upgrade (empty for a fresh or current database).
+    """
     con.execute(SCHEMA_SQL)
+    return upgrade_columns(con)
+
+
+_TABLE_RE = re.compile(r"CREATE TABLE IF NOT EXISTS (\w+) \((.*?)\n\);", re.S)
+_NOT_COLUMN = ("PRIMARY KEY", "UNIQUE", "FOREIGN KEY", "CHECK", "CONSTRAINT")
+_CONSTRAINED = re.compile(r"\b(NOT NULL|PRIMARY KEY|UNIQUE|REFERENCES)\b", re.I)
+
+
+class SchemaMigrationError(RuntimeError):
+    pass
+
+
+def declared_columns(schema_sql: str | None = None) -> dict[str, list[tuple[str, str]]]:
+    """{table: [(column, definition)]} in declaration order, parsed from schema.sql (read at call time)."""
+    schema_sql = SCHEMA_SQL if schema_sql is None else schema_sql
+    out: dict[str, list[tuple[str, str]]] = {}
+    for table, body in _TABLE_RE.findall(schema_sql):
+        cols = []
+        for raw in body.splitlines():
+            line = raw.split("--", 1)[0].strip().rstrip(",").strip()
+            if not line or line.upper().startswith(_NOT_COLUMN):
+                continue
+            name, _, definition = line.partition(" ")
+            cols.append((name, definition.strip()))
+        out[table] = cols
+    return out
+
+
+def upgrade_columns(con: duckdb.DuckDBPyConnection) -> list[str]:
+    executed = []
+    for table, cols in declared_columns().items():
+        existing = set(table_columns(con, table))
+        for name, definition in cols:
+            if name in existing:
+                continue
+            if _CONSTRAINED.search(definition):
+                raise SchemaMigrationError(f"{table}.{name}: '{definition}' needs a deliberate migration")
+            stmt = f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {name} {definition}"
+            con.execute(stmt)
+            executed.append(stmt)
+    return executed
 
 
 def table_columns(con: duckdb.DuckDBPyConnection, table: str) -> list[str]:

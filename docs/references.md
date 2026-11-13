@@ -163,6 +163,7 @@ exports are not committed). Checked against the Q2 FY27 XBRL of 9 companies; "ex
 | CA7 | API ISIN is **stale** for ~25% of records: 60 of 237 resolvable records in 28 trading days carried an older ISIN than bhavcopy (e.g. DIXON `INE935N01012` vs `INE935N01020`). Old and new ISINs share the 4-char issuer code (chars 4-7), except PREMIERPOL (`INE247401016` vs `INE309M01020`). | VERIFIED (DIXON, PREMIERPOL in test); counts OBSERVED | Resolution: ISIN, then symbol with same issuer code, else quarantine |
 | CA8 | `caBroadcastDate` is `null` on every record in the fixture, so action visibility time is unknown. | VERIFIED | fixture |
 | CA9 | All 256 EQ records in the window match one of five purpose patterns (dividend, bonus, face-value split, rights with premium, demerger); 9 GS records are interest payments. | VERIFIED | test |
+| CA10 | `BUY BACK` purpose (Corporate_action RSS 13-Nov-2026, FDC): parsed as `BUYBACK`, price factor 1 (a buyback changes no share count per holding: C2). AGM-combined dividend wording, consolidations and capital reductions have **no fixture yet** and stay UNPARSED (quarantined) until one is committed. | VERIFIED (text) ; CHOICE (factor) | `tests/test_phase1_fixes_c.py` |
 
 ## 2c. Calendar and index lists
 

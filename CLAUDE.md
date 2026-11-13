@@ -26,7 +26,11 @@ python -m financials --data-dir data fetch-days 2026-11-12        # also fetch-c
 python -m financials --data-dir data promote                       # the only writer
 python -m financials --data-dir data materialize 2026-11-12
 python -m financials --data-dir data screen "Market Cap > 500 AND ROE > 15"
-python -m financials --data-dir data quarantine list --reason ISIN_COLLISION    # resolve: quarantine resolve --id … --action … --note …
+python -m financials --data-dir data quarantine list --reason ISIN_COLLISION    # then: quarantine inspect <id> / resolve --id … --action … --note … / reprocess
+python -m financials --data-dir data discover-filings --universe nifty500      # results, annual, shareholding listings + Reg. 30 RSS (new files only)
+python -m financials --data-dir data run-day --date 2026-11-13                  # daily: fetch, discover (RSS hint), promote, materialize
+python -m financials --data-dir data rebuild-market --from 2025-09-23           # roll market state back to a date and replay (audited)
+python -m financials --data-dir data materialize --from 2024-10-01 --to 2026-11-13
 python -m financials --data-dir data backfill-index --manifest reference/nifty500_changes.csv
 python -m financials.bench --out docs/benchmarks.md                # after performance-relevant changes
 ```

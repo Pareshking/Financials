@@ -301,6 +301,61 @@ def list_quarantine(
     )
 
 
+def inspect_quarantine(con, quarantine_id: str) -> dict[str, Any]:
+    """One finding with its context (bars around the date, corporate actions, raw rows, filing) and the exact
+    commands that resolve it [P2-12]. Read-only."""
+    rows = fetch_dicts(con, "SELECT * FROM quarantine_queue WHERE quarantine_id = ?", [quarantine_id])
+    if not rows:
+        raise AdminError(f"unknown quarantine id {quarantine_id}")
+    q = rows[0]
+    d = json.loads(q["details"])
+    ctx: dict[str, Any] = {}
+    sec, day = q["security_id"], d.get("trade_date") or d.get("ex_date")
+    if sec:
+        ctx["identifiers"] = fetch_dicts(
+            con, "SELECT symbol, series, isin, fin_instrm_id, valid_from, valid_to FROM security_identifier_history "
+            "WHERE security_id = ? ORDER BY valid_from", [sec])  # fmt: skip
+    if sec and day:
+        ctx["bars"] = fetch_dicts(
+            con, "SELECT trade_date, open, close, volume FROM ohlcv WHERE security_id = ? AND trade_date BETWEEN "
+            "CAST(? AS DATE) - INTERVAL 10 DAY AND CAST(? AS DATE) + INTERVAL 10 DAY ORDER BY 1",
+            [sec, day, day])  # fmt: skip
+        ctx["corp_actions"] = fetch_dicts(
+            con, "SELECT action_id, action_type, ratio_num, ratio_den, status, price_factor, observed_gap "
+            "FROM corp_actions WHERE security_id = ? AND ex_date = CAST(? AS DATE)", [sec, day])  # fmt: skip
+    if q["filing_id"]:
+        ctx["filing"] = (fetch_dicts(con, "SELECT category, source_url, broadcast_ts, broadcast_ts_source FROM filings "
+                                     "WHERE filing_id = ?", [q["filing_id"]]) or [None])[0]  # fmt: skip
+    if q["reason_code"] in ("MISSING_FIN_INSTRM_ID", "ISIN_COLLISION") and day:
+        ctx["raw_rows"] = fetch_dicts(
+            con, "SELECT symbol, series, isin, fin_instrm_id, open, close FROM raw_cm_bhavcopy WHERE trade_date = ? "
+            "AND (isin = ? OR symbol = ?)", [day, d.get("isin"), d.get("symbol")])  # fmt: skip
+    base = f"python -m financials quarantine resolve --id {quarantine_id}"
+    suggest = {
+        "UNEXPLAINED_GAP": [f"{base} --action CORP_ACTION --note '<source>' --payload-json "
+                            "'{\"action_type\": \"BONUS\", \"ratio_num\": 1, \"ratio_den\": 1}'",
+                            f"{base} --action ACCEPT --note '<why the gap is genuine>'"],
+        "ISIN_CHANGE_WITHOUT_ACTION": [f"{base} --action CORP_ACTION --note '<source>' --payload-json "
+                                       "'{\"action_type\": \"SPLIT\", \"ratio_num\": 2, \"ratio_den\": 10}'"],
+        "ISIN_COLLISION": [f"{base} --action MERGE_SECURITIES --note '<evidence>'"],
+        "UNPARSED_PURPOSE": [f"{base} --action REJECT --note '<not a price action>'",
+                             "resolve the day's GAP finding with --action CORP_ACTION (supersedes this record)"],
+        "VERIFY_FAILED": [f"{base} --action REJECT --note '<wrong record>'",
+                          "resolve the day's GAP finding with --action CORP_ACTION (supersedes this record)"],
+        "NO_VISIBILITY": [f"{base} --action OVERRIDE --note '<source>' --payload-json "
+                          "'{\"field\": \"broadcast_ts\", \"value\": \"YYYY-MM-DDTHH:MM:SS (UTC)\"}'",
+                          "python -m financials quarantine reprocess  (after the calendar covers the date)"],
+        "MISSING_SESSION": ["fetch the missing day(s), then python -m financials rebuild-market --from <date>"],
+    }  # fmt: skip
+    for r in ("UNKNOWN_ISIN", "UNKNOWN_SYMBOL", "AMBIGUOUS_ISIN", "AMBIGUOUS_SYMBOL", "CIN_MISMATCH"):
+        suggest[r] = [f"{base} --action OVERRIDE --note '<evidence>' --payload-json "
+                      "'{\"field\": \"security_id\", \"value\": \"<sec_...>\"}'",
+                      "python -m financials quarantine reprocess  (once the security is known)"]  # fmt: skip
+    suggest.setdefault("MISSING_FIN_INSTRM_ID", ["python -m financials quarantine reprocess"])
+    fallback = [f"{base} --action ACCEPT|REJECT --note '<why>'"]
+    return {"quarantine": {**q, "details": d}, "context": ctx, "resolve_with": suggest.get(q["reason_code"], fallback)}
+
+
 def _override(con, entity_id: str | None, field: str, value: Any, valid_from: date, reason: str) -> None:
     if entity_id is None:
         raise AdminError("this resolution needs an entity")
@@ -311,12 +366,47 @@ def _override(con, entity_id: str | None, field: str, value: Any, valid_from: da
     }], or_ignore=True)  # fmt: skip
 
 
-def resolve_quarantine(con, quarantine_id: str, *, action: str, note: str, payload: dict | None = None) -> dict:
+def resolve_quarantine(
+    con, quarantine_id: str, *, action: str, note: str, payload: dict | None = None, stage_root=None
+) -> dict:
+    """Resolve one finding (audited). A filing-level OVERRIDE is applied at once when `stage_root` is given: the
+    filing's batch is promoted again with the override (the finding reopens if that still fails)."""
     if action not in RESOLUTIONS:
         raise AdminError(f"action must be one of {sorted(RESOLUTIONS)}")
     if not note.strip():
         raise AdminError("a resolution note is required")
-    return _transaction(con, _resolve, quarantine_id, action, note.strip(), payload or {})
+    result = _transaction(con, _resolve, quarantine_id, action, note.strip(), payload or {})
+    if result.get("repromote") and stage_root is not None:
+        result["repromoted"] = _repromote_filing(con, stage_root, result["filing_id"], quarantine_id)
+    return result
+
+
+def _repromote_filing(con, stage_root, filing_id: str, qid: str) -> dict | None:
+    from pathlib import Path
+
+    from financials.promoter import REPROCESSING, promote
+
+    stage_root = Path(stage_root)
+    logged = [r[0] for r in con.execute("SELECT stage_path FROM promotion_log").fetchall()]
+    files = [
+        (stage_root / p / "filings.parquet").as_posix() for p in logged if (stage_root / p / "filings.parquet").exists()
+    ]
+    if not files:
+        return None
+    hit = con.execute("SELECT DISTINCT filename FROM read_parquet(?, filename = true) WHERE filing_id = ?",
+                      [files, filing_id]).fetchall()  # fmt: skip
+    if not hit:
+        return None
+    rel = Path(hit[0][0]).parent.relative_to(stage_root).as_posix()
+    con.execute("UPDATE quarantine_queue SET resolution = ? WHERE quarantine_id = ?", [REPROCESSING, qid])
+    con.execute("DELETE FROM promotion_log WHERE stage_path = ?", [rel])
+    r = promote(con, stage_root / rel)
+    con.execute(
+        "INSERT OR REPLACE INTO promotion_log VALUES (?, ?, ?, ?, ?)", [rel, r.job, r.status, r.message, utc_now()]
+    )
+    con.execute("UPDATE quarantine_queue SET resolution = 'OVERRIDDEN' WHERE quarantine_id = ? AND resolution = ?",
+                [qid, REPROCESSING])  # fmt: skip
+    return {"stage": rel, "status": r.status}
 
 
 def _resolve(con, qid: str, action: str, note: str, payload: dict) -> dict:
@@ -333,12 +423,7 @@ def _resolve(con, qid: str, action: str, note: str, payload: dict) -> dict:
     effects: dict[str, Any] = {}
 
     if action == "OVERRIDE":
-        for key in ("field", "value"):
-            if key not in payload:
-                raise AdminError(f"OVERRIDE needs payload.{key}")
-        vf = date.fromisoformat(payload.get("valid_from", str(date.today())))
-        _override(con, entity, payload["field"], payload["value"], vf, f"{qid}: {note}")
-        effects["override"] = payload["field"]
+        effects.update(_filing_override(con, q, payload, entity, note))
 
     elif action == "CORP_ACTION":
         if q["stage"] != "GAP" or not q["security_id"]:
@@ -363,6 +448,38 @@ def _resolve(con, qid: str, action: str, note: str, payload: dict) -> dict:
         [utc_now(), RESOLUTIONS[action], note, qid],
     )
     return {"quarantine_id": qid, "resolution": RESOLUTIONS[action], **effects}
+
+
+# OVERRIDE writes only fields the promoter reads, per quarantine reason [P2-13].
+FILING_OVERRIDE_FIELDS = {
+    "broadcast_ts": ("NO_VISIBILITY",),
+    "security_id": ("UNKNOWN_ISIN", "UNKNOWN_SYMBOL", "AMBIGUOUS_ISIN", "AMBIGUOUS_SYMBOL", "CIN_MISMATCH"),
+}
+
+
+def _filing_override(con, q: dict, payload: dict, entity: str | None, note: str) -> dict:
+    from datetime import datetime
+
+    field, value = payload.get("field"), payload.get("value")
+    if field not in FILING_OVERRIDE_FIELDS or value is None:
+        raise AdminError(f"OVERRIDE needs payload.field in {sorted(FILING_OVERRIDE_FIELDS)} and payload.value")
+    if q["reason_code"] not in FILING_OVERRIDE_FIELDS[field] or not q["filing_id"]:
+        raise AdminError(f"{field} overrides resolve {FILING_OVERRIDE_FIELDS[field]} findings on a filing")
+    if field == "broadcast_ts":
+        value = datetime.fromisoformat(str(value)).isoformat()  # UTC, naive (invariant 11)
+    else:
+        row = con.execute("SELECT entity_id FROM securities WHERE security_id = ?", [value]).fetchone()
+        if row is None:
+            raise AdminError(f"unknown security {value}")
+        entity = row[0]
+    now = utc_now()
+    insert_rows(con, "filing_overrides", [{
+        "override_id": stable_id("fov", q["filing_id"], field, value, now), "filing_id": q["filing_id"], "field": field,
+        "value": str(value), "quarantine_id": q["quarantine_id"], "reason": note, "created_at": now,
+    }])  # fmt: skip
+    if entity is not None:
+        _override(con, entity, f"filing_{field}", {"filing_id": q["filing_id"], "value": str(value)}, now.date(), note)
+    return {"override": field, "filing_id": q["filing_id"], "repromote": True}
 
 
 def _add_corp_action(con, q: dict, details: dict, payload: dict, entity: str, note: str) -> dict:

@@ -39,6 +39,7 @@ RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ),
     ("RIGHTS", re.compile(rf"^RIGHTS\s+(\d+)\s*:\s*(\d+)\s*@\s*PREMIUM\s+{_RS}{_NUM}\s*/-$")),
     ("DEMERGER", re.compile(r"^DEMERGER$")),
+    ("BUYBACK", re.compile(r"^BUY ?BACK$")),  # RSS 13-Nov-2026 (FDC): no price factor, like a dividend [CA10]
 )
 
 
@@ -96,6 +97,8 @@ def parse_purpose(subject: str, face_value: Decimal | None) -> tuple[str, str | 
                 if face_value is None:
                     return "UNPARSED", "rights premium without face value", ()
                 out.append(ParsedComponent("RIGHTS", ratio_num=g[0], ratio_den=g[1], issue_price=face_value + g[2]))
+            elif kind == "BUYBACK":
+                out.append(ParsedComponent("BUYBACK"))
             else:
                 out.append(ParsedComponent("DEMERGER"))
             break

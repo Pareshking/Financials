@@ -1,8 +1,8 @@
 """The single writer. Reads staged batches, runs gates, commits atomically to market.duckdb.
 
-Gates (docs/architecture.md §12): G1 completeness and G2 identifier resolution for market
-days; G3 accounting identities are enforced by the parser and surface as staged issues.
-G4/G5 belong to feature materialisation (not built yet).
+Gates (docs/architecture.md §12): G1 completeness, G2 identifier resolution, ORDER and the CAL3 no-session
+inference for market days; G3 accounting identities are enforced by the parsers and surface as staged issues;
+G4 (null spike) and G5 (atomic universe) run in feature materialisation (financials.features.materialize).
 """
 
 from __future__ import annotations
@@ -785,6 +785,9 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
             [filing["exchange"], meta["stated_isin"]],
         ).fetchall()
         reason = "UNKNOWN_ISIN" if not ent else "AMBIGUOUS_ISIN"
+    ovr = filing_overrides(con, fid)
+    if "security_id" in ovr:  # `quarantine resolve --action OVERRIDE` [P2-13]
+        ent = con.execute("SELECT entity_id FROM securities WHERE security_id = ?", [ovr["security_id"]]).fetchall()
     if len(ent) != 1:
         q = _quarantine(
             con,
@@ -799,6 +802,8 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     board_end = meta["board_meeting_end_ts"]
     board_ist_date = utc_to_ist_date(board_end) if board_end is not None else None
     visible, source = _visible_from(con, filing["exchange"], filing["broadcast_ts"], board_end, board_ist_date)
+    if visible is None and "broadcast_ts" in ovr:
+        visible, source = datetime.fromisoformat(ovr["broadcast_ts"]), "MANUAL_OVERRIDE"
     if visible is None:
         q = _quarantine(
             con,
@@ -842,6 +847,14 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     insert_rows(con, "fact_observations", [{**f, "entity_id": entity_id, "visible_from_ts": visible} for f in facts])
     q = cross_check_shares(con, entity_id, meta["period_end"])
     return PromotionResult("PROMOTED", "results_xbrl", message=fid, quarantined=[q] if q else [])
+
+
+def filing_overrides(con, filing_id: str) -> dict[str, str]:
+    """Latest value per field of the filing's OVERRIDE resolutions (append-only table; later rows win)."""
+    rows = con.execute(
+        "SELECT field, value FROM filing_overrides WHERE filing_id = ? ORDER BY created_at", [filing_id]
+    ).fetchall()
+    return dict(rows)
 
 
 def _link_revision(con, fid: str, entity_id: str, meta: dict, visible: datetime) -> None:

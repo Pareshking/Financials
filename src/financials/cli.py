@@ -13,6 +13,8 @@ from collections.abc import Sequence
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+import duckdb
+
 from financials.db import apply_schema, connect
 from financials.dsl import run_screen
 from financials.features import materialize
@@ -143,6 +145,8 @@ def build_parser() -> argparse.ArgumentParser:
     qr.add_argument("--note", required=True)
     qr.add_argument("--payload-json", default="{}")
     qs.add_parser("reprocess", help="re-promote batches whose identity / visibility blockers may be cleared")
+    qi = qs.add_parser("inspect", help="one finding with its context and the commands that resolve it")
+    qi.add_argument("id")
     ex = sub.add_parser("extract-index-changes", help="NSE Indices notices (pdftotext -layout .txt) -> manifest CSV")
     ex.add_argument("text_dir", type=Path)
     ex.add_argument("--index", default="Nifty 500")
@@ -194,6 +198,9 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
         print(f"{len(events)} events from {len(sorted(args.text_dir.glob('*.txt')))} notices -> {args.out}", file=out)
         return 0
 
+    if args.cmd == "screen" or (args.cmd == "quarantine" and args.qcmd in ("list", "inspect")):
+        return read_command(args, db_path, out)
+
     args.data_dir.mkdir(parents=True, exist_ok=True)
     con = connect(db_path)
     try:
@@ -218,28 +225,16 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
         if args.cmd == "materialize":
             return materialize_dates(con, args.as_of, args.from_date, args.to_date, out)
         if args.cmd == "quarantine":
-            from financials.admin import AdminError, list_quarantine, resolve_quarantine
+            from financials.admin import AdminError, resolve_quarantine
 
             if args.qcmd == "reprocess":
                 from financials.admin import reprocess
 
                 print(json.dumps(reprocess(con, stage_root), default=str, indent=1), file=out)
                 return 0
-            if args.qcmd == "list":
-                rows = list_quarantine(
-                    con,
-                    stage=args.stage,
-                    reason_code=args.reason,
-                    entity_id=args.entity,
-                    security_id=args.security,
-                    include_resolved=args.all,
-                    limit=args.limit,
-                )
-                print(json.dumps(rows, default=str, indent=1), file=out)
-                return 0
             try:
                 result = resolve_quarantine(con, args.id, action=args.action, note=args.note,
-                                            payload=json.loads(args.payload_json))  # fmt: skip
+                                            payload=json.loads(args.payload_json), stage_root=stage_root)  # fmt: skip
             except AdminError as exc:
                 print(f"error: {exc}", file=out)
                 return 1
@@ -280,10 +275,6 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
                 return 1
             print(f"backfilled {r['rows']} intervals before {r['first_snapshot']} across {len(r['steps'])} "
                   f"event dates", file=out)  # fmt: skip
-            return 0
-        if args.cmd == "screen":
-            rows = run_screen(con, args.query, as_of=args.as_of)
-            print(json.dumps(rows, default=str, indent=1), file=out)
             return 0
     finally:
         con.close()
@@ -414,3 +405,35 @@ def run_day(args, transport: Transport | None, out) -> int:
     for e in errors:
         print(f"error: {e}", file=out)
     return 1 if errors or waiting or rc else 0
+
+
+def read_command(args, db_path: Path, out) -> int:
+    """screen / quarantine list / quarantine inspect: read-only connection, no schema upgrade [P2-12]. DuckDB
+    refuses any other process while a writer (promote, materialize, ...) holds the file: reported, not retried."""
+    if not db_path.exists():
+        print(f"error: no market database at {db_path} (run init-db)", file=out)
+        return 2
+    try:
+        con = connect(db_path, read_only=True)
+    except duckdb.IOException as exc:
+        print(f"error: database busy (a writer holds {db_path.name}); retry when it finishes: {exc}", file=out)
+        return 3
+    try:
+        if args.cmd == "screen":
+            print(json.dumps(run_screen(con, args.query, as_of=args.as_of), default=str, indent=1), file=out)
+            return 0
+        from financials.admin import AdminError, inspect_quarantine, list_quarantine
+
+        if args.qcmd == "list":
+            rows = list_quarantine(con, stage=args.stage, reason_code=args.reason, entity_id=args.entity,
+                                   security_id=args.security, include_resolved=args.all, limit=args.limit)  # fmt: skip
+            print(json.dumps(rows, default=str, indent=1), file=out)
+            return 0
+        try:
+            print(json.dumps(inspect_quarantine(con, args.id), default=str, indent=1), file=out)
+        except AdminError as exc:
+            print(f"error: {exc}", file=out)
+            return 1
+        return 0
+    finally:
+        con.close()

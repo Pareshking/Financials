@@ -99,6 +99,14 @@ def parse_reg30_event(data: bytes) -> ParsedEvents:
     handlers = {"PARA_B": _para_b, "CHANGE_IN_MANAGEMENT": _cim, "FUND_RAISING": _fund_raising,
                 "FRAUD_OR_DEFAULT": _fraud}  # fmt: skip
     handlers[family](main, records, out)
+    # Zero-drop (C24): every numeric element of the filing is kept on its event rows' details.
+    numeric = {}
+    for f in inst.facts:
+        if f.is_numeric:
+            key = "|".join(_local(m) for _, m in inst.contexts[f.context_id].dimensions) or "MAIN"
+            numeric.setdefault(key, {})[f.name] = f.value_text.strip()
+    for e in out.events:
+        e.setdefault("details", {})["numeric"] = {**numeric.get("MAIN", {}), **numeric.get(e["record_key"], {})}
     return out
 
 

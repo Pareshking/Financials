@@ -352,6 +352,13 @@ comparisons or other periods.
 | `reverse_dcf_implied_g` | g such that 5-year DCF (WACC 12%, terminal 4%) = EV | FCFF > 0, EV > 0 |
 | `pe_percentile`, `ev_ebitda_percentile` | rank vs own prior quarter-end values | ≥ 4 prior quarters |
 
+### 10.8b Zero-drop line items (C24)
+
+Every numeric XBRL line item is a fact: curated tags for the ratio engine, `li_<element>` for every other element,
+`oth_<element>__<label>` for amounts on text-labelled "Others"/"Details" members, `asfiled_<element>` for a value a
+named rule withholds. `fact_observations.line_item_category` / `parent_subtotal` place each line under its subtotal.
+Ratios still read only curated tags; line items are for statements, sub-rows and audits.
+
 ### 10.9 Annual-statement ratios (Reg. 34, C23) and Reg. 30 event counts (E3-E7)
 
 | Column | Definition |

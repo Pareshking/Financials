@@ -22,6 +22,7 @@ from pathlib import Path
 
 import yaml
 
+from financials.line_items import describe
 from financials.parsers.igaap_bank import BANK_DURATION_TAGS, BANK_INSTANT_TAGS
 from financials.parsers.indas_corp import DURATION_TAGS, IMPLEMENTED_PROFILES, INSTANT_TAGS, detect_profile
 from financials.parsers.indas_nbfc import NBFC_DURATION_TAGS, NBFC_INSTANT_TAGS
@@ -41,7 +42,6 @@ from financials.parsers.shareholding import (
     parse_shareholding,
 )
 from financials.parsers.xbrl import parse_instance
-from financials.registry_audit import classify
 
 SHP_PROFILE = "REG31_SHP"
 # Reg. 31 is dimensional: every element is registered with the axes it was seen on (not only
@@ -82,6 +82,13 @@ MAPPED_BY_PROFILE = {
         "PropertyPlantAndEquipment": "ppe_net",
         "RevenueFromExternalCustomers": "revenue_domestic|revenue_foreign",
     },
+}
+CURATED_BY_PROFILE = {
+    "INDAS_CORP": {**DURATION_TAGS, **INSTANT_TAGS},
+    "INDAS_NBFC": {**NBFC_DURATION_TAGS, **NBFC_INSTANT_TAGS},
+    "IGAAP_BANK": {**BANK_DURATION_TAGS, **BANK_INSTANT_TAGS},
+    **{p: {**spec.duration_tags, **spec.instant_tags} for p, spec in INSURER_SPECS.items()},
+    "REG34_ANNUAL": {**DURATION_TAGS, **INSTANT_TAGS, **ANNUAL_DURATION_TAGS, **ANNUAL_INSTANT_TAGS},
 }
 MEMBERS_BY_AXIS = {SHP_PROFILE: {CATEGORY_AXIS: CATEGORIES}}
 AXES_MAPPED = {
@@ -216,18 +223,30 @@ def merge_registry(registry_path: Path, reports: list[dict], batch: str) -> dict
         mapped = MAPPED_BY_PROFILE.get(profile, {})
         for name, entry in entries.items():
             entry["mapped_to"] = mapped.get(name)
-            entry.pop("status", None)
-            entry.pop("reason", None)
-            if entry["numeric"] and entry["mapped_to"] is None:
-                reason = classify(name, profile)
-                entry["status"] = "EXCLUDED" if reason else "UNCLASSIFIED"
-                if reason:
-                    entry["reason"] = reason
+            for k in ("status", "reason", "line_item_category", "parent_subtotal", "duplicate_of"):
+                entry.pop(k, None)
+            if not entry["numeric"]:
+                continue
+            # Zero-drop (C24): every numeric element has a canonical key, category and parent subtotal.
+            if profile == SHP_PROFILE:
+                entry["mapped_to"] = entry["mapped_to"] or f"shareholding_line_items.{name}"
+                entry["line_item_category"] = "SHAREHOLDING"
+            elif profile == "REG30_EVENT":
+                entry["mapped_to"] = entry["mapped_to"] or f"corporate_events.details.numeric.{name}"
+                entry["line_item_category"] = "EVENT"
+            else:
+                d = describe(profile, name, CURATED_BY_PROFILE.get(profile, {}))
+                entry["mapped_to"] = d["canonical_key"]
+                entry["line_item_category"] = d["line_item_category"]
+                entry["parent_subtotal"] = d["parent_subtotal"]
+                if d["duplicate_of"]:
+                    entry["duplicate_of"] = d["duplicate_of"]
     reg["files"] = sorted(seen_files)
     registry_path.write_text(
-        "# Every XBRL element seen in non-dimensional contexts, per profile (REG31_SHP: every context, with its\n"
-        "# axes; `axes`/`members` list dimensional structure). Generated and merged by\n"
-        "# scripts/inspect_xbrl_exhaustive.py; mapped_to = canonical tag in the production parser (null = unmapped).\n"
+        "# Every XBRL element seen per profile: non-dimensional contexts (REG31_SHP / REG30_EVENT: every context).\n"
+        "# Zero-drop (C24): every numeric element is mapped: mapped_to = canonical key, line_item_category,\n"
+        "# parent_subtotal, duplicate_of. `axes`/`members` list dimensional structure.\n"
+        "# Generated and merged by scripts/inspect_xbrl_exhaustive.py.\n"
         + yaml.safe_dump(reg, sort_keys=True, allow_unicode=True, width=120),
         encoding="utf-8",
     )

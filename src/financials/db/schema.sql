@@ -235,6 +235,8 @@ CREATE TABLE IF NOT EXISTS fact_observations (
     value_other     DECIMAL(28,8),
     source_element  VARCHAR NOT NULL,
     visible_from_ts TIMESTAMP NOT NULL,
+    line_item_category VARCHAR,                 -- C24: PNL_EXPENSE | CASH_FLOW | BALANCE_SHEET | ... (line_items.py)
+    parent_subtotal VARCHAR,                    -- canonical key of the subtotal this line sits under
     PRIMARY KEY (filing_id, parser_version, canonical_tag, period_start, period_end),
     CHECK ((unit = 'INR') = (value_inr IS NOT NULL)),
     CHECK ((unit = 'INR') = (value_other IS NULL)),
@@ -255,6 +257,20 @@ CREATE TABLE IF NOT EXISTS shareholding_meta (
     promoter_encumbered_shares BIGINT,           -- pledge + NDU + other encumbrances [SHP10]
     rules_applied           VARCHAR,             -- comma-separated named rules (e.g. NO_PROMOTER_CATEGORY)
     PRIMARY KEY (filing_id, parser_version)
+);
+
+-- Every numeric Reg. 31 fact per shareholder-category member (C24, zero drop).
+CREATE TABLE IF NOT EXISTS shareholding_line_items (
+    filing_id       VARCHAR NOT NULL REFERENCES filings(filing_id),
+    parser_version  VARCHAR NOT NULL,
+    entity_id       VARCHAR NOT NULL REFERENCES entity_master(entity_id),
+    as_of_date      DATE NOT NULL,
+    category_member VARCHAR NOT NULL,           -- CategoryOfShareholdersAxis member (ENTITY when non-dimensional)
+    element         VARCHAR NOT NULL,
+    value           DECIMAL(28,8) NOT NULL,
+    unit            VARCHAR NOT NULL,           -- SHARES | PURE | INR
+    visible_from_ts TIMESTAMP NOT NULL,
+    PRIMARY KEY (filing_id, parser_version, category_member, element)
 );
 
 -- Named public holders above 1% (Reg. 31 detail tables) [SHP12].

@@ -73,24 +73,52 @@ def test_registry_covers_every_reg31_element_axis_and_category(path):
     assert path.name in REGISTRY["files"]
 
 
-def test_every_seen_numeric_element_is_mapped_or_excluded_with_a_reason():
-    """C22: 100% of numeric elements in the registry are accounted for; status agrees with the audit rules."""
-    from financials.registry_audit import REASONS, classify
+def test_every_seen_numeric_element_is_mapped():
+    """C24 zero-drop: every numeric element in the registry has a canonical key and a category; none is excluded.
+    Structural duplicates are still mapped and name the key they duplicate."""
+    from financials.line_items import STRUCTURAL_DUPLICATES
 
     problems = []
     for profile, entries in REGISTRY["profiles"].items():
         for name, e in entries.items():
             if not e["numeric"]:
                 continue
-            if e["mapped_to"]:
-                if "status" in e:
-                    problems.append((profile, name, "mapped but has a status"))
-                continue
-            expected = classify(name, profile)
-            if e.get("status") != "EXCLUDED" or e.get("reason") not in REASONS or e.get("reason") != expected:
-                problems.append((profile, name, e.get("status"), e.get("reason"), expected))
+            if not e.get("mapped_to") or e.get("line_item_category") in (None, "UNCLASSIFIED") or "status" in e:
+                problems.append((profile, name, e.get("mapped_to"), e.get("line_item_category")))
+            if (profile, name) in STRUCTURAL_DUPLICATES and e.get("duplicate_of") != STRUCTURAL_DUPLICATES[
+                (profile, name)
+            ]:
+                problems.append((profile, name, "duplicate_of"))
     assert problems == []
     assert "UNKNOWN" not in REGISTRY["profiles"]
+
+
+ALL_RESULTS = sorted([*INTEGRATED, *XBRL_DIR.glob("AR_XBRL_*.xml")])
+
+
+@pytest.mark.parametrize("path", ALL_RESULTS, ids=lambda p: p.name[:40])
+def test_zero_drop_every_numeric_element_of_a_committed_filing_becomes_a_fact(path):
+    """C24: every numeric non-dimensional element in a period the parser validated yields a fact (curated tag,
+    li_ key, or asfiled_ when a named rule withheld the value). Pre-cutoff and undeclared contexts stay raw."""
+    from financials.parsers.integrated import parse_integrated_results
+
+    data = path.read_bytes()
+    r = parse_integrated_results(data, path.name)
+    inst = parse_instance(data)
+    if r.profile == "REG34_ANNUAL":
+        durs, insts = set(r.meta["in_scope_periods"]), set(r.meta["in_scope_instants"])
+    else:
+        durs, insts = {r.meta["quarter_period"], r.meta["ytd_period"]}, {r.meta["period_end"]}
+    elements = set()
+    for f in inst.facts:
+        c = inst.contexts[f.context_id]
+        inside = (c.instant in insts) if c.instant is not None else ((c.start, c.end) in durs)
+        if f.is_numeric and not c.dimensions and inside:
+            elements.add(f.name)
+    assert elements - {f.source_element for f in r.facts} == set()
+    assert all(
+        f.line_item_category for f in r.facts if not f.source_element.startswith(("DERIVED:", "PPE_", "INTANG", "GEO"))
+    )
 
 
 ANNUAL_FILES = sorted(XBRL_DIR.glob("AR_XBRL_*.xml"))
@@ -116,3 +144,8 @@ def test_registry_covers_every_element_of_committed_event_filings(path):
     axes = {a.split(":")[-1] for c in inst.contexts.values() for a, _ in c.dimensions}
     assert axes - set(REGISTRY["axes"]["REG30_EVENT"]) == set()
     assert path.name in REGISTRY["files"]
+
+
+def test_evidence_ids_are_unique():
+    ids = re.findall(r"^\| ([A-Z]+\d+) \|", REFS, flags=re.M)
+    assert sorted({i for i in ids if ids.count(i) > 1}) == []

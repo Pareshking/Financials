@@ -43,7 +43,7 @@ CREATE TABLE stg_xbrl_facts (
     filing_id VARCHAR NOT NULL, parser_version VARCHAR NOT NULL, scope VARCHAR NOT NULL,
     canonical_tag VARCHAR NOT NULL, period_type VARCHAR NOT NULL, period_start DATE NOT NULL,
     period_end DATE NOT NULL, period_months INTEGER, unit VARCHAR NOT NULL, value_inr DECIMAL(20,2),
-    value_other DECIMAL(28,8), source_element VARCHAR NOT NULL
+    value_other DECIMAL(28,8), source_element VARCHAR NOT NULL, line_item_category VARCHAR, parent_subtotal VARCHAR
 );
 CREATE TABLE stg_corp_actions (
     filing_id VARCHAR NOT NULL, seq INTEGER NOT NULL, component INTEGER NOT NULL, exchange VARCHAR NOT NULL,
@@ -61,6 +61,10 @@ CREATE TABLE stg_shp_meta (
     filing_id VARCHAR PRIMARY KEY, parser_version VARCHAR NOT NULL, as_of_date DATE NOT NULL,
     stated_isin VARCHAR NOT NULL, stated_symbol VARCHAR, has_partly_paid BOOLEAN, promoter_pledge_flag BOOLEAN,
     promoter_pledged_shares BIGINT, promoter_encumbered_shares BIGINT, rules_applied VARCHAR
+);
+CREATE TABLE stg_shp_line_items (
+    filing_id VARCHAR NOT NULL, category_member VARCHAR NOT NULL, element VARCHAR NOT NULL,
+    value DECIMAL(28,8) NOT NULL, unit VARCHAR NOT NULL, PRIMARY KEY (filing_id, category_member, element)
 );
 CREATE TABLE stg_shp_holders (
     filing_id VARCHAR NOT NULL, holder_category VARCHAR NOT NULL, row_member VARCHAR NOT NULL,
@@ -95,6 +99,7 @@ TABLE_ORDER = (
     "stg_shp_meta",
     "stg_shp_categories",
     "stg_shp_holders",
+    "stg_shp_line_items",
     "stg_xbrl_filing",
     "stg_xbrl_facts",
     "stg_corp_actions",
@@ -328,6 +333,8 @@ def stage_results_xbrl(
             "value_inr": to_inr(f.value) if f.unit == "INR" else None,
             "value_other": None if f.unit == "INR" else f.value,
             "source_element": f.source_element,
+            "line_item_category": f.line_item_category,
+            "parent_subtotal": f.parent_subtotal,
         }
         for f in parsed.facts
     ]
@@ -554,6 +561,11 @@ def stage_shareholding(
             "rules_applied": ",".join(m["rules_applied"]) or None,
         }
     ]
+    tables["stg_shp_line_items"] = [
+        {"filing_id": fid, "category_member": li["category_member"], "element": li["element"], "value": li["value"],
+         "unit": li["unit"] or "UNKNOWN"}
+        for li in parsed.line_items
+    ]  # fmt: skip
     tables["stg_shp_holders"] = [
         {
             "filing_id": fid,

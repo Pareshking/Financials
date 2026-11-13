@@ -38,7 +38,10 @@ from financials.parsers.indas_corp import (
     _check,
     _check_eps,
     _check_identities,
+    enrich_line_items,
+    map_line_items,
     period_months,
+    preserve_withheld,
 )
 from financials.parsers.xbrl import Instance, parse_instance
 from financials.scope import MIN_PERIOD_END_DATE
@@ -143,11 +146,21 @@ def parse_reg34_annual(data: bytes, file_name: str | None = None) -> ParsedResul
     if result.issues:
         return result
     _map(inst, result)
+    map_line_items(
+        inst,
+        result,
+        {**DURATION_TAGS, **INSTANT_TAGS, **ANNUAL_DURATION_TAGS, **ANNUAL_INSTANT_TAGS},
+        durations=set(result.meta["in_scope_periods"]),
+        instants=set(result.meta["in_scope_instants"]),
+    )
     _ppe_schedule(inst, result)
     _intangibles(inst, result)
     _geographic(inst, result)
     _label_rules(inst, result)
     _apply_contingent_placeholder_rule(result)
+    preserve_withheld(inst, result, durations=set(result.meta["in_scope_periods"]),
+                      instants=set(result.meta["in_scope_instants"]))  # fmt: skip
+    enrich_line_items(result)
     if result.issues:
         return result
     _identities(result)

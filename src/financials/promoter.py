@@ -975,6 +975,15 @@ def _promote_shareholding(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
             }
         ],
     )
+    insert_rows(
+        con,
+        "shareholding_line_items",
+        [
+            {**li, "parser_version": meta["parser_version"], "entity_id": entity_id, "as_of_date": meta["as_of_date"],
+             "visible_from_ts": visible}
+            for li in read_table(con, stage_dir, "stg_shp_line_items")
+        ],
+    )  # fmt: skip
     holders = read_table(con, stage_dir, "stg_shp_holders")  # [] for stages written before 0.4.0
     insert_rows(
         con,

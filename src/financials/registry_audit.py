@@ -1,4 +1,5 @@
-"""Audit of numeric XBRL elements that the production parsers do not map to a canonical tag (C22).
+"""Classification of numeric XBRL elements outside the curated canonical tags (C22; since C24 every one of them is
+mapped as a line item: the reason code below becomes its `line_item_category`, see financials/line_items.py).
 
 Every numeric element in docs/tag_registry.yaml is either mapped (``mapped_to``) or ``status: EXCLUDED``
 with one reason code below. Rules are ordered, deterministic regexes on the element name, optionally scoped
@@ -255,6 +256,8 @@ OVERRIDES: dict[tuple[str, str], str] = {
     # Equals ExceptionalItemsBeforeTax (mapped) in every annual filing that files both [X76].
     ("REG34_ANNUAL", "ExceptionalItems"): "DERIVED_SUBTOTAL",
     ("REG34_ANNUAL", "TradeReceivables"): "BALANCE_SHEET_DETAIL",
+    # Geographic / product split of external revenue (Ind AS 108.33) [X75]
+    ("REG34_ANNUAL", "RevenueFromExternalCustomers"): "SEGMENT_DISCLOSURE",
     ("REG34_ANNUAL", "ReclassificationAdjustmentsOnExchangeDifferencesOnTranslationBeforeTax"): "OCI_SUBLINE",
     # Split of the mapped ShareOfProfitLossOfAssociatesAndJointVentures... line.
     ("REG34_ANNUAL", "ShareOfProfitLossOfAssociatesAccountedForUsingEquityMethod"): "DERIVED_SUBTOTAL",

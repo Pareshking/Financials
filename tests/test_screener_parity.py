@@ -1008,3 +1008,56 @@ def test_tcs_fy25_comparative_in_fy26_filing_matches_screener_too(kind):
     r, facts = _annual("TCS", FY25)
     golden, divergent = REG34_FY25_GOLDEN[(kind, "TCS_FY25")]
     _check_rows("TCS", _annual_statement(kind, r, FY25), golden, divergent, facts, display_rounding=True)
+
+
+# ---------------------------------------------------------------- expense sub-rows (C24) [S21]
+# Screener's annual P&L expense rows, from the Data Sheet of the same exports, against the zero-drop line items.
+# Raw Material Cost = materials consumed + purchases of stock-in-trade; Change in Inventory = -changes in inventories;
+# Employee Cost = employee benefit expense: exact. Power and Fuel + Other Mfr. Exp + Selling and admin + Other
+# Expenses = OtherExpenses net of excise, except for an EXPENSE_NETTING amount that Screener moves out of Sales and
+# Other Income: Reliance 1,555 = 1,439 (Sales) + 116 (Other Income), ELIN 0.24 = 0.23 (Other Income); this explains
+# three residuals that the unmapped-element search could not (no XBRL line item equals them).
+SUBROW_GOLDEN = {  # name: (fixture, period, {row: Screener value}, other-expense split residual)
+    "ELIN": ("INTEGRATED_FILING_INDAS_1672621_25052026073245_WEB.xml", FY,
+             {"Raw Material Cost": "978.05", "Change in Inventory": "9.46", "Employee Cost": "169.66"},
+             ("93.68", Decimal("0.24"))),
+    "TCS": ("AR_XBRL_TCS_09082026012216.xml", FY,
+            {"Raw Material Cost": "43", "Employee Cost": "154994"}, ("39586", Decimal("2"))),
+    "ETERNAL": ("AR_XBRL_ETERNAL_23092026175418.xml", FY,
+                {"Raw Material Cost": "32169", "Change in Inventory": "2002", "Employee Cost": "3536",
+                 "Power and Fuel": "355"}, ("19453", Decimal("0"))),
+    "ITC": ("INTEGRATED_FILING_INDAS_1670766_21052026063229_WEB.xml", FY,
+            {"Raw Material Cost": "35098.34", "Change in Inventory": "2550.46", "Employee Cost": "6781.50"},
+            ("12233.02", Decimal("-11.91"))),
+    "RELIANCE": ("INTEGRATED_FILING_INDAS_1658776_24042026105714_WEB.xml", FY,
+                 {"Raw Material Cost": "698930", "Change in Inventory": "10267", "Employee Cost": "30318"},
+                 ("157734", Decimal("1555"))),
+}  # fmt: skip
+
+
+@pytest.mark.parametrize("name", sorted(SUBROW_GOLDEN))
+def test_expense_sub_rows_reconstruct_from_mapped_line_items(name):
+    from financials.parsers.integrated import parse_integrated_results
+
+    fixture, period, golden, (split_total, residual) = SUBROW_GOLDEN[name]
+    r = parse_integrated_results((XBRL_DIR / fixture).read_bytes(), fixture)
+    v = {f.canonical_tag: f.value / CR for f in r.facts if (f.period_start, f.period_end) == period}
+    ours = {
+        "Raw Material Cost": v.get("cost_of_materials_consumed", 0) + v.get("purchases_of_stock_in_trade", 0),
+        "Change in Inventory": -v.get("changes_in_inventories", 0),
+        "Employee Cost": v["employee_benefit_expense"],
+        "Power and Fuel": v.get("power_and_fuel"),
+    }
+    for row, want in golden.items():
+        assert abs(ours[row] - Decimal(want)) <= Decimal("0.5") * (0 if "." in want else 1) + TOL, (name, row)
+    other_net = v["other_expenses"] - v.get("excise_duty", 0)
+    assert abs(other_net - Decimal(split_total) - residual) <= TOL, (name, other_net, split_total, residual)
+
+
+def test_expense_netting_explains_the_reliance_and_elin_residuals():
+    """The other-expense split residual equals the Sales + Other Income residuals already pinned above."""
+    rel_sales, rel_oi = ANNUAL_GOLDEN[("FY", "RELIANCE")][1]["Sales"][1], ANNUAL_GOLDEN[("FY", "RELIANCE")][1][
+        "Other Income"][1]  # fmt: skip
+    assert -(rel_sales + rel_oi) == SUBROW_GOLDEN["RELIANCE"][3][1] == Decimal("1555")
+    elin_oi = ANNUAL_GOLDEN[("FY", "ELIN")][1]["Other Income"][1]
+    assert abs(-elin_oi - SUBROW_GOLDEN["ELIN"][3][1]) <= TOL

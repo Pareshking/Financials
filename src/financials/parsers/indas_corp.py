@@ -13,6 +13,7 @@ Rules implemented (docs/architecture.md §6-7; evidence in docs/references.md):
 from __future__ import annotations
 
 import calendar
+import dataclasses
 import re
 from dataclasses import dataclass, field
 from datetime import date, time
@@ -250,6 +251,8 @@ class CanonicalFact:
     unit: str
     value: Decimal
     source_element: str
+    line_item_category: str | None = None  # C24
+    parent_subtotal: str | None = None
 
 
 @dataclass
@@ -341,6 +344,9 @@ def parse_with_spec(data: bytes, spec: ProfileSpec) -> ParsedResults:
         _check_eps(result)
         if spec.post_process is not None:
             spec.post_process(result)
+            preserve_withheld(inst, result, durations={result.meta["quarter_period"], result.meta["ytd_period"]},
+                              instants={result.meta["period_end"]})  # fmt: skip
+    enrich_line_items(result)
     return result
 
 
@@ -489,6 +495,8 @@ def _map_facts(inst: Instance, result: ParsedResults, spec: ProfileSpec | None =
         result.facts.append(cf)
 
     _apply_label_rules(inst, result, declared, period_end, spec.label_rules)
+    map_line_items(inst, result, {**spec.duration_tags, **spec.instant_tags},
+                   durations=set(declared.values()), instants={period_end})  # fmt: skip
 
     # Derived per-filing facts.
     q_start, q_end = result.meta["quarter_period"]
@@ -510,12 +518,153 @@ def _map_facts(inst: Instance, result: ParsedResults, spec: ProfileSpec | None =
         )
     _apply_zero_attribution_rule(result)
     _apply_owners_tci_rule(result)
+    preserve_withheld(inst, result, durations=set(declared.values()), instants={period_end})
     result.meta["interest_paid_cfo_class"] = _classify(
         result, "interest_paid_operating", "interest_paid_financing", "FINANCING"
     )
     result.meta["interest_recd_cfo_class"] = _classify(
         result, "interest_received_operating", "interest_received_investing", "INVESTING"
     )
+
+
+UNIT_OF_KIND = {"INR": "INR", "INR_PER_SHARE": "INR_PER_SHARE", "PURE": "PURE", "SHARES": "SHARES"}
+
+
+def map_line_items(inst: Instance, result: ParsedResults, curated: dict, *, durations: set, instants: set) -> None:
+    """Zero-drop pass (C24): every numeric line item not already mapped, in the periods the curated pass validated,
+    becomes a fact under its deterministic key; amounts on text-labelled members become `oth_` facts. Curated
+    facts get their category/parent metadata too. A conflicting duplicate key is skipped with a warning (never a
+    guess); the raw fact stays in raw_xbrl_facts."""
+    from financials.line_items import describe, describe_key, line_item_key, slug
+
+    profile = result.profile or ""
+    cache: dict[str, dict] = {}
+
+    def meta(element: str) -> dict:
+        if element not in cache:
+            cache[element] = describe(profile, element, curated)
+        return cache[element]
+
+    # metadata on curated / label-rule facts already emitted
+    enriched = []
+    for f in result.facts:
+        if f.line_item_category is None:
+            m = describe_key(f.canonical_tag)
+            f = dataclasses.replace(f, line_item_category=m["line_item_category"], parent_subtotal=m["parent_subtotal"])
+        enriched.append(f)
+    result.facts[:] = enriched
+    seen = {(f.canonical_tag, f.period_start, f.period_end) for f in result.facts}
+    conflicts: dict[tuple, set] = {}
+    pending: dict[tuple, CanonicalFact] = {}
+
+    def period_of(ctx):
+        if ctx.instant is not None:
+            return ("INSTANT", ctx.instant, ctx.instant, None) if ctx.instant in instants else None
+        p = (ctx.start, ctx.end)
+        return ("DURATION", ctx.start, ctx.end, period_months(*p)) if p in durations else None
+
+    labels: dict[tuple, str] = {}
+    for f in inst.facts:
+        dims = inst.contexts[f.context_id].dimensions
+        if not f.is_numeric and len(dims) == 1 and f.name.startswith("Description") and f.value_text.strip():
+            labels.setdefault(dims, f.value_text.strip())
+    # A label shared by several members (subsidiary schedules: "Foreign subsidiary"; segments on two axes) gets the
+    # member, then the axis, appended so every key stays unique and deterministic.
+    by_label: dict[str, set] = {}
+    for dims, label in labels.items():
+        by_label.setdefault(slug(label), set()).add(dims)
+
+    def label_key(dims: tuple) -> str:
+        base = slug(labels[dims])
+        same = by_label[base]
+        if len(same) == 1:
+            return base
+        axis, member = (x.split(":")[-1] for x in dims[0])
+        with_member = f"{base}__{slug(member)}"
+        if sum(1 for d in same if slug(d[0][1].split(":")[-1]) == slug(member)) == 1:
+            return with_member
+        return f"{with_member}__{slug(axis)}"
+
+    for f in inst.facts:
+        if not f.is_numeric:
+            continue
+        ctx = inst.contexts[f.context_id]
+        per = period_of(ctx)
+        if per is None:
+            continue
+        ptype, start, end, months = per
+        kind = inst.unit_kind(f.unit_ref)
+        unit = UNIT_OF_KIND.get(kind, kind or "UNKNOWN")
+        if ctx.dimensions:
+            label = labels.get(ctx.dimensions)
+            if label is None or len(ctx.dimensions) != 1:
+                continue  # a record row, not a line item
+            base = line_item_key(f.name, curated)
+            key = f"oth_{base}__{label_key(ctx.dimensions)}"
+            m = meta(f.name)
+            cat, parent = m["line_item_category"], base
+        else:
+            if f.name in curated:
+                continue  # curated pass owns it
+            m = meta(f.name)
+            key, cat, parent = m["canonical_key"], m["line_item_category"], m["parent_subtotal"]
+        k = (key, start, end)
+        if k in seen:
+            continue
+        try:
+            value = f.decimal()
+        except ParseError:
+            continue
+        cf = CanonicalFact(key, ptype, start, end, months, unit, value, f.name, cat, parent)
+        if k in pending and pending[k].value != value:
+            conflicts.setdefault(k, set()).update({str(pending[k].value), str(value)})
+            continue
+        pending.setdefault(k, cf)
+    for k, cf in pending.items():
+        if k not in conflicts:
+            result.facts.append(cf)
+    if conflicts:
+        result.meta.setdefault("warnings", []).append(
+            {"code": "LINE_ITEM_CONFLICT", "keys": sorted(f"{k[0]}@{k[2]}" for k in conflicts)}
+        )
+
+
+def enrich_line_items(result: ParsedResults) -> None:
+    """Category / parent metadata for facts created after the line-item pass (derived, rule and schedule facts)."""
+    from financials.line_items import describe_key
+
+    result.facts[:] = [
+        f if f.line_item_category else dataclasses.replace(
+            f, **{k: v for k, v in describe_key(f.canonical_tag).items() if k != "canonical_key"})
+        for f in result.facts
+    ]  # fmt: skip
+
+
+def preserve_withheld(inst: Instance, result: ParsedResults, *, durations: set, instants: set) -> None:
+    """Zero-drop (C24): a value a named rule withheld or replaced (placeholder owners/NCI [X48], owners tagged as
+    TCI, contingent-liability placeholders [X73]) is kept as filed under `asfiled_<element>`; the canonical tag
+    keeps the corrected value."""
+    from financials.line_items import snake
+
+    have = {f.source_element for f in result.facts}
+    seen = set()
+    for f in inst.facts:
+        c = inst.contexts[f.context_id]
+        if not f.is_numeric or c.dimensions or f.name in have:
+            continue
+        inside = c.instant in instants if c.instant is not None else (c.start, c.end) in durations
+        if not inside:
+            continue
+        start, end = (c.instant, c.instant) if c.instant is not None else (c.start, c.end)
+        key = ("asfiled_" + snake(f.name), start, end)
+        if key in seen:
+            continue
+        seen.add(key)
+        ptype = "INSTANT" if c.instant is not None else "DURATION"
+        months = None if ptype == "INSTANT" else period_months(start, end)
+        kind = inst.unit_kind(f.unit_ref)
+        result.facts.append(CanonicalFact(key[0], ptype, start, end, months, UNIT_OF_KIND.get(kind, kind or "UNKNOWN"),
+                                          f.decimal(), f.name, "AS_FILED_WITHHELD", None))  # fmt: skip
 
 
 def _apply_zero_attribution_rule(result: ParsedResults) -> None:

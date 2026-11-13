@@ -98,6 +98,7 @@ class ParsedShareholding:
     meta: dict = field(default_factory=dict)
     categories: dict[str, dict[str, Decimal]] = field(default_factory=dict)
     major_holders: list[dict] = field(default_factory=list)
+    line_items: list[dict] = field(default_factory=list)  # C24: every numeric fact per category member
     issues: list[ShpIssue] = field(default_factory=list)
 
     @property
@@ -157,6 +158,21 @@ def parse_shareholding(data: bytes) -> ParsedShareholding:
             )
             continue
         out.categories.setdefault(category, {})[measure] = fact.decimal()
+
+    # Zero-drop (C24): every numeric fact on the category axis (any member, any measure) or without dimensions.
+    seen_li: set[tuple[str, str]] = set()
+    for fact in inst.facts:
+        if not fact.is_numeric:
+            continue
+        ctx = inst.contexts[fact.context_id]
+        if ctx.dimensions and (len(ctx.dimensions) != 1 or not ctx.dimensions[0][0].endswith(CATEGORY_AXIS)):
+            continue  # per-holder / per-person record rows: major_holders or raw only
+        member = ctx.dimensions[0][1].split(":")[-1] if ctx.dimensions else "ENTITY"
+        if (member, fact.name) in seen_li:
+            continue
+        seen_li.add((member, fact.name))
+        out.line_items.append({"category_member": member, "element": fact.name, "value": fact.decimal(),
+                               "unit": inst.unit_kind(fact.unit_ref)})  # fmt: skip
 
     for (axis, member), row in sorted(holders.items()):
         name, shares = row.get("NameOfTheShareholder"), row.get("NumberOfShares")

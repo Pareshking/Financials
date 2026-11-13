@@ -9,7 +9,7 @@ UNVERIFIED there must not be hard-coded; code that depends on it quarantines on 
 
 - **Purpose:** personal, single-user research, screening and point-in-time (PIT) backtesting. No redistribution [C8].
 - **Universe v1:** NSE Mainboard `EQ`, `BE`, `BZ`, starting with the Nifty 500 [C7]. SME (`SM`, `ST`) out of scope. BSE is used only as a fallback and for historical Reg. 34 annual XBRL backfill.
-- **Data scope (v1, CHOICE [C9]):** `trade_date >= 2024-10-01` for prices, delivery, corporate actions and index snapshots; `period_end >= 2024-12-31` for financials and shareholding (`financials/scope.py`). Promotion returns `OUT_OF_SCOPE` for older inputs (vaulted, not parsed); `fetch-days` / `fetch-corp-actions` clamp start dates. Multi-year windows use `fundamentals.cagr(..., min_periods_required)` and stay NULL until enough in-scope quarters exist.
+- **Data scope (v1, CHOICE [C9]):** `trade_date >= 2024-10-01` for prices, delivery, corporate actions and index snapshots; `period_end >= 2025-03-31` for financials and shareholding (Q4 FY25, the first Integrated Filing quarter [X38]; `financials/scope.py`). As of Nov 2026 that is 7 quarters: TTM works, YoY-on-TTM is NULL until Q3 FY27 (Dec-2026) results are filed. Promotion returns `OUT_OF_SCOPE` for older inputs (vaulted, not parsed); `fetch-days` / `fetch-corp-actions` clamp start dates. Multi-year windows use `fundamentals.cagr(..., min_periods_required)` and stay NULL until enough in-scope quarters exist.
 - **Non-goals (v1):** multi-user, UI hosting, Cloudflare (R2/D1/Workers), real-time intraday prices, SME/Indian-GAAP corporates.
 
 ## 2. Runtime topology

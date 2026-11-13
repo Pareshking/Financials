@@ -3,8 +3,8 @@
 Personal, single-user Indian equity research, screening and point-in-time backtesting engine.
 Universe v1: NSE Mainboard `EQ`/`BE`/`BZ`, starting with the Nifty 500. SME excluded.
 **Data starts** (CHOICE C9, `financials/scope.py`): market data, corporate actions and index snapshots
-`>= 2024-10-01` (`MIN_TRADE_DATE`, UDiFF era); financials and shareholding `period_end >= 2024-12-31`
-(`MIN_PERIOD_END_DATE`, Q3 FY25). No parsers or fallbacks for older formats.
+`>= 2024-10-01` (`MIN_TRADE_DATE`, UDiFF era); financials and shareholding `period_end >= 2025-03-31`
+(`MIN_PERIOD_END_DATE`, Q4 FY25: first Integrated Filing quarter). No parsers or fallbacks for older formats.
 No redistribution.
 
 **Read before changing anything:** `docs/architecture.md` (design) and `docs/references.md`
@@ -83,8 +83,8 @@ data/                  local only, gitignored: vault/, staging/, market.duckdb
 13. Schema lives only in `src/financials/db/schema.sql`. No nullable `UNIQUE` columns (DuckDB `OR IGNORE` bug [I1]).
     Bulk inserts go through `financials.db.insert_rows` (Arrow), never row-by-row `executemany`.
 14. **Scope cutoff.** Out-of-scope inputs are vaulted (blob + filing) and promoted as `OUT_OF_SCOPE`;
-    nothing is parsed into canonical tables. Filter financials on period **end** (a Q3 FY25 Apr–Dec YTD
-    is in scope). Any window needing history before the cutoff (3Y/5Y CAGR, 5Y dilution, 5Y valuation
+    nothing is parsed into canonical tables. Filter financials on period **end** (FY25 from the Q4 FY25
+    filing is in scope). Any window needing history before the cutoff (3Y/5Y CAGR, 5Y dilution, 5Y valuation
     percentile, 3Y FCF conversion…) returns NULL via `min_periods_required`, never a partial-window number.
 
 ## Testing rules

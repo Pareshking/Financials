@@ -1,9 +1,8 @@
-"""v1 scope cutoff [C9]: MIN_TRADE_DATE = 2024-10-01, MIN_PERIOD_END_DATE = 2024-12-31."""
+"""v1 scope cutoff [C9]: MIN_TRADE_DATE = 2024-10-01, MIN_PERIOD_END_DATE = 2025-03-31."""
 
 import io
 import zipfile
 from datetime import date, datetime
-from decimal import Decimal
 
 from conftest import FETCHED_AT, bhav_bytes, bhav_url
 from test_fundamentals import con, insert_rows, quarterly_revenue  # noqa: F401  (fixture + helpers)
@@ -26,7 +25,7 @@ def _redate_bhavcopy(src: str, new_iso: str) -> bytes:
 
 
 def test_constants():
-    assert (date(2024, 10, 1), date(2024, 12, 31)) == (MIN_TRADE_DATE, MIN_PERIOD_END_DATE)
+    assert (date(2024, 10, 1), date(2025, 3, 31)) == (MIN_TRADE_DATE, MIN_PERIOD_END_DATE)
 
 
 def test_pre_cutoff_market_day_is_vaulted_but_not_loaded(market):
@@ -75,23 +74,26 @@ def test_pre_cutoff_results_filing_is_out_of_scope(market):
         assert market.con.execute(f"SELECT count(*) FROM {t}").fetchone()[0] == 0, t
 
 
-def test_q3_fy25_ytd_starting_before_cutoff_is_kept():
-    """Filter is on period END: the Apr-Dec 2024 YTD of a Q3 FY25 filing is in scope."""
-    assert quarters_available_since(date(2024, 12, 31), 1)
-    assert not quarters_available_since(date(2024, 9, 30), 1)
+def test_q4_fy25_full_year_starting_before_cutoff_is_kept():
+    """Filter is on period END: FY25 (Apr 2024-Mar 2025) from the Q4 FY25 filing is in scope; the
+    legacy Q3 FY25 (Dec 2024) quarter is not [X38]."""
+    assert quarters_available_since(date(2025, 3, 31), 1)
+    assert not quarters_available_since(date(2024, 12, 31), 1)
 
 
 def test_multi_year_windows_are_null_until_history_exists(con):  # noqa: F811
     insert_rows(con, "fact_observations", quarterly_revenue())
     book = load_factbook(con, "ent_test", "STANDALONE", datetime(2030, 1, 1))
     end = date(2026, 9, 30)
-    # 8 quarters Q3 FY25..Q2 FY27 exist on/after the cutoff: YoY TTM and 1Y CAGR are defined.
-    assert yoy_growth(book, "revenue_from_operations", end) is not None
-    assert cagr(book, "revenue_from_operations", end, 1) == yoy_growth(book, "revenue_from_operations", end)
-    # 3Y / 5Y windows would need quarters before 2024-12-31: NULL, not a partial number.
+    # Only 7 quarters (Q4 FY25..Q2 FY27) are in scope: TTM works, YoY TTM needs Dec 2024 -> NULL
+    # until the Dec-2026 quarter is filed.
+    assert book.ttm("revenue_from_operations", end) is not None
+    assert yoy_growth(book, "revenue_from_operations", end) is None
+    assert cagr(book, "revenue_from_operations", end, 1) is None
+    # 3Y / 5Y windows: NULL, not a partial number.
     assert cagr(book, "revenue_from_operations", end, 3) is None
     assert cagr(book, "revenue_from_operations", end, 5) is None
     # Even though the synthetic book holds Jun/Sep 2024 quarters, a window needing them is NULL.
     assert yoy_growth(book, "revenue_from_operations", date(2025, 9, 30)) is None
     assert cagr(book, "revenue_from_operations", end, 2, min_periods_required=12) is None
-    assert isinstance(cagr(book, "revenue_from_operations", end, 1), Decimal)
+    assert quarters_available_since(date(2026, 12, 31), 8)  # unlocks with Q3 FY27

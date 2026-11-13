@@ -157,6 +157,11 @@ INSTANT_TAGS: dict[str, tuple[str, str]] = {
     "BorrowingsNoncurrent": ("borrowings_noncurrent", "INR"),
     "BorrowingsCurrent": ("borrowings_current", "INR"),
     "TradePayablesCurrent": ("trade_payables_current", "INR"),
+    # Mapped in the unmapped-element audit (C22): Screener balance-sheet sub-rows and Piotroski/Beneish inputs.
+    "TradePayablesNoncurrent": ("trade_payables_noncurrent", "INR"),
+    "LoansCurrent": ("loans_current", "INR"),
+    "LoansNoncurrent": ("loans_noncurrent", "INR"),
+    "CashAndCashEquivalentsCashFlowStatement": ("cash_cf_statement", "INR"),
     "NoncurrentLiabilities": ("noncurrent_liabilities", "INR"),
     "CurrentLiabilities": ("current_liabilities", "INR"),
     "Liabilities": ("total_liabilities", "INR"),

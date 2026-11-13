@@ -69,3 +69,23 @@ def test_registry_covers_every_reg31_element_axis_and_category(path):
     assert axes - set(REGISTRY["axes"]["REG31_SHP"]) == set()
     assert members - set(REGISTRY["members"]["REG31_SHP"]["CategoryOfShareholdersAxis"]) == set()
     assert path.name in REGISTRY["files"]
+
+
+def test_every_seen_numeric_element_is_mapped_or_excluded_with_a_reason():
+    """C22: 100% of numeric elements in the registry are accounted for; status agrees with the audit rules."""
+    from financials.registry_audit import REASONS, classify
+
+    problems = []
+    for profile, entries in REGISTRY["profiles"].items():
+        for name, e in entries.items():
+            if not e["numeric"]:
+                continue
+            if e["mapped_to"]:
+                if "status" in e:
+                    problems.append((profile, name, "mapped but has a status"))
+                continue
+            expected = classify(name, profile)
+            if e.get("status") != "EXCLUDED" or e.get("reason") not in REASONS or e.get("reason") != expected:
+                problems.append((profile, name, e.get("status"), e.get("reason"), expected))
+    assert problems == []
+    assert "UNKNOWN" not in REGISTRY["profiles"]

@@ -38,6 +38,7 @@ from financials.parsers.shareholding import (
     parse_shareholding,
 )
 from financials.parsers.xbrl import parse_instance
+from financials.registry_audit import classify
 
 SHP_PROFILE = "REG31_SHP"
 # Reg. 31 is dimensional: every element is registered with the axes it was seen on (not only
@@ -187,6 +188,13 @@ def merge_registry(registry_path: Path, reports: list[dict], batch: str) -> dict
         mapped = MAPPED_BY_PROFILE.get(profile, {})
         for name, entry in entries.items():
             entry["mapped_to"] = mapped.get(name)
+            entry.pop("status", None)
+            entry.pop("reason", None)
+            if entry["numeric"] and entry["mapped_to"] is None:
+                reason = classify(name, profile)
+                entry["status"] = "EXCLUDED" if reason else "UNCLASSIFIED"
+                if reason:
+                    entry["reason"] = reason
     reg["files"] = sorted(seen_files)
     registry_path.write_text(
         "# Every XBRL element seen in non-dimensional contexts, per profile (REG31_SHP: every context, with its\n"

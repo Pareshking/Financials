@@ -487,6 +487,36 @@ def _irdai_equity(result: ParsedResults) -> None:
     )
 
 
+# Mapped in the unmapped-element audit (C22). IRDAI `Assets`/`Investments`/`CurrentLiabilities` are deliberately
+# NOT mapped: `Assets` equals ApplicationOfFunds (net of current liabilities) and `Investments` exceeds it [C22].
+_AUDIT_DURATION = {
+    "AmountOfRelatedPartyTransactionDuringTheReportingPeriod": "rpt_total_amount",
+    "EffectOfExchangeRateChangesOnCashAndCashEquivalents": "fx_effect_on_cash",
+}
+LIFE_DURATION.update(_tags({**_AUDIT_DURATION, "CurrentTax": "current_tax"}))
+GENERAL_DURATION.update(_tags(_AUDIT_DURATION))
+INDAS_DURATION.update(
+    _tags(
+        {
+            "AmountOfRelatedPartyTransactionDuringTheReportingPeriod": "rpt_total_amount",
+            "OtherExpenses": "other_expenses",
+            "IncreaseDecreaseInCashAndCashEquivalents": "net_cash_flow_after_fx",
+            "ProfitLossFromDiscontinuedOperationsBeforeTax": "discontinued_pbt",
+        }
+    )
+)
+INDAS_INSTANT.update(
+    _tags(
+        {
+            "PropertyPlantAndEquipment": "ppe_net",
+            "Goodwill": "goodwill",
+            "OtherIntangibleAssets": "other_intangibles",
+            "InvestmentProperty": "investment_property",
+        }
+    )
+)
+
+
 LIFE_SPEC = ProfileSpec(
     "IRDAI_LIFE",
     LIFE_DURATION,

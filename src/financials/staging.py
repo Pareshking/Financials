@@ -23,7 +23,7 @@ from financials.ids import stable_id
 from financials.money import to_inr
 from financials.parsers import ParseError
 from financials.parsers.delivery import parse_sec_bhavdata_full
-from financials.parsers.indas_corp import parse_indas_corp_results
+from financials.parsers.integrated import parse_integrated_results
 from financials.parsers.nse_corp_actions import parse_nse_corp_actions_json
 from financials.parsers.udiff import parse_udiff_cm
 from financials.parsers.xbrl import parse_instance
@@ -36,13 +36,14 @@ CREATE TABLE stg_xbrl_filing (
     taxonomy_ns VARCHAR NOT NULL, scope VARCHAR NOT NULL, level_of_rounding VARCHAR NOT NULL,
     fy_start DATE NOT NULL, fy_end DATE NOT NULL, period_end DATE NOT NULL, reporting_quarter VARCHAR,
     audited BOOLEAN, board_meeting_end_ts TIMESTAMP, interest_paid_cfo_class VARCHAR,
-    interest_recd_cfo_class VARCHAR, stated_isin VARCHAR, stated_symbol VARCHAR, company_name VARCHAR
+    interest_recd_cfo_class VARCHAR, stated_isin VARCHAR, stated_symbol VARCHAR, company_name VARCHAR,
+    stated_cin VARCHAR, auditor_qualified BOOLEAN, audit_opinion VARCHAR
 );
 CREATE TABLE stg_xbrl_facts (
     filing_id VARCHAR NOT NULL, parser_version VARCHAR NOT NULL, scope VARCHAR NOT NULL,
     canonical_tag VARCHAR NOT NULL, period_type VARCHAR NOT NULL, period_start DATE NOT NULL,
     period_end DATE NOT NULL, period_months INTEGER, unit VARCHAR NOT NULL, value_inr DECIMAL(20,2),
-    value_other DECIMAL(28,8), source_element VARCHAR NOT NULL
+    value_other DECIMAL(28,8), source_element VARCHAR NOT NULL, line_item_category VARCHAR, parent_subtotal VARCHAR
 );
 CREATE TABLE stg_corp_actions (
     filing_id VARCHAR NOT NULL, seq INTEGER NOT NULL, component INTEGER NOT NULL, exchange VARCHAR NOT NULL,
@@ -59,11 +60,32 @@ CREATE TABLE stg_holidays (
 CREATE TABLE stg_shp_meta (
     filing_id VARCHAR PRIMARY KEY, parser_version VARCHAR NOT NULL, as_of_date DATE NOT NULL,
     stated_isin VARCHAR NOT NULL, stated_symbol VARCHAR, has_partly_paid BOOLEAN, promoter_pledge_flag BOOLEAN,
-    promoter_pledged_shares BIGINT
+    promoter_pledged_shares BIGINT, promoter_encumbered_shares BIGINT, rules_applied VARCHAR
+);
+CREATE TABLE stg_shp_line_items (
+    filing_id VARCHAR NOT NULL, category_member VARCHAR NOT NULL, element VARCHAR NOT NULL,
+    value DECIMAL(28,8) NOT NULL, unit VARCHAR NOT NULL, PRIMARY KEY (filing_id, category_member, element)
+);
+CREATE TABLE stg_shp_holders (
+    filing_id VARCHAR NOT NULL, holder_category VARCHAR NOT NULL, row_member VARCHAR NOT NULL,
+    holder_name VARCHAR NOT NULL, shares BIGINT NOT NULL, pct DOUBLE,
+    PRIMARY KEY (filing_id, holder_category, row_member)
 );
 CREATE TABLE stg_shp_categories (
     filing_id VARCHAR NOT NULL, category VARCHAR NOT NULL, shares BIGINT, holders BIGINT, pct DOUBLE,
     demat_shares BIGINT, voting_rights BIGINT, PRIMARY KEY (filing_id, category)
+);
+CREATE TABLE stg_events (
+    filing_id VARCHAR NOT NULL, record_key VARCHAR NOT NULL, family VARCHAR NOT NULL, event_type VARCHAR NOT NULL,
+    event_subtype VARCHAR, occurred_on DATE, report_date DATE NOT NULL, counterparty VARCHAR,
+    amount_inr DECIMAL(20,2), person_name VARCHAR, person_category VARCHAR, change_type VARCHAR,
+    cessation_category VARCHAR, details JSON, stated_symbol VARCHAR, stated_isin VARCHAR,
+    PRIMARY KEY (filing_id, record_key)
+);
+CREATE TABLE stg_kpis (
+    filing_id VARCHAR NOT NULL, seq INTEGER NOT NULL, symbol VARCHAR NOT NULL, kpi VARCHAR NOT NULL,
+    period_start DATE, period_end DATE, value DECIMAL(24,6), unit VARCHAR NOT NULL, source_kind VARCHAR NOT NULL,
+    source_url VARCHAR NOT NULL, visible_from_ts TIMESTAMP, notes VARCHAR, issue VARCHAR, PRIMARY KEY (filing_id, seq)
 );
 CREATE TABLE stg_issues (
     filing_id VARCHAR, stage VARCHAR NOT NULL, reason_code VARCHAR NOT NULL, details JSON NOT NULL
@@ -81,9 +103,13 @@ TABLE_ORDER = (
     "stg_holidays",
     "stg_shp_meta",
     "stg_shp_categories",
+    "stg_shp_holders",
+    "stg_shp_line_items",
     "stg_xbrl_filing",
     "stg_xbrl_facts",
     "stg_corp_actions",
+    "stg_events",
+    "stg_kpis",
     "stg_issues",
 )
 
@@ -179,13 +205,14 @@ def stage_market_day(
     raw_bhav = [{"filing_id": b_fil.filing_id, **asdict(r)} for r in bhav_rows]
 
     raw_deliv: list[dict[str, Any]] = []
+    issues: list[dict[str, Any]] = []
+    d_sha = "nodeliv"
     if delivery is not None:
         if not delivery_url:
             raise ValueError("delivery_url required with delivery bytes")
         d_rows = parse_sec_bhavdata_full(delivery)
-        if d_rows[0].trade_date != trade_date:
-            raise ParseError(f"delivery date {d_rows[0].trade_date} != bhavcopy date {trade_date}")
         d_blob = vault.put(delivery, ext="csv", media_type="text/csv", fetched_at=fetched_at)
+        d_sha = d_blob.sha256[:12]
         d_fil = make_filing(
             d_blob,
             exchange="NSE",
@@ -197,15 +224,28 @@ def stage_market_day(
         )
         blobs.append(_blob_row(d_blob))
         filings.append(_filing_row(d_fil))
-        raw_deliv = [{"filing_id": d_fil.filing_id, **asdict(r)} for r in d_rows]
+        if d_rows[0].trade_date != trade_date:
+            # Kept as evidence (blob + filing), never joined: quarantined by the promoter [P1-8].
+            issues.append({"filing_id": d_fil.filing_id, "stage": "DELIVERY", "reason_code": "DELIVERY_DATE_MISMATCH",
+                           "details": json.dumps({"delivery_date": str(d_rows[0].trade_date),
+                                                  "trade_date": str(trade_date), "url": delivery_url})})  # fmt: skip
+        else:
+            raw_deliv = [{"filing_id": d_fil.filing_id, **asdict(r)} for r in d_rows]
 
-    run_id = f"{trade_date:%Y%m%d}-{b_blob.sha256[:12]}"
+    # The delivery file is part of the batch identity: a later fetch that adds it is a new batch [P0-2].
+    run_id = f"{trade_date:%Y%m%d}-{b_blob.sha256[:12]}-{d_sha}"
     return write_stage(
         stage_root,
         "market_day",
         run_id,
-        {"blobs": blobs, "filings": filings, "raw_cm_bhavcopy": raw_bhav, "raw_delivery": raw_deliv},
-        extra={"trade_date": trade_date.isoformat(), "exchange": "NSE"},
+        {
+            "blobs": blobs,
+            "filings": filings,
+            "raw_cm_bhavcopy": raw_bhav,
+            "raw_delivery": raw_deliv,
+            "stg_issues": issues,
+        },
+        extra={"trade_date": trade_date.isoformat(), "exchange": "NSE", "has_delivery": bool(raw_deliv)},
     )
 
 
@@ -247,29 +287,10 @@ def stage_results_xbrl(
         ]
         return write_stage(stage_root, "results_xbrl", fid, tables)
 
-    tables["raw_xbrl_facts"] = [
-        {
-            "filing_id": fid,
-            "parser_version": PARSER_VERSION,
-            "seq": f.seq,
-            "element_ns": f.ns,
-            "element_name": f.name,
-            "context_id": f.context_id,
-            "ctx_start": inst.contexts[f.context_id].start,
-            "ctx_end": inst.contexts[f.context_id].end,
-            "ctx_instant": inst.contexts[f.context_id].instant,
-            "dimensions": json.dumps(dict(inst.contexts[f.context_id].dimensions))
-            if inst.contexts[f.context_id].dimensions
-            else None,
-            "unit_ref": f.unit_ref,
-            "decimals": f.decimals,
-            "value_text": f.value_text,
-        }
-        for f in inst.facts
-    ]
+    tables["raw_xbrl_facts"] = _raw_fact_rows(fid, inst)
 
     try:
-        parsed = parse_indas_corp_results(data)
+        parsed = parse_integrated_results(data, source_url.rsplit("/", 1)[-1])
     except ParseError as exc:
         tables["stg_issues"] = [
             {
@@ -313,6 +334,9 @@ def stage_results_xbrl(
             "stated_isin": m["stated_isin"],
             "stated_symbol": m["stated_symbol"],
             "company_name": m["company_name"],
+            "stated_cin": m.get("stated_cin"),
+            "auditor_qualified": m.get("auditor_qualified"),
+            "audit_opinion": m.get("audit_opinion"),
         }
     ]
     tables["stg_xbrl_facts"] = [
@@ -329,6 +353,8 @@ def stage_results_xbrl(
             "value_inr": to_inr(f.value) if f.unit == "INR" else None,
             "value_other": None if f.unit == "INR" else f.value,
             "source_element": f.source_element,
+            "line_item_category": f.line_item_category,
+            "parent_subtotal": f.parent_subtotal,
         }
         for f in parsed.facts
     ]
@@ -461,6 +487,35 @@ def stage_index_snapshot(
     )
 
 
+def _raw_fact_rows(fid: str, inst) -> list[dict[str, Any]]:
+    """Every fact of an instance, every context, exactly as sent (invariant 3)."""
+    rows = []
+    for f in inst.facts:
+        c = inst.contexts[f.context_id]
+        rows.append(
+            {
+                "filing_id": fid,
+                "parser_version": PARSER_VERSION,
+                "seq": f.seq,
+                "element_ns": f.ns,
+                "element_name": f.name,
+                "context_id": f.context_id,
+                "ctx_start": c.start,
+                "ctx_end": c.end,
+                "ctx_instant": c.instant,
+                "dimensions": json.dumps(dict(c.dimensions)) if c.dimensions else None,
+                "unit_ref": f.unit_ref,
+                "decimals": f.decimals,
+                "value_text": f.value_text,
+            }
+        )
+    return rows
+
+
+def _int_or_none(v) -> int | None:
+    return None if v is None else int(v)
+
+
 def stage_shareholding(
     vault: Vault,
     stage_root: Path,
@@ -488,6 +543,7 @@ def stage_shareholding(
     fid = filing.filing_id
     tables: dict[str, list[dict[str, Any]]] = {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)]}
     try:
+        tables["raw_xbrl_facts"] = _raw_fact_rows(fid, parse_instance(data))
         parsed = parse_shareholding(data)
     except ParseError as exc:
         tables["stg_issues"] = [
@@ -520,10 +576,26 @@ def stage_shareholding(
             "stated_symbol": m["stated_symbol"],
             "has_partly_paid": m["has_partly_paid"],
             "promoter_pledge_flag": m["promoter_pledge_flag"],
-            "promoter_pledged_shares": None
-            if m["promoter_pledged_shares"] is None
-            else int(m["promoter_pledged_shares"]),
+            "promoter_pledged_shares": _int_or_none(m["promoter_pledged_shares"]),
+            "promoter_encumbered_shares": _int_or_none(m["promoter_encumbered_shares"]),
+            "rules_applied": ",".join(m["rules_applied"]) or None,
         }
+    ]
+    tables["stg_shp_line_items"] = [
+        {"filing_id": fid, "category_member": li["category_member"], "element": li["element"], "value": li["value"],
+         "unit": li["unit"] or "UNKNOWN"}
+        for li in parsed.line_items
+    ]  # fmt: skip
+    tables["stg_shp_holders"] = [
+        {
+            "filing_id": fid,
+            "holder_category": h["holder_category"],
+            "row_member": h["row_member"],
+            "holder_name": h["holder_name"],
+            "shares": int(h["shares"]),
+            "pct": None if h["pct"] is None else float(h["pct"]),
+        }
+        for h in parsed.major_holders
     ]
     tables["stg_shp_categories"] = [
         {
@@ -537,6 +609,99 @@ def stage_shareholding(
         for cat, vals in sorted(parsed.categories.items())
     ]
     return write_stage(stage_root, "shareholding", fid, tables)
+
+
+def stage_reg30_event(
+    vault: Vault,
+    stage_root: Path,
+    *,
+    data: bytes,
+    source_url: str,
+    fetched_at: datetime,
+    broadcast_ts: datetime | None = None,
+    broadcast_ts_source: str = "UNKNOWN",
+    exchange: str = "NSE",
+) -> Path:
+    """Vault + parse one Reg. 30 structured event XBRL [E1-E7]; broadcast time from the announcements RSS."""
+    from financials.parsers.reg30_events import parse_reg30_event
+
+    blob = vault.put(data, ext="xml", media_type="application/xml", fetched_at=fetched_at)
+    filing = make_filing(
+        blob,
+        exchange=exchange,
+        category="REG30_EVENT",
+        source_url=source_url,
+        fetched_at=fetched_at,
+        broadcast_ts=broadcast_ts,
+        broadcast_ts_source=broadcast_ts_source,
+    )
+    fid = filing.filing_id
+    tables: dict[str, list[dict[str, Any]]] = {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)]}
+    try:
+        tables["raw_xbrl_facts"] = _raw_fact_rows(fid, parse_instance(data))
+        parsed = parse_reg30_event(data)
+    except ParseError as exc:
+        tables["stg_issues"] = [
+            {
+                "filing_id": fid,
+                "stage": "PARSE",
+                "reason_code": "PARSE_ERROR",
+                "details": json.dumps({"error": str(exc)}),
+            }
+        ]
+        return write_stage(stage_root, "reg30_event", fid, tables)
+    if parsed.issues:
+        tables["stg_issues"] = [
+            {
+                "filing_id": fid,
+                "stage": i.stage,
+                "reason_code": i.reason_code,
+                "details": json.dumps(i.details, default=str, sort_keys=True),
+            }
+            for i in parsed.issues
+        ]
+        return write_stage(stage_root, "reg30_event", fid, tables)
+    m = parsed.meta
+    tables["stg_events"] = [
+        {
+            "filing_id": fid,
+            "record_key": e["record_key"],
+            "family": parsed.family,
+            "event_type": e["event_type"],
+            "event_subtype": e.get("event_subtype"),
+            "occurred_on": e.get("occurred_on"),
+            "report_date": m["report_date"],
+            "counterparty": e.get("counterparty"),
+            "amount_inr": e.get("amount_inr"),
+            "person_name": e.get("person_name"),
+            "person_category": e.get("person_category"),
+            "change_type": e.get("change_type"),
+            "cessation_category": e.get("cessation_category"),
+            "details": json.dumps(e.get("details") or {}, default=str, sort_keys=True),
+            "stated_symbol": m["stated_symbol"],
+            "stated_isin": m["stated_isin"],
+        }
+        for e in parsed.events
+    ]
+    return write_stage(stage_root, "reg30_event", fid, tables, extra={"family": parsed.family})
+
+
+def stage_kpis(vault: Vault, stage_root: Path, *, data: bytes, source_url: str, fetched_at: datetime) -> Path:
+    """Vault + parse a supplemental-KPI file (CSV/JSON, parsers.kpis). The file itself is the evidence."""
+    from financials.parsers.kpis import parse_kpis
+
+    rows = parse_kpis(data)
+    ext = "json" if data.lstrip()[:1] in (b"[", b"{") else "csv"
+    blob = vault.put(
+        data, ext=ext, media_type="application/json" if ext == "json" else "text/csv", fetched_at=fetched_at
+    )
+    filing = make_filing(blob, exchange="MANUAL", category="SUPPLEMENTAL_KPIS", source_url=source_url,
+                         fetched_at=fetched_at)  # fmt: skip
+    return write_stage(
+        stage_root, "kpis", filing.filing_id,
+        {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)],
+         "stg_kpis": [{"filing_id": filing.filing_id, **asdict(r)} for r in rows]},
+    )  # fmt: skip
 
 
 def stage_raw_only(

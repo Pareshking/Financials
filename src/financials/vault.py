@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import tempfile
 from dataclasses import dataclass
@@ -106,4 +107,37 @@ class Vault:
         data = (self.root / blob.storage_path).read_bytes()
         if hashlib.sha256(data).hexdigest() != blob.sha256:
             raise RuntimeError(f"vault corruption: {blob.storage_path}")
+        return data
+
+    # ── fetch index: which URL gave which blob (or a 404), append-only JSON lines ──
+
+    @property
+    def index_path(self) -> Path:
+        return self.root / "url_index.jsonl"
+
+    def record_fetch(
+        self, url: str, status: int, fetched_at: datetime, data: bytes | None = None, ext: str = ""
+    ) -> None:
+        entry = {"url": url, "status": status, "fetched_at": fetched_at.isoformat()}
+        if data is not None:
+            sha = hashlib.sha256(data).hexdigest()
+            entry |= {"sha256": sha, "storage_path": self.relative_path(sha, ext)}
+        self.root.mkdir(parents=True, exist_ok=True)
+        with self.index_path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(entry, sort_keys=True) + "\n")
+        self._index = None
+
+    def last_fetch(self, url: str) -> dict | None:
+        if getattr(self, "_index", None) is None:
+            self._index = {}
+            if self.index_path.exists():
+                for line in self.index_path.read_text(encoding="utf-8").splitlines():
+                    e = json.loads(line)
+                    self._index[e["url"]] = e
+        return self._index.get(url)
+
+    def read_path(self, storage_path: str, sha256: str) -> bytes:
+        data = (self.root / storage_path).read_bytes()
+        if hashlib.sha256(data).hexdigest() != sha256:
+            raise RuntimeError(f"vault corruption: {storage_path}")
         return data

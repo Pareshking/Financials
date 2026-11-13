@@ -8,10 +8,12 @@ from decimal import Decimal
 import pytest
 from conftest import FETCHED_AT, bhav_bytes, bhav_url
 
-from _fixture_helpers import CORP, NBFC
+from _fixture_helpers import CORP, NBFC, XBRL_DIR
 from financials.corp_actions import CorpAction
 from financials.promoter import adjusted_closes, pit_fact, promote, record_corp_action, verify_pending_actions
 from financials.staging import stage_market_day, stage_results_xbrl
+
+LIFE = XBRL_DIR / "INTEGRATED_FILING_LI_1739355_15102026072525_WEB.xml"  # HDFC Life Q2 FY27
 
 XBRL_URL = "https://nsearchives.nseindia.com/corporate/xbrl/"
 
@@ -214,7 +216,8 @@ def test_results_filing_without_broadcast_or_calendar_is_quarantined(market):
 def test_results_filing_board_meeting_rule(market):
     promote_day(market, "20251014")
     market.con.execute(
-        "INSERT INTO trading_calendar VALUES ('NSE', DATE '2026-11-06', TRUE, 'test'), "
+        "INSERT INTO trading_calendar (exchange, cal_date, is_trading, note) "
+        "VALUES ('NSE', DATE '2026-11-06', TRUE, 'test'), "
         "('NSE', DATE '2026-11-09', TRUE, 'test')"
     )
     result = promote(market.con, stage_corp(market))
@@ -235,15 +238,35 @@ def test_results_filing_for_unknown_issuer_is_quarantined(market):
     ]
 
 
-def test_unimplemented_profile_is_quarantined_with_raw_kept(market):
+def test_unknown_taxonomy_is_quarantined_with_raw_kept(market):
+    """Every current-era profile is implemented since Batch 6, so the routing guard is exercised with an unknown
+    namespace (HDFC Life's, renamed in memory; the fixture file is untouched). Until Batch 6 this test used, in turn,
+    the NBFC, bank and life-insurer fixtures as 'not implemented' profiles."""
+    data = LIFE.read_bytes().replace(b"IntegratedFinance_LI", b"IntegratedFinance_Unknown")
+    stage = stage_results_xbrl(
+        market.vault, market.stage_root, data=data, source_url=XBRL_URL + LIFE.name, fetched_at=FETCHED_AT
+    )
+    result = promote(market.con, stage)
+    assert result.status == "QUARANTINED"
+    assert market.con.execute("SELECT reason_code FROM quarantine_queue").fetchall() == [("UNKNOWN_TAXONOMY",)]
+    assert count(market, "SELECT count(*) FROM raw_xbrl_facts") == 1527  # all raw facts kept
+
+
+def test_nbfc_filing_is_parsed_then_stops_at_the_identity_gate(market):
+    """Batch 4: INDAS_NBFC is implemented (the routing guard is tested above with an unknown namespace)."""
     stage = stage_results_xbrl(
         market.vault,
         market.stage_root,
         data=NBFC.read_bytes(),
         source_url=XBRL_URL + NBFC.name,
         fetched_at=FETCHED_AT,
+        broadcast_ts=datetime(2026, 11, 13, 8),
+        broadcast_ts_source="RSS_PUBDATE",
     )
     result = promote(market.con, stage)
+    # Parsing now succeeds; the filing then stops at the next gate (issuer not in this test's security master).
     assert result.status == "QUARANTINED"
-    assert market.con.execute("SELECT reason_code FROM quarantine_queue").fetchall() == [("PROFILE_NOT_IMPLEMENTED",)]
+    assert market.con.execute("SELECT stage, reason_code FROM quarantine_queue").fetchall() == [
+        ("IDENTITY", "UNKNOWN_ISIN")
+    ]
     assert count(market, "SELECT count(*) FROM raw_xbrl_facts") == 359

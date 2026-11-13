@@ -89,6 +89,186 @@ def backfill_index(
     return _transaction(con, run)
 
 
+# ── rebuild-market [P0-1] ──────────────────────────────────────────────────
+
+AUTO_DECIDED = ("VERIFIED", "UNOBSERVABLE", "QUARANTINED")  # verification outcomes recomputed on replay
+
+
+def rebuild_market(con, from_date: date, *, note: str = "rebuild-market") -> dict[str, Any]:
+    """Roll market-derived state back to `from_date` so the staged market days from that date replay in order.
+
+    Raw tables, vault rows and filings are append-only and untouched. Removed: bars, bhavcopy/inferred calendar
+    rows, identifier intervals opened on/after the date (intervals closed on/after it reopen), feature history.
+    Reset: automatically decided corporate actions with ex-date on/after it go back to PENDING (manual decisions
+    VERIFIED_MANUAL / REJECTED / SUPERSEDED stand). Open GAP / IDENTIFIER / CALENDAR findings on/after it are
+    marked SUPERSEDED_BY_REBUILD; a replay that finds the same problem reopens the same row. Market-day entries
+    of `promotion_log` on/after the date are removed so `promote` replays them. Audited in `admin_log`."""
+
+    def run(con):
+        from financials.promoter import REBUILD_SUPERSEDED
+
+        now = utc_now()
+        counts: dict[str, int] = {}
+
+        def n(key: str, sql: str, params: list) -> None:
+            counts[key] = len(con.execute(sql + " RETURNING 1", params).fetchall())
+
+        features_dates = [r[0] for r in con.execute(
+            "SELECT DISTINCT as_of_date FROM screener_features_history WHERE as_of_date >= ? ORDER BY 1", [from_date]
+        ).fetchall()]  # fmt: skip
+        n("ohlcv", "DELETE FROM ohlcv WHERE trade_date >= ?", [from_date])
+        n("calendar", "DELETE FROM trading_calendar WHERE cal_date >= ? "
+          "AND source IN ('BHAVCOPY', 'INFERRED_PREV_CLOSE')", [from_date])  # fmt: skip
+        n("intervals_removed", "DELETE FROM security_identifier_history WHERE valid_from >= ?", [from_date])
+        n(
+            "intervals_reopened",
+            "UPDATE security_identifier_history SET valid_to = NULL WHERE valid_to >= ?",
+            [from_date],
+        )
+        n("corp_actions_reset", "UPDATE corp_actions SET status = 'PENDING', price_factor = NULL, eps_factor = NULL, "
+          "observed_gap = NULL, decided_at = NULL WHERE ex_date >= ? AND status IN ('VERIFIED', 'UNOBSERVABLE') "
+          "OR (ex_date >= ? AND status = 'QUARANTINED' AND action_type <> 'UNKNOWN')",
+          [from_date, from_date])  # fmt: skip
+        n("quarantines_superseded",
+          "UPDATE quarantine_queue SET resolved_at = ?, resolution = ?, resolution_note = ? "
+          "WHERE (resolved_at IS NULL OR resolution = 'FIXED_BY_RULE') AND stage IN ('GAP', 'IDENTIFIER', 'CALENDAR') "
+          "AND CAST(json_extract_string(details, '$.trade_date') AS DATE) >= ?",
+          [now, REBUILD_SUPERSEDED, f"rebuild-market --from {from_date}: {note}", from_date])  # fmt: skip
+        n("features", "DELETE FROM screener_features_history WHERE as_of_date >= ?", [from_date])
+        con.execute("DELETE FROM screener_features")
+        con.execute("INSERT INTO screener_features SELECT * FROM screener_features_history WHERE as_of_date = "
+                    "(SELECT max(as_of_date) FROM screener_features_history)")  # fmt: skip
+        logged = [r[0] for r in con.execute("SELECT stage_path FROM promotion_log WHERE job = 'market_day'").fetchall()]
+        replay = [p for p in logged if p.split("/", 1)[-1][:8] >= f"{from_date:%Y%m%d}"]  # run id = YYYYMMDD-...
+        if replay:
+            con.execute("DELETE FROM promotion_log WHERE stage_path IN (SELECT unnest(?))", [replay])
+        counts["market_days_to_replay"] = len(replay)
+        result = {"from": from_date, **counts, "features_dates": features_dates}
+        con.execute(
+            "INSERT INTO admin_log VALUES (?, 'REBUILD_MARKET', ?, ?, ?, ?)",
+            [stable_id("adm", "rebuild", from_date, now), json.dumps({"from": str(from_date)}),
+             json.dumps(result, default=str), note, now],
+        )  # fmt: skip
+        return result
+
+    return _transaction(con, run)
+
+
+# ── reprocess [P1-9] ───────────────────────────────────────────────────────
+
+RETRYABLE = ("UNKNOWN_ISIN", "UNKNOWN_SYMBOL", "AMBIGUOUS_ISIN", "AMBIGUOUS_SYMBOL", "AMBIGUOUS_SECURITY",
+             "STALE_ISIN_OTHER_ISSUER", "NO_VISIBILITY")  # fmt: skip
+
+
+def reprocess(con, stage_root) -> dict[str, Any]:
+    """Promote again every batch with an open, retryable finding (identity not yet known, visibility not yet
+    derivable, a filing override recorded since). Each open finding is marked REPROCESSING first; promoting
+    the batch again reopens it if the problem is still there (same deterministic id), otherwise it is closed as
+    REPROCESSED. MISSING_FIN_INSTRM_ID bars are loaded when their ISIN belongs to exactly one security that day
+    with the same symbol and series."""
+    from pathlib import Path
+
+    from financials.promoter import REPROCESSING, promote
+
+    stage_root = Path(stage_root)
+    now = utc_now()
+    con.execute(
+        "UPDATE quarantine_queue SET resolved_at = NULL, resolution = NULL WHERE resolution = ?", [REPROCESSING]
+    )
+    open_q = fetch_dicts(
+        con,
+        "SELECT quarantine_id, filing_id FROM quarantine_queue WHERE resolved_at IS NULL AND filing_id IS NOT NULL "
+        "AND reason_code IN (SELECT unnest(?))",
+        [list(RETRYABLE)],
+    )
+    filing_ids = sorted({q["filing_id"] for q in open_q})
+    stages: list[str] = []
+    if filing_ids:
+        logged = [r[0] for r in con.execute("SELECT stage_path FROM promotion_log").fetchall()]
+        files = [
+            (stage_root / p / "filings.parquet").as_posix()
+            for p in logged
+            if (stage_root / p / "filings.parquet").exists()
+        ]
+        if files:
+            rows = con.execute(
+                "SELECT DISTINCT filename FROM read_parquet(?, filename = true) WHERE filing_id IN (SELECT unnest(?))",
+                [files, filing_ids],
+            ).fetchall()
+            stages = sorted({Path(f).parent.relative_to(stage_root).as_posix() for (f,) in rows})
+    ids = [q["quarantine_id"] for q in open_q]
+    if ids:
+        con.execute(
+            "UPDATE quarantine_queue SET resolved_at = ?, resolution = ? WHERE quarantine_id IN (SELECT unnest(?))",
+            [now, REPROCESSING, ids],
+        )
+    results = []
+    for rel in stages:
+        con.execute("DELETE FROM promotion_log WHERE stage_path = ?", [rel])
+        r = promote(con, stage_root / rel)
+        con.execute(
+            "INSERT OR REPLACE INTO promotion_log VALUES (?, ?, ?, ?, ?)", [rel, r.job, r.status, r.message, utc_now()]
+        )
+        results.append({"stage": rel, "status": r.status, "message": r.message})
+    fixed = con.execute(
+        "UPDATE quarantine_queue SET resolution = 'REPROCESSED', resolution_note = 'cleared on reprocess' "
+        "WHERE resolution = ? RETURNING quarantine_id",
+        [REPROCESSING],
+    ).fetchall()
+    loaded = _load_missing_fin_instrm_id_bars(con)
+    out = {"batches": results, "cleared": [r[0] for r in fixed], "bars_loaded": loaded}
+    con.execute("INSERT INTO admin_log VALUES (?, 'REPROCESS', '{}', ?, NULL, ?)",
+                [stable_id("adm", "reprocess", now), json.dumps(out, default=str), now])  # fmt: skip
+    return out
+
+
+def _load_missing_fin_instrm_id_bars(con) -> int:
+    rows = fetch_dicts(
+        con,
+        "SELECT quarantine_id, filing_id, details FROM quarantine_queue WHERE resolved_at IS NULL "
+        "AND reason_code = 'MISSING_FIN_INSTRM_ID'",
+    )
+    loaded = 0
+    for q in rows:
+        d = json.loads(q["details"])
+        day = date.fromisoformat(str(d["trade_date"])[:10])
+        raw = fetch_dicts(
+            con,
+            "SELECT * FROM raw_cm_bhavcopy WHERE filing_id = ? AND symbol = ? AND isin = ? AND trade_date = ?",
+            [q["filing_id"], d["symbol"], d["isin"], day],
+        )
+        if len(raw) != 1:
+            continue
+        r = raw[0]
+        secs = con.execute(
+            "SELECT DISTINCT security_id FROM security_identifier_history WHERE isin = ? AND symbol = ? AND series = ? "
+            "AND valid_from <= ? AND (valid_to IS NULL OR valid_to > ?)",
+            [r["isin"], r["symbol"], r["series"], day, day],
+        ).fetchall()
+        if len(secs) != 1:
+            continue
+        sec = secs[0][0]
+        insert_rows(con, "ohlcv", [{
+            "security_id": sec, "exchange": r["exchange"], "series": r["series"], "trade_date": day, "open": r["open"],
+            "high": r["high"], "low": r["low"], "close": r["close"], "volume": r["volume"],
+            "turnover_inr": r["turnover_inr"], "deliv_qty": None, "price_filing_id": r["filing_id"],
+            "delivery_filing_id": None,
+        }], or_ignore=True)  # fmt: skip
+        prev = _prev_closes(con, r["exchange"], day).get(sec)
+        for f in audit_day(
+            sec, day, r["open"], prev, _actions(con, "security_id = ? AND ex_date = ?", [sec, day]), False
+        ):
+            _quarantine(con, stage="GAP", reason_code=f.reason_code, security_id=sec,
+                        details={"trade_date": day, "gap": f.gap, "prev_close": prev, "open": r["open"]})  # fmt: skip
+        con.execute(
+            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'REPROCESSED', resolution_note = ? "
+            "WHERE quarantine_id = ?",
+            [utc_now(), f"bar loaded by ISIN for {sec}", q["quarantine_id"]],
+        )
+        loaded += 1
+    return loaded
+
+
 # ── quarantine ─────────────────────────────────────────────────────────────
 
 RESOLUTIONS = {"ACCEPT": "ACCEPTED", "REJECT": "REJECTED", "OVERRIDE": "OVERRIDDEN", "CORP_ACTION": "OVERRIDDEN",
@@ -121,6 +301,61 @@ def list_quarantine(
     )
 
 
+def inspect_quarantine(con, quarantine_id: str) -> dict[str, Any]:
+    """One finding with its context (bars around the date, corporate actions, raw rows, filing) and the exact
+    commands that resolve it [P2-12]. Read-only."""
+    rows = fetch_dicts(con, "SELECT * FROM quarantine_queue WHERE quarantine_id = ?", [quarantine_id])
+    if not rows:
+        raise AdminError(f"unknown quarantine id {quarantine_id}")
+    q = rows[0]
+    d = json.loads(q["details"])
+    ctx: dict[str, Any] = {}
+    sec, day = q["security_id"], d.get("trade_date") or d.get("ex_date")
+    if sec:
+        ctx["identifiers"] = fetch_dicts(
+            con, "SELECT symbol, series, isin, fin_instrm_id, valid_from, valid_to FROM security_identifier_history "
+            "WHERE security_id = ? ORDER BY valid_from", [sec])  # fmt: skip
+    if sec and day:
+        ctx["bars"] = fetch_dicts(
+            con, "SELECT trade_date, open, close, volume FROM ohlcv WHERE security_id = ? AND trade_date BETWEEN "
+            "CAST(? AS DATE) - INTERVAL 10 DAY AND CAST(? AS DATE) + INTERVAL 10 DAY ORDER BY 1",
+            [sec, day, day])  # fmt: skip
+        ctx["corp_actions"] = fetch_dicts(
+            con, "SELECT action_id, action_type, ratio_num, ratio_den, status, price_factor, observed_gap "
+            "FROM corp_actions WHERE security_id = ? AND ex_date = CAST(? AS DATE)", [sec, day])  # fmt: skip
+    if q["filing_id"]:
+        ctx["filing"] = (fetch_dicts(con, "SELECT category, source_url, broadcast_ts, broadcast_ts_source FROM filings "
+                                     "WHERE filing_id = ?", [q["filing_id"]]) or [None])[0]  # fmt: skip
+    if q["reason_code"] in ("MISSING_FIN_INSTRM_ID", "ISIN_COLLISION") and day:
+        ctx["raw_rows"] = fetch_dicts(
+            con, "SELECT symbol, series, isin, fin_instrm_id, open, close FROM raw_cm_bhavcopy WHERE trade_date = ? "
+            "AND (isin = ? OR symbol = ?)", [day, d.get("isin"), d.get("symbol")])  # fmt: skip
+    base = f"python -m financials quarantine resolve --id {quarantine_id}"
+    suggest = {
+        "UNEXPLAINED_GAP": [f"{base} --action CORP_ACTION --note '<source>' --payload-json "
+                            "'{\"action_type\": \"BONUS\", \"ratio_num\": 1, \"ratio_den\": 1}'",
+                            f"{base} --action ACCEPT --note '<why the gap is genuine>'"],
+        "ISIN_CHANGE_WITHOUT_ACTION": [f"{base} --action CORP_ACTION --note '<source>' --payload-json "
+                                       "'{\"action_type\": \"SPLIT\", \"ratio_num\": 2, \"ratio_den\": 10}'"],
+        "ISIN_COLLISION": [f"{base} --action MERGE_SECURITIES --note '<evidence>'"],
+        "UNPARSED_PURPOSE": [f"{base} --action REJECT --note '<not a price action>'",
+                             "resolve the day's GAP finding with --action CORP_ACTION (supersedes this record)"],
+        "VERIFY_FAILED": [f"{base} --action REJECT --note '<wrong record>'",
+                          "resolve the day's GAP finding with --action CORP_ACTION (supersedes this record)"],
+        "NO_VISIBILITY": [f"{base} --action OVERRIDE --note '<source>' --payload-json "
+                          "'{\"field\": \"broadcast_ts\", \"value\": \"YYYY-MM-DDTHH:MM:SS (UTC)\"}'",
+                          "python -m financials quarantine reprocess  (after the calendar covers the date)"],
+        "MISSING_SESSION": ["fetch the missing day(s), then python -m financials rebuild-market --from <date>"],
+    }  # fmt: skip
+    for r in ("UNKNOWN_ISIN", "UNKNOWN_SYMBOL", "AMBIGUOUS_ISIN", "AMBIGUOUS_SYMBOL", "CIN_MISMATCH"):
+        suggest[r] = [f"{base} --action OVERRIDE --note '<evidence>' --payload-json "
+                      "'{\"field\": \"security_id\", \"value\": \"<sec_...>\"}'",
+                      "python -m financials quarantine reprocess  (once the security is known)"]  # fmt: skip
+    suggest.setdefault("MISSING_FIN_INSTRM_ID", ["python -m financials quarantine reprocess"])
+    fallback = [f"{base} --action ACCEPT|REJECT --note '<why>'"]
+    return {"quarantine": {**q, "details": d}, "context": ctx, "resolve_with": suggest.get(q["reason_code"], fallback)}
+
+
 def _override(con, entity_id: str | None, field: str, value: Any, valid_from: date, reason: str) -> None:
     if entity_id is None:
         raise AdminError("this resolution needs an entity")
@@ -131,12 +366,47 @@ def _override(con, entity_id: str | None, field: str, value: Any, valid_from: da
     }], or_ignore=True)  # fmt: skip
 
 
-def resolve_quarantine(con, quarantine_id: str, *, action: str, note: str, payload: dict | None = None) -> dict:
+def resolve_quarantine(
+    con, quarantine_id: str, *, action: str, note: str, payload: dict | None = None, stage_root=None
+) -> dict:
+    """Resolve one finding (audited). A filing-level OVERRIDE is applied at once when `stage_root` is given: the
+    filing's batch is promoted again with the override (the finding reopens if that still fails)."""
     if action not in RESOLUTIONS:
         raise AdminError(f"action must be one of {sorted(RESOLUTIONS)}")
     if not note.strip():
         raise AdminError("a resolution note is required")
-    return _transaction(con, _resolve, quarantine_id, action, note.strip(), payload or {})
+    result = _transaction(con, _resolve, quarantine_id, action, note.strip(), payload or {})
+    if result.get("repromote") and stage_root is not None:
+        result["repromoted"] = _repromote_filing(con, stage_root, result["filing_id"], quarantine_id)
+    return result
+
+
+def _repromote_filing(con, stage_root, filing_id: str, qid: str) -> dict | None:
+    from pathlib import Path
+
+    from financials.promoter import REPROCESSING, promote
+
+    stage_root = Path(stage_root)
+    logged = [r[0] for r in con.execute("SELECT stage_path FROM promotion_log").fetchall()]
+    files = [
+        (stage_root / p / "filings.parquet").as_posix() for p in logged if (stage_root / p / "filings.parquet").exists()
+    ]
+    if not files:
+        return None
+    hit = con.execute("SELECT DISTINCT filename FROM read_parquet(?, filename = true) WHERE filing_id = ?",
+                      [files, filing_id]).fetchall()  # fmt: skip
+    if not hit:
+        return None
+    rel = Path(hit[0][0]).parent.relative_to(stage_root).as_posix()
+    con.execute("UPDATE quarantine_queue SET resolution = ? WHERE quarantine_id = ?", [REPROCESSING, qid])
+    con.execute("DELETE FROM promotion_log WHERE stage_path = ?", [rel])
+    r = promote(con, stage_root / rel)
+    con.execute(
+        "INSERT OR REPLACE INTO promotion_log VALUES (?, ?, ?, ?, ?)", [rel, r.job, r.status, r.message, utc_now()]
+    )
+    con.execute("UPDATE quarantine_queue SET resolution = 'OVERRIDDEN' WHERE quarantine_id = ? AND resolution = ?",
+                [qid, REPROCESSING])  # fmt: skip
+    return {"stage": rel, "status": r.status}
 
 
 def _resolve(con, qid: str, action: str, note: str, payload: dict) -> dict:
@@ -153,17 +423,20 @@ def _resolve(con, qid: str, action: str, note: str, payload: dict) -> dict:
     effects: dict[str, Any] = {}
 
     if action == "OVERRIDE":
-        for key in ("field", "value"):
-            if key not in payload:
-                raise AdminError(f"OVERRIDE needs payload.{key}")
-        vf = date.fromisoformat(payload.get("valid_from", str(date.today())))
-        _override(con, entity, payload["field"], payload["value"], vf, f"{qid}: {note}")
-        effects["override"] = payload["field"]
+        effects.update(_filing_override(con, q, payload, entity, note))
 
     elif action == "CORP_ACTION":
         if q["stage"] != "GAP" or not q["security_id"]:
             raise AdminError("CORP_ACTION resolves GAP quarantines")
         effects.update(_add_corp_action(con, q, details, payload, entity, note))
+
+    elif action == "REJECT" and q["stage"] == "CORP_ACTION" and details.get("action_id"):
+        n = con.execute(
+            "UPDATE corp_actions SET status = 'REJECTED', decided_at = ? WHERE action_id = ? "
+            "AND status IN ('PENDING', 'QUARANTINED') RETURNING action_id",
+            [utc_now(), details["action_id"]],
+        ).fetchall()
+        effects["rejected_action"] = details["action_id"] if n else None
 
     elif action == "MERGE_SECURITIES":
         if q["reason_code"] != "ISIN_COLLISION":
@@ -175,6 +448,38 @@ def _resolve(con, qid: str, action: str, note: str, payload: dict) -> dict:
         [utc_now(), RESOLUTIONS[action], note, qid],
     )
     return {"quarantine_id": qid, "resolution": RESOLUTIONS[action], **effects}
+
+
+# OVERRIDE writes only fields the promoter reads, per quarantine reason [P2-13].
+FILING_OVERRIDE_FIELDS = {
+    "broadcast_ts": ("NO_VISIBILITY",),
+    "security_id": ("UNKNOWN_ISIN", "UNKNOWN_SYMBOL", "AMBIGUOUS_ISIN", "AMBIGUOUS_SYMBOL", "CIN_MISMATCH"),
+}
+
+
+def _filing_override(con, q: dict, payload: dict, entity: str | None, note: str) -> dict:
+    from datetime import datetime
+
+    field, value = payload.get("field"), payload.get("value")
+    if field not in FILING_OVERRIDE_FIELDS or value is None:
+        raise AdminError(f"OVERRIDE needs payload.field in {sorted(FILING_OVERRIDE_FIELDS)} and payload.value")
+    if q["reason_code"] not in FILING_OVERRIDE_FIELDS[field] or not q["filing_id"]:
+        raise AdminError(f"{field} overrides resolve {FILING_OVERRIDE_FIELDS[field]} findings on a filing")
+    if field == "broadcast_ts":
+        value = datetime.fromisoformat(str(value)).isoformat()  # UTC, naive (invariant 11)
+    else:
+        row = con.execute("SELECT entity_id FROM securities WHERE security_id = ?", [value]).fetchone()
+        if row is None:
+            raise AdminError(f"unknown security {value}")
+        entity = row[0]
+    now = utc_now()
+    insert_rows(con, "filing_overrides", [{
+        "override_id": stable_id("fov", q["filing_id"], field, value, now), "filing_id": q["filing_id"], "field": field,
+        "value": str(value), "quarantine_id": q["quarantine_id"], "reason": note, "created_at": now,
+    }])  # fmt: skip
+    if entity is not None:
+        _override(con, entity, f"filing_{field}", {"filing_id": q["filing_id"], "value": str(value)}, now.date(), note)
+    return {"override": field, "filing_id": q["filing_id"], "repromote": True}
 
 
 def _add_corp_action(con, q: dict, details: dict, payload: dict, entity: str, note: str) -> dict:
@@ -193,18 +498,42 @@ def _add_corp_action(con, q: dict, details: dict, payload: dict, entity: str, no
         action_type=payload["action_type"], ex_date=ex, ratio_num=dec("ratio_num"), ratio_den=dec("ratio_den"),
         issue_price=dec("issue_price"), cash_per_share=dec("cash_per_share"),
     )  # fmt: skip
+    # Records the parser could not factor (UNKNOWN purpose) or that failed verification would poison the
+    # verification group of this date [P0-3]: they are retired as SUPERSEDED by the manual action (audit kept).
+    superseded = [r[0] for r in con.execute(
+        "SELECT action_id FROM corp_actions WHERE security_id = ? AND ex_date = ? AND status = 'QUARANTINED'",
+        [sec, ex]).fetchall()]  # fmt: skip
+    now = utc_now()
+    if superseded:
+        con.execute(
+            "UPDATE corp_actions SET status = 'SUPERSEDED', decided_at = ? WHERE security_id = ? AND ex_date = ? "
+            "AND status = 'QUARANTINED'",
+            [now, sec, ex],
+        )
     record_corp_action(con, action, source_filing_id=filing[0], entity_id=entity)
     verify_pending_actions(con, "NSE")
     status = con.execute("SELECT status FROM corp_actions WHERE action_id = ?", [action.action_id]).fetchone()[0]
     if status not in ("VERIFIED", "UNOBSERVABLE"):
         raise AdminError(f"recorded {payload['action_type']} does not explain the gap (status {status}); not applied")
+    con.execute("UPDATE corp_actions SET status = 'VERIFIED_MANUAL', decided_at = ? WHERE action_id = ?",
+                [now, action.action_id])  # fmt: skip
+    # The corporate-action quarantines of the retired records are closed by this resolution.
+    if superseded:
+        con.execute(
+            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'OVERRIDDEN', resolution_note = ? "
+            "WHERE stage = 'CORP_ACTION' AND resolved_at IS NULL AND security_id = ? "
+            "AND (json_extract_string(details, '$.action_id') IN (SELECT unnest(?)) "
+            "OR CAST(json_extract_string(details, '$.ex_date') AS DATE) = ?)",
+            [now, f"superseded by {action.action_id}: {note}", sec, superseded, ex],
+        )
     _override(con, entity, "manual_corp_action", {"action_id": action.action_id, **payload}, ex, note)
     still_open = con.execute(
         "SELECT count(*) FROM quarantine_queue WHERE stage = 'GAP' AND security_id = ? AND resolved_at IS NULL "
         "AND CAST(json_extract_string(details, '$.trade_date') AS DATE) = ? AND quarantine_id <> ?",
         [sec, ex, q["quarantine_id"]],
     ).fetchone()[0]
-    return {"corp_action": action.action_id, "status": status, "other_gaps_open_same_day": still_open}
+    return {"corp_action": action.action_id, "status": "VERIFIED_MANUAL", "superseded": superseded,
+            "other_gaps_open_same_day": still_open}  # fmt: skip
 
 
 def _merge_securities(con, q: dict, details: dict, note: str) -> dict:
@@ -294,3 +623,69 @@ def _merge_securities(con, q: dict, details: dict, note: str) -> dict:
                 details={"trade_date": trade_date, "gap": f.gap, "prev_close": prev, "open": r["open"]},
             )
     return {"kept": keep, "merged": drop, "bars_loaded": loaded}
+
+
+# ── scope override (Mandate 3) ─────────────────────────────────────────────
+
+SCOPE_VALUES = ("CONSOLIDATED", "STANDALONE")
+
+
+def set_scope_override(con, entity_id: str, *, quarterly: str | None, annual: str | None, reason: str) -> dict:
+    """Pin a company's quarterly / annual scope (C18), or clear the pin with quarterly = annual = None.
+    Audited: every change appends a company_overrides row (field 'scope_policy')."""
+    if not reason.strip():
+        raise AdminError("a reason is required")
+    if (quarterly is None) != (annual is None):
+        raise AdminError("set both scopes, or neither to clear the override")
+    for v in (quarterly, annual):
+        if v is not None and v not in SCOPE_VALUES:
+            raise AdminError(f"scope must be one of {SCOPE_VALUES}")
+    return _transaction(con, _set_scope, entity_id, quarterly, annual, reason.strip())
+
+
+def _set_scope(con, entity_id: str, quarterly: str | None, annual: str | None, reason: str) -> dict:
+    if con.execute("SELECT 1 FROM entity_master WHERE entity_id = ?", [entity_id]).fetchone() is None:
+        raise AdminError(f"unknown entity {entity_id}")
+    now = utc_now()
+    con.execute("DELETE FROM entity_scope_override WHERE entity_id = ?", [entity_id])
+    value = {"quarterly": quarterly, "annual": annual} if quarterly else "CLEARED"
+    if quarterly:
+        row = {"entity_id": entity_id, "quarterly_scope": quarterly, "annual_scope": annual, "reason": reason,
+               "recorded_at": now}  # fmt: skip
+        insert_rows(con, "entity_scope_override", [row])
+    body = value if isinstance(value, str) else json.dumps(value, sort_keys=True)
+    insert_rows(con, "company_overrides", [{
+        "override_id": stable_id("ovr", entity_id, "scope_policy", body, now), "entity_id": entity_id,
+        "field": "scope_policy", "value": body, "valid_from": now.date(), "valid_to": None, "reason": reason,
+        "created_at": now,
+    }])  # fmt: skip
+    return {"entity_id": entity_id, "scope_policy": value}
+
+
+ARCHETYPE_VALUES = ("INDUSTRIAL_SERVICES", "FINANCIAL_LENDING", "INSURANCE", "NEW_GEN_TECH")
+
+
+def set_archetype_override(con, entity_id: str, *, archetype: str | None, reason: str) -> dict:
+    """Pin (or clear with archetype=None) a company's valuation archetype (C21); audited in company_overrides."""
+    if not reason.strip():
+        raise AdminError("a reason is required")
+    if archetype is not None and archetype not in ARCHETYPE_VALUES:
+        raise AdminError(f"archetype must be one of {ARCHETYPE_VALUES}")
+    return _transaction(con, _set_archetype, entity_id, archetype, reason.strip())
+
+
+def _set_archetype(con, entity_id: str, archetype: str | None, reason: str) -> dict:
+    if con.execute("SELECT 1 FROM entity_master WHERE entity_id = ?", [entity_id]).fetchone() is None:
+        raise AdminError(f"unknown entity {entity_id}")
+    now = utc_now()
+    con.execute("DELETE FROM entity_archetype_override WHERE entity_id = ?", [entity_id])
+    if archetype:
+        insert_rows(con, "entity_archetype_override", [{"entity_id": entity_id, "valuation_archetype": archetype,
+                                                        "reason": reason, "recorded_at": now}])  # fmt: skip
+    body = archetype or "CLEARED"
+    insert_rows(con, "company_overrides", [{
+        "override_id": stable_id("ovr", entity_id, "valuation_archetype", body, now), "entity_id": entity_id,
+        "field": "valuation_archetype", "value": body, "valid_from": now.date(), "valid_to": None, "reason": reason,
+        "created_at": now,
+    }])  # fmt: skip
+    return {"entity_id": entity_id, "valuation_archetype": body}

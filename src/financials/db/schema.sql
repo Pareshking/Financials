@@ -112,6 +112,7 @@ CREATE TABLE IF NOT EXISTS trading_calendar (
     cal_date    DATE    NOT NULL,
     is_trading  BOOLEAN NOT NULL,
     note        VARCHAR,
+    source      VARCHAR,                         -- BHAVCOPY | HOLIDAY_MASTER | INFERRED_PREV_CLOSE [CAL3]
     PRIMARY KEY (exchange, cal_date)
 );
 
@@ -180,7 +181,44 @@ CREATE TABLE IF NOT EXISTS filing_meta (
     visible_from_source     VARCHAR NOT NULL,   -- BROADCAST | BOARD_MEETING_RULE
     interest_paid_cfo_class VARCHAR,
     interest_recd_cfo_class VARCHAR,
+    auditor_qualified       BOOLEAN,            -- Reg. 34: WhetherAuditorsReportHasBeenQualified... [X76]
+    audit_opinion           VARCHAR,            -- Integrated Filing declaration: UNMODIFIED | NOT_APPLICABLE | raw text [E8]
     PRIMARY KEY (filing_id, parser_version)
+);
+
+-- Revision chains (append-only link table; filings rows are never updated) [E9]. A later filing of the same
+-- entity, profile, scope and period end supersedes the earlier one: REVISION when the bytes differ, RESEND when
+-- the blob is byte-identical.
+CREATE TABLE IF NOT EXISTS filing_revisions (
+    filing_id             VARCHAR NOT NULL REFERENCES filings(filing_id),
+    supersedes_filing_id  VARCHAR NOT NULL REFERENCES filings(filing_id),
+    entity_id             VARCHAR NOT NULL REFERENCES entity_master(entity_id),
+    period_end            DATE NOT NULL,
+    scope                 VARCHAR NOT NULL,
+    relation              VARCHAR NOT NULL,     -- REVISION | RESEND
+    PRIMARY KEY (filing_id, supersedes_filing_id)
+);
+
+-- Reg. 30 structured events [E1-E7]. One row per record (an order, a person, an allotment). event_id derives from
+-- the blob sha256 + record, so byte-identical re-sends are one event.
+CREATE TABLE IF NOT EXISTS corporate_events (
+    event_id           VARCHAR PRIMARY KEY,
+    filing_id          VARCHAR NOT NULL REFERENCES filings(filing_id),
+    parser_version     VARCHAR NOT NULL,
+    entity_id          VARCHAR NOT NULL REFERENCES entity_master(entity_id),
+    family             VARCHAR NOT NULL,        -- PARA_B | CHANGE_IN_MANAGEMENT | FUND_RAISING | FRAUD_OR_DEFAULT
+    event_type         VARCHAR NOT NULL,        -- ORDER_WIN | LITIGATION | MANAGEMENT_CHANGE | AUDITOR_CHANGE | ...
+    event_subtype      VARCHAR,                 -- as filed
+    occurred_on        DATE,
+    report_date        DATE NOT NULL,
+    counterparty       VARCHAR,
+    amount_inr         DECIMAL(20,2),           -- absolute rupees as filed; NULL when not a number
+    person_name        VARCHAR,
+    person_category    VARCHAR,                 -- as filed (Key Managerial Personnel, Auditors, ...)
+    change_type        VARCHAR,                 -- Appointment | Cessation
+    cessation_category VARCHAR,                 -- Resignation | Superannuation or retirement | Cessation | ...
+    details            JSON,
+    visible_from_ts    TIMESTAMP NOT NULL       -- broadcast (RSS pubDate, IST -> UTC)
 );
 
 CREATE TABLE IF NOT EXISTS fact_observations (
@@ -198,6 +236,8 @@ CREATE TABLE IF NOT EXISTS fact_observations (
     value_other     DECIMAL(28,8),
     source_element  VARCHAR NOT NULL,
     visible_from_ts TIMESTAMP NOT NULL,
+    line_item_category VARCHAR,                 -- C24: PNL_EXPENSE | CASH_FLOW | BALANCE_SHEET | ... (line_items.py)
+    parent_subtotal VARCHAR,                    -- canonical key of the subtotal this line sits under
     PRIMARY KEY (filing_id, parser_version, canonical_tag, period_start, period_end),
     CHECK ((unit = 'INR') = (value_inr IS NOT NULL)),
     CHECK ((unit = 'INR') = (value_other IS NULL)),
@@ -213,9 +253,40 @@ CREATE TABLE IF NOT EXISTS shareholding_meta (
     as_of_date              DATE NOT NULL,
     has_partly_paid         BOOLEAN,
     promoter_pledge_flag    BOOLEAN,
-    promoter_pledged_shares BIGINT,              -- NULL when pledged but quantity tag unverified
+    promoter_pledged_shares BIGINT,              -- NULL when a pledge is declared but no quantity is filed
     visible_from_ts         TIMESTAMP NOT NULL,
+    promoter_encumbered_shares BIGINT,           -- pledge + NDU + other encumbrances [SHP10]
+    rules_applied           VARCHAR,             -- comma-separated named rules (e.g. NO_PROMOTER_CATEGORY)
     PRIMARY KEY (filing_id, parser_version)
+);
+
+-- Every numeric Reg. 31 fact per shareholder-category member (C24, zero drop).
+CREATE TABLE IF NOT EXISTS shareholding_line_items (
+    filing_id       VARCHAR NOT NULL REFERENCES filings(filing_id),
+    parser_version  VARCHAR NOT NULL,
+    entity_id       VARCHAR NOT NULL REFERENCES entity_master(entity_id),
+    as_of_date      DATE NOT NULL,
+    category_member VARCHAR NOT NULL,           -- CategoryOfShareholdersAxis member (ENTITY when non-dimensional)
+    element         VARCHAR NOT NULL,
+    value           DECIMAL(28,8) NOT NULL,
+    unit            VARCHAR NOT NULL,           -- SHARES | PURE | INR
+    visible_from_ts TIMESTAMP NOT NULL,
+    PRIMARY KEY (filing_id, parser_version, category_member, element)
+);
+
+-- Named public holders above 1% (Reg. 31 detail tables) [SHP12].
+CREATE TABLE IF NOT EXISTS shareholding_major_holders (
+    filing_id       VARCHAR NOT NULL REFERENCES filings(filing_id),
+    parser_version  VARCHAR NOT NULL,
+    entity_id       VARCHAR NOT NULL REFERENCES entity_master(entity_id),
+    as_of_date      DATE NOT NULL,
+    holder_category VARCHAR NOT NULL,           -- MUTUAL_FUNDS | INSURANCE | FPI_CAT1 | FDI | BODIES_CORPORATE | ...
+    row_member      VARCHAR NOT NULL,           -- the filing's own typed-member id for the row
+    holder_name     VARCHAR NOT NULL,
+    shares          BIGINT NOT NULL,
+    pct             DOUBLE,                     -- fraction, as filed
+    visible_from_ts TIMESTAMP NOT NULL,
+    PRIMARY KEY (filing_id, parser_version, holder_category, row_member)
 );
 
 CREATE TABLE IF NOT EXISTS shareholding_observations (
@@ -223,10 +294,10 @@ CREATE TABLE IF NOT EXISTS shareholding_observations (
     parser_version  VARCHAR NOT NULL,
     entity_id       VARCHAR NOT NULL REFERENCES entity_master(entity_id),
     as_of_date      DATE NOT NULL,
-    category        VARCHAR NOT NULL,           -- TOTAL | PROMOTER | PUBLIC | FII | DII | MUTUAL_FUNDS | NON_INSTITUTIONS
+    category        VARCHAR NOT NULL,           -- parsers/shareholding.py CATEGORIES (TOTAL, PROMOTER, PUBLIC, FII, ...)
     shares          BIGINT,
     holders         BIGINT,
-    pct             DOUBLE,                     -- fraction of total shares
+    pct             DOUBLE,                     -- fraction, as filed (denominator excludes DR shares [SHP9])
     demat_shares    BIGINT,
     voting_rights   BIGINT,
     visible_from_ts TIMESTAMP NOT NULL,
@@ -251,7 +322,9 @@ CREATE TABLE IF NOT EXISTS corp_actions (
     status            VARCHAR NOT NULL DEFAULT 'PENDING',
     related_entity_id VARCHAR REFERENCES entity_master(entity_id),
     coa_pct           DOUBLE,
-    source_filing_id  VARCHAR NOT NULL REFERENCES filings(filing_id)
+    source_filing_id  VARCHAR NOT NULL REFERENCES filings(filing_id),
+    recorded_at       TIMESTAMP,                 -- when the ledger first held the action (system time)
+    decided_at        TIMESTAMP                  -- when status last changed (verification / manual resolution)
 );
 
 CREATE TABLE IF NOT EXISTS quarantine_queue (
@@ -312,8 +385,8 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     fcff_yield          DOUBLE,
     other_income_to_pbt DOUBLE,
     altman_z_dd         DOUBLE,              -- X2 uses OtherEquity as retained-earnings proxy
-    piotroski_f         INTEGER,             -- NULL until annual (Reg. 34) data exists
-    beneish_m           DOUBLE,              -- NULL until annual (Reg. 34) data exists
+    piotroski_f         INTEGER,             -- 0..9, year-end-assets variant; NULL without two FYs [C23]
+    beneish_m           DOUBLE,              -- 8-variable M-score; NULL without two FYs [C23]
     return_1m           DOUBLE,
     return_3m           DOUBLE,
     return_6m           DOUBLE,
@@ -334,6 +407,105 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     cf_as_of            DATE,
     shp_as_of           DATE,
     in_nifty500         BOOLEAN,
+    eps_ttm             DECIMAL(18,4),       -- TTM owners' profit / current shares [X53]
+    eps_continuing_ttm  DECIMAL(18,4),       -- TTM continuing owners' profit / current shares [C10]
+    roe_continuing      DOUBLE,              -- same denominator as roe [C14]
+    core_profit_ttm     DECIMAL(24,2),       -- continuing owners' profit less exceptional items net of tax [C14]
+    is_lending_nbfc     BOOLEAN,             -- INDAS_NBFC only [C13]; NULL for other profiles
+    nii_ttm             DECIMAL(24,2),       -- lenders: interest earned - finance costs
+    ppop_ttm            DECIMAL(24,2),       -- lenders: pre-provision operating profit
+    cost_to_income      DOUBLE,
+    credit_cost         DOUBLE,              -- TTM impairment / avg loans (opening + closing)
+    nim_asset_proxy     DOUBLE,              -- TTM NII / avg total assets
+    roa                 DOUBLE,              -- TTM owners' profit / avg total assets (lenders)
+    loans               DECIMAL(24,2),
+    loans_as_of         DATE,
+    loans_avg_from      DATE,                -- opening balance-sheet date of the average
+    gnpa_pct            DOUBLE,              -- NULL for NBFCs: no taxonomy element [X54]
+    nnpa_pct            DOUBLE,
+    pcr                 DOUBLE,
+    credit_to_deposit   DOUBLE,              -- banks: advances / deposits (latest balance sheet)
+    cet1_pct            DOUBLE,              -- banks: filed CET1 ratio (standalone)
+    at1_pct             DOUBLE,              -- banks: filed AT1 ratio (standalone)
+    roa_filed           DOUBLE,              -- banks: filed ReturnOnAssets, annualisation varies by bank [X59]
+    govt_holding_pct    DOUBLE,              -- banks: PercentageOfShareHeldByGovernmentOfIndia (PSU marker)
+    insurer_basis       VARCHAR,             -- IRDAI_LIFE | IRDAI_GENERAL | INDAS117 (ratios not comparable across) [X64]
+    net_premium_earned_ttm DECIMAL(24,2),    -- IRDAI general: PremiumEarned; life: NetPremiumIncome
+    insurance_revenue_ttm  DECIMAL(24,2),    -- Ind AS 117 insurers only
+    claims_ratio        DOUBLE,              -- general / Ind AS 117 insurers (definitions in §10.6)
+    expense_ratio       DOUBLE,
+    combined_ratio      DOUBLE,
+    solvency_ratio      DOUBLE,              -- times, after SOLVENCY_PERCENT_SCALING [X65]; NULL for Ind AS 117 filers
+    investment_income_ttm DECIMAL(24,2),
+    persistency_13m     DOUBLE,              -- life insurers, filed in XBRL [X62]
+    persistency_61m     DOUBLE,
+    scope_reason        VARCHAR,             -- DEFAULT | FALLBACK_DEFAULT_INCOMPLETE | OVERRIDE | YTD_BRIDGE | BALANCE_SHEET_ONLY
+    default_quarterly_scope VARCHAR,         -- company default for quarterly / TTM figures [C18]
+    default_annual_scope    VARCHAR,         -- company default for annual statements [C18]
+    sloan_accrual       DOUBLE,              -- (TTM PAT - CFO - CFI) / avg total assets [C19]
+    cfo_to_ebitda       DOUBLE,
+    fcf_to_pat          DOUBLE,
+    working_capital_intensity DOUBLE,        -- (receivables + inventory - payables) / TTM revenue
+    receivables_sales_divergence DOUBLE,     -- receivables YoY - revenue YoY (needs 8 quarters)
+    net_debt_to_fcf     DOUBLE,
+    cost_of_debt        DOUBLE,              -- TTM finance costs / avg (borrowings + leases)
+    dol                 DOUBLE,              -- EBIT YoY / revenue YoY, only if |revenue YoY| >= 5% (needs 8 quarters)
+    gross_ebitda_spread DOUBLE,              -- (gross profit - EBITDA) / revenue; COGS >= 10% guard (C6)
+    reverse_dcf_implied_g  DOUBLE,           -- 5Y FCFF growth implied by EV [C20]
+    reverse_dcf_wacc_used  DOUBLE,           -- assumption stored with the result (0.12)
+    reverse_dcf_terminal_g DOUBLE,           -- assumption stored with the result (0.04)
+    pe_percentile       DOUBLE,              -- rank vs own prior quarter-end values, >= 4 quarters [C20]
+    ev_ebitda_percentile DOUBLE,
+    valuation_archetype VARCHAR,             -- INDUSTRIAL_SERVICES | FINANCIAL_LENDING | INSURANCE | NEW_GEN_TECH [C21]
+    ev_to_gross_profit  DOUBLE,
+    ex_cash_pe          DOUBLE,              -- (mcap - liquid cash) / (continuing owners' PAT - OI x (1 - ETR))
+    ev_to_billings      DOUBLE,              -- EV / (TTM revenue + YoY change in contract liabilities)
+    ev_to_esop_adj_ebitda DOUBLE,            -- EV / (EBITDA + ESOP cost), cash-flow window
+    price_to_cfo        DOUBLE,
+    rule_of_40          DOUBLE,              -- revenue YoY + EBITDA margin (needs 8 quarters)
+    billings_growth_pct DOUBLE,              -- billings YoY (needs 8 quarters and labelled contract liabilities)
+    neg_working_capital_float_pct DOUBLE,    -- ((payables + contract liabilities) - (receivables + inventory)) / revenue
+    net_burn_multiple   DOUBLE,              -- cash burn / incremental revenue, only when FCF < 0 (needs 8 quarters)
+    cash_runway_months  DOUBLE,              -- liquid cash / monthly burn, only when FCF < 0
+    esop_adj_fcf        DECIMAL(24,2),       -- FCF - ESOP cost
+    liquid_cash         DECIMAL(24,2),       -- cash + other bank balances + current investments
+    promoter_holding_pct DOUBLE,             -- Reg. 31 fractions as filed; denominator excludes DR shares [SHP9]
+    promoter_pledge_pct DOUBLE,              -- pledged / promoter shares [SHP10]
+    promoter_encumbered_pct DOUBLE,          -- (pledge + NDU + other encumbrance) / promoter shares [SHP10]
+    fii_holding_pct     DOUBLE,              -- SEBI "Institutions (Foreign)": includes FDI and overseas depositories
+    fpi_holding_pct     DOUBLE,              -- FPI Category I + II only [SHP13]
+    dii_holding_pct     DOUBLE,              -- SEBI "Institutions (Domestic)"
+    public_holding_pct  DOUBLE,
+    non_promoter_non_public_pct DOUBLE,      -- DR custodian + employee trusts, of total issued shares
+    fii_dii_qoq_change_pct DOUBLE,           -- (FII + DII) now minus previous quarter end; fraction points
+    capex_to_depreciation DOUBLE,            -- FY (PPE + intangibles capex) / D&A [C23]
+    cwip_to_gross_block DOUBLE,              -- CWIP / gross block (Reg. 34 PPE schedule) [X71]
+    rote                DOUBLE,              -- FY owners' PAT / (owners' equity - goodwill - other intangibles)
+    rnd_and_royalty_intensity DOUBLE,        -- (R&D + royalty) / revenue; NULL when neither is disclosed [X73]
+    contingent_liabilities_to_net_worth DOUBLE, -- contingent liabilities / owners' equity [X73]
+    annual_fy_end       DATE,                -- fiscal year the annual ratios (incl. Piotroski/Beneish) use
+    order_wins_90d      INTEGER,             -- Reg. 30 order wins visible, occurred in the 90 days to as-of [E3]
+    order_value_90d     DECIMAL(24,2),       -- sum of their filed amounts (rupees)
+    kmp_resignations_90d INTEGER,            -- KMP / director cessations by resignation [E5]
+    auditor_resignations_90d INTEGER,        -- auditor cessations by resignation [E5]
+    fraud_or_default_90d INTEGER,            -- fraud / default disclosures [E7]
+    penalties_90d       INTEGER,             -- NULL: no penalty / regulatory-action event observed (UNVERIFIED) [E7]
+    roce_screener       DOUBLE,              -- Screener export: (PBT + Interest) x 2 / (opening + closing capital) [S22]
+    debtor_days         DOUBLE,              -- Screener export: closing debtors / (sales / 365) [S22]
+    inventory_turnover  DOUBLE,              -- Screener export: sales / closing inventory [S22]
+    working_capital     DECIMAL(24,2),       -- Screener export: Other Assets - Other Liabilities (rupees) [S22]
+    inventory_days      DOUBLE,              -- closing inventory / (sales / 365) [S23]
+    days_payable        DOUBLE,              -- closing trade payables / (sales / 365) [S23]
+    cash_conversion_cycle DOUBLE,            -- debtor + inventory - payable days [S23]
+    working_capital_days DOUBLE,             -- (CA - cash & bank - current investments - CL) / (sales / 365) [S23]
+    vnb_margin          DOUBLE,              -- supplemental_kpis (life insurers), latest period visible at as-of
+    embedded_value      DECIMAL(24,2),       -- supplemental_kpis, rupees
+    ape_growth          DOUBLE,              -- supplemental_kpis
+    gov                 DECIMAL(24,2),       -- supplemental_kpis (new-gen tech): gross order value, rupees
+    take_rate           DOUBLE,              -- supplemental_kpis: net take rate
+    contribution_margin DOUBLE,              -- supplemental_kpis
+    nrr                 DOUBLE,              -- supplemental_kpis: net revenue retention
+    cac_payback         DOUBLE,              -- supplemental_kpis: months
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -369,8 +541,8 @@ CREATE TABLE IF NOT EXISTS screener_features (
     fcff_yield          DOUBLE,
     other_income_to_pbt DOUBLE,
     altman_z_dd         DOUBLE,              -- X2 uses OtherEquity as retained-earnings proxy
-    piotroski_f         INTEGER,             -- NULL until annual (Reg. 34) data exists
-    beneish_m           DOUBLE,              -- NULL until annual (Reg. 34) data exists
+    piotroski_f         INTEGER,             -- 0..9, year-end-assets variant; NULL without two FYs [C23]
+    beneish_m           DOUBLE,              -- 8-variable M-score; NULL without two FYs [C23]
     return_1m           DOUBLE,
     return_3m           DOUBLE,
     return_6m           DOUBLE,
@@ -391,6 +563,105 @@ CREATE TABLE IF NOT EXISTS screener_features (
     cf_as_of            DATE,
     shp_as_of           DATE,
     in_nifty500         BOOLEAN,
+    eps_ttm             DECIMAL(18,4),       -- TTM owners' profit / current shares [X53]
+    eps_continuing_ttm  DECIMAL(18,4),       -- TTM continuing owners' profit / current shares [C10]
+    roe_continuing      DOUBLE,              -- same denominator as roe [C14]
+    core_profit_ttm     DECIMAL(24,2),       -- continuing owners' profit less exceptional items net of tax [C14]
+    is_lending_nbfc     BOOLEAN,             -- INDAS_NBFC only [C13]; NULL for other profiles
+    nii_ttm             DECIMAL(24,2),       -- lenders: interest earned - finance costs
+    ppop_ttm            DECIMAL(24,2),       -- lenders: pre-provision operating profit
+    cost_to_income      DOUBLE,
+    credit_cost         DOUBLE,              -- TTM impairment / avg loans (opening + closing)
+    nim_asset_proxy     DOUBLE,              -- TTM NII / avg total assets
+    roa                 DOUBLE,              -- TTM owners' profit / avg total assets (lenders)
+    loans               DECIMAL(24,2),
+    loans_as_of         DATE,
+    loans_avg_from      DATE,                -- opening balance-sheet date of the average
+    gnpa_pct            DOUBLE,              -- NULL for NBFCs: no taxonomy element [X54]
+    nnpa_pct            DOUBLE,
+    pcr                 DOUBLE,
+    credit_to_deposit   DOUBLE,              -- banks: advances / deposits (latest balance sheet)
+    cet1_pct            DOUBLE,              -- banks: filed CET1 ratio (standalone)
+    at1_pct             DOUBLE,              -- banks: filed AT1 ratio (standalone)
+    roa_filed           DOUBLE,              -- banks: filed ReturnOnAssets, annualisation varies by bank [X59]
+    govt_holding_pct    DOUBLE,              -- banks: PercentageOfShareHeldByGovernmentOfIndia (PSU marker)
+    insurer_basis       VARCHAR,             -- IRDAI_LIFE | IRDAI_GENERAL | INDAS117 (ratios not comparable across) [X64]
+    net_premium_earned_ttm DECIMAL(24,2),    -- IRDAI general: PremiumEarned; life: NetPremiumIncome
+    insurance_revenue_ttm  DECIMAL(24,2),    -- Ind AS 117 insurers only
+    claims_ratio        DOUBLE,              -- general / Ind AS 117 insurers (definitions in §10.6)
+    expense_ratio       DOUBLE,
+    combined_ratio      DOUBLE,
+    solvency_ratio      DOUBLE,              -- times, after SOLVENCY_PERCENT_SCALING [X65]; NULL for Ind AS 117 filers
+    investment_income_ttm DECIMAL(24,2),
+    persistency_13m     DOUBLE,              -- life insurers, filed in XBRL [X62]
+    persistency_61m     DOUBLE,
+    scope_reason        VARCHAR,             -- DEFAULT | FALLBACK_DEFAULT_INCOMPLETE | OVERRIDE | YTD_BRIDGE | BALANCE_SHEET_ONLY
+    default_quarterly_scope VARCHAR,         -- company default for quarterly / TTM figures [C18]
+    default_annual_scope    VARCHAR,         -- company default for annual statements [C18]
+    sloan_accrual       DOUBLE,              -- (TTM PAT - CFO - CFI) / avg total assets [C19]
+    cfo_to_ebitda       DOUBLE,
+    fcf_to_pat          DOUBLE,
+    working_capital_intensity DOUBLE,        -- (receivables + inventory - payables) / TTM revenue
+    receivables_sales_divergence DOUBLE,     -- receivables YoY - revenue YoY (needs 8 quarters)
+    net_debt_to_fcf     DOUBLE,
+    cost_of_debt        DOUBLE,              -- TTM finance costs / avg (borrowings + leases)
+    dol                 DOUBLE,              -- EBIT YoY / revenue YoY, only if |revenue YoY| >= 5% (needs 8 quarters)
+    gross_ebitda_spread DOUBLE,              -- (gross profit - EBITDA) / revenue; COGS >= 10% guard (C6)
+    reverse_dcf_implied_g  DOUBLE,           -- 5Y FCFF growth implied by EV [C20]
+    reverse_dcf_wacc_used  DOUBLE,           -- assumption stored with the result (0.12)
+    reverse_dcf_terminal_g DOUBLE,           -- assumption stored with the result (0.04)
+    pe_percentile       DOUBLE,              -- rank vs own prior quarter-end values, >= 4 quarters [C20]
+    ev_ebitda_percentile DOUBLE,
+    valuation_archetype VARCHAR,             -- INDUSTRIAL_SERVICES | FINANCIAL_LENDING | INSURANCE | NEW_GEN_TECH [C21]
+    ev_to_gross_profit  DOUBLE,
+    ex_cash_pe          DOUBLE,              -- (mcap - liquid cash) / (continuing owners' PAT - OI x (1 - ETR))
+    ev_to_billings      DOUBLE,              -- EV / (TTM revenue + YoY change in contract liabilities)
+    ev_to_esop_adj_ebitda DOUBLE,            -- EV / (EBITDA + ESOP cost), cash-flow window
+    price_to_cfo        DOUBLE,
+    rule_of_40          DOUBLE,              -- revenue YoY + EBITDA margin (needs 8 quarters)
+    billings_growth_pct DOUBLE,              -- billings YoY (needs 8 quarters and labelled contract liabilities)
+    neg_working_capital_float_pct DOUBLE,    -- ((payables + contract liabilities) - (receivables + inventory)) / revenue
+    net_burn_multiple   DOUBLE,              -- cash burn / incremental revenue, only when FCF < 0 (needs 8 quarters)
+    cash_runway_months  DOUBLE,              -- liquid cash / monthly burn, only when FCF < 0
+    esop_adj_fcf        DECIMAL(24,2),       -- FCF - ESOP cost
+    liquid_cash         DECIMAL(24,2),       -- cash + other bank balances + current investments
+    promoter_holding_pct DOUBLE,             -- Reg. 31 fractions as filed; denominator excludes DR shares [SHP9]
+    promoter_pledge_pct DOUBLE,              -- pledged / promoter shares [SHP10]
+    promoter_encumbered_pct DOUBLE,          -- (pledge + NDU + other encumbrance) / promoter shares [SHP10]
+    fii_holding_pct     DOUBLE,              -- SEBI "Institutions (Foreign)": includes FDI and overseas depositories
+    fpi_holding_pct     DOUBLE,              -- FPI Category I + II only [SHP13]
+    dii_holding_pct     DOUBLE,              -- SEBI "Institutions (Domestic)"
+    public_holding_pct  DOUBLE,
+    non_promoter_non_public_pct DOUBLE,      -- DR custodian + employee trusts, of total issued shares
+    fii_dii_qoq_change_pct DOUBLE,           -- (FII + DII) now minus previous quarter end; fraction points
+    capex_to_depreciation DOUBLE,            -- FY (PPE + intangibles capex) / D&A [C23]
+    cwip_to_gross_block DOUBLE,              -- CWIP / gross block (Reg. 34 PPE schedule) [X71]
+    rote                DOUBLE,              -- FY owners' PAT / (owners' equity - goodwill - other intangibles)
+    rnd_and_royalty_intensity DOUBLE,        -- (R&D + royalty) / revenue; NULL when neither is disclosed [X73]
+    contingent_liabilities_to_net_worth DOUBLE, -- contingent liabilities / owners' equity [X73]
+    annual_fy_end       DATE,                -- fiscal year the annual ratios (incl. Piotroski/Beneish) use
+    order_wins_90d      INTEGER,             -- Reg. 30 order wins visible, occurred in the 90 days to as-of [E3]
+    order_value_90d     DECIMAL(24,2),       -- sum of their filed amounts (rupees)
+    kmp_resignations_90d INTEGER,            -- KMP / director cessations by resignation [E5]
+    auditor_resignations_90d INTEGER,        -- auditor cessations by resignation [E5]
+    fraud_or_default_90d INTEGER,            -- fraud / default disclosures [E7]
+    penalties_90d       INTEGER,             -- NULL: no penalty / regulatory-action event observed (UNVERIFIED) [E7]
+    roce_screener       DOUBLE,              -- Screener export: (PBT + Interest) x 2 / (opening + closing capital) [S22]
+    debtor_days         DOUBLE,              -- Screener export: closing debtors / (sales / 365) [S22]
+    inventory_turnover  DOUBLE,              -- Screener export: sales / closing inventory [S22]
+    working_capital     DECIMAL(24,2),       -- Screener export: Other Assets - Other Liabilities (rupees) [S22]
+    inventory_days      DOUBLE,              -- closing inventory / (sales / 365) [S23]
+    days_payable        DOUBLE,              -- closing trade payables / (sales / 365) [S23]
+    cash_conversion_cycle DOUBLE,            -- debtor + inventory - payable days [S23]
+    working_capital_days DOUBLE,             -- (CA - cash & bank - current investments - CL) / (sales / 365) [S23]
+    vnb_margin          DOUBLE,              -- supplemental_kpis (life insurers), latest period visible at as-of
+    embedded_value      DECIMAL(24,2),       -- supplemental_kpis, rupees
+    ape_growth          DOUBLE,              -- supplemental_kpis
+    gov                 DECIMAL(24,2),       -- supplemental_kpis (new-gen tech): gross order value, rupees
+    take_rate           DOUBLE,              -- supplemental_kpis: net take rate
+    contribution_margin DOUBLE,              -- supplemental_kpis
+    nrr                 DOUBLE,              -- supplemental_kpis: net revenue retention
+    cac_payback         DOUBLE,              -- supplemental_kpis: months
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -400,10 +671,69 @@ CREATE TABLE IF NOT EXISTS user_custom_ratios (
     created_at  TIMESTAMP NOT NULL
 );
 
+-- Audited administrative operations (rebuild-market, reprocess): one row per run, never updated.
+CREATE TABLE IF NOT EXISTS admin_log (
+    admin_id    VARCHAR PRIMARY KEY,
+    action      VARCHAR NOT NULL,
+    params      JSON NOT NULL,
+    result      JSON,
+    note        VARCHAR,
+    created_at  TIMESTAMP NOT NULL
+);
+
+-- Filing-level overrides from `quarantine resolve --action OVERRIDE` (whitelisted fields, read by the promoter).
+CREATE TABLE IF NOT EXISTS filing_overrides (
+    override_id    VARCHAR PRIMARY KEY,
+    filing_id      VARCHAR NOT NULL,
+    field          VARCHAR NOT NULL,              -- broadcast_ts | security_id
+    value          VARCHAR NOT NULL,
+    quarantine_id  VARCHAR,
+    reason         VARCHAR NOT NULL,
+    created_at     TIMESTAMP NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS promotion_log (
     stage_path   VARCHAR PRIMARY KEY,          -- relative to the staging root
     job          VARCHAR NOT NULL,
     status       VARCHAR NOT NULL,             -- PROMOTED | ALREADY_PROMOTED | QUARANTINED
     message      VARCHAR,
     promoted_at  TIMESTAMP NOT NULL
+);
+
+-- Presentation / IRDAI public-disclosure KPIs that are not in exchange XBRL (VNB margin, embedded value, APE growth for
+-- life insurers; GOV, take rate, contribution margin, NRR, CAC payback for new-gen tech). Point-in-time like every
+-- fundamental: visible_from_ts is when the source document became public. Phase 3 fills it; no fetcher yet.
+CREATE TABLE IF NOT EXISTS supplemental_kpis (
+    entity_id       VARCHAR NOT NULL REFERENCES entity_master(entity_id),
+    kpi             VARCHAR NOT NULL,        -- vnb_margin | embedded_value | ape_growth | persistency_13m | persistency_61m
+                                             -- | gov | take_rate | contribution_margin | nrr | cac_payback
+    period_start    DATE    NOT NULL,
+    period_end      DATE    NOT NULL,
+    value           DECIMAL(24,6) NOT NULL,
+    unit            VARCHAR NOT NULL,        -- INR | RATIO | MONTHS | COUNT
+    source_kind     VARCHAR NOT NULL,        -- INVESTOR_PRESENTATION | IRDAI_PUBLIC_DISCLOSURE | ANNUAL_REPORT | MANUAL
+    source_url      VARCHAR NOT NULL,
+    source_sha256   VARCHAR NOT NULL,        -- vaulted document
+    visible_from_ts TIMESTAMP NOT NULL,      -- UTC
+    recorded_at     TIMESTAMP NOT NULL,
+    notes           VARCHAR,
+    PRIMARY KEY (entity_id, kpi, period_start, period_end, visible_from_ts)
+);
+
+-- Manual per-company scope override (Mandate 3, C18). Written only through admin.set_scope_override, which also
+-- appends an audit row to company_overrides; a user preference, not data, so it applies at every as-of date.
+CREATE TABLE IF NOT EXISTS entity_scope_override (
+    entity_id       VARCHAR PRIMARY KEY REFERENCES entity_master(entity_id),
+    quarterly_scope VARCHAR NOT NULL,        -- CONSOLIDATED | STANDALONE
+    annual_scope    VARCHAR NOT NULL,
+    reason          VARCHAR NOT NULL,
+    recorded_at     TIMESTAMP NOT NULL
+);
+
+-- Manual valuation-archetype override (C21): written only by admin.set_archetype_override, audited in company_overrides.
+CREATE TABLE IF NOT EXISTS entity_archetype_override (
+    entity_id           VARCHAR PRIMARY KEY REFERENCES entity_master(entity_id),
+    valuation_archetype VARCHAR NOT NULL,
+    reason              VARCHAR NOT NULL,
+    recorded_at         TIMESTAMP NOT NULL
 );

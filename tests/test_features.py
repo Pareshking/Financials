@@ -37,6 +37,13 @@ def test_elin_point_in_time_features(published):
     assert r["pb"] == pytest.approx(float(r["market_cap"] / r["total_equity"]))
     assert r["pe"] is None and r["sales_ttm"] is None  # only Q2 + H1 known: no TTM window
     assert r["promoter_pct"] == pytest.approx(0.3297)
+    # Batch 8 columns, materialised end to end [SHP8-SHP10]. ELIN: no pledge, no NPNP, one quarter only.
+    assert r["promoter_holding_pct"] == pytest.approx(0.3297)
+    assert r["promoter_holding_pct"] + r["public_holding_pct"] == pytest.approx(1.0)
+    assert r["promoter_pledge_pct"] == 0.0 and r["promoter_encumbered_pct"] == 0.0
+    assert r["non_promoter_non_public_pct"] == 0.0
+    assert r["fii_holding_pct"] is not None and r["dii_holding_pct"] is not None
+    assert r["fii_dii_qoq_change_pct"] is None  # no 2026-06-30 filing in this market
     assert (r["scope_used"], r["fundamentals_end"], r["bs_as_of"]) == (
         "STANDALONE",
         date(2026, 9, 30),

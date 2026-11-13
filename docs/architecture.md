@@ -9,7 +9,7 @@ UNVERIFIED there must not be hard-coded; code that depends on it quarantines on 
 
 - **Purpose:** personal, single-user research, screening and point-in-time (PIT) backtesting. No redistribution [C8].
 - **Universe v1:** NSE Mainboard `EQ`, `BE`, `BZ`, starting with the Nifty 500 [C7]. SME (`SM`, `ST`) out of scope. BSE is used only as a fallback and for historical Reg. 34 annual XBRL backfill.
-- **Data scope (v1, CHOICE [C9]):** `trade_date >= 2024-10-01` for prices, delivery, corporate actions and index snapshots; `period_end >= 2024-12-31` for financials and shareholding (`financials/scope.py`). Promotion returns `OUT_OF_SCOPE` for older inputs (vaulted, not parsed); `fetch-days` / `fetch-corp-actions` clamp start dates. Multi-year windows use `fundamentals.cagr(..., min_periods_required)` and stay NULL until enough in-scope quarters exist.
+- **Data scope (v1, CHOICE [C9]):** `trade_date >= 2024-10-01` for prices, delivery, corporate actions and index snapshots; `period_end >= 2025-03-31` for financials and shareholding (Q4 FY25, the first Integrated Filing quarter [X38]; `financials/scope.py`). As of Nov 2026 that is 7 quarters: TTM works, YoY-on-TTM is NULL until Q3 FY27 (Dec-2026) results are filed. Promotion returns `OUT_OF_SCOPE` for older inputs (vaulted, not parsed); `fetch-days` / `fetch-corp-actions` clamp start dates. Multi-year windows use `fundamentals.cagr(..., min_periods_required)` and stay NULL until enough in-scope quarters exist.
 - **Non-goals (v1):** multi-user, UI hosting, Cloudflare (R2/D1/Workers), real-time intraday prices, SME/Indian-GAAP corporates.
 
 ## 2. Runtime topology
@@ -26,11 +26,13 @@ Operator commands (`python -m financials --data-dir data …`):
 | Command | Effect |
 |---|---|
 | `init-db` | apply `schema.sql` to `data/market.duckdb` |
-| `fetch-days START [END]`, `fetch-corp-actions START END`, `fetch-holidays`, `fetch-index --as-of D`, `fetch-shareholding SYM…`, `fetch-results URL [--broadcast-utc TS]` | download → vault → staging only |
-| `promote` | the single writer: applies pending stages in order (holidays, market days by date, index snapshots, corporate actions, results, shareholding, raw-only) and records them in `promotion_log`; ABORTED batches stay pending |
-| `materialize D` | builds features for `D` with gates G4/G5 |
-| `screen "QUERY" [--as-of D]` | runs a DSL screen on the live table or point-in-time on history |
-| `quarantine list [--stage --reason --entity --security --all]`, `quarantine resolve --id Q --action A --note N [--payload-json J]` | audited quarantine resolution (D-6) |
+| `fetch-days START [END]`, `fetch-corp-actions START END`, `fetch-holidays`, `fetch-index --as-of D`, `fetch-shareholding SYM…\|--universe U`, `fetch-annual SYM…\|--universe U`, `fetch-results [URL] [--symbols …\|--universe U]`, `discover-filings [--symbols …\|--universe nifty500\|active\|--from-rss]` | download → vault → staging only. Vaulted archive files are never downloaded again (vault URL index); a failed day or file is reported and the run goes on; corporate actions are asked in 30-day windows |
+| `promote` | the single writer: applies pending stages in order (holidays, market days by date, index snapshots, corporate actions, results, shareholding, raw-only) and records them in `promotion_log`. ABORTED batches stay pending, and every later market day waits behind an aborted one |
+| `rebuild-market --from D` | rolls market-derived state back to `D` (bars, bhavcopy/inferred calendar rows, identifier intervals, auto-decided corporate actions, feature history), replays the staged days and re-materialises; raw tables untouched; audited in `admin_log` |
+| `materialize D` / `materialize --from D1 --to D2` | builds features for `D` (or every promoted trading day in the range, ascending) with gates G4/G5 |
+| `run-day --date D` | holiday list, market days D−7..D, corporate actions D−7..D+30, discovery for symbols with results in the day's RSS (A9) + Reg. 30 events, promote, materialise D; idempotent |
+| `screen "QUERY" [--as-of D]` | runs a DSL screen on the live table or point-in-time on history (read-only connection) |
+| `quarantine list [--stage --reason --entity --security --all]`, `quarantine inspect Q`, `quarantine resolve --id Q --action A --note N [--payload-json J]`, `quarantine reprocess` | audited quarantine resolution (D-6); `list` and `inspect` are read-only |
 | `extract-index-changes TEXT_DIR --out CSV`, `backfill-index --manifest CSV` | index membership before the first snapshot (§11.6) |
 | `python -m financials.bench --out docs/benchmarks.md` | reproducible benchmarks on the fixtures (`docs/benchmarks.md`) |
 
@@ -61,7 +63,7 @@ data/vault/ab/ab12…ef.<ext>   ───────────▶  ▼  in on
 | Corporate actions | `www.nseindia.com/api/corporates-corporateActions?index=equities&from_date=…&to_date=…` | JSON | VERIFIED [P12, CA1-CA9] | 1 |
 | Corporate actions (discovery) | `nsearchives…/content/RSS/Corporate_action.xml` (no symbol/ISIN) | RSS | VERIFIED [CA6] | discovery only |
 | Trading holidays | `www.nseindia.com/api/holiday-master?type=trading` | JSON (current year) | VERIFIED [CAL1] | 1 |
-| Shareholding (Reg. 31) | `www.nseindia.com/api/corporate-share-holdings-master?index=equities&symbol=X` → `nsearchives…/corporate/xbrl/SHP_*.xml` | JSON + XBRL | VERIFIED [SHP1-SHP6] | 1 |
+| Shareholding (Reg. 31) | `www.nseindia.com/api/corporate-share-holdings-master?index=equities&symbol=X` → `nsearchives…/corporate/xbrl/SHP_*.xml` | JSON + XBRL | VERIFIED [SHP1-SHP15] | 1 |
 | Reg. 34 annual XBRL | UNVERIFIED [R2] | XBRL | — | 2 |
 | F&O, SLBM, AMC portfolios, macro | UNVERIFIED | various | — | 3 |
 
@@ -93,7 +95,7 @@ This section only records the decisions; it does not duplicate the DDL.
 | L2 calendar/index | `trading_calendar`, `calendar_coverage`, `raw_index_snapshot`, `index_constituents_history` |
 | L2 shareholding | `shareholding_meta`, `shareholding_observations` |
 | L3 | `screener_features`, `screener_features_history`, `user_custom_ratios`; control: `promotion_log` |
-| Not yet built | `entity_classification_history` (sector/archetype history), `supplemental_kpis` |
+| Not yet built | `entity_classification_history` (sector/archetype history) |
 
 Decisions:
 - **Timestamps are `TIMESTAMP` holding UTC.** `TIMESTAMPTZ` would make DuckDB's Python client require `pytz` [I2].
@@ -131,6 +133,14 @@ Other outcomes:
 - Precedence for 12-month periods: a Reg. 34 annual fact supersedes the Reg. 33 FY fact **only from its own `visible_from_ts`**.
 
 ### 6.4 Scope continuity
+
+**Default scope per company (Mandate 3, C18).** `fundamentals.resolve_scope` returns one `ScopeDecision` per company and
+as-of: the default quarterly scope (consolidated if the latest quarterly filing has a consolidated version, else
+standalone), a complete fallback scope, an H1/FY bridge, or balance-sheet-only, never a mix. `scope_reason` records
+which. `default_annual_scope` (same rule on FY filings) drives annual statements. A manual override
+(`python -m financials scope-override --entity … --quarterly … --annual … --reason …`, or `--clear`) pins both and is
+audited.
+
 - TTM uses CONSOLIDATED only when all 4 trailing quarters exist in CONSOLIDATED; otherwise STANDALONE.
 - YoY on TTM needs **8** consecutive same-scope quarters.
 - A ratio never mixes scopes. Every row exposes `scope_used`.
@@ -152,6 +162,9 @@ Balance sheet and cash flow come only from H1/FY filings [X12, X13, X22]. In Q2/
 7. **Unknown elements** are kept in `raw_xbrl_facts` and simply not mapped. If a **mapped critical tag** is missing where the profile requires it → quarantine `PARSE/MISSING_CRITICAL`.
 8. **Revisions:** a revised filing for the same (entity, scope, period) is a new filing linked by `supersedes_filing_id`. Both stay. PIT picks by `visible_from_ts`.
 
+### 7.5 Named label rules
+Some lines exist only as a free-text `Description*` label on a dimensional "Others" or detail member, with the amount in contexts carrying the same member. `indas_corp.LABEL_RULES` fixes, per rule, the axis, the amount element and an anchored label pattern: `LEASE_LIAB_NONCURRENT`, `LEASE_LIAB_CURRENT` [X39] and `EXCISE_DUTY` [X40]. Duration amounts go through the same period reconciliation as every other fact. Canonical facts record `source_element = LABEL:<rule>`. New rules need a real fixture and a test (`tests/test_label_rules.py`); every rule is listed in `docs/tag_registry.yaml`.
+
 ### 7.6 Restatement policy (v1)
 Flag `restatement_suspected` for an entity-period when any of these hold:
 - `ProfitLossFromDiscontinuedOperations* ≠ 0`;
@@ -166,14 +179,14 @@ Element names are VERIFIED in the INDAS_CORP fixture unless marked otherwise.
 
 | Block | Definition |
 |---|---|
-| `rev_ops` | `RevenueFromOperations − ExciseDuty` (excise tag UNVERIFIED [X31]; if absent, `RevenueFromOperations`) |
+| `rev_ops` | `RevenueFromOperations − excise_duty`, where `excise_duty` comes from the `EXCISE_DUTY` label rule (there is no `ExciseDuty` element [X40]); no excise label = 0 |
 | `cogs` | `CostOfMaterialsConsumed + PurchasesOfStockInTrade + ChangesInInventoriesOfFinishedGoodsWorkInProgressAndStockInTrade` (inventory change is expense-signed [X11]) |
 | `gross_profit` | `rev_ops − cogs`, only for `INDAS_CORP` with `(CostOfMaterialsConsumed + PurchasesOfStockInTrade) ≥ 0.10 × rev_ops`; otherwise NULL [C6] |
 | `ebitda` | `ProfitBeforeExceptionalItemsAndTax + FinanceCosts + DepreciationDepletionAndAmortisationExpense − OtherIncome`. Avoids the exceptional-items sign [X9, X10]. For consolidated filings, where share of associates sits relative to PBEIT is UNVERIFIED [X29]. |
 | `ebit` | `ebitda − DepreciationDepletionAndAmortisationExpense` |
 | `etr` | `clamp(TaxExpense / ProfitBeforeTax, 0, 0.50)` if PBT > 0 and tax ≥ 0; else 0 [C5] |
 | `nopat` | `ebit × (1 − etr)` |
-| `total_debt` | `BorrowingsNoncurrent + BorrowingsCurrent` (+ `lease_liabilities` only once annual notes provide them; quarterly has no lease tag [X16]) |
+| `total_debt` | `BorrowingsNoncurrent + BorrowingsCurrent + lease_liabilities_noncurrent + lease_liabilities_current`; leases come from the `LEASE_LIAB_*` label rules [X39] and are added exactly once (no label = 0) |
 | `cash_liquid` | `CashAndCashEquivalents + BankBalanceOtherThanCashAndCashEquivalents + CurrentInvestments` (+ non-current treasury investments only once annual notes split them [X17]) |
 | `net_debt` | `total_debt − cash_liquid` |
 | `invested_capital` | `Equity` (incl. NCI on consolidated; tag UNVERIFIED [X29]) `+ total_debt − cash_liquid` |
@@ -205,11 +218,11 @@ Notation: `avg(x)` = mean of opening and closing balance; `ttm(x)` = trailing 4 
 | Ratio | Formula | Phase |
 |---|---|---|
 | ROCE | `ttm(ebit) / avg(invested_capital + cash_liquid)` | 1 |
-| ROE | `ttm(ProfitLossForPeriod) / avg(Equity)` | 1 |
-| ROIC | `ttm(nopat) / avg(invested_capital)` | 1 |
+| ROE | `ttm(ProfitOrLossAttributableToOwnersOfParent) / avg(EquityAttributableToOwnersOfParent)`; standalone filings fall back to `ProfitLossForPeriod` / `Equity` [X42] | 1 |
+| ROIC | `ttm(nopat) / ((opening + closing) / 2 invested_capital)`, NULL without the opening balance sheet [C16] | 1 |
 | ROIIC 3Y/5Y | `(nopat_t − nopat_{t−n}) / (IC_t − IC_{t−n})`, FY values | 2 |
 | Reinvestment rate | `(capex − depreciation + Δ(working capital)) / nopat`, FY | 2 |
-| CROIC | `fcf / avg(invested_capital)` | 1 |
+| CROIC | `ttm(fcf) / ((opening + closing) / 2 invested_capital)`, NULL without the opening balance sheet [C16] | 1 |
 | Shareholder yield | `(dividends paid + gross buybacks − gross equity issued) / market_cap` | 2 |
 | 5Y net dilution | `shares_adj_t / shares_adj_{t−5y} − 1` | 2 |
 | Incremental asset turnover | `Δ3y rev_ops / Δ3y net fixed assets` | 2 |
@@ -228,7 +241,9 @@ Notation: `avg(x)` = mean of opening and closing balance; `ttm(x)` = trailing 4 
 | Effective cost of debt | `ttm(FinanceCosts) / avg(total_debt)` (includes lease interest while debt excludes leases [L4], so overstated for lease-heavy firms) | 1 |
 | Contingent liabilities / net worth | annual notes | 2 |
 | RPT leak % | `(RPT purchases + loans given + royalties) / rev_ops` from RPT contexts [X19] | 2 |
-| PE, PB, EV/EBITDA, EV/Sales, P/CFO | standard, using §8 blocks | 1 |
+| PE | `market_cap / ttm(COALESCE(owners, PAT) − discontinued)`, per filing before TTM [C10] | 1 |
+| ROE (continuing), core profit, EPS | C14, C15: `roe_continuing`, `core_profit_ttm`, `eps_ttm`, `eps_continuing_ttm` | 1 |
+| PB, EV/EBITDA, EV/Sales, P/CFO | standard, using §8 blocks (PB on owners' equity; EV adds minority interest) | 1 |
 
 ### 10.2 Forensic (stored as separate columns, never summed)
 - `piotroski_f` (0..9)
@@ -251,27 +266,118 @@ All three are NULL for `FINANCIAL_LENDING` and `INSURANCE`; Beneish additionally
 
 ### 10.4 New-gen tech (archetype `NEW_GEN_TECH`)
 - From XBRL: EV/gross profit, ex-cash PE `(market_cap − cash_liquid) / (PAT − OtherIncome × (1 − etr))`, EV/billings `ev / (rev_ops + Δ contract liabilities)` (annual), EV/ESOP-adjusted EBITDA (`AdjustmentsForSharebasedPayments` is tagged in the CF), P/CFO, Rule of 40, net working-capital float, burn multiple, cash runway, ESOP-adjusted FCF.
-- From `supplemental_kpis` (manual or presentation-sourced, Phase 3): EV/GOV, take rate, contribution margin, NRR, CAC payback.
+- From `supplemental_kpis` (`load-kpis FILE`, manual or presentation-sourced): GOV, take rate, contribution margin, NRR, CAC payback.
+
+### 10.1b Cash conversion and operating leverage (industrial, C19)
+
+| Column | Formula | Guard |
+|---|---|---|
+| `sloan_accrual` | (TTM PAT − CFO − CFI) / avg total assets | opening balance sheet |
+| `cfo_to_ebitda` | TTM CFO / TTM EBITDA | EBITDA > 0 |
+| `fcf_to_pat` | TTM FCF / TTM PAT | PAT > 0 |
+| `working_capital_intensity` | (receivables + inventories − payables) / TTM revenue | latest balance sheet |
+| `receivables_sales_divergence` | receivables YoY − revenue YoY | 8 quarters |
+| `net_debt_to_fcf` | net debt / TTM FCF | FCF > 0 |
+| `cost_of_debt` | TTM finance costs / avg (borrowings + leases) | opening balance sheet |
+| `dol` | EBIT YoY / revenue YoY | 8 quarters, \|revenue YoY\| ≥ 5%, EBIT > 0 both years |
+| `gross_ebitda_spread` | (gross profit − EBITDA) / revenue | COGS ≥ 10% of revenue |
+| `fcff_yield` | FCFF / EV, interest add-back per filing CFO classification | existing |
 
 ### 10.5 Lenders (`INDAS_NBFC`, `IGAAP_BANK`)
 
-| Ratio | Formula | Status |
-|---|---|---|
-| NII | bank `InterestEarned − InterestExpended`; NBFC `InterestEarned − FinanceCosts` | tags VERIFIED |
-| NIM (proxy) | `annualised NII / avg(total assets)`, labelled `nim_asset_proxy` | H1/FY only |
-| PPOP | bank `OperatingProfitBeforeProvisionAndContingencies` | VERIFIED |
-| Cost / income | `OperatingExpenses / (NII + OtherIncome)` | VERIFIED tags |
-| Credit cost | `annualised ProvisionsOtherThanTaxAndContingencies / avg(advances)` | advances H1/FY only |
-| GNPA %, NNPA % | `PercentageOfGrossNpa`, `PercentageOfNpa` (fractions) | VERIFIED |
-| PCR | `(GrossNonPerformingAssets − NonPerformingAssets) / GrossNonPerformingAssets` | VERIFIED tags |
-| CET1, AT1 | tagged | VERIFIED; total CRAR UNVERIFIED |
-| RoA | tagged `ReturnOnAssets` (annualisation UNVERIFIED) or `ttm(PAT)/avg(assets)` | — |
-| P/B | `market_cap / Equity` | — |
-| CASA % | `supplemental_kpis` | not in XBRL [X23] |
+NBFC columns come from the Division III parser (`parsers/indas_nbfc.py`, X54-X57); bank columns from the RBI-format
+parser (`parsers/igaap_bank.py`, X58-X61). Industrial ratios (EBITDA, OPM, ROCE, ROIC, CROIC, D/E, Altman, FCF, EV) are
+NULL for both. Bank `sales_ttm` = TTM interest earned (Screener's bank "Revenue", S4). Bank regulatory ratios come from
+the standalone book (X60).
 
-### 10.6 Insurers
-- General: claims ratio `NetClaimsIncurred / PremiumEarned`; combined ratio = claims ratio + `(NetCommission + OperatingExpensesRelatedToInsuranceBusiness) / NetPremiumWritten`; solvency (tag UNVERIFIED).
-- Life (UNVERIFIED): VNB margin, APE growth, EV, persistency → `supplemental_kpis`.
+**Denominators (C16):** ROE and ROE (continuing) use the latest **closing** owners' equity (Screener's convention,
+available from the first balance sheet). RoA, NIM proxy, credit cost, **ROIC and CROIC** use **(opening + closing) / 2** over 12
+months and stay NULL until the opening balance sheet exists.
+
+| Column | NBFC formula | Bank formula |
+|---|---|---|
+| `nii_ttm` | TTM `InterestEarned − FinanceCosts` | TTM `InterestEarned − InterestExpended` |
+| `ppop_ttm` | TTM net total income − opex = PBEIT + impairment (X55) | TTM `OperatingProfitBeforeProvisionAndContingencies` (= NII + OI − opex, X58) |
+| `cost_to_income` | opex / (revenue + other income − finance costs) | `OperatingExpenses / (NII + OtherIncome)` |
+| `credit_cost` | TTM impairment / avg(loans) | TTM `ProvisionsOtherThanTaxAndContingencies` / avg(advances) |
+| `loans`, `loans_as_of`, `loans_avg_from` | loans, latest BS date, opening date of the average | advances (same fields) |
+| `nim_asset_proxy` | TTM NII / avg(total assets) | same |
+| `roa` | TTM owners' profit / avg(total assets) | same; filed RoA in `roa_filed` (annualisation varies, X59) |
+| `gnpa_pct`, `nnpa_pct`, `pcr` | **NULL**: no NBFC element (X54) | `PercentageOfGrossNpa`, `PercentageOfNpa`, `(GNPA − NNPA) / GNPA` (standalone, latest period) |
+| `credit_to_deposit` | — | advances / deposits (latest BS) |
+| `cet1_pct`, `at1_pct` | — | `CET1Ratio`, `AdditionalTier1Ratio` (standalone; no total CRAR element) |
+| `govt_holding_pct` | — | `PercentageOfShareHeldByGovernmentOfIndia` (PSU marker) |
+| `is_lending_nbfc` | C13 | NULL |
+| `pb` | market cap / owners' equity | market cap / (Capital + Reserves and surplus) |
+| CASA % | — | `supplemental_kpis` (not in XBRL [X23]) |
+
+### 10.6 Insurers (`IRDAI_LIFE`, `IRDAI_GENERAL`, `INDAS_INSURANCE`)
+
+Parsed by `parsers/irdai_insurance.py` (X62-X66). Three accounting bases coexist and are **never compared**:
+`insurer_basis` says which one a row uses. Industrial and lender ratios (EBITDA, OPM, ROCE, ROIC, CROIC, D/E, Altman,
+FCF, EV, NII, NIM) are NULL for insurers. `sales_ttm` = net premium earned (general), net premium (life) or insurance
+revenue (Ind AS 117). P/B = market cap / (share capital + reserves and surplus + application money) for IRDAI formats,
+market cap / `Equity` for Ind AS 117.
+
+| Column | IRDAI general | IRDAI life | Ind AS 117 |
+|---|---|---|---|
+| `net_premium_earned_ttm` | `PremiumEarned` | `NetPremiumIncome` | NULL |
+| `insurance_revenue_ttm` | NULL | NULL | `InsuranceRevenue` |
+| `claims_ratio` | `IncurredClaims / PremiumEarned` (= filed `IncurredClaimRatio`) | NULL | incurred claims / insurance revenue (gross of reinsurance) |
+| `expense_ratio` | (net commission + opex) / `NetPremiumWritten` | `ExpensesOfManagement / GrossPremiumIncome` | NULL |
+| `combined_ratio` | claims + expense (= filed `CombinedRatio`, X66) | NULL | (service expenses − net reinsurance) / insurance revenue |
+| `solvency_ratio` | filed, times (`SOLVENCY_PERCENT_SCALING`, X65) | same | NULL (no element) |
+| `investment_income_ttm` | policyholders' + shareholders' | same | `InvestmentIncome` |
+| `persistency_13m`, `_61m` | — | filed `PersistencyRatio13ThMonth`, `…61ThMonth` | — |
+
+`supplemental_kpis` (schema.sql) holds what XBRL lacks: VNB margin, embedded value, APE growth (life), and Batch 7's
+new-gen tech KPIs. Each row is point in time (`visible_from_ts` = publication of the source document). Loaded with
+`load-kpis FILE` (CSV/JSON, `financials.parsers.kpis`): the file is vaulted, staged and promoted like any batch; rows
+with an unknown KPI, the wrong unit, a publication before period end or an unresolvable symbol are quarantined `KPI/…`.
+`screener_features` carries `vnb_margin`, `embedded_value`, `ape_growth`, `gov`, `take_rate`, `contribution_margin`,
+`nrr`, `cac_payback` (latest period visible at as-of; NULL when none is loaded). Persistency filed in XBRL [X62] wins; a
+loaded persistency only fills a NULL. No fetcher (Phase 3).
+
+### 10.8 New-gen tech (`NEW_GEN_TECH`, C21) and valuation bands (C20)
+
+| Column | Formula | Guard |
+|---|---|---|
+| `valuation_archetype` | profile-derived; NEW_GEN_TECH by curated list / override | — |
+| `ev_to_gross_profit` | EV / TTM gross profit | gross profit exists (COGS ≥ 10%) |
+| `ex_cash_pe` | (mcap − liquid cash) / (continuing owners' PAT − OI × (1 − ETR)) | denominator > 0 |
+| `ev_to_billings` | EV / (TTM revenue + Δ contract liabilities over 12 months) | labelled contract liabilities, opening BS |
+| `ev_to_esop_adj_ebitda` | EV / (EBITDA + ESOP), cash-flow window | ESOP add-back present |
+| `price_to_cfo` | mcap / TTM CFO | CFO > 0 |
+| `rule_of_40` | revenue YoY + EBITDA margin | 8 quarters |
+| `billings_growth_pct` | billings YoY | 8 quarters + contract liabilities 24 months back |
+| `neg_working_capital_float_pct` | ((payables + contract liabilities) − (receivables + inventory)) / revenue | latest BS |
+| `net_burn_multiple` | −FCF / revenue increase | FCF < 0, revenue up, 8 quarters |
+| `cash_runway_months` | liquid cash / (−FCF / 12) | FCF < 0 |
+| `esop_adj_fcf`, `liquid_cash` | FCF − ESOP; cash + bank + current investments | — |
+| `reverse_dcf_implied_g` | g such that 5-year DCF (WACC 12%, terminal 4%) = EV | FCFF > 0, EV > 0 |
+| `pe_percentile`, `ev_ebitda_percentile` | rank vs own prior quarter-end values | ≥ 4 prior quarters |
+
+### 10.8b Zero-drop line items (C24)
+
+Every numeric XBRL line item is a fact: curated tags for the ratio engine, `li_<element>` for every other element,
+`oth_<element>__<label>` for amounts on text-labelled "Others"/"Details" members, `asfiled_<element>` for a value a
+named rule withholds. `fact_observations.line_item_category` / `parent_subtotal` place each line under its subtotal.
+Ratios still read only curated tags; line items are for statements, sub-rows and audits.
+
+### 10.9 Annual-statement ratios (Reg. 34, C23) and Reg. 30 event counts (E3-E7)
+
+| Column | Definition |
+|---|---|
+| `piotroski_f` | Piotroski F-score 0..9 for the latest 12-month FY in the row's scope; year-end total assets (C23); NULL without a post-cutoff prior FY |
+| `beneish_m` | Beneish 8-variable M-score (SG&A proxy = `OtherExpenses`); NULL without a post-cutoff prior FY |
+| `capex_to_depreciation`, `cwip_to_gross_block`, `rote`, `rnd_and_royalty_intensity`, `contingent_liabilities_to_net_worth`, `annual_fy_end` | FY ratios from the Reg. 34 notes (PPE schedule X71, notes X73) |
+| `order_wins_90d`, `order_value_90d`, `kmp_resignations_90d`, `auditor_resignations_90d`, `fraud_or_default_90d` | Reg. 30 events visible at the as-of and disclosed in the 90 days to it (`corporate_events`) |
+| `penalties_90d` | NULL: no penalty / regulatory-action filing observed (UNVERIFIED, E7) |
+| `roce_screener`, `debtor_days`, `inventory_turnover`, `working_capital` | Screener export formulas (S22) on our Screener-style statement rows, latest FY; kept beside our own `roce` (operating EBIT over closing capital) |
+| `inventory_days`, `days_payable`, `cash_conversion_cycle`, `working_capital_days` | closing balance / (Sales / 365); cycle = debtor + inventory − payable days; working-capital days on (CA − cash − current investments − CL) (S23: matches the website on TCS; CCC does not) |
+
+Revisions (E9, E10): `filing_revisions` links a filing to the one it supersedes (REVISION or byte-identical RESEND);
+PIT reads already take the latest version visible at the as-of, so the link is provenance, not a read path.
 
 ### 10.7 `screener_features` columns in Phase 1
 
@@ -280,7 +386,7 @@ Source of truth: `screener_features_history` in `schema.sql`; aliases in `financ
 | Status | Columns |
 |---|---|
 | **Active** (always computed when a bar exists) | `close`, `price_date`, `return_1m/3m/6m/12m` (need 22/64/127/253 bars), `price_to_dma50/200` (50/200 bars), `dist_52w_high` (252 bars), `deliv_avg_5d/20d`, `delivery_velocity`, `in_nifty500` |
-| **Active once the input filing is visible** | `shares` (+`shares_source`), `market_cap`, `promoter_pct`, `fii_pct`, `dii_pct`, `float_turnover_pct`, `shp_as_of` (Reg. 31); `total_equity`, `net_debt`, `pb`, `debt_to_equity`, `bs_as_of` (H1/FY balance sheet); `altman_z_dd` (H1/FY BS + TTM EBIT; OtherEquity proxy) |
+| **Active once the input filing is visible** | `shares` (+`shares_source`), `market_cap`, `promoter_holding_pct`, `promoter_pledge_pct`, `promoter_encumbered_pct`, `fii_holding_pct`, `fpi_holding_pct`, `dii_holding_pct`, `public_holding_pct`, `non_promoter_non_public_pct`, `float_turnover_pct`, `shp_as_of` (Reg. 31; `promoter_pct`/`fii_pct`/`dii_pct` kept as deprecated duplicates for saved screens); `fii_dii_qoq_change_pct` (needs the filing for the immediately preceding quarter end, both visible); `total_equity`, `net_debt`, `pb`, `debt_to_equity`, `bs_as_of` (H1/FY balance sheet); `altman_z_dd` (H1/FY BS + TTM EBIT; OtherEquity proxy) |
 | **Active once 4 same-scope quarters exist** | `sales_ttm`, `ebitda_ttm`, `pat_ttm`, `pe`, `ev_ebitda`, `enterprise_value`, `opm`, `roe`, `roce`, `roic`, `other_income_to_pbt`; `fcf_ttm`, `croic`, `fcff_yield`, `cf_as_of` via the H1/FY bridge |
 | **Active once 8 quarters exist** | `sales_growth_yoy`, `profit_growth_yoy` |
 | **NULL placeholder until Phase 2** | `piotroski_f`, `beneish_m` (need year-over-year annual Reg. 34 data) |
@@ -337,16 +443,44 @@ Expected volume is 0–7 per day [P4]. When an action verifies later, matching g
 - Prerequisites: price history (bhavcopy days) covering the event dates, and a complete first snapshot. The fixture snapshot resolves 497/500, so the backfill correctly refuses [IDX7].
 - Manifest: `reference/nifty500_changes.csv` is generated by `financials extract-index-changes` from the committed notices, and a test asserts it equals the extraction. Prose-only demerger notices (dummies) are **not** extracted; add `TEMPORARY` rows by hand when a backtest needs those days exact.
 
+## 11.8c Derived quarters in statements
+
+Statement builders read a point-in-time FactBook through `fundamentals.BookAsResult`. A flow not filed for exactly
+`(start, end)` is derived as YTD(s0, end) − YTD(s0, start − 1 day): Q4 = FY − 9M for the P&L and H2 = FY − H1 for the
+cash flow. The book holds one entity and one scope, so standalone FY − consolidated 9M is never formed, and the derived
+value exists only once both filings are visible (visibility = the later broadcast). `FactBook.quarter` and
+`ttm_from_ytd` apply the same rule for TTM (`tests/test_q4_derivation.py`; no real 9-month filing is a fixture yet).
+
+## 11.9 Knowledge modes and feature snapshots
+
+`screener_features_history` holds one row per security in the universe per materialised `as_of_date`: a full
+daily snapshot, not a change log. `screen --as-of D` reads `as_of_date = D` exactly; a date that was never
+materialised returns no rows. Re-materialising a date replaces that date's rows (the inputs stay append-only), and
+`rebuild-market` deletes the history from its date before replaying. Unchanged rows are not deduplicated: a screen
+on `D` needs the full universe of `D`, and ~2,500 securities × ~530 sessions (2024-10 → 2026-11) is ~1.3 M rows.
+
+Price inputs are read in one of two knowledge modes (`features._price_inputs`):
+- `valid` (default; all materialised history): what the market knew on `D`. A corporate action counts from its
+  ex-date and a GAP finding freezes the series until resolved, whenever the resolution happened. A fix of our
+  pipeline (an unparsed split, a missed action) is a correction, not new information. Rule resolutions
+  (FIXED_BY_RULE) are written at promotion time, so a backfill run today would otherwise freeze every split.
+- `system` (`compute_rows(..., knowledge="system")`): what this system had decided by `as_of_ts` (an action counts
+  once `decided_at <= as_of_ts`; a finding freezes if created by then and not resolved by then). For auditing what
+  the live system showed; never written to history.
+
 ## 12. Promoter quality gates (in order)
 
 | Gate | Rule | On failure |
 |---|---|---|
 | G1 Completeness | EQ/BE/BZ rows ≥ 92% of the trailing 5-trading-day median | Abort batch; keep previous state; retry later |
-| G2 Identifier resolution | Every raw price row resolves to a `security_id` via `(exchange, fin_instrm_id \| symbol+series, isin, date)`; unresolved rows ≤ 1% | Unresolved rows → quarantine; above 1% → abort |
-| G3 Accounting identities | Per filing: P&L chain (X9 / bank equivalents), `Assets = EquityAndLiabilities` when BS present, expense components sum to `Expenses`; tolerance §7.3 | Quarantine that filing only |
+| G2 Identifier resolution | Every raw price row resolves to a `security_id` via `(exchange, fin_instrm_id \| symbol+series, isin, date)`; unresolved rows ≤ 1% | Every unresolved row carries an identity issue (missing `FinInstrmId`, ISIN collision, out of order, duplicate) and is quarantined `IDENTIFIER/…`; above 1% → abort. `quarantine reprocess` loads a missing-`FinInstrmId` bar by ISIN |
+| G3 Accounting identities | Per filing, in the parsers (staged issues): P&L chain (X9 / bank equivalents), `Assets = EquityAndLiabilities` when BS present, expense components sum to `Expenses`; tolerance §7.3 | Quarantine that filing only |
 | G4 Null-spike (features) | Null rate of `close`, `market_cap`, `sales_ttm`, `pat_ttm`, `total_equity` rises ≤ 1.5 percentage points vs the previous materialised date | Abort; previous features stay live |
 | G5 Atomic features | Row count = universe (securities with a bar in the last 15 days and a valid identifier); history rows for the date and the live table replaced in one transaction | No partial state is ever visible |
-| ORDER | Market days and index snapshots must arrive in date order | Abort; replay needs a rebuild |
+| ORDER | Market days and index snapshots must arrive in date order | Abort. `promote` holds later market days behind an aborted one, so a day that fails G1 is never overtaken; an older day found later needs `rebuild-market --from D` |
+| CAL3 No-session inference | After a market day, its `PrvsClsgPric` vs the previous promoted close: ≥ 99% of ≥ 100 common securities equal → the dates in between had no session (`trading_calendar.source = INFERRED_PREV_CLOSE`) | Otherwise `CALENDAR/MISSING_SESSION` (a session is missing from the database) |
+| Delivery | A delivery file for another date than its bhavcopy | `DELIVERY/DELIVERY_DATE_MISMATCH`; the file is vaulted, not joined. A delivery fetched after its bhavcopy fills `deliv_qty` on the promoted bars |
+| Inactive securities | Open identifier interval with no bar in the last 20 promoted sessions (CHOICE, ID1) | Closed the day after the last bar; reopens via `FinInstrmId` when it trades again |
 | Share cross-check | Reg. 31 total vs results paid-up / face value differ by > 0.5% (skipped for partly-paid issuers) | Quarantine `SHARES/CROSS_CHECK_FAILED`; promotion continues |
 
 ## 13. Schedule (local machine, IST)
@@ -384,14 +518,77 @@ ALIAS      := a name in financials.dsl.ALIASES or user_custom_ratios (case-insen
 - Division compiles to `x / NULLIF(y, 0)`. NULL comparisons are not TRUE, and `NOT` keeps NULL as NULL, so a stock missing a metric never passes a filter on it.
 - An unknown alias is a compile error, never a guess.
 
+## 14b. Statement builder: quarterly rows (Mandate 4, first slice)
+
+`financials/statements/quarterly.py` builds Screener-style quarterly rows from **our** definitions. Every row
+keeps its sub-rows, so any figure can be traced to XBRL. `tie_out` must return exactly 0, to the rupee:
+Revenue − Expenses − Interest − Depreciation + Other Income (+ bank exceptional) = PBT. Divergences from Screener
+are reported in `QuarterStatement.divergences`, never imitated. Evidence: S1–S7.
+
+| Row | INDAS_CORP (canonical tags) | Sub-rows |
+|---|---|---|
+| Sales | `revenue_from_operations − excise_duty` | revenue from operations, less excise |
+| Expenses | `total_expenses − depreciation − finance_costs − excise_duty` | materials, stock-in-trade purchases, inventory change, employee cost, other expenses net of excise |
+| Operating Profit | Sales − Expenses | — |
+| Other Income | `other_income + exceptional_items` [S2] | reported other income, exceptional items |
+| Depreciation / Interest / Tax | as reported | tax: current, deferred |
+| Profit before tax | `pbt` (associates excluded: `ASSOCIATES_PLACEMENT` [S3]) | before exceptional, exceptional |
+| Net Profit | `pat_owners`, else `pat` | continuing PAT, regulatory deferral, discontinued, associates, PAT, less NCI |
+
+Banks, NBFCs, life and general insurers use the raw-element formulas in S4–S7 until their parsers land
+(Mandate 2 batches 4–6). They then switch to canonical tags with the same tests. Annual-only sub-rows
+(fixed-asset schedule, notes) are NULL on quarterly statements. The Screener export carries only the
+Data Sheet rows, so golden parity covers top-level rows only. Sub-rows are checked by summation, not by golden values.
+
+### 14b-1. Expense sub-rows and segments (X49, X50)
+
+Expenses sub-rows add **Power and fuel** and **Freight** when the filer labels them (named label rules). They stay NULL
+when it doesn't, and the rest of other expenses absorbs them, so the sub-rows still sum to Expenses. Segments
+(`parsers/segments.py`) are parsed and checked against filed totals and the balance sheet, but are not persisted
+until a segment table is agreed. They are never used to fill P&L rows.
+
+### 14c. Annual statements and conventions (S10-S15)
+
+**Balance sheet** (`statements/balance_sheet.py`; H1 and FY ends only; Q1/Q3 NULL):
+
+| Row | Definition | Sub-rows |
+|---|---|---|
+| Equity Capital | `equity_share_capital` | — |
+| Reserves | `other_equity` (owners only) | — |
+| Borrowings | borrowings (NC + C) + lease liabilities (NC + C, label rule) | the four lines |
+| Other Liabilities | Total − Equity Capital − Reserves − Borrowings | NCI, trade payables, other |
+| Total | `total_assets − min(DTA, DTL)` when both are positive | deferred tax netted |
+| Net Block | PPE + investment property + goodwill + other intangibles + ROU (label rule) | the five lines |
+| CWIP | CWIP + intangibles under development | both |
+| Investments | non-current + current + equity-method | the three lines |
+| Other Assets | Total − Net Block − CWIP − Investments | receivables (current), inventory, cash & bank, other |
+
+**Cash flow** (`statements/cashflow.py`; YTD only, so H1 and FY; Q1/Q3 NULL): CFO as filed = Profit from operations
+(cash generated − working-capital changes) + Receivables + Inventory + Payables + Loans & Advances + Other WC items
++ Direct taxes + Other operating items; CFI = fixed assets purchased/sold, interest and dividends received, other;
+CFF = borrowings in/out, interest, dividends, leases, shares, other; Net Cash Flow after FX. Groupings are listed in
+`WC_GROUPS`. Every "other" row is the residual, so sub-rows always sum to the filed total.
+
+**Conventions**
+- Signs: P&L costs positive, as filed. Cash flow positive = cash in. We show Change in Inventory with the XBRL sign;
+  Screener reverses it.
+- Rounding: we keep rupees (`DECIMAL(20,2)`). Comparisons with Screener use ₹ Cr to 2 dp with ±0.01 tolerance,
+  because filings in ₹ lakh round differently.
+- Scope: consolidated when a consolidated filing exists, else standalone (S1; Mandate 3 makes this per company).
+- Quarterly vs annual-only: quarterly statements carry the P&L rows of §14b; BS and CF only at H1/FY. Annual-only
+  sub-rows (other-expense split, dividend amount, fixed-asset schedule, notes) are NULL on every quarterly statement
+  and wait for the Reg. 34 parser.
+- Divergence codes: `ASSOCIATES_PLACEMENT`, `BANK_EXCEPTIONAL`, `LIFE_TRANSFER_GROSSUP`, `FX_IN_INVESTING`.
+  Unexplained residuals are pinned in the parity harness (S11, S13), never imitated.
+
 ## 15. Phases
 
 **Phase 1: thin slice, screenable end-to-end (Nifty 500)**
 
 Status (2026-11-13): **built and tested end to end** on real fixtures, all listed items below, plus index backfill (§11.6), quarantine resolution (D-6) and benchmarks (`docs/benchmarks.md`). Known gaps inside Phase 1:
 - `piotroski_f` / `beneish_m` columns exist but stay NULL: both need year-over-year annual data (Reg. 34, Phase 2).
-- Altman Z'' uses OtherEquity as the retained-earnings proxy; ROCE/ROE use the latest balance sheet, not an average.
-- EV excludes minority interest and preference capital (tags UNVERIFIED [X29]).
+- Altman Z'' uses OtherEquity as the retained-earnings proxy; ROCE and ROE use the latest balance sheet (ROE by decision, C16); ROIC, CROIC, RoA, NIM proxy and credit cost use opening + closing averages.
+- EV adds minority interest (`NonControllingInterest`, VERIFIED [X34, X42]); preference capital is still excluded (no tag seen). PE and ROE use the owners' share of profit and equity [X42].
 - Results-XBRL discovery API is UNVERIFIED [A7]; `fetch-results` takes URLs.
 - A split and a series change between two promoted days create a second security; the collision is quarantined and resolved with `quarantine resolve --action MERGE_SECURITIES` (SIGMA, Oct 2025).
 - Index backfill covers regular replacement tables only; dummy/spin-off `TEMPORARY` rows are manual.
@@ -427,7 +624,7 @@ Status (2026-11-13): **built and tested end to end** on real fixtures, all liste
 |---|---|---|
 | D-1 | Where fetchers run | **Decided**: local only; CI = offline lint + tests |
 | D-2 | Which known-defect rules (§7.4) to allow | None yet; quarantine |
-| D-3 | Phase 2 fixtures | **Done** (2026-11-13): lending NBFC, life insurer, consolidated corporate with NCI, H1 bank, Reg. 34 annual and pledged Reg. 31 committed with evidence tests [X32-X38, SHP7]. Still useful later: Q1/Q3 corp, a loss-valued exceptional item, an employee-trust shareholding |
+| D-3 | Phase 2 fixtures | **Done** (2026-11-13): lending NBFC, life insurer, consolidated corporate with NCI, H1 bank, Reg. 34 annual and pledged Reg. 31 committed with evidence tests [X32-X38, SHP7]. Still useful later: Q1/Q3 corp, a loss-valued exceptional item. (Employee-trust shareholding: Batch 8, Vedanta/JSW [SHP8].) |
 | D-4 | Corporate-actions source | **Decided**: NSE API adapter (+ RSS for discovery); unparseable purposes → QUARANTINED. BSE fallback not built (`api.bseindia.com` returned 403 [A1]) |
-| D-6 | How a human resolves a quarantine | **Built**: `financials quarantine list` / `resolve --action ACCEPT\|REJECT\|OVERRIDE\|CORP_ACTION\|MERGE_SECURITIES --note …` (`financials.admin`). One transaction; rows are never deleted; every change is logged in `company_overrides`. `CORP_ACTION` must verify against the observed gap, which then unfreezes the adjusted series. `MERGE_SECURITIES` repoints identity, prices, actions, index rows and quarantine links to the `FinInstrmId` owner, tombstones the duplicate entity as `MERGED`, and loads the colliding bar from raw (SIGMA case [P14]). Known-defect rules (D-2) are still not built |
+| D-6 | How a human resolves a quarantine | **Built**: `financials quarantine list` / `inspect Q` (context + the exact resolving commands) / `resolve --action ACCEPT\|REJECT\|OVERRIDE\|CORP_ACTION\|MERGE_SECURITIES --note …` / `reprocess` (`financials.admin`). One transaction; rows are never deleted; every change is logged in `company_overrides`. `CORP_ACTION` must verify against the observed gap; records of that date the parser could not factor (UNKNOWN purpose, failed verification) are retired as `SUPERSEDED`, the manual action is stored `VERIFIED_MANUAL`, and the adjusted series unfreezes. `REJECT` on a corporate-action finding retires that record (`REJECTED`). `OVERRIDE` takes only fields the promoter reads: `broadcast_ts` for `NO_VISIBILITY` and `security_id` for identity failures of a filing (`filing_overrides`), applied at once by promoting that filing again. `MERGE_SECURITIES` repoints identity, prices, actions, index rows and quarantine links to the `FinInstrmId` owner, tombstones the duplicate entity as `MERGED`, and loads the colliding bar from raw (SIGMA case [P14]). `reprocess` re-promotes batches with open identity / visibility findings. Known-defect rules (D-2) are still not built |
 | D-5 | Historical index-membership backfill source | Snapshot-forward only [L1] |

@@ -13,8 +13,11 @@ from datetime import date
 from decimal import Decimal
 
 SHARE_COUNT_TYPES = frozenset({"SPLIT", "CONSOLIDATION", "BONUS", "RIGHTS"})
-ACTION_TYPES = SHARE_COUNT_TYPES | {"DEMERGER", "MERGER", "DIVIDEND", "UNKNOWN"}  # UNKNOWN = unparsed purpose
+ACTION_TYPES = SHARE_COUNT_TYPES | {"DEMERGER", "MERGER", "DIVIDEND", "BUYBACK", "UNKNOWN"}  # UNKNOWN = unparsed
 ACCEPTED_STATUSES = frozenset({"VERIFIED", "UNOBSERVABLE", "VERIFIED_MANUAL"})
+# Out of every computation: SUPERSEDED (replaced by a manual action on the same date), REJECTED (a human ruled
+# the record wrong). Kept in the ledger for audit, never deleted.
+RETIRED_STATUSES = frozenset({"SUPERSEDED", "REJECTED"})
 
 VERIFY_TOLERANCE = Decimal("0.10")  # |observed/theoretical - 1|
 UNOBSERVABLE_BAND = Decimal("0.10")  # |factor - 1| below this is indistinguishable from noise
@@ -82,7 +85,7 @@ def theoretical_factors(action: CorpAction, close_prev: Decimal | None) -> tuple
         return None, Decimal(1)
     if t == "UNKNOWN":
         raise ValueError(f"{action.action_id}: unparsed corporate action cannot be factored")
-    return Decimal(1), Decimal(1)  # MERGER (acquirer), DIVIDEND: never adjust prices [C2]
+    return Decimal(1), Decimal(1)  # MERGER (acquirer), DIVIDEND, BUYBACK: never adjust prices [C2, CA10]
 
 
 def verify_group(actions: list[CorpAction], open_ex: Decimal | None, close_prev: Decimal | None) -> list[Verification]:

@@ -76,7 +76,9 @@ def test_q4_is_derived_from_fy_minus_9m(con):
     assert book.quarter("revenue_from_operations", date(2026, 3, 31)) == D(170)
 
 
-def test_ttm_and_yoy_need_enough_quarters(con):
+def test_ttm_and_yoy_need_enough_quarters(con, monkeypatch):
+    # Arithmetic only: lift the scope guard (tested in test_scope.py) for these synthetic 2024 quarters.
+    monkeypatch.setattr("financials.fundamentals.financials_in_scope", lambda d: True)
     insert_rows(con, "fact_observations", quarterly_revenue())
     book = load_factbook(con, E, "STANDALONE", datetime(2030, 1, 1))
     end = date(2026, 9, 30)

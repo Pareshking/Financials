@@ -59,6 +59,11 @@ class Instance:
     contexts: dict[str, Context]
     facts: list[Fact]
     _by_key: dict[tuple[str, str], Fact] = field(default_factory=dict, repr=False)
+    # unit id -> INR | INR_PER_SHARE | PURE | SHARES | <CCY> | <CCY>_PER_SHARE
+    units: dict[str, str] = field(default_factory=dict)
+
+    def unit_kind(self, unit_ref: str | None) -> str | None:
+        return None if unit_ref is None else self.units.get(unit_ref, "UNKNOWN")
 
     @property
     def entity_namespace(self) -> str | None:
@@ -119,6 +124,18 @@ def parse_instance(data: bytes) -> Instance:
             dimensions=dims,
         )
 
+    units: dict[str, str] = {}
+    for u in root.findall(f"{{{XBRLI}}}unit"):
+        measures = [(m.text or "").strip().split(":")[-1] for m in u.iter(f"{{{XBRLI}}}measure")]
+        divide = u.find(f"{{{XBRLI}}}divide") is not None
+        if divide and len(measures) == 2 and measures[1].lower() == "shares":
+            units[u.get("id", "")] = f"{measures[0].upper()}_PER_SHARE"
+        elif len(measures) == 1:
+            m = measures[0]
+            units[u.get("id", "")] = {"pure": "PURE", "shares": "SHARES"}.get(m.lower(), m.upper())
+        else:
+            units[u.get("id", "")] = "UNKNOWN"
+
     facts: list[Fact] = []
     by_key: dict[tuple[str, str], Fact] = {}
     for seq, el in enumerate(root):
@@ -134,4 +151,4 @@ def parse_instance(data: bytes) -> Instance:
             raise ParseError(f"duplicate fact {name}@{ctx} with different values")
         by_key.setdefault(key, fact)
         facts.append(fact)
-    return Instance(namespaces, contexts, facts, by_key)
+    return Instance(namespaces, contexts, facts, by_key, units)

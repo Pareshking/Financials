@@ -82,7 +82,7 @@ def test_corp_action_resolution_verifies_and_unfreezes(mkt):
     assert m.con.execute("SELECT count(*) FROM corp_actions").fetchone()[0] == 0  # rolled back
     r = resolve_quarantine(m.con, q["quarantine_id"], action="CORP_ACTION", note="1:1 bonus per NSE",
                            payload={"action_type": "BONUS", "ratio_num": 1, "ratio_den": 1})  # fmt: skip
-    assert r["status"] == "VERIFIED"
+    assert r["status"] == "VERIFIED_MANUAL"
     closes = dict(adjusted_closes(m.con, pid))
     assert closes[date(2025, 9, 22)] == closes[date(2025, 9, 22)].__class__("1519.0000")
     assert date(2025, 9, 23) in closes

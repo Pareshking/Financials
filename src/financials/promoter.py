@@ -1,8 +1,8 @@
 """The single writer. Reads staged batches, runs gates, commits atomically to market.duckdb.
 
-Gates (docs/architecture.md §12): G1 completeness and G2 identifier resolution for market
-days; G3 accounting identities are enforced by the parser and surface as staged issues.
-G4/G5 belong to feature materialisation (not built yet).
+Gates (docs/architecture.md §12): G1 completeness, G2 identifier resolution, ORDER and the CAL3 no-session
+inference for market days; G3 accounting identities are enforced by the parsers and surface as staged issues;
+G4 (null spike) and G5 (atomic universe) run in feature materialisation (financials.features.materialize).
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from typing import Any
 
 import duckdb
 
+from financials import PARSER_VERSION
 from financials.corp_actions import ACCEPTED_STATUSES, CorpAction, adjust_closes, audit_day, verify_group
 from financials.db import fetch_dicts, insert_rows
 from financials.identity import UNIVERSE_SERIES, Interval, SecurityRegistry
@@ -57,7 +58,9 @@ def promote(con: duckdb.DuckDBPyConnection, stage_dir: Path) -> PromotionResult:
         "holidays": _promote_holidays,
         "index_snapshot": _promote_index_snapshot,
         "shareholding": _promote_shareholding,
+        "reg30_event": _promote_reg30_event,
         "raw_only": _promote_raw_only,
+        "kpis": _promote_kpis,
     }.get(job)
     if handler is None:
         raise ValueError(f"unknown job {job!r}")
@@ -113,9 +116,17 @@ def _quarantine_row(
     }
 
 
+REBUILD_SUPERSEDED = "SUPERSEDED_BY_REBUILD"
+REPROCESSING = "REPROCESSING"  # set by `quarantine reprocess` while the batch is promoted again
+
+
 def _quarantine_many(con, rows: list[dict[str, Any]]) -> list[str]:
-    """One bulk insert for many findings (a gap-heavy day can raise thousands)."""
-    insert_rows(con, "quarantine_queue", rows, or_ignore=True)
+    """One bulk insert for many findings (a gap-heavy day can raise thousands). IDs are deterministic, so a
+    replayed finding hits its old row: kept as is (a human decision stands), except a row that rebuild-market
+    superseded or that `quarantine reprocess` is retrying, which is reopened because the problem is still there."""
+    insert_rows(con, "quarantine_queue", rows, on_conflict=(
+        "ON CONFLICT (quarantine_id) DO UPDATE SET resolved_at = NULL, resolution = NULL, resolution_note = NULL "
+        f"WHERE quarantine_queue.resolution IN ('{REBUILD_SUPERSEDED}', '{REPROCESSING}')"))  # fmt: skip
     return [r["quarantine_id"] for r in rows]
 
 
@@ -157,6 +168,8 @@ def _promote_market_day(con, stage_dir: Path, manifest: dict[str, Any]) -> Promo
         "SELECT count(*) FROM ohlcv WHERE exchange = ? AND trade_date = ?", [exchange, trade_date]
     ).fetchone()[0]
     if already:
+        if deliv:
+            return _attach_delivery(con, stage_dir, exchange, trade_date)
         return PromotionResult("ALREADY_PROMOTED", "market_day", message=str(trade_date))
     later = con.execute("SELECT max(trade_date) FROM ohlcv WHERE exchange = ?", [exchange]).fetchone()[0]
     if later is not None and later > trade_date:
@@ -264,12 +277,126 @@ def _promote_market_day(con, stage_dir: Path, manifest: dict[str, Any]) -> Promo
     insert_rows(con, "ohlcv", ohlcv_rows)
     # A bhavcopy is ground truth: it overrides a holiday row (e.g. a special/Muhurat session).
     con.execute(
-        "INSERT OR REPLACE INTO trading_calendar VALUES (?, ?, TRUE, 'bhavcopy present')", [exchange, trade_date]
+        "INSERT OR REPLACE INTO trading_calendar (exchange, cal_date, is_trading, note, source) "
+        "VALUES (?, ?, TRUE, 'bhavcopy present', 'BHAVCOPY')",
+        [exchange, trade_date],
     )
 
+    quarantined += _stage_issue_quarantines(con, stage_dir)
+    quarantined += _infer_non_sessions(con, exchange, trade_date, filing_id)
     verify_pending_actions(con, exchange)
     quarantined += _audit_gaps(con, exchange, trade_date, obs)
-    return PromotionResult("PROMOTED", "market_day", message=str(trade_date), quarantined=quarantined)
+    closed = close_inactive_securities(con, exchange, trade_date)
+    message = str(trade_date) + (f", {closed} inactive securities closed" if closed else "")
+    return PromotionResult("PROMOTED", "market_day", message=message, quarantined=quarantined)
+
+
+# CAL3: a session's PrvsClsgPric equals the previous session's close for (nearly) every security, across weekends
+# and holidays alike (2025-10-17 -> 20, 10-01 -> 03, 10-21 -> 23: 100% of ~2,450). Skipping a real session drops
+# the match to ~1-2% (10-20 -> 23). So when the match against the last promoted day is >= 99%, no session took
+# place on the dates in between; otherwise a session is missing from the database.
+CAL3_MIN_MATCH = Decimal("0.99")
+CAL3_MIN_COMMON = 100
+
+
+def _infer_non_sessions(con, exchange: str, trade_date: date, filing_id: str) -> list[str]:
+    from datetime import timedelta
+
+    prev = con.execute(
+        "SELECT max(trade_date) FROM ohlcv WHERE exchange = ? AND trade_date < ?", [exchange, trade_date]
+    ).fetchone()[0]
+    if prev is None or (trade_date - prev).days <= 1:
+        return []
+    common, equal = con.execute(
+        """SELECT count(*), count(*) FILTER (WHERE r.prev_close_reported = o.close)
+           FROM raw_cm_bhavcopy r
+           JOIN security_identifier_history h
+             ON h.exchange = r.exchange AND h.symbol = r.symbol AND h.series = r.series
+            AND h.valid_from <= r.trade_date AND (h.valid_to IS NULL OR h.valid_to > r.trade_date)
+           JOIN ohlcv o ON o.security_id = h.security_id AND o.exchange = r.exchange AND o.trade_date = ?
+           WHERE r.filing_id = ? AND r.trade_date = ? AND r.prev_close_reported IS NOT NULL""",
+        [prev, filing_id, trade_date],
+    ).fetchone()
+    ratio = Decimal(equal) / Decimal(common) if common else Decimal(0)
+    if common >= CAL3_MIN_COMMON and ratio >= CAL3_MIN_MATCH:
+        gap = [prev + timedelta(days=i) for i in range(1, (trade_date - prev).days)]
+        insert_rows(con, "trading_calendar", [
+            {"exchange": exchange, "cal_date": d, "is_trading": False, "source": "INFERRED_PREV_CLOSE",
+             "note": f"no session: {trade_date} PrvsClsgPric = {prev} close ({equal}/{common})"} for d in gap
+        ], or_ignore=True)  # fmt: skip
+        return []
+    return [
+        _quarantine(
+            con,
+            stage="CALENDAR",
+            reason_code="MISSING_SESSION",
+            filing_id=filing_id,
+            details={
+                "trade_date": trade_date,
+                "previous_promoted": prev,
+                "matched": equal,
+                "common": common,
+                "hint": "fetch the missing day(s), then rebuild-market --from",
+            },
+        )
+    ]
+
+
+INACTIVITY_TRADING_DAYS = 20  # CHOICE: an open interval with no bar in the last 20 promoted sessions is closed
+
+
+def close_inactive_securities(con, exchange: str, as_of: date, threshold: int | None = None) -> int:
+    """P1-11: close the open identifier interval of a security that has not traded in the last `threshold`
+    promoted sessions (delisted, merged, suspended, moved to a series outside the universe). valid_to = the day
+    after its last bar. A security that trades again reopens through its FinInstrmId (identity.py)."""
+    n = INACTIVITY_TRADING_DAYS if threshold is None else threshold
+    recent = [r[0] for r in con.execute(
+        "SELECT DISTINCT trade_date FROM ohlcv WHERE exchange = ? AND trade_date <= ? ORDER BY 1 DESC LIMIT ?",
+        [exchange, as_of, n],
+    ).fetchall()]  # fmt: skip
+    if len(recent) < n:
+        return 0
+    cutoff = min(recent)
+    rows = con.execute(
+        """UPDATE security_identifier_history h SET valid_to = greatest(l.last_bar + INTERVAL 1 DAY, h.valid_from
+                  + INTERVAL 1 DAY)::DATE
+           FROM (SELECT security_id, max(trade_date) AS last_bar FROM ohlcv WHERE exchange = ? GROUP BY 1) l
+           WHERE h.security_id = l.security_id AND h.exchange = ? AND h.valid_to IS NULL AND l.last_bar < ?
+           RETURNING 1""",
+        [exchange, exchange, cutoff],
+    ).fetchall()
+    return len(rows)
+
+
+def _stage_issue_quarantines(con, stage_dir: Path) -> list[str]:
+    rows = [
+        _quarantine_row(
+            stage=i["stage"], reason_code=i["reason_code"], filing_id=i["filing_id"], details=json.loads(i["details"])
+        )
+        for i in read_table(con, stage_dir, "stg_issues")
+    ]
+    return _quarantine_many(con, rows) if rows else []
+
+
+def _attach_delivery(con, stage_dir: Path, exchange: str, trade_date: date) -> PromotionResult:
+    """A delivery file fetched after its bhavcopy was promoted [P0-2]: raw rows are appended, and bars of that
+    day whose delivery is still NULL get it, matched on (symbol, series) through the identifier interval valid on
+    the day. Bars that already carry delivery are never changed."""
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_delivery"))
+    path = (Path(stage_dir) / "raw_delivery.parquet").as_posix()
+    updated = con.execute(
+        """UPDATE ohlcv o SET deliv_qty = d.deliv_qty, delivery_filing_id = d.filing_id
+           FROM read_parquet(?) d JOIN security_identifier_history h
+             ON h.exchange = d.exchange AND h.symbol = d.symbol AND h.series = d.series
+            AND h.valid_from <= d.trade_date AND (h.valid_to IS NULL OR h.valid_to > d.trade_date)
+           WHERE o.security_id = h.security_id AND o.exchange = d.exchange AND o.series = d.series
+             AND o.trade_date = d.trade_date AND o.trade_date = ? AND o.deliv_qty IS NULL AND d.deliv_qty IS NOT NULL
+           RETURNING 1""",
+        [path, trade_date],
+    ).fetchall()
+    if not updated:  # a replay, or every bar already has delivery
+        return PromotionResult("ALREADY_PROMOTED", "market_day", message=str(trade_date))
+    return PromotionResult("PROMOTED", "market_day", message=f"{trade_date}: delivery attached to {len(updated)} bars")
 
 
 def _prev_closes(con, exchange: str, trade_date: date) -> dict[str, Decimal]:
@@ -358,6 +485,8 @@ def record_corp_action(
                 "cash_per_share": action.cash_per_share,
                 "status": status,
                 "source_filing_id": source_filing_id,
+                "recorded_at": utc_now(),
+                "decided_at": None,
             }
         ],
         or_ignore=True,
@@ -389,9 +518,9 @@ def verify_pending_actions(con, exchange: str) -> int:
         results = verify_group(group, bar[0], prev[0])
         for a, v in zip(group, results, strict=True):
             con.execute(
-                "UPDATE corp_actions SET status = ?, price_factor = ?, eps_factor = ?, observed_gap = ? "
-                "WHERE action_id = ?",
-                [v.status, _f(v.price_factor), _f(v.eps_factor), _f(v.observed_gap), a.action_id],
+                "UPDATE corp_actions SET status = ?, price_factor = ?, eps_factor = ?, observed_gap = ?, "
+                "decided_at = ? WHERE action_id = ?",
+                [v.status, _f(v.price_factor), _f(v.eps_factor), _f(v.observed_gap), utc_now(), a.action_id],
             )
             if v.status == "QUARANTINED" and a.status == "PENDING":
                 _quarantine(
@@ -535,7 +664,12 @@ def _promote_corp_actions(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
                     security_id=sec,
                     entity_id=entity,
                     filing_id=r["filing_id"],
-                    details={"subject": r["subject"], "reason": r["parse_reason"], "ex_date": r["ex_date"]},
+                    details={
+                        "subject": r["subject"],
+                        "reason": r["parse_reason"],
+                        "ex_date": r["ex_date"],
+                        "action_id": action.action_id,
+                    },
                 )
             )
         recorded += 1
@@ -631,18 +765,37 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     ).fetchone()[0]:
         return PromotionResult("ALREADY_PROMOTED", "results_xbrl", message=fid)
 
-    ent = con.execute(
-        "SELECT DISTINCT s.entity_id FROM security_identifier_history h "
-        "JOIN securities s USING (security_id) WHERE h.exchange = ? AND h.isin = ?",
-        [filing["exchange"], meta["stated_isin"]],
-    ).fetchall()
+    if meta["stated_isin"] is None and meta["accounting_profile"] == "REG34_ANNUAL":
+        # Reg. 34 annual XBRL carries no ISIN: the symbol in the NSE file name, resolved on the broadcast date (the
+        # file is named when it is filed), plus the filed CIN when the entity has one on record [X70].
+        on = utc_to_ist_date(filing["broadcast_ts"]) if filing["broadcast_ts"] is not None else meta["fy_end"]
+        ent = con.execute(
+            "SELECT DISTINCT s.entity_id FROM security_identifier_history h JOIN securities s USING (security_id) "
+            "WHERE h.exchange = ? AND h.symbol = ? AND h.valid_from <= ? AND (h.valid_to IS NULL OR h.valid_to > ?)",
+            [filing["exchange"], meta["stated_symbol"], on, on],
+        ).fetchall()
+        reason = "UNKNOWN_SYMBOL" if not ent else "AMBIGUOUS_SYMBOL"
+        if len(ent) == 1 and meta.get("stated_cin"):
+            cin = con.execute("SELECT cin FROM entity_master WHERE entity_id = ?", [ent[0][0]]).fetchone()[0]
+            if cin is not None and cin != meta["stated_cin"]:
+                ent, reason = [], "CIN_MISMATCH"
+    else:
+        ent = con.execute(
+            "SELECT DISTINCT s.entity_id FROM security_identifier_history h "
+            "JOIN securities s USING (security_id) WHERE h.exchange = ? AND h.isin = ?",
+            [filing["exchange"], meta["stated_isin"]],
+        ).fetchall()
+        reason = "UNKNOWN_ISIN" if not ent else "AMBIGUOUS_ISIN"
+    ovr = filing_overrides(con, fid)
+    if "security_id" in ovr:  # `quarantine resolve --action OVERRIDE` [P2-13]
+        ent = con.execute("SELECT entity_id FROM securities WHERE security_id = ?", [ovr["security_id"]]).fetchall()
     if len(ent) != 1:
         q = _quarantine(
             con,
             stage="IDENTITY",
-            reason_code="UNKNOWN_ISIN" if not ent else "AMBIGUOUS_ISIN",
+            reason_code=reason,
             filing_id=fid,
-            details={"isin": meta["stated_isin"], "symbol": meta["stated_symbol"]},
+            details={"isin": meta["stated_isin"], "symbol": meta["stated_symbol"], "cin": meta.get("stated_cin")},
         )
         return PromotionResult("QUARANTINED", "results_xbrl", message=fid, quarantined=[q])
     entity_id = ent[0][0]
@@ -650,6 +803,8 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     board_end = meta["board_meeting_end_ts"]
     board_ist_date = utc_to_ist_date(board_end) if board_end is not None else None
     visible, source = _visible_from(con, filing["exchange"], filing["broadcast_ts"], board_end, board_ist_date)
+    if visible is None and "broadcast_ts" in ovr:
+        visible, source = datetime.fromisoformat(ovr["broadcast_ts"]), "MANUAL_OVERRIDE"
     if visible is None:
         q = _quarantine(
             con,
@@ -683,13 +838,46 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
                 "visible_from_source": source,
                 "interest_paid_cfo_class": meta["interest_paid_cfo_class"],
                 "interest_recd_cfo_class": meta["interest_recd_cfo_class"],
+                "auditor_qualified": meta.get("auditor_qualified"),
+                "audit_opinion": meta.get("audit_opinion"),
             }
         ],
     )
+    _link_revision(con, fid, entity_id, meta, visible)
     facts = read_table(con, stage_dir, "stg_xbrl_facts")
     insert_rows(con, "fact_observations", [{**f, "entity_id": entity_id, "visible_from_ts": visible} for f in facts])
     q = cross_check_shares(con, entity_id, meta["period_end"])
     return PromotionResult("PROMOTED", "results_xbrl", message=fid, quarantined=[q] if q else [])
+
+
+def filing_overrides(con, filing_id: str) -> dict[str, str]:
+    """Latest value per field of the filing's OVERRIDE resolutions (append-only table; later rows win)."""
+    rows = con.execute(
+        "SELECT field, value FROM filing_overrides WHERE filing_id = ? ORDER BY created_at", [filing_id]
+    ).fetchall()
+    return dict(rows)
+
+
+def _link_revision(con, fid: str, entity_id: str, meta: dict, visible: datetime) -> None:
+    """Revision chain [E9]: this filing supersedes the latest filing of the same entity, profile, scope and period end
+    that became visible before it. Byte-identical blobs are RESENDs. Append-only link rows; facts need nothing else,
+    because every PIT read already takes the latest version visible at the as-of."""
+    prior = con.execute(
+        "SELECT m.filing_id, f.sha256 FROM filing_meta m JOIN filings f USING (filing_id) WHERE m.entity_id = ? "
+        "AND m.accounting_profile = ? AND m.scope = ? AND m.period_end = ? AND m.filing_id <> ? "
+        "AND m.visible_from_ts < ? ORDER BY m.visible_from_ts DESC, m.filing_id DESC LIMIT 1",
+        [entity_id, meta["accounting_profile"], meta["scope"], meta["period_end"], fid, visible],
+    ).fetchone()
+    if prior is None:
+        return
+    sha = con.execute("SELECT sha256 FROM filings WHERE filing_id = ?", [fid]).fetchone()[0]
+    insert_rows(
+        con,
+        "filing_revisions",
+        [{"filing_id": fid, "supersedes_filing_id": prior[0], "entity_id": entity_id, "period_end": meta["period_end"],
+          "scope": meta["scope"], "relation": "RESEND" if sha == prior[1] else "REVISION"}],
+        or_ignore=True,
+    )  # fmt: skip
 
 
 def pit_fact(
@@ -715,7 +903,8 @@ def _promote_holidays(con, stage_dir: Path, manifest: dict[str, Any]) -> Promoti
     for r in rows:
         # Never overwrite a day a bhavcopy proved to be a trading day.
         con.execute(
-            "INSERT OR IGNORE INTO trading_calendar VALUES (?, ?, FALSE, ?)",
+            "INSERT OR IGNORE INTO trading_calendar (exchange, cal_date, is_trading, note, source) "
+            "VALUES (?, ?, FALSE, ?, 'HOLIDAY_MASTER')",
             [r["exchange"], r["cal_date"], "holiday: " + r["description"]],
         )
     years = sorted({r["cal_date"].year for r in rows})
@@ -871,7 +1060,7 @@ def _promote_shareholding(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
         return _out_of_scope(
             con, stage_dir, "shareholding", f"as of {staged_meta[0]['as_of_date']} < {MIN_PERIOD_END_DATE}"
         )
-    _insert_vault_rows(con, stage_dir, ("blobs", "filings"))
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_xbrl_facts"))
     filing = read_table(con, stage_dir, "filings")[0]
     fid = filing["filing_id"]
     issues = read_table(con, stage_dir, "stg_issues")
@@ -926,8 +1115,34 @@ def _promote_shareholding(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
                 "has_partly_paid": meta["has_partly_paid"],
                 "promoter_pledge_flag": meta["promoter_pledge_flag"],
                 "promoter_pledged_shares": meta["promoter_pledged_shares"],
+                "promoter_encumbered_shares": meta.get("promoter_encumbered_shares"),
+                "rules_applied": meta.get("rules_applied"),
                 "visible_from_ts": visible,
             }
+        ],
+    )
+    insert_rows(
+        con,
+        "shareholding_line_items",
+        [
+            {**li, "parser_version": meta["parser_version"], "entity_id": entity_id, "as_of_date": meta["as_of_date"],
+             "visible_from_ts": visible}
+            for li in read_table(con, stage_dir, "stg_shp_line_items")
+        ],
+    )  # fmt: skip
+    holders = read_table(con, stage_dir, "stg_shp_holders")  # [] for stages written before 0.4.0
+    insert_rows(
+        con,
+        "shareholding_major_holders",
+        [
+            {
+                **{k: h[k] for k in ("filing_id", "holder_category", "row_member", "holder_name", "shares", "pct")},
+                "parser_version": meta["parser_version"],
+                "entity_id": entity_id,
+                "as_of_date": meta["as_of_date"],
+                "visible_from_ts": visible,
+            }
+            for h in holders
         ],
     )
     insert_rows(
@@ -951,6 +1166,125 @@ def _promote_shareholding(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     return PromotionResult("PROMOTED", "shareholding", message=fid, quarantined=[q] if q else [])
 
 
+def _promote_kpis(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
+    """Supplemental KPIs [P2 closeout]: each valid row resolves its symbol on period_end and lands in
+    supplemental_kpis keyed by visible_from_ts (point in time). Invalid or unresolvable rows are quarantined."""
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings"))
+    filing = read_table(con, stage_dir, "filings")[0]
+    blob_sha = filing["sha256"]
+    rows = read_table(con, stage_dir, "stg_kpis")
+    good, quarantined = [], []
+    for r in rows:
+        ent = []
+        if r["issue"] is None:
+            ent = con.execute(
+                "SELECT DISTINCT s.entity_id FROM security_identifier_history h JOIN securities s USING (security_id) "
+                "WHERE h.symbol = ? AND h.valid_from <= ? AND (h.valid_to IS NULL OR h.valid_to > ?)",
+                [r["symbol"], r["period_end"], r["period_end"]],
+            ).fetchall() or con.execute(
+                "SELECT DISTINCT s.entity_id FROM security_identifier_history h JOIN securities s USING (security_id) "
+                "WHERE h.symbol = ?", [r["symbol"]]).fetchall()  # fmt: skip
+        if r["issue"] is not None or len(ent) != 1:
+            reason = r["issue"] or ("UNKNOWN_SYMBOL" if not ent else "AMBIGUOUS_SYMBOL")
+            quarantined.append(
+                _quarantine(
+                    con,
+                    stage="KPI",
+                    reason_code=reason,
+                    filing_id=filing["filing_id"],
+                    details={"seq": r["seq"], "symbol": r["symbol"], "kpi": r["kpi"]},
+                )
+            )
+            continue
+        good.append(
+            {
+                "entity_id": ent[0][0],
+                "kpi": r["kpi"],
+                "period_start": r["period_start"],
+                "period_end": r["period_end"],
+                "value": r["value"],
+                "unit": r["unit"],
+                "source_kind": r["source_kind"],
+                "source_url": r["source_url"],
+                "source_sha256": blob_sha,
+                "visible_from_ts": r["visible_from_ts"],
+                "recorded_at": utc_now(),
+                "notes": r["notes"],
+            }
+        )
+    insert_rows(con, "supplemental_kpis", good, or_ignore=True)
+    return PromotionResult("PROMOTED", "kpis", message=f"{len(good)} KPI rows", quarantined=quarantined)
+
+
 def _promote_raw_only(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
     _insert_vault_rows(con, stage_dir, ("blobs", "filings"))
     return PromotionResult("PROMOTED", "raw_only", message=read_table(con, stage_dir, "filings")[0]["category"])
+
+
+# ── Reg. 30 structured events [E1-E7] ──────────────────────────────────────
+
+
+def _promote_reg30_event(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_xbrl_facts"))
+    filing = read_table(con, stage_dir, "filings")[0]
+    fid = filing["filing_id"]
+    issues = read_table(con, stage_dir, "stg_issues")
+    if issues:
+        qs = [
+            _quarantine(con, stage=i["stage"], reason_code=i["reason_code"], filing_id=fid,
+                        details=json.loads(i["details"]))
+            for i in issues
+        ]  # fmt: skip
+        return PromotionResult("QUARANTINED", "reg30_event", message=fid, quarantined=qs)
+    events = read_table(con, stage_dir, "stg_events")
+    if not events:  # an event family we do not parse: vaulted raw only [E2]
+        return PromotionResult("PROMOTED", "reg30_event", message=f"{fid} raw only")
+    first = events[0]
+    on = first["report_date"]
+    if first["stated_isin"]:
+        secs = resolve_security_by_isin(con, filing["exchange"], first["stated_isin"], on)
+    else:  # fraud/default disclosures carry the symbol only [E7]
+        secs = [r[0] for r in con.execute(
+            "SELECT DISTINCT security_id FROM security_identifier_history WHERE exchange = ? AND symbol = ? "
+            "AND valid_from <= ? AND (valid_to IS NULL OR valid_to > ?)",
+            [filing["exchange"], first["stated_symbol"], on, on]).fetchall()]  # fmt: skip
+    entities = sorted(
+        {con.execute("SELECT entity_id FROM securities WHERE security_id = ?", [s_]).fetchone()[0] for s_ in secs}
+    )
+    if len(entities) != 1:
+        key = "ISIN" if first["stated_isin"] else "SYMBOL"  # SME symbols are outside the universe (C9 scope)
+        q = _quarantine(
+            con,
+            stage="IDENTITY",
+            reason_code=("UNKNOWN_" if not entities else "AMBIGUOUS_") + key,
+            filing_id=fid,
+            details={"isin": first["stated_isin"], "symbol": first["stated_symbol"]},
+        )
+        return PromotionResult("QUARANTINED", "reg30_event", message=fid, quarantined=[q])
+    if filing["broadcast_ts"] is None:
+        q = _quarantine(
+            con,
+            stage="PERIOD",
+            reason_code="NO_VISIBILITY",
+            filing_id=fid,
+            entity_id=entities[0],
+            details={"report_date": on},
+        )
+        return PromotionResult("QUARANTINED", "reg30_event", message=fid, quarantined=[q])
+    insert_rows(
+        con,
+        "corporate_events",
+        [
+            {
+                "event_id": stable_id("evt", filing["sha256"], e["record_key"]),
+                "filing_id": fid, "parser_version": PARSER_VERSION, "entity_id": entities[0],
+                **{k: e[k] for k in ("family", "event_type", "event_subtype", "occurred_on", "report_date",
+                                     "counterparty", "amount_inr", "person_name", "person_category", "change_type",
+                                     "cessation_category", "details")},
+                "visible_from_ts": filing["broadcast_ts"],
+            }
+            for e in events
+        ],
+        or_ignore=True,  # a byte-identical re-send is the same event [E4]
+    )  # fmt: skip
+    return PromotionResult("PROMOTED", "reg30_event", message=fid)

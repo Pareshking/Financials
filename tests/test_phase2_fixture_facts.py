@@ -58,7 +58,8 @@ def test_life_insurer_integrated_taxonomy(inst):
     """[X33] HDFC Life Q2 FY27: IntegratedFinance_LI namespace (2025-01-31), dates match declared periods."""
     i = inst(LIFE)
     assert "/IntegratedFinance_LI/2025-01-31/" in i.entity_namespace
-    assert detect_profile(i.entity_namespace) is None  # no parser yet: would quarantine UNKNOWN_TAXONOMY
+    # Routing, not a file fact: known profile since Batch 5 (PROFILE_NOT_IMPLEMENTED until Batch 6); was None.
+    assert detect_profile(i.entity_namespace) == "IRDAI_LIFE"
     for tag in ("GrossPremiumIncome", "NetPremiumIncome", "ChangeInActuarialLiability", "BenefitsPaidNet"):
         assert num(i, tag, "OneD") > 0, tag
     assert num(i, "InvestmentsPolicyholders", "OneI") > 0

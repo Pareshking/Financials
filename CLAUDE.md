@@ -3,12 +3,15 @@
 Personal, single-user Indian equity research, screening and point-in-time backtesting engine.
 Universe v1: NSE Mainboard `EQ`/`BE`/`BZ`, starting with the Nifty 500. SME excluded.
 **Data starts** (CHOICE C9, `financials/scope.py`): market data, corporate actions and index snapshots
-`>= 2024-10-01` (`MIN_TRADE_DATE`, UDiFF era); financials and shareholding `period_end >= 2024-12-31`
-(`MIN_PERIOD_END_DATE`, Q3 FY25). No parsers or fallbacks for older formats.
+`>= 2024-10-01` (`MIN_TRADE_DATE`, UDiFF era); financials and shareholding `period_end >= 2025-03-31`
+(`MIN_PERIOD_END_DATE`, Q4 FY25: first Integrated Filing quarter). No parsers or fallbacks for older formats.
 No redistribution.
 
-**Read before changing anything:** `docs/architecture.md` (design) and `docs/references.md`
-(evidence register: what is VERIFIED vs UNVERIFIED).
+**Read before changing anything:** `docs/architecture.md` (design), `docs/references.md`
+(evidence register: what is VERIFIED vs UNVERIFIED) and `docs/data_sources.md` (every feed; generated
+from `config/data_sources.yaml` by `python -m financials.sources --write`; edit the YAML, never the MD),
+and `docs/tag_registry.yaml` (every XBRL element seen per profile + named label rules; extend it with
+`python scripts/inspect_xbrl_exhaustive.py FILES --registry docs/tag_registry.yaml --batch <id>`).
 
 ## Commands
 
@@ -23,7 +26,11 @@ python -m financials --data-dir data fetch-days 2026-11-12        # also fetch-c
 python -m financials --data-dir data promote                       # the only writer
 python -m financials --data-dir data materialize 2026-11-12
 python -m financials --data-dir data screen "Market Cap > 500 AND ROE > 15"
-python -m financials --data-dir data quarantine list --reason ISIN_COLLISION    # resolve: quarantine resolve --id … --action … --note …
+python -m financials --data-dir data quarantine list --reason ISIN_COLLISION    # then: quarantine inspect <id> / resolve --id … --action … --note … / reprocess
+python -m financials --data-dir data discover-filings --universe nifty500      # results, annual, shareholding listings + Reg. 30 RSS (new files only)
+python -m financials --data-dir data run-day --date 2026-11-13                  # daily: fetch, discover (RSS hint), promote, materialize
+python -m financials --data-dir data rebuild-market --from 2025-09-23           # roll market state back to a date and replay (audited)
+python -m financials --data-dir data materialize --from 2024-10-01 --to 2026-11-13
 python -m financials --data-dir data backfill-index --manifest reference/nifty500_changes.csv
 python -m financials.bench --out docs/benchmarks.md                # after performance-relevant changes
 ```
@@ -83,8 +90,8 @@ data/                  local only, gitignored: vault/, staging/, market.duckdb
 13. Schema lives only in `src/financials/db/schema.sql`. No nullable `UNIQUE` columns (DuckDB `OR IGNORE` bug [I1]).
     Bulk inserts go through `financials.db.insert_rows` (Arrow), never row-by-row `executemany`.
 14. **Scope cutoff.** Out-of-scope inputs are vaulted (blob + filing) and promoted as `OUT_OF_SCOPE`;
-    nothing is parsed into canonical tables. Filter financials on period **end** (a Q3 FY25 Apr–Dec YTD
-    is in scope). Any window needing history before the cutoff (3Y/5Y CAGR, 5Y dilution, 5Y valuation
+    nothing is parsed into canonical tables. Filter financials on period **end** (FY25 from the Q4 FY25
+    filing is in scope). Any window needing history before the cutoff (3Y/5Y CAGR, 5Y dilution, 5Y valuation
     percentile, 3Y FCF conversion…) returns NULL via `min_periods_required`, never a partial-window number.
 
 ## Testing rules

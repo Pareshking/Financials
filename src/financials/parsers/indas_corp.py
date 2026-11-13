@@ -196,6 +196,12 @@ LABEL_RULES: tuple[tuple[str, str, str, str, str, re.Pattern[str]], ...] = (
     # Right-of-use assets: only a labelled OtherNoncurrentAssets member (Eternal, ITC) [X47]
     ("RIGHT_OF_USE_ASSETS", "OtherNoncurrentAssetsAxis", "OtherNoncurrentAssets", "right_of_use_assets", "INSTANT",
      re.compile(r"^\s*right[\s-]*of[\s-]*use", re.I)),
+    # Manufacturing cost lines, labelled only by some filers (4/10 and 1/10 in Batch 3) [X50].
+    # Absent label = not disclosed (NULL), never 0: unlike excise, nothing is netted against them.
+    ("POWER_AND_FUEL", "DetailsOfOtherExpensesAxis", "OtherExpenses", "power_and_fuel", "DURATION",
+     re.compile(r"^\s*power\s*(?:and|&|,)\s*fuel", re.I)),
+    ("FREIGHT", "DetailsOfOtherExpensesAxis", "OtherExpenses", "freight", "DURATION",
+     re.compile(r"^\s*freight", re.I)),
     ("EXCISE_DUTY", "DetailsOfOtherExpensesAxis", "OtherExpenses", "excise_duty", "DURATION",
      re.compile(r"^\s*excise\s+dut", re.I)),
 )  # fmt: skip
@@ -454,11 +460,37 @@ def _map_facts(inst: Instance, result: ParsedResults) -> None:
                 "DERIVED:PaidUpValueOfEquityShareCapital/FaceValueOfEquityShareCapital",
             )
         )
+    _apply_zero_attribution_rule(result)
     result.meta["interest_paid_cfo_class"] = _classify(
         result, "interest_paid_operating", "interest_paid_financing", "FINANCING"
     )
     result.meta["interest_recd_cfo_class"] = _classify(
         result, "interest_received_operating", "interest_received_investing", "INVESTING"
+    )
+
+
+def _apply_zero_attribution_rule(result: ParsedResults) -> None:
+    """Named rule ZERO_ATTRIBUTION_PLACEHOLDER [X48].
+
+    Owners' share = 0 AND NCI share = 0 while profit for the period != 0 cannot be a real attribution
+    (owners + NCI must equal PAT); it is an unfilled placeholder (APL Apollo Q2 FY27, decimals -7 vs -5).
+    Drop both canonical facts for that period, so owners' profit falls back to total PAT per filing
+    (COALESCE). Raw facts stay in the vault untouched. Any other mismatch still fails OWNERS_PLUS_NCI.
+    """
+    by_period: dict[tuple[date, date], dict[str, Decimal]] = {}
+    for f in result.facts:
+        if f.canonical_tag in ("pat", "pat_owners", "pat_nci"):
+            by_period.setdefault((f.period_start, f.period_end), {})[f.canonical_tag] = f.value
+    dropped = [p for p, v in by_period.items() if v.get("pat_owners") == 0 and v.get("pat_nci") == 0 and v.get("pat")]
+    if not dropped:
+        return
+    result.facts = [
+        f
+        for f in result.facts
+        if not (f.canonical_tag in ("pat_owners", "pat_nci") and (f.period_start, f.period_end) in dropped)
+    ]
+    result.meta.setdefault("rules_applied", []).append(
+        {"rule": "ZERO_ATTRIBUTION_PLACEHOLDER", "periods": [[str(a), str(b)] for a, b in sorted(dropped)]}
     )
 
 

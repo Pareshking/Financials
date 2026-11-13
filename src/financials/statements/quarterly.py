@@ -73,7 +73,12 @@ def corp_quarter(result, start: date, end: date) -> QuarterStatement:
             "Purchases of stock-in-trade": v("purchases_of_stock_in_trade"),
             "Change in inventories": v("changes_in_inventories"),
             "Employee cost": v("employee_benefit_expense"),
-            "Other expenses (net of excise)": None if v("other_expenses") is None else v("other_expenses") - excise,
+            # Labelled manufacturing lines where the filer discloses them [X50]; None = not disclosed
+            "Power and fuel": v("power_and_fuel"),
+            "Freight": v("freight"),
+            "Other expenses (rest, net of excise)": None
+            if v("other_expenses") is None
+            else v("other_expenses") - excise - z("power_and_fuel") - z("freight"),
         },
     )
     rows["Operating Profit"] = Row(

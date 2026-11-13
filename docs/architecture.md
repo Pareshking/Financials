@@ -409,6 +409,13 @@ Banks, NBFCs, life and general insurers use the raw-element formulas in S4–S7 
 (fixed-asset schedule, notes) are NULL on quarterly statements. The Screener export carries only the
 Data Sheet rows, so golden parity covers top-level rows only. Sub-rows are checked by summation, not by golden values.
 
+### 14b-1. Expense sub-rows and segments (X49, X50)
+
+Expenses sub-rows add **Power and fuel** and **Freight** when the filer labels them (named label rules). They stay NULL
+when it doesn't, and the rest of other expenses absorbs them, so the sub-rows still sum to Expenses. Segments
+(`parsers/segments.py`) are parsed and checked against filed totals and the balance sheet, but are not persisted
+until a segment table is agreed. They are never used to fill P&L rows.
+
 ### 14c. Annual statements and conventions (S10-S15)
 
 **Balance sheet** (`statements/balance_sheet.py`; H1 and FY ends only; Q1/Q3 NULL):

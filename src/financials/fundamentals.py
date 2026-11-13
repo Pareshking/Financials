@@ -72,6 +72,21 @@ class FactBook:
                 return v + d[fy_prev] - d[ytd_prev]
         return None
 
+    def coalesced(self, tag: str, fallback: str | None) -> str:
+        """Per-period COALESCE(tag, fallback) as a derived tag, so TTM never mixes "present" and "absent" filings.
+
+        `fallback=None` means 0: used for lines whose absence in a filing means "none reported" (excise [X40]).
+        Coalescing happens per period (i.e. per filing) before any quarter/TTM arithmetic.
+        """
+        key = f"{tag}|{fallback or 0}"
+        if key not in self.durations:
+            primary = self.durations.get(tag, {})
+            base = self.durations.get(fallback, {}) if fallback else self.durations.get("revenue_from_operations", {})
+            out = {p: primary.get(p, base[p] if fallback else Decimal(0)) for p in base}
+            out.update(primary)
+            self.durations[key] = out
+        return key
+
     def latest_flow_end(self, tag: str) -> date | None:
         ends = [e for (_, e) in self.durations.get(tag, {})]
         return max(ends) if ends else None
@@ -131,12 +146,18 @@ def _sum(*vals: Decimal | None) -> Decimal | None:
     return None if any(v is None for v in vals) else sum(vals, Decimal(0))  # type: ignore[arg-type]
 
 
+def _sum_present(*vals: Decimal | None) -> Decimal | None:
+    """Sum of the lines a balance sheet reports; NULL only if it reports none of them."""
+    got = [v for v in vals if v is not None]
+    return sum(got, Decimal(0)) if got else None
+
+
 def building_blocks(book: FactBook, end: date) -> dict[str, Decimal | date | None]:
     """Canonical blocks (§8) for the TTM window ending `end` and the latest balance sheet <= end."""
     t = lambda tag: book.ttm(tag, end)  # noqa: E731
     gross_rev = t("revenue_from_operations")
     # Net of excise duty when the filing labels an excise line [X40]; absent label = no excise.
-    excise = t("excise_duty") if book.durations.get("excise_duty") else Decimal(0)
+    excise = t(book.coalesced("excise_duty", None))
     rev = None if gross_rev is None or excise is None else gross_rev - excise
     materials, purchases, inv_change = (
         t("cost_of_materials_consumed"),
@@ -202,7 +223,8 @@ def building_blocks(book: FactBook, end: date) -> dict[str, Decimal | date | Non
         "ebit": ebit,
         "pat": t("pat"),
         # Profit for PE / ROE: owners' share when the filing attributes profit (consolidated) [X42]
-        "pat_owners": t("pat_owners") if book.durations.get("pat_owners") else t("pat"),
+        # COALESCE(owners, total) per filing before the 4-quarter roll-up, so a mixed window stays non-NULL
+        "pat_owners": t(book.coalesced("pat_owners", "pat")),
         "other_income": oth,
         "pbt": pbt,
         "etr": etr,
@@ -213,7 +235,17 @@ def building_blocks(book: FactBook, end: date) -> dict[str, Decimal | date | Non
         "total_equity": equity,
         "equity_owners": stock("equity_attributable_to_owners") or equity,
         "minority_interest": stock("non_controlling_interest") or (Decimal(0) if equity is not None else None),
+        # Investments = non-current + current + equity-method (associates/JVs) [X44]. invested_capital is
+        # financing-side (equity + debt - cash), so associate stakes are already inside it; adding them again
+        # would double count. Operating IC removes them to match NOPAT, which excludes associates' profit.
+        "investments": _sum_present(
+            stock("noncurrent_investments"), stock("current_investments"), stock("equity_method_investments")
+        ),
+        "equity_method_investments": stock("equity_method_investments"),
         "invested_capital": invested,
+        "operating_invested_capital": None
+        if invested is None
+        else invested - (stock("equity_method_investments") or Decimal(0)),
         "total_assets": stock("total_assets"),
         "current_assets": stock("current_assets"),
         "current_liabilities": stock("current_liabilities"),

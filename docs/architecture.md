@@ -409,6 +409,40 @@ Banks, NBFCs, life and general insurers use the raw-element formulas in S4–S7 
 (fixed-asset schedule, notes) are NULL on quarterly statements. The Screener export carries only the
 Data Sheet rows, so golden parity covers top-level rows only. Sub-rows are checked by summation, not by golden values.
 
+### 14c. Annual statements and conventions (S10-S15)
+
+**Balance sheet** (`statements/balance_sheet.py`; H1 and FY ends only; Q1/Q3 NULL):
+
+| Row | Definition | Sub-rows |
+|---|---|---|
+| Equity Capital | `equity_share_capital` | — |
+| Reserves | `other_equity` (owners only) | — |
+| Borrowings | borrowings (NC + C) + lease liabilities (NC + C, label rule) | the four lines |
+| Other Liabilities | Total − Equity Capital − Reserves − Borrowings | NCI, trade payables, other |
+| Total | `total_assets − min(DTA, DTL)` when both are positive | deferred tax netted |
+| Net Block | PPE + investment property + goodwill + other intangibles + ROU (label rule) | the five lines |
+| CWIP | CWIP + intangibles under development | both |
+| Investments | non-current + current + equity-method | the three lines |
+| Other Assets | Total − Net Block − CWIP − Investments | receivables (current), inventory, cash & bank, other |
+
+**Cash flow** (`statements/cashflow.py`; YTD only, so H1 and FY; Q1/Q3 NULL): CFO as filed = Profit from operations
+(cash generated − working-capital changes) + Receivables + Inventory + Payables + Loans & Advances + Other WC items
++ Direct taxes + Other operating items; CFI = fixed assets purchased/sold, interest and dividends received, other;
+CFF = borrowings in/out, interest, dividends, leases, shares, other; Net Cash Flow after FX. Groupings are listed in
+`WC_GROUPS`. Every "other" row is the residual, so sub-rows always sum to the filed total.
+
+**Conventions**
+- Signs: P&L costs positive, as filed. Cash flow positive = cash in. We show Change in Inventory with the XBRL sign;
+  Screener reverses it.
+- Rounding: we keep rupees (`DECIMAL(20,2)`). Comparisons with Screener use ₹ Cr to 2 dp with ±0.01 tolerance,
+  because filings in ₹ lakh round differently.
+- Scope: consolidated when a consolidated filing exists, else standalone (S1; Mandate 3 makes this per company).
+- Quarterly vs annual-only: quarterly statements carry the P&L rows of §14b; BS and CF only at H1/FY. Annual-only
+  sub-rows (other-expense split, dividend amount, fixed-asset schedule, notes) are NULL on every quarterly statement
+  and wait for the Reg. 34 parser.
+- Divergence codes: `ASSOCIATES_PLACEMENT`, `BANK_EXCEPTIONAL`, `LIFE_TRANSFER_GROSSUP`, `FX_IN_INVESTING`.
+  Unexplained residuals are pinned in the parity harness (S11, S13), never imitated.
+
 ## 15. Phases
 
 **Phase 1: thin slice, screenable end-to-end (Nifty 500)**

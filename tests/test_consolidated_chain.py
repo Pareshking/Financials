@@ -57,3 +57,18 @@ def test_dropping_regulatory_term_would_break_identity():
     )
     r = parse_indas_corp_results(data)
     assert ("IDENTITY", "PBT_MINUS_TAX") in {(i.stage, i.reason_code) for i in r.issues}
+
+
+def test_equity_method_investments_are_separate_from_noncurrent_investments(tp):
+    """[X44] Tata Power: associates/JVs 13485.22 Cr sit outside NoncurrentInvestments 2748.69 Cr."""
+    from financials.fundamentals import FactBook, building_blocks
+
+    assert tp.value("equity_method_investments", END, END) == Decimal("134852200000")
+    book = FactBook("e", "CONSOLIDATED")
+    for f in tp.facts:
+        if f.period_type == "INSTANT":
+            book.instants.setdefault(f.canonical_tag, {})[f.period_end] = f.value
+    b = building_blocks(book, END)
+    nci, ci = tp.value("noncurrent_investments", END, END), tp.value("current_investments", END, END) or 0
+    assert b["investments"] == nci + ci + Decimal("134852200000")
+    assert b["invested_capital"] - b["operating_invested_capital"] == Decimal("134852200000")

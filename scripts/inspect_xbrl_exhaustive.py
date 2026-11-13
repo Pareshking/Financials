@@ -114,6 +114,10 @@ def merge_registry(registry_path: Path, reports: list[dict], batch: str) -> dict
             entry["context_kinds"] = sorted(set(entry["context_kinds"]) | e["kinds"])
             entry["seen_negative"] = entry["seen_negative"] or e["negative"]
             entry["mapped_to"] = MAPPED.get(name)
+    # mapped_to always reflects the current parser, including for elements first seen in earlier batches
+    for entries in profiles.values():
+        for name, entry in entries.items():
+            entry["mapped_to"] = MAPPED.get(name)
     reg["files"] = sorted(seen_files)
     registry_path.write_text(
         "# Every XBRL element seen in non-dimensional contexts, per profile. Generated and merged by\n"

@@ -115,5 +115,33 @@ output); `tests/test_index_backfill.py::test_derived_text_matches_pdf` regenerat
 | `xbrl/INTEGRATED_FILING_NBFC_INDAS_1742040_19102026075918_WEB.xml` | S: Bajaj Finance Q2 FY27 consolidated (S5) | `3de881019f229f5fde8d2aa113ea1c71304f5225ebe6a4d192b5f4a65f54ea34` |
 | `xbrl/INTEGRATED_FILING_LI_1739360_15102026072721_WEB.xml` | S: HDFC Life Q2 FY27 consolidated (S6) | `d6058876141b32251fdc2d557b2987ca31fffc89ffaddeb472d7ad6288897b54` |
 | `xbrl/INTEGRATED_FILING_GI_1740432_16102026073544_WEB.xml` | S: ICICI Lombard Q2 FY27 standalone, Revision of 1738196 (S7) | `5e8d56b54e5fa87989d789fa01abe151d5356abc095fef36395d9c918d3e744c` |
+| `xbrl/INTEGRATED_FILING_INDAS_1672621_25052026073245_WEB.xml` | S10: ELIN Q4 FY26 consolidated (FY P&L/BS/CF) | `39ce72ba7222bea08b656fcc2b375bcd4263873008bbbd4d875f32bf4358b0d3` |
+| `xbrl/INTEGRATED_FILING_INDAS_1648408_09042026114218_WEB.xml` | S10: TCS Q4 FY26 consolidated (DTA/DTL netting, leases in borrowings) | `17d9c6bb6ac7de632e5558dc2442cbb509b978cce481ff1ed8362b8a8f557cc9` |
+| `xbrl/INTEGRATED_FILING_INDAS_1670766_21052026063229_WEB.xml` | S10: ITC Q4 FY26 consolidated (ROU, investment property, equity-method investments) | `366b95ff7cc75b499c447ad0852d8d02233cd290ad4d0fad06b4269480fb23c7` |
+| `xbrl/INTEGRATED_FILING_INDAS_1658776_24042026105714_WEB.xml` | S11: Reliance Q4 FY26 consolidated (unexplained borrowings residual) | `6b05d2d10220d88055392da3bc30a2bed456d27930ebf57cef7bb0d48b386270` |
+| `xbrl/INTEGRATED_FILING_INDAS_1660628_28042026082148_WEB.xml` | X46: Eternal Q4 FY26 consolidated (audit status per context, ROU, FX in CFI) | `dcad4aee5189866b0835428eacc170a0582f131401bf2f54de4b4c815926250a` |
+| `xbrl/INTEGRATED_FILING_NBFC_INDAS_1661603_29042026104724_WEB.xml` | X46: Bajaj Finance Q4 FY26 consolidated (audit status per context) | `88a56b7b0ff07e0dd596e8760eddc24d19389ba1a0db205e14ea7e3228b8c7f5` |
+| `xbrl/INTEGRATED_FILING_BANKING_1654391_18042026073048_WEB.xml` | S14: HDFC Bank Q4 FY26 consolidated | `de471a6c3e9af6fa4b93c229f53ce77244eaf664db91b9f0039b6d93472ee3f1` |
 
-Source URL pattern for all twelve: `https://nsearchives.nseindia.com/corporate/xbrl/<file>`.
+Source URL pattern for all nineteen: `https://nsearchives.nseindia.com/corporate/xbrl/<file>`.
+
+## Screener goldens (local only, not committed)
+
+The repository is public, so the user-supplied Screener Excel exports (2026-11-13) and their extracted Data Sheets are
+**not** committed. Re-create them with `python scripts/extract_screener_golden.py EXPORT.xlsx ... --out data/screener_golden`
+(`data/` is gitignored). The parity harness carries only the specific figures it asserts. Hashes:
+
+| Export sha256 | Extracted JSON sha256 | File |
+|---|---|---|
+| `1ecda3744f11079c2fad5b00f458efc576da42a1f7a2c3259e133d5715cc686b` | `bdd7e4b2d370ef6f1183dee5c3ddb397ed3b5ee405824ee47ef5e90adc4b7dc3` | `TATA_CONSULTANCY_SERVICES_LTD.json` |
+| `08a48ee253914da355241b8022a7cc8db98a3725f4339575862421d1dc19182b` | `b5c833ba3a63f737a14a867c930b6985604de88e07db53456116ae05f4ec3d2e` | `ELIN_ELECTRONICS_LTD.json` |
+| `99ef74f02f51cc2c40218d824b9dfc6a668e836e931364a70b4a46a4a0d8ca79` | `bac1d0d7702d34e1d6af37f3ef181a0c60f29defb802c9304dfefdebfb596bc5` | `ITC_LTD.json` |
+| `05b25df6981044b0d7fb556aac4f68c77da1b62247e74d6bbe18f59fd9dedbda` | `4eaad51e02e1657170df89a820ca49af1950668274bdaacff23236e57d366ae1` | `BAJAJ_FINANCE_LTD.json` |
+| `14163f4d412e18c51d3f45cf169701effd596f7da62dbb7f6df4e06ef086ed05` | `0d5f39c0d92834c4c5f37ed2f9e476fe1b676d289ba198b8b5dd8f482de02b45` | `TATA_MOTORS_PASSENGER_VEHICLES_LTD.json` |
+| `a3987966d0824c6b96439e0daefe75d114d9947fd12750082268763d8824bc21` | `97c07878e56b14d32d210016c30892684196c5aa949c397b64ec1184dafbf839` | `ETERNAL_LTD.json` |
+| `67d37e45fa0c5daf478f4a868ac7055df8303e0d1906bd9c79eae458f1c8a829` | `e2737a83e14713ac99ffef3e08d6ce56e7aaa015ba4ebfad6bc65c1e63e7cf12` | `HDFC_LIFE_INSURANCE_COMPANY_LTD.json` |
+| `c4bac255a4bda4f329da9006503be15d9108da123a3a8a9457e3a99fad20446c` | `785856a89daffa802ef36c08371c58f479a0267d06872cc92a5f87b78b0685d0` | `TATA_MOTORS_LTD.json` |
+| `e047fb373a15866a2e5541228275c2142c5f2c42046d7094fe953f1ec49f8230` | `2e36ebf3a8eabefd54f3852240e09a0972cbf26d36ad02960f8a9dcc39026597` | `HDFC_BANK_LTD.json` |
+| `042a2d466e5c83a1e37afa3ef87cdfd9628d129b935f616f0aeda0d7b93e56aa` | `a4506402ac2543848c020db3f82e066dc46272d492a369e17352f5a588fb5b2a` | `RELIANCE_INDUSTRIES_LTD.json` |
+| `75e82a7bb887382e94d44dcb9609fce829b17da55680f7d7adae6861d151eeeb` | `5efd6240d6d4d9e8128be1bf03634d67a0043f239bc1a9e0c8738c1bc3407dd3` | `STAR_HEALTH___ALLIED_INSURANCE_COMPANY_LTD.json` |
+| `30f81d594b343e2a295d39530680d7abb619d94a4217680a784ea63b4d148335` | `0c8360fa1de536885cacbc34ab699611f72f937ef65d5f61737bfa29cd22b4e9` | `ICICI_LOMBARD_GENERAL_INSURANCE_COMPANY_LTD.json` |

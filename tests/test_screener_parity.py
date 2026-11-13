@@ -126,3 +126,226 @@ def test_standalone_filing_does_not_match_consolidated_golden():
     st = corp_quarter(parse_indas_corp_results((XBRL_DIR / "INTEGRATED_FILING_INDAS_1751354_02112026065539_WEB.xml")
                                               .read_bytes()), *Q)  # fmt: skip
     assert abs(st.rows["Sales"].value / CR - Decimal("20268.63")) > 1000
+
+
+# ---------------------------------------------------------------- second period and annual statements [S10-S13]
+# Q4 FY26 filings: the Jan-Mar 2026 quarter, FY26 P&L (FourD), the 31-Mar-2026 balance sheet and FY26 cash flow.
+# Divergence values: an XBRL element (the gap must equal it) or a Decimal (an unexplained residual pinned exactly,
+# so any change in Screener's figure or our definition surfaces).
+from financials.statements.balance_sheet import balance_sheet  # noqa: E402
+from financials.statements.cashflow import cashflow  # noqa: E402
+
+Q4 = (date(2026, 1, 1), date(2026, 3, 31))
+FY = (date(2025, 4, 1), date(2026, 3, 31))
+MAR = date(2026, 3, 31)
+FX = "EffectOfExchangeRateChangesOnCashAndCashEquivalents"
+Q4_FILES = {
+    "ELIN": "INTEGRATED_FILING_INDAS_1672621_25052026073245_WEB.xml",
+    "TCS": "INTEGRATED_FILING_INDAS_1648408_09042026114218_WEB.xml",
+    "ITC": "INTEGRATED_FILING_INDAS_1670766_21052026063229_WEB.xml",
+    "RELIANCE": "INTEGRATED_FILING_INDAS_1658776_24042026105714_WEB.xml",
+    "ETERNAL": "INTEGRATED_FILING_INDAS_1660628_28042026082148_WEB.xml",
+    "HDFCBANK": "INTEGRATED_FILING_BANKING_1654391_18042026073048_WEB.xml",
+    "BAJFINANCE": "INTEGRATED_FILING_NBFC_INDAS_1661603_29042026104724_WEB.xml",
+}
+Q4_KIND = {"HDFCBANK": "bank", "BAJFINANCE": "nbfc"}
+
+# (statement, company) -> (screener rows, divergences)
+ANNUAL_GOLDEN = {
+    ("BS", "ELIN"): ({"Equity Capital": "24.38", "Reserves": "532.12", "Borrowings": "16.53",
+                      "Other Liabilities": "192.78", "Total Liabilities": "765.81", "Net Block": "252.70",
+                      "Capital Work in Progress": "27.74", "Investments": "81.90", "Other Assets": "403.47"},
+                     {"Borrowings": ("UNEXPLAINED", Decimal("0.54")),
+                      "Other Liabilities": ("UNEXPLAINED", Decimal("-0.53"))}),
+    ("BS", "TCS"): ({"Equity Capital": "362", "Reserves": "106878", "Borrowings": "11283", "Other Liabilities": "62644",
+                     "Total Liabilities": "181167", "Net Block": "31343", "Capital Work in Progress": "2665",
+                     "Investments": "33988", "Other Assets": "113171"}, {}),
+    ("BS", "ITC"): ({"Equity Capital": "1252.95", "Reserves": "71254.35", "Borrowings": "2399.06",
+                     "Other Liabilities": "18730.84", "Total Liabilities": "93637.20", "Net Block": "22442.53",
+                     "Capital Work in Progress": "1601.88", "Investments": "38128.43", "Other Assets": "31464.36"}, {}),
+    ("BS", "RELIANCE"): ({"Equity Capital": "13532", "Reserves": "890498", "Borrowings": "402962",
+                          "Other Liabilities": "870554", "Total Liabilities": "2177546", "Net Block": "1124795",
+                          "Capital Work in Progress": "237686", "Investments": "248332", "Other Assets": "566733"},
+                         {"Borrowings": ("UNEXPLAINED", Decimal("4962")),
+                          "Other Liabilities": ("UNEXPLAINED", Decimal("-4962"))}),
+    ("BS", "ETERNAL"): ({"Equity Capital": "919", "Reserves": "30061", "Borrowings": "4592",
+                         "Other Liabilities": "5150",
+                         "Total Liabilities": "40722", "Net Block": "12675", "Capital Work in Progress": "136",
+                         "Investments": "14833", "Other Assets": "13078"}, {}),
+    ("CF", "ELIN"): ({"Cash from Operating Activity": "53.78", "Cash from Investing Activity": "-34.38",
+                      "Cash from Financing Activity": "-15.33", "Net Cash Flow": "4.07"}, {}),
+    ("CF", "TCS"): ({"Cash from Operating Activity": "52094", "Cash from Investing Activity": "-11886",
+                     "Cash from Financing Activity": "-42133", "Net Cash Flow": "-1925"},
+                    {"Cash from Investing Activity": ("FX_IN_INVESTING", FX)}),
+    ("CF", "ITC"): ({"Cash from Operating Activity": "18464.31", "Cash from Investing Activity": "-2320.74",
+                     "Cash from Financing Activity": "-16147.12", "Net Cash Flow": "-3.55"}, {}),
+    ("CF", "RELIANCE"): ({"Cash from Operating Activity": "192113", "Cash from Investing Activity": "-101089",
+                          "Cash from Financing Activity": "-51549", "Net Cash Flow": "39475"}, {}),
+    ("CF", "ETERNAL"): ({"Cash from Operating Activity": "632", "Cash from Investing Activity": "540",
+                         "Cash from Financing Activity": "-842", "Net Cash Flow": "330"},
+                        {"Cash from Investing Activity": ("FX_IN_INVESTING", FX)}),
+    ("FY", "ELIN"): ({"Sales": "1287.73", "Other Income": "6.41", "Depreciation": "24.37", "Interest": "8.19",
+                      "Profit before tax": "29.65", "Tax": "7.05", "Net Profit": "22.59"},
+                     {"Other Income": ("UNEXPLAINED", Decimal("-0.23"))}),
+    ("FY", "TCS"): ({"Sales": "267021", "Other Income": "-124", "Depreciation": "5560", "Interest": "1227",
+                     "Profit before tax": "65487", "Tax": "16033", "Net Profit": "49210"}, {}),
+    ("FY", "ITC"): ({"Sales": "78868.40", "Other Income": "2523.09", "Depreciation": "1710.53", "Interest": "85.17",
+                     "Profit before tax": "28033.39", "Tax": "7015.24", "Net Profit": "20689.47"},
+                    {"Other Income": ("UNEXPLAINED", Decimal("388.99")),
+                     "Profit before tax": ("ASSOCIATES_PLACEMENT", ASSOC)}),
+    ("FY", "RELIANCE"): ({"Sales": "1055780", "Other Income": "28846", "Depreciation": "57688", "Interest": "27061",
+                          "Profit before tax": "123162", "Tax": "27552", "Net Profit": "80775"},
+                         {"Sales": ("UNEXPLAINED", Decimal("-1439")),
+                          "Other Income": ("UNEXPLAINED", Decimal("-116"))}),
+    ("FY", "ETERNAL"): ({"Sales": "54364", "Other Income": "1396", "Depreciation": "1597", "Interest": "392",
+                         "Profit before tax": "615", "Tax": "249", "Net Profit": "366"}, {}),
+}  # fmt: skip
+
+Q4_GOLDEN = {
+    "ELIN": {
+        "Sales": "324.19",
+        "Expenses": "318.23",
+        "Other Income": "1.11",
+        "Depreciation": "6.48",
+        "Interest": "2.30",
+        "Profit before tax": "-1.71",
+        "Tax": "-0.95",
+        "Net Profit": "-0.76",
+    },
+    "TCS": {
+        "Sales": "70698.00",
+        "Expenses": "51422.00",
+        "Other Income": "757.00",
+        "Depreciation": "1406.00",
+        "Interest": "265.00",
+        "Profit before tax": "18362.00",
+        "Tax": "4578.00",
+        "Net Profit": "13718.00",
+    },
+    "ITC": {
+        "Sales": "17824.68",
+        "Expenses": "10900.45",
+        "Other Income": "699.52",
+        "Depreciation": "421.95",
+        "Interest": "29.18",
+        "Profit before tax": "7172.62",
+        "Tax": "1702.88",
+        "Net Profit": "5387.97",
+    },
+    "RELIANCE": {
+        "Sales": "294059.00",
+        "Expenses": "249918.00",
+        "Other Income": "4447.00",
+        "Depreciation": "14808.00",
+        "Interest": "6585.00",
+        "Profit before tax": "27195.00",
+        "Tax": "6579.00",
+        "Net Profit": "16971.00",
+    },
+    "ETERNAL": {
+        "Sales": "17292.00",
+        "Expenses": "16806.00",
+        "Other Income": "342.00",
+        "Depreciation": "468.00",
+        "Interest": "132.00",
+        "Profit before tax": "228.00",
+        "Tax": "54.00",
+        "Net Profit": "174.00",
+    },
+    "HDFCBANK": {
+        "Revenue": "87182.50",
+        "Expenses": "44027.87",
+        "Other Income": "29737.44",
+        "Interest": "45220.44",
+        "Profit before tax": "27671.63",
+        "Tax": "6597.41",
+        "Net Profit": "20350.76",
+    },
+    "BAJFINANCE": {
+        "Revenue": "21605.79",
+        "Expenses": "6553.07",
+        "Other Income": "10.92",
+        "Depreciation": "255.52",
+        "Interest": "7398.28",
+        "Profit before tax": "7409.84",
+        "Tax": "1856.54",
+        "Net Profit": "5464.57",
+    },
+}
+
+
+def _q4(name):
+    data = (XBRL_DIR / Q4_FILES[name]).read_bytes()
+    facts = {**quarter_facts(parse_instance(data), MAR)}
+    fy_facts = {}
+    inst = parse_instance(data)
+    for f in inst.facts:
+        c = inst.contexts[f.context_id]
+        if c.dimensions or c.instant is not None or not f.is_numeric or (c.start, c.end) != FY or f.name in fy_facts:
+            continue
+        fy_facts[f.name] = Decimal(f.value_text.strip())
+    return data, facts, fy_facts
+
+
+def _check_rows(name, st, golden, divergent, facts):
+    for row, want in golden.items():
+        ours = st.rows[row].value
+        assert ours is not None, (name, row)
+        gap = Decimal(want) - ours / CR
+        if row in divergent:
+            code, ref = divergent[row]
+            if isinstance(ref, Decimal):
+                assert abs(gap - ref) <= TOL, (name, row, gap, ref)
+                continue
+            assert any(code in d for d in st.divergences), (name, row, st.divergences)
+            expected = -facts[ref] / CR if code == "BANK_EXCEPTIONAL" else facts[ref] / CR
+            assert abs(gap - expected) <= TOL, (name, row, gap, expected)
+        else:
+            assert abs(gap) <= TOL, (name, row, ours / CR, want)
+
+
+@pytest.mark.parametrize("key", sorted(ANNUAL_GOLDEN))
+def test_annual_statements_match_screener(key):
+    kind, name = key
+    data, _, fy_facts = _q4(name)
+    r = parse_indas_corp_results(data)
+    assert r.ok, r.issues
+    st = {"BS": lambda: balance_sheet(r, MAR), "CF": lambda: cashflow(r, *FY), "FY": lambda: corp_quarter(r, *FY)}[
+        kind
+    ]()
+    golden, divergent = ANNUAL_GOLDEN[key]
+    _check_rows(name, st, golden, divergent, fy_facts)
+
+
+@pytest.mark.parametrize("name", sorted(Q4_FILES))
+def test_second_quarter_ties_out_and_keeps_the_same_divergences(name):
+    """Jan-Mar 2026: every statement reconciles to PBT; the divergence set is the same as in Jul-Sep 2026."""
+    data, facts, _ = _q4(name)
+    kind = Q4_KIND.get(name, "corp")
+    st = corp_quarter(parse_indas_corp_results(data), *Q4) if kind == "corp" else RAW_BUILDERS[kind](facts)
+    assert tie_out(st) == 0
+    codes = {d.split(":")[0].split(" ")[0] for d in st.divergences}
+    expected = {d.split(":")[0].split(" ")[0] for d in build(name)[0].divergences}
+    assert codes == expected, (name, codes, expected)
+    divergent = {
+        "ITC": {"Other Income": ("ASSOCIATES_PLACEMENT", ASSOC), "Profit before tax": ("ASSOCIATES_PLACEMENT", ASSOC)},
+        "BAJFINANCE": {"Other Income": ("ASSOCIATES_PLACEMENT", ASSOC),
+                       "Profit before tax": ("ASSOCIATES_PLACEMENT", ASSOC)},
+        "HDFCBANK": {"Profit before tax": ("BANK_EXCEPTIONAL", "ExceptionalItems")},
+    }.get(name, {})  # fmt: skip
+    _check_rows(name, st, Q4_GOLDEN[name], divergent, facts)
+
+
+def test_balance_sheet_nets_deferred_tax_like_screener():
+    """[S10] Total = Assets - min(DTA, DTL): TCS 182372 - 1205 = 181167 (DTL < DTA)."""
+    r = parse_indas_corp_results((XBRL_DIR / Q4_FILES["TCS"]).read_bytes())
+    st = balance_sheet(r, MAR)
+    assert st.rows["Total Assets"].parts["Deferred tax netted"] / CR == Decimal("-1205")
+    for side in ("Total Assets", "Total Liabilities"):
+        assert st.rows[side].value / CR == Decimal("181167")
+
+
+def test_audit_status_is_per_context():
+    """[X46] Eternal Q4 FY26 marks the quarter Unaudited and the FY Audited; this used to raise ParseError."""
+    r = parse_indas_corp_results((XBRL_DIR / Q4_FILES["ETERNAL"]).read_bytes())
+    assert (r.meta["audited"], r.meta["audited_ytd"]) == (False, True)

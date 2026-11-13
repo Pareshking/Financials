@@ -86,15 +86,55 @@ DURATION_TAGS: dict[str, tuple[str, str]] = {
     "InterestReceivedClassifiedAsInvestingActivities": ("interest_received_investing", "INR"),
     "DividendsPaidClassifiedAsFinancingActivities": ("dividends_paid", "INR"),
     "AdjustmentsForSharebasedPayments": ("share_based_payments_addback", "INR"),
+    # Cash-flow reconciliation (indirect method) [X45]. Sign as filed: working-capital lines are positive when
+    # they add cash; AdjustmentsForInterestIncome / DividendIncome / UndistributedProfitsOfAssociates are filed
+    # as positive amounts that the filer *deducts* (25/25 Sep-2026 filings, unique sign solution).
+    "AdjustmentsForReconcileProfitLoss": ("cf_adjustments_total", "INR"),
+    "AdjustmentsForDepreciationAndAmortisationExpense": ("cf_adj_depreciation", "INR"),
+    "AdjustmentsForFinanceCosts": ("cf_adj_finance_costs", "INR"),
+    "AdjustmentsForInterestIncome": ("cf_adj_interest_income_deducted", "INR"),
+    "AdjustmentsForDividendIncome": ("cf_adj_dividend_income_deducted", "INR"),
+    "AdjustmentsForUndistributedProfitsOfAssociates": ("cf_adj_associates_deducted", "INR"),
+    "AdjustmentsForDecreaseIncreaseInTradeReceivablesCurrent": ("cf_wc_trade_receivables_current", "INR"),
+    "AdjustmentsForDecreaseIncreaseInTradeReceivablesNoncurrent": ("cf_wc_trade_receivables_noncurrent", "INR"),
+    "AdjustmentsForDecreaseIncreaseInInventories": ("cf_wc_inventories", "INR"),
+    "AdjustmentsForIncreaseDecreaseInTradePayablesCurrent": ("cf_wc_trade_payables_current", "INR"),
+    "AdjustmentsForIncreaseDecreaseInTradePayablesNoncurrent": ("cf_wc_trade_payables_noncurrent", "INR"),
+    "AdjustmentsForDecreaseIncreaseInOtherCurrentAssets": ("cf_wc_other_current_assets", "INR"),
+    "AdjustmentsForDecreaseIncreaseInOtherNoncurrentAssets": ("cf_wc_other_noncurrent_assets", "INR"),
+    "AdjustmentsForOtherFinancialAssetsCurrent": ("cf_wc_other_financial_assets_current", "INR"),
+    "AdjustmentsForOtherFinancialAssetsNoncurrent": ("cf_wc_other_financial_assets_noncurrent", "INR"),
+    "AdjustmentsForOtherBankBalances": ("cf_wc_other_bank_balances", "INR"),
+    "AdjustmentsForIncreaseDecreaseInOtherCurrentLiabilities": ("cf_wc_other_current_liabilities", "INR"),
+    "AdjustmentsForIncreaseDecreaseInOtherNoncurrentLiabilities": ("cf_wc_other_noncurrent_liabilities", "INR"),
+    "AdjustmentsForProvisionsCurrent": ("cf_wc_provisions_current", "INR"),
+    "AdjustmentsForProvisionsNoncurrent": ("cf_wc_provisions_noncurrent", "INR"),
+    "AdjustmentsForOtherFinancialLiabilitiesCurrent": ("cf_wc_other_financial_liabilities_current", "INR"),
+    "AdjustmentsForOtherFinancialLiabilitiesNoncurrent": ("cf_wc_other_financial_liabilities_noncurrent", "INR"),
+    "DividendsReceivedClassifiedAsOperatingActivities": ("dividends_received_operating", "INR"),
+    "DividendsReceivedClassifiedAsInvestingActivities": ("dividends_received_investing", "INR"),
+    "ProceedsFromBorrowingsClassifiedAsFinancingActivities": ("borrowings_proceeds", "INR"),
+    "RepaymentsOfBorrowingsClassifiedAsFinancingActivities": ("borrowings_repayments", "INR"),
+    "PaymentsOfLeaseLiabilitiesClassifiedAsFinancingActivities": ("lease_payments", "INR"),
+    "ProceedsFromIssuingSharesClassifiedAsFinancingActivities": ("share_issue_proceeds", "INR"),
+    "IncreaseDecreaseInCashAndCashEquivalentsBeforeEffectOfExchangeRateChanges": ("net_cash_flow", "INR"),
+    "EffectOfExchangeRateChangesOnCashAndCashEquivalents": ("fx_effect_on_cash", "INR"),
+    "IncreaseDecreaseInCashAndCashEquivalents": ("net_cash_flow_after_fx", "INR"),
     "AmountOfRelatedPartyTransactionDuringTheReportingPeriod": ("rpt_total_amount", "INR"),
 }
 
 INSTANT_TAGS: dict[str, tuple[str, str]] = {
     "PropertyPlantAndEquipment": ("ppe_net", "INR"),
     "CapitalWorkInProgress": ("cwip", "INR"),
+    "IntangibleAssetsUnderDevelopment": ("intangibles_under_development", "INR"),
+    "InvestmentProperty": ("investment_property", "INR"),
+    "DeferredTaxAssetsNet": ("deferred_tax_assets", "INR"),
+    "DeferredTaxLiabilitiesNet": ("deferred_tax_liabilities", "INR"),
     "Goodwill": ("goodwill", "INR"),
     "OtherIntangibleAssets": ("other_intangibles", "INR"),
     "NoncurrentInvestments": ("noncurrent_investments", "INR"),
+    # Associates / JVs: a separate Schedule III line, not inside NoncurrentInvestments [X44]
+    "InvestmentsAccountedForUsingEquityMethod": ("equity_method_investments", "INR"),
     "NoncurrentAssets": ("noncurrent_assets", "INR"),
     "Inventories": ("inventories", "INR"),
     "CurrentInvestments": ("current_investments", "INR"),
@@ -153,6 +193,9 @@ LABEL_RULES: tuple[tuple[str, str, str, str, str, re.Pattern[str]], ...] = (
      "lease_liabilities_noncurrent", "INSTANT", re.compile(r"^\s*lease\s+liab", re.I)),
     ("LEASE_LIAB_CURRENT", "OtherCurrentFinancialLiabilitiesAxis", "OtherCurrentFinancialLiabilities",
      "lease_liabilities_current", "INSTANT", re.compile(r"^\s*lease\s+liab", re.I)),
+    # Right-of-use assets: only a labelled OtherNoncurrentAssets member (Eternal, ITC) [X47]
+    ("RIGHT_OF_USE_ASSETS", "OtherNoncurrentAssetsAxis", "OtherNoncurrentAssets", "right_of_use_assets", "INSTANT",
+     re.compile(r"^\s*right[\s-]*of[\s-]*use", re.I)),
     ("EXCISE_DUTY", "DetailsOfOtherExpensesAxis", "OtherExpenses", "excise_duty", "DURATION",
      re.compile(r"^\s*excise\s+dut", re.I)),
 )  # fmt: skip
@@ -303,7 +346,12 @@ def _parse_meta(inst: Instance, result: ParsedResults) -> None:
     if end_date and end_time:
         board_end = ist_to_utc(end_date, time.fromisoformat(end_time))
 
-    audited_text = (inst.first_text("WhetherResultsAreAuditedOrUnaudited") or "").strip().lower()
+    # Audit status is per context: a Q4 filing may mark the quarter Unaudited and the FY Audited [X46].
+    audit_by_period: dict[tuple, bool | None] = {}
+    for f in inst.facts:
+        c = inst.contexts[f.context_id]
+        if f.name == "WhetherResultsAreAuditedOrUnaudited" and not c.dimensions and c.instant is None:
+            audit_by_period[(c.start, c.end)] = {"audited": True, "unaudited": False}.get(f.value_text.strip().lower())
     result.meta.update(
         scope=scope,
         level_of_rounding=rounding,
@@ -313,7 +361,8 @@ def _parse_meta(inst: Instance, result: ParsedResults) -> None:
         ytd_period=ytd,
         period_end=q_end,
         reporting_quarter=inst.first_text("ReportingQuarter"),
-        audited={"audited": True, "unaudited": False}.get(audited_text),
+        audited=audit_by_period.get((q_start, q_end)),  # the quarter's own status (filings.audited)
+        audited_ytd=audit_by_period.get(ytd) if ytd else None,
         board_meeting_end_ts=board_end,
         stated_isin=isin,
         stated_symbol=symbol,
@@ -476,6 +525,13 @@ def _check_identities(result: ParsedResults) -> None:
         owners, nci = v("pat_owners"), v("pat_nci")
         if None not in (owners, nci, pat):
             _check(result, "OWNERS_PLUS_NCI", owners + nci, pat, 3, p)
+        adj, cgo = v("cf_adjustments_total"), v("cash_generated_from_operations")
+        if None not in (pbt, adj, cgo):
+            # Indirect method starts from PBT (before associates) [X45]
+            _check(result, "CF_RECONCILE", pbt + adj, cgo, 3, p)
+        cfo, cfi, cff, net = v("cfo"), v("cfi"), v("cff"), v("net_cash_flow")
+        if None not in (cfo, cfi, cff, net):
+            _check(result, "CF_NET", cfo + cfi + cff, net, 4, p)
         comps = [v(t) for t in EXPENSE_COMPONENTS]
         if exp is not None and None not in comps:
             _check(result, "EXPENSE_COMPONENTS", sum(comps, Decimal(0)), exp, len(comps) + 1, p)

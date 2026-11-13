@@ -115,6 +115,34 @@ CREATE TABLE IF NOT EXISTS trading_calendar (
     PRIMARY KEY (exchange, cal_date)
 );
 
+CREATE TABLE IF NOT EXISTS calendar_coverage (   -- years for which a holiday list was loaded
+    exchange          VARCHAR NOT NULL,
+    cal_year          INTEGER NOT NULL,
+    source_filing_id  VARCHAR NOT NULL REFERENCES filings(filing_id),
+    PRIMARY KEY (exchange, cal_year)
+);
+
+CREATE TABLE IF NOT EXISTS raw_index_snapshot (
+    filing_id      VARCHAR NOT NULL REFERENCES filings(filing_id),
+    index_name     VARCHAR NOT NULL,
+    snapshot_date  DATE    NOT NULL,
+    symbol         VARCHAR NOT NULL,
+    series         VARCHAR NOT NULL,
+    isin           VARCHAR NOT NULL,
+    company_name   VARCHAR,
+    industry       VARCHAR,
+    PRIMARY KEY (index_name, snapshot_date, isin, filing_id)
+);
+
+CREATE TABLE IF NOT EXISTS index_constituents_history (
+    index_name   VARCHAR NOT NULL,
+    security_id  VARCHAR NOT NULL REFERENCES securities(security_id),
+    valid_from   DATE NOT NULL,                  -- first snapshot seen in (true inclusion may be earlier) [L1]
+    valid_to     DATE,                           -- exclusive; snapshot date it was first missing
+    source       VARCHAR NOT NULL,               -- SNAPSHOT | MANUAL_BACKFILL
+    PRIMARY KEY (index_name, security_id, valid_from)
+);
+
 -- ── L2 Market ───────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS ohlcv (
     security_id        VARCHAR NOT NULL REFERENCES securities(security_id),

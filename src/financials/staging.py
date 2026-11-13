@@ -52,6 +52,10 @@ CREATE TABLE stg_corp_actions (
     issue_price DECIMAL(18,4), cash_per_share DECIMAL(18,4),
     PRIMARY KEY (filing_id, seq, component)
 );
+CREATE TABLE stg_holidays (
+    filing_id VARCHAR NOT NULL, exchange VARCHAR NOT NULL, cal_date DATE NOT NULL, description VARCHAR NOT NULL,
+    PRIMARY KEY (filing_id, cal_date)
+);
 CREATE TABLE stg_issues (
     filing_id VARCHAR, stage VARCHAR NOT NULL, reason_code VARCHAR NOT NULL, details JSON NOT NULL
 );
@@ -64,6 +68,8 @@ TABLE_ORDER = (
     "raw_cm_bhavcopy",
     "raw_delivery",
     "raw_xbrl_facts",
+    "raw_index_snapshot",
+    "stg_holidays",
     "stg_xbrl_filing",
     "stg_xbrl_facts",
     "stg_corp_actions",
@@ -379,4 +385,63 @@ def stage_corp_actions(
         filing.filing_id,
         {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)], "stg_corp_actions": rows},
         extra={"exchange": exchange},
+    )
+
+
+def stage_holidays(
+    vault: Vault, stage_root: Path, *, data: bytes, source_url: str, fetched_at: datetime, exchange: str = "NSE"
+) -> Path:
+    from financials.calendar import parse_holiday_master
+
+    holidays = parse_holiday_master(data)
+    blob = vault.put(data, ext="json", media_type="application/json", fetched_at=fetched_at)
+    filing = make_filing(blob, exchange=exchange, category="HOLIDAYS", source_url=source_url, fetched_at=fetched_at)
+    rows = [
+        {"filing_id": filing.filing_id, "exchange": exchange, "cal_date": d, "description": desc}
+        for d, desc in holidays
+    ]
+    return write_stage(
+        stage_root,
+        "holidays",
+        filing.filing_id,
+        {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)], "stg_holidays": rows},
+        extra={"exchange": exchange},
+    )
+
+
+def stage_index_snapshot(
+    vault: Vault,
+    stage_root: Path,
+    *,
+    data: bytes,
+    source_url: str,
+    index_name: str,
+    snapshot_date,
+    fetched_at: datetime,
+    exchange: str = "NSE",
+) -> Path:
+    from financials.parsers.indices import parse_index_list
+
+    members = parse_index_list(data)
+    blob = vault.put(data, ext="csv", media_type="text/csv", fetched_at=fetched_at)
+    filing = make_filing(blob, exchange=exchange, category="INDEX_LIST", source_url=source_url, fetched_at=fetched_at)
+    rows = [
+        {
+            "filing_id": filing.filing_id,
+            "index_name": index_name,
+            "snapshot_date": snapshot_date,
+            "symbol": m.symbol,
+            "series": m.series,
+            "isin": m.isin,
+            "company_name": m.company_name,
+            "industry": m.industry,
+        }
+        for m in members
+    ]
+    return write_stage(
+        stage_root,
+        "index_snapshot",
+        f"{index_name.replace(' ', '_')}-{snapshot_date}-{blob.sha256[:12]}",
+        {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)], "raw_index_snapshot": rows},
+        extra={"index_name": index_name, "snapshot_date": str(snapshot_date)},
     )

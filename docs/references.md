@@ -81,6 +81,16 @@ Last reviewed: 2026-11-13.
 | CA8 | `caBroadcastDate` is `null` on every record in the fixture, so action visibility time is unknown. | VERIFIED | fixture |
 | CA9 | All 256 EQ records in the window match one of five purpose patterns (dividend, bonus, face-value split, rights with premium, demerger); 9 GS records are interest payments. | VERIFIED | test |
 
+## 2c. Calendar and index lists
+
+| # | Claim | Status | Evidence |
+|---|---|---|---|
+| CAL1 | `holiday-master?type=trading` returns a dict keyed by segment (`CM`, `FO`, …); `CM` lists 20 holidays for 2026 only (`tradingDate` `DD-Mon-YYYY`, weekend holidays included, Diwali Laxmi Pujan marked `*`). | VERIFIED | `tests/test_calendar_and_index.py` |
+| CAL2 | Special sessions (Muhurat) can produce a bhavcopy on a listed holiday. | UNVERIFIED | Rule anyway: bhavcopy overrides holiday rows |
+| IDX1 | `ind_nifty500list.csv` (2026-11-13): 501 rows, columns `Company Name, Industry, Symbol, Series, ISIN Code`. | VERIFIED | test |
+| IDX2 | Index lists can contain non-ISIN placeholders (`DUMMYHEG`, `DUM545A01024`), presumably around demergers. | VERIFIED (present) | test; quarantined as `PLACEHOLDER_ISIN` |
+| IDX3 | Against the 2025-10-14 bhavcopy, 31 of the 2026 constituents do not resolve by ISIN: later IPOs plus splits since (e.g. KOTAKBANK `INE237A01028` → `INE237A01036`). | OBSERVED | Snapshot must be promoted after the same day's bhavcopy |
+
 ## 2a. Implementation facts (DuckDB 1.3.2, pyarrow 26)
 
 | # | Claim | Status | Evidence |

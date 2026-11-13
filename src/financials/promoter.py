@@ -53,6 +53,8 @@ def promote(con: duckdb.DuckDBPyConnection, stage_dir: Path) -> PromotionResult:
         "market_day": _promote_market_day,
         "results_xbrl": _promote_results_xbrl,
         "corp_actions": _promote_corp_actions,
+        "holidays": _promote_holidays,
+        "index_snapshot": _promote_index_snapshot,
     }.get(job)
     if handler is None:
         raise ValueError(f"unknown job {job!r}")
@@ -249,11 +251,9 @@ def _promote_market_day(con, stage_dir: Path, manifest: dict[str, Any]) -> Promo
             }
         )
     insert_rows(con, "ohlcv", ohlcv_rows)
-    insert_rows(
-        con,
-        "trading_calendar",
-        [{"exchange": exchange, "cal_date": trade_date, "is_trading": True, "note": "bhavcopy present"}],
-        or_ignore=True,
+    # A bhavcopy is ground truth: it overrides a holiday row (e.g. a special/Muhurat session).
+    con.execute(
+        "INSERT OR REPLACE INTO trading_calendar VALUES (?, ?, TRUE, 'bhavcopy present')", [exchange, trade_date]
     )
 
     verify_pending_actions(con, exchange)
@@ -572,10 +572,9 @@ def _visible_from(
         return broadcast_ts, "BROADCAST"
     if board_end is None or board_end_ist_date is None:
         return None, None
-    nxt = con.execute(
-        "SELECT min(cal_date) FROM trading_calendar WHERE exchange = ? AND is_trading AND cal_date > ?",
-        [exchange, board_end_ist_date],
-    ).fetchone()[0]
+    from financials.calendar import next_trading_day
+
+    nxt = next_trading_day(con, exchange, board_end_ist_date)
     if nxt is None:
         return None, None
     return ist_to_utc(nxt, time(0, 0)), "BOARD_MEETING_RULE"
@@ -678,3 +677,115 @@ def pit_fact(
         [entity_id, scope, canonical_tag, period_start, period_end, as_of],
     ).fetchone()
     return None if row is None else row[0]
+
+
+# ── calendar & index membership ────────────────────────────────────────────
+
+
+def _promote_holidays(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings"))
+    rows = read_table(con, stage_dir, "stg_holidays")
+    for r in rows:
+        # Never overwrite a day a bhavcopy proved to be a trading day.
+        con.execute(
+            "INSERT OR IGNORE INTO trading_calendar VALUES (?, ?, FALSE, ?)",
+            [r["exchange"], r["cal_date"], "holiday: " + r["description"]],
+        )
+    years = sorted({r["cal_date"].year for r in rows})
+    for y in years:
+        con.execute(
+            "INSERT OR REPLACE INTO calendar_coverage VALUES (?, ?, ?)", [manifest["exchange"], y, rows[0]["filing_id"]]
+        )
+    return PromotionResult("PROMOTED", "holidays", message=f"{len(rows)} holidays, years {years}")
+
+
+def _promote_index_snapshot(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
+    index_name = manifest["index_name"]
+    snap = date.fromisoformat(manifest["snapshot_date"])
+    latest = con.execute(
+        "SELECT max(snapshot_date) FROM raw_index_snapshot WHERE index_name = ?", [index_name]
+    ).fetchone()[0]
+    if latest is not None and snap < latest:
+        raise GateFailure("ORDER", f"{index_name} snapshot {snap} older than {latest}")
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_index_snapshot"))
+    rows = [r for r in read_table(con, stage_dir, "raw_index_snapshot")]
+    members: set[str] = set()
+    quarantined = []
+    for r in rows:
+        if not r["isin"].startswith("IN"):  # e.g. DUMMYHEG / DUM545A01024 placeholder [IDX2]
+            quarantined.append(
+                _quarantine(
+                    con,
+                    stage="INDEX",
+                    reason_code="PLACEHOLDER_ISIN",
+                    filing_id=r["filing_id"],
+                    details={"index": index_name, "isin": r["isin"], "symbol": r["symbol"], "snapshot": snap},
+                )
+            )
+            continue
+        secs, method = resolve_corp_action_security(con, "NSE", r["isin"], r["symbol"], snap)
+        if len(secs) != 1:
+            quarantined.append(
+                _quarantine(
+                    con,
+                    stage="INDEX",
+                    reason_code=method if not secs else "AMBIGUOUS_SECURITY",
+                    filing_id=r["filing_id"],
+                    details={"index": index_name, "isin": r["isin"], "symbol": r["symbol"], "snapshot": snap},
+                )
+            )
+            continue
+        members.add(secs[0])
+    real = [r for r in rows if r["isin"].startswith("IN")]
+    unresolved = len(real) - len(members)
+    if real and unresolved / len(real) > float(G2_MAX_UNRESOLVED):
+        raise GateFailure("G2", f"{unresolved}/{len(real)} constituents unresolved")
+    open_now = {
+        sec
+        for (sec,) in con.execute(
+            "SELECT security_id FROM index_constituents_history WHERE index_name = ? AND valid_to IS NULL",
+            [index_name],
+        ).fetchall()
+    }
+    for sec in open_now - members:
+        con.execute(
+            "UPDATE index_constituents_history SET valid_to = ? WHERE index_name = ? AND security_id = ? "
+            "AND valid_to IS NULL",
+            [snap, index_name, sec],
+        )
+    insert_rows(
+        con,
+        "index_constituents_history",
+        [
+            {"index_name": index_name, "security_id": sec, "valid_from": snap, "valid_to": None, "source": "SNAPSHOT"}
+            for sec in sorted(members - open_now)
+        ],
+    )
+    return PromotionResult(
+        "PROMOTED",
+        "index_snapshot",
+        message=f"{index_name} {snap}: +{len(members - open_now)} -{len(open_now - members)}",
+        quarantined=quarantined,
+    )
+
+
+class SurvivorshipBiasError(LookupError):
+    """Raised when a point-in-time universe is requested before membership history begins [L1]."""
+
+
+def index_members(con, index_name: str, as_of: date, *, allow_survivorship_bias: bool = False) -> list[str]:
+    first = con.execute(
+        "SELECT min(valid_from) FROM index_constituents_history WHERE index_name = ?", [index_name]
+    ).fetchone()[0]
+    if first is None:
+        raise SurvivorshipBiasError(f"no membership history for {index_name}")
+    if as_of < first:
+        if not allow_survivorship_bias:
+            raise SurvivorshipBiasError(f"{index_name} history starts {first}; {as_of} would use later members")
+        as_of = first
+    rows = con.execute(
+        "SELECT security_id FROM index_constituents_history WHERE index_name = ? AND valid_from <= ? "
+        "AND (valid_to IS NULL OR valid_to > ?) ORDER BY security_id",
+        [index_name, as_of, as_of],
+    ).fetchall()
+    return [r[0] for r in rows]

@@ -7,8 +7,9 @@ Universe v1: NSE Mainboard `EQ`/`BE`/`BZ`, starting with the Nifty 500. SME excl
 (`MIN_PERIOD_END_DATE`, Q4 FY25: first Integrated Filing quarter). No parsers or fallbacks for older formats.
 No redistribution.
 
-**Read before changing anything:** `docs/architecture.md` (design) and `docs/references.md`
-(evidence register: what is VERIFIED vs UNVERIFIED).
+**Read before changing anything:** `docs/architecture.md` (design), `docs/references.md`
+(evidence register: what is VERIFIED vs UNVERIFIED) and `docs/data_sources.md` (every feed; generated
+from `config/data_sources.yaml` by `python -m financials.sources --write`; edit the YAML, never the MD).
 
 ## Commands
 

@@ -133,6 +133,18 @@ Last reviewed: 2026-11-13.
 | I7 | Inserting quarantine rows one at a time (Arrow register + insert per row) made a gap-heavy promotion take 11.2 s; bulk insert takes 0.9 s. | OBSERVED | `docs/benchmarks.md`, `tests/test_benchmarks.py` |
 | I5 | `executemany` is ~1 ms/row; Arrow registration loads ~3,000 rows in <0.1 s. | OBSERVED | benchmark 2026-11-13 |
 
+## 2e. Feed probes (single request each, 2026-11-13, cloud container; no fixtures committed)
+
+| # | Claim | Status | Evidence |
+|---|---|---|---|
+| FD14 | Bulk / block deals: `nsearchives…/content/equities/bulk.csv`, `…/block.csv` (header `Date,Symbol,Security Name,Client Name,Buy/Sell,Quantity Traded,Trade Price / Wght. Avg. Price[,Remarks]`). Current day only (no date in URL): history needs daily capture. | OBSERVED | probe |
+| FD15 | Short selling: `nsearchives…/archives/equities/shortSelling/shortselling_DDMMYYYY.csv` (`Security Name, Symbol Name, Trade Date, Quantity`). The file for 12-11-2026 holds trade date **11-Nov-2026** (one-day lag). | OBSERVED | probe |
+| FD16 | F&O UDiFF bhavcopy: `nsearchives…/content/fo/BhavCopy_NSE_FO_0_0_0_YYYYMMDD_F_0000.csv.zip`, same column family as CM UDiFF (`XpryDt, StrkPric, OptnTp, OpnIntrst, ChngInOpnIntrst`, …). | OBSERVED | probe (1.37 MB zip) |
+| FD17 | Participant-wise OI / volume: `nsearchives…/content/nsccl/fao_participant_oi_DDMMYYYY.csv`, `…_vol_DDMMYYYY.csv`; title line, then `Client Type, Future Index Long, …`. | OBSERVED | probe |
+| FD18 | F&O ban list: `nsearchives…/archives/fo/sec_ban/fo_secban_DDMMYYYY.csv` ("Securities in Ban For Trade Date …", then `n,SYMBOL`). | OBSERVED | probe |
+| FD19 | SLBM bhavcopy: `nsearchives…/archives/slbs/bhavcopy/SLBM_BC_DDMMYYYY.DAT` (fixed-width-ish CSV, no header). | OBSERVED | probe |
+| FD20 | Surveillance and risk: price bands `nsearchives…/content/equities/sec_list_DDMMYYYY.csv` (`Symbol,Series,Security Name,Band,Remarks`); ASM `www.nseindia.com/api/reportASM` (JSON `longterm`/`shortterm`); VaR `nsearchives…/archives/nsccl/var/C_VAR1_DDMMYYYY_1.DAT`. GSM endpoint not probed. | OBSERVED | probes |
+
 ## 3. Access & discovery
 
 | # | Claim | Status | Evidence |

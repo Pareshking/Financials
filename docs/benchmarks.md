@@ -7,12 +7,12 @@ Machine: Linux-6.18.44-fc-v445-x86_64-with-glibc2.39, 4 CPUs, Python 3.13.18, Du
 
 | Day | Raw rows | Delivery rows | Stage (parse + Parquet) ms | Promote ms | Total ms | Rows/s |
 |---|---|---|---|---|---|---|
-| 20250919 | 3,139 | 0 | 265 | 271 | 535 | 5,865 |
-| 20250922 | 3,210 | 0 | 204 | 429 | 633 | 5,070 |
-| 20250923 | 3,144 | 0 | 187 | 387 | 574 | 5,479 |
-| 20251013 | 3,218 | 0 | 185 | 503 | 688 | 4,674 |
-| 20251014 | 3,215 | 3,044 | 262 | 491 | 752 | 8,319 |
-| 20261112 | 3,727 | 3,566 | 310 | 1000 | 1310 | 5,569 |
+| 20250919 | 3,139 | 0 | 283 | 284 | 566 | 5,542 |
+| 20250922 | 3,210 | 0 | 203 | 434 | 636 | 5,044 |
+| 20250923 | 3,144 | 0 | 196 | 364 | 559 | 5,622 |
+| 20251013 | 3,218 | 0 | 199 | 527 | 726 | 4,434 |
+| 20251014 | 3,215 | 3,044 | 263 | 504 | 767 | 8,165 |
+| 20261112 | 3,727 | 3,566 | 296 | 953 | 1249 | 5,839 |
 
 Promote includes identity resolution, G1/G2, `ohlcv`, corporate-action verification and the gap auditor.
 
@@ -20,30 +20,30 @@ Promote includes identity resolution, G1/G2, `ohlcv`, corporate-action verificat
 
 | Filing | p50 ms | p95 ms |
 |---|---|---|
-| INDAS_CORP results (ELIN, 620 facts) | 6.1 | 8.9 |
-| REG31 shareholding (ELIN, 1,436 facts) | 13.1 | 28.1 |
+| INDAS_CORP results (ELIN, 620 facts) | 6.1 | 7.1 |
+| REG31 shareholding (ELIN, 1,436 facts) | 11.9 | 18.8 |
 
 ## 3. Feature materialisation
 
-Full universe for 2026-11-12: **2,981 rows in 203 ms** (PROMOTED), including G4 (null-spike vs 2025-10-14) and G5 (atomic swap).
+Full universe for 2026-11-12: **2,981 rows in 207 ms** (PROMOTED), including G4 (null-spike vs 2025-10-14) and G5 (atomic swap).
 
 ## 4. DSL screen latency (50 runs each, warm)
 
 | Screen | p50 ms | p95 ms |
 |---|---|---|
-| `Market Cap > 100 AND Promoter holding > 30` | 1.99 | 2.34 |
-| `(roe > 15 OR roce > 20) AND NOT debt to equity > 1 AND pe < 40` | 1.99 | 3.23 |
-| `Return 1M > 5 OR price to 200dma > 1.1 OR delivery velocity > 1.5` | 1.92 | 2.19 |
-| `(net profit - 2) / (sales + 1) * 100 > 10 AND In Nifty 500 = 1` | 2.32 | 3.16 |
-| `net cash to mcap > 5 AND market cap > 500` | 2.17 | 3.27 |
-| `In Nifty 500 = 1 AND (fii holding + dii holding) > 20 OR price to book value < 1` | 1.96 | 2.61 |
-| **all screens** | **2.03** | **2.91** |
+| `Market Cap > 100 AND Promoter holding > 30` | 1.92 | 4.03 |
+| `(roe > 15 OR roce > 20) AND NOT debt to equity > 1 AND pe < 40` | 1.95 | 2.22 |
+| `Return 1M > 5 OR price to 200dma > 1.1 OR delivery velocity > 1.5` | 1.82 | 2.30 |
+| `(net profit - 2) / (sales + 1) * 100 > 10 AND In Nifty 500 = 1` | 2.15 | 2.39 |
+| `net cash to mcap > 5 AND market cap > 500` | 2.03 | 2.54 |
+| `In Nifty 500 = 1 AND (fii holding + dii holding) > 20 OR price to book value < 1` | 1.97 | 2.28 |
+| **all screens** | **1.97** | **2.49** |
 
 ## 5. Storage footprint (after all promotions, `CHECKPOINT`)
 
 | Store | Bytes | MB |
 |---|---|---|
-| market.duckdb | 31,731,712 | 31.7 |
+| market.duckdb | 31,993,856 | 32.0 |
 | staging (Parquet) | 2,593,732 | 2.6 |
 | vault (raw files) | 2,530,138 | 2.5 |
 

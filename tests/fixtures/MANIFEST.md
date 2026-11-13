@@ -107,5 +107,13 @@ output); `tests/test_index_backfill.py::test_derived_text_matches_pdf` regenerat
 | `xbrl/INTEGRATED_FILING_INDAS_1748218_28102026075349_WEB.xml` | B1: United Spirits Q2 FY27 standalone. Excise 53% of gross revenue (X40) | `42ba2cdcf272db4e055fbf3430d12b60f3d932fe43b91471ae3b1b48073b3ac3` |
 | `xbrl/INTEGRATED_FILING_INDAS_1753920_05112026063545_WEB.xml` | B1: ONGC Q2 FY27 standalone. Lease label with typo "Lease Liabilties" (X39) | `c63b1484dcf638cd44c80a8a06dd91daf66635ec111ba68f6329f712a9963ab4` |
 | `xbrl/INTEGRATED_FILING_INDAS_1756234_11112026070341_WEB.xml` | B2: Tata Power Q2 FY27 consolidated. Regulatory deferral movement, associates after PAT(continuing), owners/NCI split (X42) | `05f6dfb5a483496b3fc529b3ce8cb916248ecfbe73e7f1b62a84a83a0522d714` |
+| `xbrl/INTEGRATED_FILING_INDAS_1734607_08102026100810_WEB.xml` | S: TCS Q2 FY27 consolidated (Screener parity, NCI) | `613039552dfbe7ac779ef62340b5df844da05c3a2c8a2d943c69cf6fe862353c` |
+| `xbrl/INTEGRATED_FILING_INDAS_1751357_02112026065559_WEB.xml` | S: ITC Q2 FY27 consolidated (excise, exceptional, associates placement S3) | `23b97727608d7fa2cdb89ac5a898f01f6f5da75b8fbec07101b25553b3d62a8e` |
+| `xbrl/INTEGRATED_FILING_INDAS_1753872_05112026061939_WEB.xml` | S: ELIN Q2 FY27 consolidated (exceptional in Other Income S2) | `9b8e2bccfc59632da33a8b715d78eb7e1fdd5bf30eee5315b6259874dbf52fff` |
+| `xbrl/INTEGRATED_FILING_INDAS_1743410_21102026064843_WEB.xml` | S: Eternal Q2 FY27 consolidated (new-gen tech) | `9a010ed527323be9fa116f264e9f62665f16af3eae90100b160155ccc98431ee` |
+| `xbrl/INTEGRATED_FILING_BANKING_1740913_17102026054812_WEB.xml` | S: HDFC Bank Q2 FY27 consolidated (bank exceptional S4) | `41840bebf50eacb915fe9ddd2d7cd2bace3d6fffdaa0898a482bd56ddd94aa3b` |
+| `xbrl/INTEGRATED_FILING_NBFC_INDAS_1742040_19102026075918_WEB.xml` | S: Bajaj Finance Q2 FY27 consolidated (S5) | `3de881019f229f5fde8d2aa113ea1c71304f5225ebe6a4d192b5f4a65f54ea34` |
+| `xbrl/INTEGRATED_FILING_LI_1739360_15102026072721_WEB.xml` | S: HDFC Life Q2 FY27 consolidated (S6) | `d6058876141b32251fdc2d557b2987ca31fffc89ffaddeb472d7ad6288897b54` |
+| `xbrl/INTEGRATED_FILING_GI_1740432_16102026073544_WEB.xml` | S: ICICI Lombard Q2 FY27 standalone, Revision of 1738196 (S7) | `5e8d56b54e5fa87989d789fa01abe151d5356abc095fef36395d9c918d3e744c` |
 
-Source URL pattern for all four: `https://nsearchives.nseindia.com/corporate/xbrl/<file>`.
+Source URL pattern for all twelve: `https://nsearchives.nseindia.com/corporate/xbrl/<file>`.

@@ -387,6 +387,28 @@ ALIAS      := a name in financials.dsl.ALIASES or user_custom_ratios (case-insen
 - Division compiles to `x / NULLIF(y, 0)`. NULL comparisons are not TRUE, and `NOT` keeps NULL as NULL, so a stock missing a metric never passes a filter on it.
 - An unknown alias is a compile error, never a guess.
 
+## 14b. Statement builder: quarterly rows (Mandate 4, first slice)
+
+`financials/statements/quarterly.py` builds Screener-style quarterly rows from **our** definitions. Every row
+keeps its sub-rows, so any figure can be traced to XBRL. `tie_out` must return exactly 0, to the rupee:
+Revenue − Expenses − Interest − Depreciation + Other Income (+ bank exceptional) = PBT. Divergences from Screener
+are reported in `QuarterStatement.divergences`, never imitated. Evidence: S1–S7.
+
+| Row | INDAS_CORP (canonical tags) | Sub-rows |
+|---|---|---|
+| Sales | `revenue_from_operations − excise_duty` | revenue from operations, less excise |
+| Expenses | `total_expenses − depreciation − finance_costs − excise_duty` | materials, stock-in-trade purchases, inventory change, employee cost, other expenses net of excise |
+| Operating Profit | Sales − Expenses | — |
+| Other Income | `other_income + exceptional_items` [S2] | reported other income, exceptional items |
+| Depreciation / Interest / Tax | as reported | tax: current, deferred |
+| Profit before tax | `pbt` (associates excluded: `ASSOCIATES_PLACEMENT` [S3]) | before exceptional, exceptional |
+| Net Profit | `pat_owners`, else `pat` | continuing PAT, regulatory deferral, discontinued, associates, PAT, less NCI |
+
+Banks, NBFCs, life and general insurers use the raw-element formulas in S4–S7 until their parsers land
+(Mandate 2 batches 4–6). They then switch to canonical tags with the same tests. Annual-only sub-rows
+(fixed-asset schedule, notes) are NULL on quarterly statements. The Screener export carries only the
+Data Sheet rows, so golden parity covers top-level rows only. Sub-rows are checked by summation, not by golden values.
+
 ## 15. Phases
 
 **Phase 1: thin slice, screenable end-to-end (Nifty 500)**

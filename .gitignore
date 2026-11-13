@@ -10,3 +10,6 @@ __pycache__/
 .venv/
 .pytest_cache/
 *.egg-info/
+
+# Third-party exports used locally for parity review (never commit)
+*.xlsx

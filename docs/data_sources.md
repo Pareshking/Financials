@@ -11,7 +11,7 @@
 | F03 | Corporate actions API and RSS | 1 | VERIFIED | CONTAINER_DIRECT | P12, CA1, CA2, CA3, CA4, CA5, CA6, CA7, CA8, CA9 |
 | F04 | NSE trading holiday calendar | 1 | VERIFIED | CONTAINER_DIRECT | CAL1 |
 | F05 | Index constituents and rebalance notices | 1 | VERIFIED | CONTAINER_DIRECT | IDX1, IDX2, IDX4, IDX5, IDX6 |
-| F06 | Integrated Filing - Financials (Reg. 33 quarterly XBRL) | 1 | VERIFIED | CONTAINER_DIRECT | X1, X2, X4, X6, X32, X33, X34, X35, X38, A7 |
+| F06 | Integrated Filing - Financials (Reg. 33 quarterly XBRL) | 1 | VERIFIED | CONTAINER_DIRECT | X1, X2, X4, X6, X32, X33, X34, X35, X38, A7, A9 |
 | F07 | Reg. 34(1) annual report XBRL (MCA Ind AS taxonomy) | 2 | VERIFIED | CONTAINER_DIRECT | X36, X37, A8, X69, X70, X71, X72, X73, X74, X75, X76 |
 | F08 | Reg. 31 shareholding pattern XBRL | 1 | VERIFIED | CONTAINER_DIRECT | SHP1, SHP2, SHP3, SHP4, SHP6, SHP7, SHP8, SHP9, SHP10, SHP11, SHP12, SHP13, SHP14, SHP15 |
 | F09 | Reg. 76 reconciliation of share capital audit XBRL | 2 | UNVERIFIED | UNKNOWN | — |
@@ -132,8 +132,8 @@
 | unlocked_metrics | P&L, H1/FY balance sheet and cash flow, TTM, valuation ratios |
 | phase | 1 |
 | verification_status | VERIFIED |
-| evidence | X1, X2, X4, X6, X32, X33, X34, X35, X38, A7 |
-| notes | Verified namespaces IntegratedFinance_IndAS, _NBFC, _Banking (2026-01-31), _LI (2025-01-31). Only INDAS_CORP is parsed. General-insurance Integrated namespace not yet seen (legacy GI only, X26). Integrated filing starts Q4 FY25 for Bajaj Finance (X38). |
+| evidence | X1, X2, X4, X6, X32, X33, X34, X35, X38, A7, A9 |
+| notes | Discovery via `discover-filings` / `fetch-results --symbols\|--universe` (A7 listing, newest 20 rows; pagination UNVERIFIED) and the RSS symbol hint (A9) in `run-day`. Verified namespaces IntegratedFinance_IndAS, _NBFC, _Banking (2026-01-31), _LI (2025-01-31). Only INDAS_CORP is parsed. General-insurance Integrated namespace not yet seen (legacy GI only, X26). Integrated filing starts Q4 FY25 for Bajaj Finance (X38). |
 
 ## F07 — Reg. 34(1) annual report XBRL (MCA Ind AS taxonomy)
 

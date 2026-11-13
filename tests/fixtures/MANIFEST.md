@@ -223,6 +223,16 @@ Inspected for Batch 9 but not committed (3-8 MB each; registered in docs/tag_reg
 
 Inspected for Batch 10 but not committed: the other Reg. 30 files listed in docs/tag_registry.yaml (REG30_EVENT).
 
+## Phase 1 audit evidence (fetched 2026-11-13 in this project's earlier runs, one file per request; committed later)
+
+| File | Why it is here | Source URL | SHA-256 |
+|---|---|---|---|
+| `bhavcopy/BhavCopy_NSE_CM_0_0_0_20251017_F_0000.csv.zip` | Friday before a weekend: PrvsClsgPric chain across Sat/Sun (CAL3) | `https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20251017_F_0000.csv.zip` | `8fa1328466662888d3a0c186809f0a9ed08418ce0ca2289eca3f839f8e6db670` |
+| `bhavcopy/BhavCopy_NSE_CM_0_0_0_20251020_F_0000.csv.zip` | Monday after the weekend; session before the Muhurat day (CAL2, CAL3) | `https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20251020_F_0000.csv.zip` | `6a42d7a22418104712706f2587c437de012e9aabd6a5b95874e8f52808d4ee3d` |
+| `bhavcopy/BhavCopy_NSE_CM_0_0_0_20251021_F_0000.csv.zip` | Diwali Laxmi Pujan 2025: Muhurat session bhavcopy, turnover ~20% of 20 Oct (CAL2) | `https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20251021_F_0000.csv.zip` | `729f028f4dfde2d7dca1abca7b0277a87c4ca950dd0fd5d180ba8fc48c0b6456` |
+| `bhavcopy/BhavCopy_NSE_CM_0_0_0_20251023_F_0000.csv.zip` | Session after the 22 Oct holiday: PrvsClsgPric = 21 Oct close for every security (CAL3) | `https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20251023_F_0000.csv.zip` | `f06c74027d8b576d1b3ce7419bdb86472c153f7ac2ce687ed5dc949f2e00a105` |
+| `discovery/nse_integrated-filing-results_equities_TCS_20261113.json` | Results discovery (A7): newest 20 Integrated Filing rows (Financials + Governance) | `https://www.nseindia.com/api/integrated-filing-results?index=equities&symbol=TCS` | `2389cbc7d508c09eea436404e293862c96beb92ff902033c2ec24218fd6d6219` |
+
 ## Screener goldens (local only, not committed)
 
 The repository is public, so the user-supplied Screener Excel exports (2026-11-13; 42 distinct files, some uploaded twice)

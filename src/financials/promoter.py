@@ -116,15 +116,16 @@ def _quarantine_row(
 
 
 REBUILD_SUPERSEDED = "SUPERSEDED_BY_REBUILD"
+REPROCESSING = "REPROCESSING"  # set by `quarantine reprocess` while the batch is promoted again
 
 
 def _quarantine_many(con, rows: list[dict[str, Any]]) -> list[str]:
     """One bulk insert for many findings (a gap-heavy day can raise thousands). IDs are deterministic, so a
     replayed finding hits its old row: kept as is (a human decision stands), except a row that rebuild-market
-    superseded, which is reopened because the replay found the same problem again."""
+    superseded or that `quarantine reprocess` is retrying, which is reopened because the problem is still there."""
     insert_rows(con, "quarantine_queue", rows, on_conflict=(
         "ON CONFLICT (quarantine_id) DO UPDATE SET resolved_at = NULL, resolution = NULL, resolution_note = NULL "
-        f"WHERE quarantine_queue.resolution = '{REBUILD_SUPERSEDED}'"))  # fmt: skip
+        f"WHERE quarantine_queue.resolution IN ('{REBUILD_SUPERSEDED}', '{REPROCESSING}')"))  # fmt: skip
     return [r["quarantine_id"] for r in rows]
 
 
@@ -281,9 +282,89 @@ def _promote_market_day(con, stage_dir: Path, manifest: dict[str, Any]) -> Promo
     )
 
     quarantined += _stage_issue_quarantines(con, stage_dir)
+    quarantined += _infer_non_sessions(con, exchange, trade_date, filing_id)
     verify_pending_actions(con, exchange)
     quarantined += _audit_gaps(con, exchange, trade_date, obs)
-    return PromotionResult("PROMOTED", "market_day", message=str(trade_date), quarantined=quarantined)
+    closed = close_inactive_securities(con, exchange, trade_date)
+    message = str(trade_date) + (f", {closed} inactive securities closed" if closed else "")
+    return PromotionResult("PROMOTED", "market_day", message=message, quarantined=quarantined)
+
+
+# CAL3: a session's PrvsClsgPric equals the previous session's close for (nearly) every security, across weekends
+# and holidays alike (2025-10-17 -> 20, 10-01 -> 03, 10-21 -> 23: 100% of ~2,450). Skipping a real session drops
+# the match to ~1-2% (10-20 -> 23). So when the match against the last promoted day is >= 99%, no session took
+# place on the dates in between; otherwise a session is missing from the database.
+CAL3_MIN_MATCH = Decimal("0.99")
+CAL3_MIN_COMMON = 100
+
+
+def _infer_non_sessions(con, exchange: str, trade_date: date, filing_id: str) -> list[str]:
+    from datetime import timedelta
+
+    prev = con.execute(
+        "SELECT max(trade_date) FROM ohlcv WHERE exchange = ? AND trade_date < ?", [exchange, trade_date]
+    ).fetchone()[0]
+    if prev is None or (trade_date - prev).days <= 1:
+        return []
+    common, equal = con.execute(
+        """SELECT count(*), count(*) FILTER (WHERE r.prev_close_reported = o.close)
+           FROM raw_cm_bhavcopy r
+           JOIN security_identifier_history h
+             ON h.exchange = r.exchange AND h.symbol = r.symbol AND h.series = r.series
+            AND h.valid_from <= r.trade_date AND (h.valid_to IS NULL OR h.valid_to > r.trade_date)
+           JOIN ohlcv o ON o.security_id = h.security_id AND o.exchange = r.exchange AND o.trade_date = ?
+           WHERE r.filing_id = ? AND r.trade_date = ? AND r.prev_close_reported IS NOT NULL""",
+        [prev, filing_id, trade_date],
+    ).fetchone()
+    ratio = Decimal(equal) / Decimal(common) if common else Decimal(0)
+    if common >= CAL3_MIN_COMMON and ratio >= CAL3_MIN_MATCH:
+        gap = [prev + timedelta(days=i) for i in range(1, (trade_date - prev).days)]
+        insert_rows(con, "trading_calendar", [
+            {"exchange": exchange, "cal_date": d, "is_trading": False, "source": "INFERRED_PREV_CLOSE",
+             "note": f"no session: {trade_date} PrvsClsgPric = {prev} close ({equal}/{common})"} for d in gap
+        ], or_ignore=True)  # fmt: skip
+        return []
+    return [
+        _quarantine(
+            con,
+            stage="CALENDAR",
+            reason_code="MISSING_SESSION",
+            filing_id=filing_id,
+            details={
+                "trade_date": trade_date,
+                "previous_promoted": prev,
+                "matched": equal,
+                "common": common,
+                "hint": "fetch the missing day(s), then rebuild-market --from",
+            },
+        )
+    ]
+
+
+INACTIVITY_TRADING_DAYS = 20  # CHOICE: an open interval with no bar in the last 20 promoted sessions is closed
+
+
+def close_inactive_securities(con, exchange: str, as_of: date, threshold: int | None = None) -> int:
+    """P1-11: close the open identifier interval of a security that has not traded in the last `threshold`
+    promoted sessions (delisted, merged, suspended, moved to a series outside the universe). valid_to = the day
+    after its last bar. A security that trades again reopens through its FinInstrmId (identity.py)."""
+    n = INACTIVITY_TRADING_DAYS if threshold is None else threshold
+    recent = [r[0] for r in con.execute(
+        "SELECT DISTINCT trade_date FROM ohlcv WHERE exchange = ? AND trade_date <= ? ORDER BY 1 DESC LIMIT ?",
+        [exchange, as_of, n],
+    ).fetchall()]  # fmt: skip
+    if len(recent) < n:
+        return 0
+    cutoff = min(recent)
+    rows = con.execute(
+        """UPDATE security_identifier_history h SET valid_to = greatest(l.last_bar + INTERVAL 1 DAY, h.valid_from
+                  + INTERVAL 1 DAY)::DATE
+           FROM (SELECT security_id, max(trade_date) AS last_bar FROM ohlcv WHERE exchange = ? GROUP BY 1) l
+           WHERE h.security_id = l.security_id AND h.exchange = ? AND h.valid_to IS NULL AND l.last_bar < ?
+           RETURNING 1""",
+        [exchange, exchange, cutoff],
+    ).fetchall()
+    return len(rows)
 
 
 def _stage_issue_quarantines(con, stage_dir: Path) -> list[str]:

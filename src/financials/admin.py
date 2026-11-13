@@ -154,6 +154,121 @@ def rebuild_market(con, from_date: date, *, note: str = "rebuild-market") -> dic
     return _transaction(con, run)
 
 
+# ── reprocess [P1-9] ───────────────────────────────────────────────────────
+
+RETRYABLE = ("UNKNOWN_ISIN", "UNKNOWN_SYMBOL", "AMBIGUOUS_ISIN", "AMBIGUOUS_SYMBOL", "AMBIGUOUS_SECURITY",
+             "STALE_ISIN_OTHER_ISSUER", "NO_VISIBILITY")  # fmt: skip
+
+
+def reprocess(con, stage_root) -> dict[str, Any]:
+    """Promote again every batch with an open, retryable finding (identity not yet known, visibility not yet
+    derivable, a filing override recorded since). Each open finding is marked REPROCESSING first; promoting
+    the batch again reopens it if the problem is still there (same deterministic id), otherwise it is closed as
+    REPROCESSED. MISSING_FIN_INSTRM_ID bars are loaded when their ISIN belongs to exactly one security that day
+    with the same symbol and series."""
+    from pathlib import Path
+
+    from financials.promoter import REPROCESSING, promote
+
+    stage_root = Path(stage_root)
+    now = utc_now()
+    con.execute(
+        "UPDATE quarantine_queue SET resolved_at = NULL, resolution = NULL WHERE resolution = ?", [REPROCESSING]
+    )
+    open_q = fetch_dicts(
+        con,
+        "SELECT quarantine_id, filing_id FROM quarantine_queue WHERE resolved_at IS NULL AND filing_id IS NOT NULL "
+        "AND reason_code IN (SELECT unnest(?))",
+        [list(RETRYABLE)],
+    )
+    filing_ids = sorted({q["filing_id"] for q in open_q})
+    stages: list[str] = []
+    if filing_ids:
+        logged = [r[0] for r in con.execute("SELECT stage_path FROM promotion_log").fetchall()]
+        files = [
+            (stage_root / p / "filings.parquet").as_posix()
+            for p in logged
+            if (stage_root / p / "filings.parquet").exists()
+        ]
+        if files:
+            rows = con.execute(
+                "SELECT DISTINCT filename FROM read_parquet(?, filename = true) WHERE filing_id IN (SELECT unnest(?))",
+                [files, filing_ids],
+            ).fetchall()
+            stages = sorted({Path(f).parent.relative_to(stage_root).as_posix() for (f,) in rows})
+    ids = [q["quarantine_id"] for q in open_q]
+    if ids:
+        con.execute(
+            "UPDATE quarantine_queue SET resolved_at = ?, resolution = ? WHERE quarantine_id IN (SELECT unnest(?))",
+            [now, REPROCESSING, ids],
+        )
+    results = []
+    for rel in stages:
+        con.execute("DELETE FROM promotion_log WHERE stage_path = ?", [rel])
+        r = promote(con, stage_root / rel)
+        con.execute(
+            "INSERT OR REPLACE INTO promotion_log VALUES (?, ?, ?, ?, ?)", [rel, r.job, r.status, r.message, utc_now()]
+        )
+        results.append({"stage": rel, "status": r.status, "message": r.message})
+    fixed = con.execute(
+        "UPDATE quarantine_queue SET resolution = 'REPROCESSED', resolution_note = 'cleared on reprocess' "
+        "WHERE resolution = ? RETURNING quarantine_id",
+        [REPROCESSING],
+    ).fetchall()
+    loaded = _load_missing_fin_instrm_id_bars(con)
+    out = {"batches": results, "cleared": [r[0] for r in fixed], "bars_loaded": loaded}
+    con.execute("INSERT INTO admin_log VALUES (?, 'REPROCESS', '{}', ?, NULL, ?)",
+                [stable_id("adm", "reprocess", now), json.dumps(out, default=str), now])  # fmt: skip
+    return out
+
+
+def _load_missing_fin_instrm_id_bars(con) -> int:
+    rows = fetch_dicts(
+        con,
+        "SELECT quarantine_id, filing_id, details FROM quarantine_queue WHERE resolved_at IS NULL "
+        "AND reason_code = 'MISSING_FIN_INSTRM_ID'",
+    )
+    loaded = 0
+    for q in rows:
+        d = json.loads(q["details"])
+        day = date.fromisoformat(str(d["trade_date"])[:10])
+        raw = fetch_dicts(
+            con,
+            "SELECT * FROM raw_cm_bhavcopy WHERE filing_id = ? AND symbol = ? AND isin = ? AND trade_date = ?",
+            [q["filing_id"], d["symbol"], d["isin"], day],
+        )
+        if len(raw) != 1:
+            continue
+        r = raw[0]
+        secs = con.execute(
+            "SELECT DISTINCT security_id FROM security_identifier_history WHERE isin = ? AND symbol = ? AND series = ? "
+            "AND valid_from <= ? AND (valid_to IS NULL OR valid_to > ?)",
+            [r["isin"], r["symbol"], r["series"], day, day],
+        ).fetchall()
+        if len(secs) != 1:
+            continue
+        sec = secs[0][0]
+        insert_rows(con, "ohlcv", [{
+            "security_id": sec, "exchange": r["exchange"], "series": r["series"], "trade_date": day, "open": r["open"],
+            "high": r["high"], "low": r["low"], "close": r["close"], "volume": r["volume"],
+            "turnover_inr": r["turnover_inr"], "deliv_qty": None, "price_filing_id": r["filing_id"],
+            "delivery_filing_id": None,
+        }], or_ignore=True)  # fmt: skip
+        prev = _prev_closes(con, r["exchange"], day).get(sec)
+        for f in audit_day(
+            sec, day, r["open"], prev, _actions(con, "security_id = ? AND ex_date = ?", [sec, day]), False
+        ):
+            _quarantine(con, stage="GAP", reason_code=f.reason_code, security_id=sec,
+                        details={"trade_date": day, "gap": f.gap, "prev_close": prev, "open": r["open"]})  # fmt: skip
+        con.execute(
+            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'REPROCESSED', resolution_note = ? "
+            "WHERE quarantine_id = ?",
+            [utc_now(), f"bar loaded by ISIN for {sec}", q["quarantine_id"]],
+        )
+        loaded += 1
+    return loaded
+
+
 # ── quarantine ─────────────────────────────────────────────────────────────
 
 RESOLUTIONS = {"ACCEPT": "ACCEPTED", "REJECT": "REJECTED", "OVERRIDE": "OVERRIDDEN", "CORP_ACTION": "OVERRIDDEN",

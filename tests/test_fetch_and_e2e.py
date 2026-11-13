@@ -114,9 +114,12 @@ def fixture_routes() -> dict[str, Response]:
         p = BHAV_DIR / f"sec_bhavdata_full_{d:%d%m%Y}.csv"
         if p.exists():
             r[delivery_url(d)] = Response(200, p.read_bytes())
-    r[corp_actions_url(date(2025, 9, 15), date(2025, 10, 17))] = Response(
+    # fetch-corp-actions asks in 30-day windows [P1-7]: the real 33-day answer serves the first window (its extra
+    # 3 days are re-recorded idempotently) and the remaining 3 days answer an empty list.
+    r[corp_actions_url(date(2025, 9, 15), date(2025, 10, 14))] = Response(
         200, (FIXTURES / "corp_actions" / "nse_corporateActions_equities_15-09-2025_17-10-2025.json").read_bytes()
     )
+    r[corp_actions_url(date(2025, 10, 15), date(2025, 10, 17))] = Response(200, b"[]")
     r[holidays_url()] = Response(200, (FIXTURES / "calendar" / "nse_holiday-master_trading_20261113.json").read_bytes())
     r[index_list_url()] = Response(200, (FIXTURES / "indices" / "ind_nifty500list_20261113.csv").read_bytes())
     r[shp_master_url("ELIN")] = Response(200, SHP_MASTER.read_bytes())
@@ -141,7 +144,7 @@ def e2e(tmp_path_factory):
 
     # Keep the polite spacing logic, but without real sleeping in tests.
     orig = cli_mod.PoliteFetcher
-    cli_mod.PoliteFetcher = lambda transport: orig(transport, sleep=lambda s: None)
+    cli_mod.PoliteFetcher = lambda transport, **kw: orig(transport, sleep=lambda s: None, **kw)
     try:
         assert cli(data, "fetch-days", "2025-09-19", "2025-09-23", **fast)[0] == 0  # 20/21 Sep: weekend 404s
         assert cli(data, "fetch-days", "2025-10-13", "2025-10-14", **fast)[0] == 0
@@ -162,7 +165,7 @@ def test_e2e_fetchers_never_touched_unlisted_urls(e2e):
     _, t, _ = e2e
     routes = fixture_routes()
     misses = {u for u, _ in t.calls if u not in routes}
-    weekend = {bhavcopy_url(date(2025, 9, 20)), bhavcopy_url(date(2025, 9, 21))}
+    weekend = {bhavcopy_url(date(2025, 9, 20)), bhavcopy_url(date(2025, 9, 21)), "https://www.nseindia.com/"}
     no_delivery_fixture = {delivery_url(d) for d in DAYS if delivery_url(d) not in routes}
     assert misses == weekend | no_delivery_fixture  # every other request was a known fixture URL
 
@@ -172,7 +175,7 @@ def test_e2e_promotion_order_and_idempotency(e2e):
     lines = out.strip().splitlines()
     jobs = [ln.split()[1] for ln in lines]
     assert jobs[0] == "holidays" and jobs[1:7] == ["market_day"] * 6
-    assert jobs[7:] == ["index_snapshot", "corp_actions", "results_xbrl", "shareholding", "raw_only"]
+    assert jobs[7:] == ["index_snapshot", "corp_actions", "corp_actions", "results_xbrl", "shareholding", "raw_only"]
     code, again = cli(data, "promote")
     assert code == 0 and again == ""  # nothing pending
 
@@ -192,5 +195,5 @@ def test_e2e_features_and_screens(e2e):
 
 def test_e2e_vault_holds_every_raw_file(e2e):
     data, _, _ = e2e
-    blobs = list((data / "vault").rglob("*.*"))
+    blobs = [p for p in (data / "vault").rglob("*.*") if p.name != "url_index.jsonl"]
     assert len(blobs) == len(fixture_routes())  # each distinct response stored once

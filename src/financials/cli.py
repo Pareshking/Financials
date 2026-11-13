@@ -17,12 +17,14 @@ from financials.db import apply_schema, connect
 from financials.dsl import run_screen
 from financials.features import materialize
 from financials.fetch.http import PoliteFetcher, Transport
-from financials.fetch.jobs import Jobs
+from financials.fetch.jobs import WARMUP, Jobs
 from financials.promoter import promote
 from financials.scope import MIN_TRADE_DATE
 from financials.staging import read_manifest
 from financials.timeutil import utc_now
 from financials.vault import Vault
+
+UNIVERSES = ("nifty500", "active")
 
 JOB_ORDER = {"holidays": 0, "market_day": 1, "index_snapshot": 2, "corp_actions": 3, "results_xbrl": 4,
              "shareholding": 5, "raw_only": 6}  # fmt: skip
@@ -94,21 +96,37 @@ def build_parser() -> argparse.ArgumentParser:
     fi = sub.add_parser("fetch-index")
     fi.add_argument("--as-of", type=_date, default=date.today())
     fs = sub.add_parser("fetch-shareholding")
-    fs.add_argument("symbols", nargs="+")
+    fs.add_argument("symbols", nargs="*")
+    fs.add_argument("--universe", choices=UNIVERSES)
     fs.add_argument("--all-history", action="store_true")
     fe = sub.add_parser("fetch-events", help="Reg. 30 structured event XBRL from the announcements RSS")
     fe.add_argument("--limit", type=int)
     fa = sub.add_parser("fetch-annual", help="Reg. 34 annual report XBRL (FY ending 2025 onwards)")
-    fa.add_argument("symbols", nargs="+")
-    fr = sub.add_parser("fetch-results", help="results XBRL by URL")
-    fr.add_argument("url")
+    fa.add_argument("symbols", nargs="*")
+    fa.add_argument("--universe", choices=UNIVERSES)
+    fr = sub.add_parser("fetch-results", help="results XBRL by URL, or by symbol through the A7 listing")
+    fr.add_argument("url", nargs="?")
+    fr.add_argument("--symbols", nargs="+", default=[])
+    fr.add_argument("--universe", choices=UNIVERSES)
     fr.add_argument("--broadcast-utc", type=datetime.fromisoformat)
+    df = sub.add_parser("discover-filings", help="results, annual, shareholding listings + Reg. 30 RSS; new files only")
+    df.add_argument("--symbols", nargs="+", default=[])
+    df.add_argument("--universe", choices=UNIVERSES)
+    df.add_argument("--from-rss", action="store_true", help="symbols with results announcements in today's RSS")
+    df.add_argument("--kinds", nargs="+", default=["results", "annual", "shareholding"],
+                    choices=["results", "annual", "shareholding"])  # fmt: skip
+    df.add_argument("--no-events", action="store_true")
+    rd = sub.add_parser("run-day", help="holidays, days, corporate actions, discovery, promote, materialize")
+    rd.add_argument("--date", type=_date, required=True)
+    rd.add_argument("--lookback-days", type=int, default=7)
     sub.add_parser("promote", help="apply all pending staged batches (single writer)")
     rb = sub.add_parser("rebuild-market", help="roll market-derived state back to a date and replay it (audited)")
     rb.add_argument("--from", dest="from_date", type=_date, required=True)
     rb.add_argument("--note", default="rebuild-market")
-    mt = sub.add_parser("materialize")
-    mt.add_argument("as_of", type=_date)
+    mt = sub.add_parser("materialize", help="one date, or every promoted trading day in --from/--to, in order")
+    mt.add_argument("as_of", type=_date, nargs="?")
+    mt.add_argument("--from", dest="from_date", type=_date)
+    mt.add_argument("--to", dest="to_date", type=_date)
     q = sub.add_parser("quarantine", help="list or resolve quarantined items (audited)")
     qs = q.add_subparsers(dest="qcmd", required=True)
     ql = qs.add_parser("list")
@@ -124,6 +142,7 @@ def build_parser() -> argparse.ArgumentParser:
                                                          "MERGE_SECURITIES"])  # fmt: skip
     qr.add_argument("--note", required=True)
     qr.add_argument("--payload-json", default="{}")
+    qs.add_parser("reprocess", help="re-promote batches whose identity / visibility blockers may be cleared")
     ex = sub.add_parser("extract-index-changes", help="NSE Indices notices (pdftotext -layout .txt) -> manifest CSV")
     ex.add_argument("text_dir", type=Path)
     ex.add_argument("--index", default="Nifty 500")
@@ -152,36 +171,18 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None, *, transport: Transport | None = None, out=sys.stdout) -> int:
     args = build_parser().parse_args(argv)
     vault_dir, stage_root, db_path = _paths(args.data_dir)
-    if args.cmd.startswith("fetch"):
-        jobs = Jobs(PoliteFetcher(transport), Vault(vault_dir), stage_root)
-        staged: list[Path] = []
-        if args.cmd == "fetch-days":
-            d, end = max(args.start, MIN_TRADE_DATE), args.end or args.start
-            if args.start < MIN_TRADE_DATE:
-                print(f"note: v1 scope starts {MIN_TRADE_DATE}; earlier dates are not fetched", file=out)
-            while d <= end:
-                staged += jobs.market_day(d) or []
-                d += timedelta(days=1)
-        elif args.cmd == "fetch-corp-actions":
-            staged += jobs.corp_actions(max(args.start, MIN_TRADE_DATE), args.end)
-        elif args.cmd == "fetch-holidays":
-            staged += jobs.holidays()
-        elif args.cmd == "fetch-index":
-            staged += jobs.index_snapshot(args.as_of)
-        elif args.cmd == "fetch-shareholding":
-            for sym in args.symbols:
-                staged += jobs.shareholding(sym, latest_only=not args.all_history)
-        elif args.cmd == "fetch-events":
-            staged += jobs.reg30_events(limit=args.limit)
-        elif args.cmd == "fetch-annual":
-            for sym in args.symbols:
-                staged += jobs.annual_reports(sym)
-        elif args.cmd == "fetch-results":
-            src = "API_FIELD" if args.broadcast_utc else "UNKNOWN"
-            staged += jobs.results_xbrl(args.url, args.broadcast_utc, src)
+    if args.cmd.startswith(("fetch", "discover")):
+        jobs = Jobs(PoliteFetcher(transport, warmup=WARMUP), Vault(vault_dir), stage_root)
+        staged, errors = run_fetch(args, jobs, db_path, out)
         for s in staged:
             print(f"staged {s.relative_to(stage_root).as_posix()}", file=out)
-        return 0
+        for w in jobs.warnings:
+            print(f"warning: {w}", file=out)
+        for e in errors:
+            print(f"error: {e}", file=out)
+        return 1 if errors else 0
+    if args.cmd == "run-day":
+        return run_day(args, transport, out)
 
     if args.cmd == "extract-index-changes":
         from financials.index_changes import parse_change_notice, write_manifest
@@ -215,12 +216,15 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
                 print(f"{fr.status} {fr.as_of_date} rows={fr.rows} {fr.gate or ''} {fr.message}", file=out)
             return 1 if waiting else 0
         if args.cmd == "materialize":
-            r = materialize(con, args.as_of)
-            print(f"{r.status} {r.as_of_date} rows={r.rows} {r.gate or ''} {r.message}", file=out)
-            return 0 if r.status == "PROMOTED" else 1
+            return materialize_dates(con, args.as_of, args.from_date, args.to_date, out)
         if args.cmd == "quarantine":
             from financials.admin import AdminError, list_quarantine, resolve_quarantine
 
+            if args.qcmd == "reprocess":
+                from financials.admin import reprocess
+
+                print(json.dumps(reprocess(con, stage_root), default=str, indent=1), file=out)
+                return 0
             if args.qcmd == "list":
                 rows = list_quarantine(
                     con,
@@ -284,3 +288,129 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
     finally:
         con.close()
     return 2
+
+
+def universe_symbols(db_path: Path, name: str, as_of: date) -> list[str]:
+    """Symbols of a universe from the market database (read-only): `nifty500` = index members on `as_of`,
+    `active` = every security with an open identifier interval."""
+    if not db_path.exists():
+        raise SystemExit(f"error: --universe needs a market database at {db_path}")
+    con = connect(db_path, read_only=True)
+    try:
+        if name == "nifty500":
+            sql = """SELECT DISTINCT h.symbol FROM index_constituents_history i
+                     JOIN security_identifier_history h ON h.security_id = i.security_id AND h.valid_to IS NULL
+                     WHERE i.index_name = 'NIFTY 500' AND i.valid_from <= ? AND (i.valid_to IS NULL OR i.valid_to > ?)
+                     ORDER BY 1"""
+            rows = con.execute(sql, [as_of, as_of]).fetchall()
+        else:
+            rows = con.execute(
+                "SELECT DISTINCT symbol FROM security_identifier_history WHERE valid_to IS NULL ORDER BY 1"
+            ).fetchall()
+    finally:
+        con.close()
+    return [r[0] for r in rows]
+
+
+def _symbols(args, db_path: Path, explicit: list[str]) -> list[str]:
+    syms = list(explicit)
+    if getattr(args, "universe", None):
+        syms += [s for s in universe_symbols(db_path, args.universe, date.today()) if s not in syms]
+    return syms
+
+
+def run_fetch(args, jobs: Jobs, db_path: Path, out) -> tuple[list[Path], list[str]]:
+    staged: list[Path] = []
+    errors: list[str] = []
+    if args.cmd == "fetch-days":
+        start, end = max(args.start, MIN_TRADE_DATE), args.end or args.start
+        if args.start < MIN_TRADE_DATE:
+            print(f"note: v1 scope starts {MIN_TRADE_DATE}; earlier dates are not fetched", file=out)
+        staged, errors = jobs.market_days(start, end)
+    elif args.cmd == "fetch-corp-actions":
+        staged += jobs.corp_actions(max(args.start, MIN_TRADE_DATE), args.end)
+    elif args.cmd == "fetch-holidays":
+        staged += jobs.holidays()
+    elif args.cmd == "fetch-index":
+        staged += jobs.index_snapshot(args.as_of)
+    elif args.cmd == "fetch-shareholding":
+        syms = _symbols(args, db_path, args.symbols)
+        if args.all_history:
+            for sym in syms:
+                staged += jobs.shareholding(sym, latest_only=False)
+        else:
+            staged, errors = jobs.discover(syms, ["shareholding"], events=False)
+    elif args.cmd == "fetch-events":
+        staged += jobs.reg30_events(limit=args.limit)
+    elif args.cmd == "fetch-annual":
+        staged, errors = jobs.discover(_symbols(args, db_path, args.symbols), ["annual"], events=False)
+    elif args.cmd == "fetch-results":
+        if args.url:
+            src = "API_FIELD" if args.broadcast_utc else "UNKNOWN"
+            staged += jobs.results_xbrl(args.url, args.broadcast_utc, src)
+        staged_r, errors = jobs.discover(_symbols(args, db_path, args.symbols), ["results"], events=False)
+        staged += staged_r
+    elif args.cmd == "discover-filings":
+        syms = _symbols(args, db_path, args.symbols)
+        if args.from_rss:
+            syms += [s for s in jobs.symbols_from_rss() if s not in syms]
+        staged, errors = jobs.discover(syms, args.kinds, events=not args.no_events)
+    return staged, errors
+
+
+def materialize_dates(con, as_of: date | None, start: date | None, end: date | None, out) -> int:
+    if as_of is not None:
+        dates = [as_of]
+    elif start is not None:
+        dates = [r[0] for r in con.execute(
+            "SELECT DISTINCT trade_date FROM ohlcv WHERE trade_date >= ? AND trade_date <= ? ORDER BY 1",
+            [start, end or date.max],
+        ).fetchall()]  # fmt: skip
+    else:
+        print("error: give a date or --from [--to]", file=out)
+        return 2
+    for d in dates:  # ascending, so G4 always compares with the previous materialised date
+        r = materialize(con, d)
+        print(f"{r.status} {r.as_of_date} rows={r.rows} {r.gate or ''} {r.message}", file=out)
+        if r.status != "PROMOTED":
+            return 1
+    return 0
+
+
+def run_day(args, transport: Transport | None, out) -> int:
+    """Idempotent daily run for `--date D`: holiday list, market days D-lookback..D (vaulted days are not fetched
+    again), corporate actions D-lookback..D+30 (announced ahead of ex-date), discovery for the symbols with results
+    in today's RSS plus Reg. 30 events, then promote and materialise D. Fetch failures are reported; the rest of the
+    run continues, and the next run picks up what failed."""
+    vault_dir, stage_root, db_path = _paths(args.data_dir)
+    jobs = Jobs(PoliteFetcher(transport, warmup=WARMUP), Vault(vault_dir), stage_root)
+    d = args.date
+    errors: list[str] = []
+    steps = (
+        ("holidays", jobs.holidays),
+        ("days", lambda: jobs.market_days(max(d - timedelta(days=args.lookback_days), MIN_TRADE_DATE), d)),
+        ("corp-actions", lambda: jobs.corp_actions(max(d - timedelta(days=args.lookback_days), MIN_TRADE_DATE),
+                                                   d + timedelta(days=30))),
+        ("discovery", lambda: jobs.discover(jobs.symbols_from_rss(), ["results", "shareholding"])),
+    )  # fmt: skip
+    for name, step in steps:
+        try:
+            r = step()
+            staged, errs = r if isinstance(r, tuple) else (r, [])
+            errors += [f"{name}: {e}" for e in errs]
+            print(f"{name}: {len(staged)} staged", file=out)
+        except Exception as exc:  # a failed step must not stop the promote of what was fetched
+            errors.append(f"{name}: {exc}")
+    for w in jobs.warnings:
+        print(f"warning: {w}", file=out)
+    args.data_dir.mkdir(parents=True, exist_ok=True)
+    con = connect(db_path)
+    try:
+        apply_schema(con)
+        waiting = promote_pending(con, stage_root, out)
+        rc = materialize_dates(con, d, None, None, out)
+    finally:
+        con.close()
+    for e in errors:
+        print(f"error: {e}", file=out)
+    return 1 if errors or waiting or rc else 0

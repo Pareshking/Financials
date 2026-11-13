@@ -101,8 +101,8 @@ feeds:
     unlocked_metrics: [P&L, H1/FY balance sheet and cash flow, TTM, valuation ratios]
     phase: 1
     verification_status: VERIFIED
-    evidence: [X1, X2, X4, X6, X32, X33, X34, X35, X38, A7]
-    notes: Verified namespaces IntegratedFinance_IndAS, _NBFC, _Banking (2026-01-31), _LI (2025-01-31). Only INDAS_CORP is parsed. General-insurance Integrated namespace not yet seen (legacy GI only, X26). Integrated filing starts Q4 FY25 for Bajaj Finance (X38).
+    evidence: [X1, X2, X4, X6, X32, X33, X34, X35, X38, A7, A9]
+    notes: Discovery via `discover-filings` / `fetch-results --symbols|--universe` (A7 listing, newest 20 rows; pagination UNVERIFIED) and the RSS symbol hint (A9) in `run-day`. Verified namespaces IntegratedFinance_IndAS, _NBFC, _Banking (2026-01-31), _LI (2025-01-31). Only INDAS_CORP is parsed. General-insurance Integrated namespace not yet seen (legacy GI only, X26). Integrated filing starts Q4 FY25 for Bajaj Finance (X38).
 
   - feed_id: F07
     name: Reg. 34(1) annual report XBRL (MCA Ind AS taxonomy)

@@ -209,10 +209,10 @@ Notation: `avg(x)` = mean of opening and closing balance; `ttm(x)` = trailing 4 
 |---|---|---|
 | ROCE | `ttm(ebit) / avg(invested_capital + cash_liquid)` | 1 |
 | ROE | `ttm(ProfitOrLossAttributableToOwnersOfParent) / avg(EquityAttributableToOwnersOfParent)`; standalone filings fall back to `ProfitLossForPeriod` / `Equity` [X42] | 1 |
-| ROIC | `ttm(nopat) / avg(invested_capital)` | 1 |
+| ROIC | `ttm(nopat) / ((opening + closing) / 2 invested_capital)`, NULL without the opening balance sheet [C16] | 1 |
 | ROIIC 3Y/5Y | `(nopat_t − nopat_{t−n}) / (IC_t − IC_{t−n})`, FY values | 2 |
 | Reinvestment rate | `(capex − depreciation + Δ(working capital)) / nopat`, FY | 2 |
-| CROIC | `fcf / avg(invested_capital)` | 1 |
+| CROIC | `ttm(fcf) / invested_capital` (latest balance sheet; not covered by C16) | 1 |
 | Shareholder yield | `(dividends paid + gross buybacks − gross equity issued) / market_cap` | 2 |
 | 5Y net dilution | `shares_adj_t / shares_adj_{t−5y} − 1` | 2 |
 | Incremental asset turnover | `Δ3y rev_ops / Δ3y net fixed assets` | 2 |
@@ -266,8 +266,8 @@ NULL for both. Bank `sales_ttm` = TTM interest earned (Screener's bank "Revenue"
 the standalone book (X60).
 
 **Denominators (C16):** ROE and ROE (continuing) use the latest **closing** owners' equity (Screener's convention,
-available from the first balance sheet). RoA, NIM proxy and credit cost use **(opening + closing) / 2** over 12 months
-and stay NULL until the opening balance sheet exists.
+available from the first balance sheet). RoA, NIM proxy, credit cost and **ROIC** use **(opening + closing) / 2** over 12
+months and stay NULL until the opening balance sheet exists. CROIC keeps the latest invested capital.
 
 | Column | NBFC formula | Bank formula |
 |---|---|---|
@@ -470,7 +470,7 @@ CFF = borrowings in/out, interest, dividends, leases, shares, other; Net Cash Fl
 
 Status (2026-11-13): **built and tested end to end** on real fixtures, all listed items below, plus index backfill (§11.6), quarantine resolution (D-6) and benchmarks (`docs/benchmarks.md`). Known gaps inside Phase 1:
 - `piotroski_f` / `beneish_m` columns exist but stay NULL: both need year-over-year annual data (Reg. 34, Phase 2).
-- Altman Z'' uses OtherEquity as the retained-earnings proxy; ROCE/ROE use the latest balance sheet, not an average.
+- Altman Z'' uses OtherEquity as the retained-earnings proxy; ROCE and ROE use the latest balance sheet (ROE by decision, C16); ROIC, RoA, NIM proxy and credit cost use opening + closing averages.
 - EV adds minority interest (`NonControllingInterest`, VERIFIED [X34, X42]); preference capital is still excluded (no tag seen). PE and ROE use the owners' share of profit and equity [X42].
 - Results-XBRL discovery API is UNVERIFIED [A7]; `fetch-results` takes URLs.
 - A split and a series change between two promoted days create a second security; the collision is quarantined and resolved with `quarantine resolve --action MERGE_SECURITIES` (SIGMA, Oct 2025).

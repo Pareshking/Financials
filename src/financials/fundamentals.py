@@ -261,6 +261,8 @@ def building_blocks(book: FactBook, end: date) -> dict[str, Decimal | date | Non
         ),
         "equity_method_investments": stock("equity_method_investments"),
         "invested_capital": invested,
+        # ROIC denominator: (opening + closing) / 2 over 12 months [C16]; NULL without the opening balance sheet
+        "avg_invested_capital": _avg_invested(book, bs_as_of, invested),
         "operating_invested_capital": None
         if invested is None
         else invested - (stock("equity_method_investments") or Decimal(0)),
@@ -276,6 +278,25 @@ def building_blocks(book: FactBook, end: date) -> dict[str, Decimal | date | Non
         "bs_as_of": bs_as_of,
         "cf_as_of": cf_end if cfo is not None else None,
     }
+
+
+def invested_capital_at(book: FactBook, d: date) -> Decimal | None:
+    """equity + borrowings + labelled leases - liquid cash, on balance-sheet date `d` (same definition as §8)."""
+    g = lambda tag: book.instants.get(tag, {}).get(d)  # noqa: E731
+    borrowings = _sum(g("borrowings_noncurrent"), g("borrowings_current"))
+    cash = _sum(g("cash_and_equivalents"), g("bank_balances_other"), g("current_investments"))
+    equity = g("total_equity")
+    if None in (borrowings, cash, equity):
+        return None
+    leases = (g("lease_liabilities_noncurrent") or Decimal(0)) + (g("lease_liabilities_current") or Decimal(0))
+    return equity + borrowings + leases - cash
+
+
+def _avg_invested(book: FactBook, closing_date: date | None, closing: Decimal | None) -> Decimal | None:
+    if closing_date is None or closing is None:
+        return None
+    opening = invested_capital_at(book, _add_months(closing_date, -12))
+    return None if opening is None else (opening + closing) / 2
 
 
 def _core(continuing: Decimal | None, exceptional: Decimal | None, etr: Decimal) -> Decimal | None:

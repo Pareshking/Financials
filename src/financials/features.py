@@ -280,7 +280,7 @@ def _fundamentals(con, entity_id: str, as_of_ts: datetime, end: date) -> dict:
         "profit_growth_yoy": _f(yoy_growth(book, "pat", end)),
         "roe": _f(safe_div(b["pat_owners"], b["equity_owners"])),
         "roce": _f(safe_div(b["ebit"], capital)),
-        "roic": _f(safe_div(b["nopat"], b["invested_capital"])),
+        "roic": _f(safe_div(b["nopat"], b["avg_invested_capital"])),  # average IC [C16]
         "croic": _f(safe_div(b["fcf"], b["invested_capital"])),
         "debt_to_equity": _f(safe_div(debt, eq)),
         "other_income_to_pbt": _f(safe_div(b["other_income"], b["pbt"])),

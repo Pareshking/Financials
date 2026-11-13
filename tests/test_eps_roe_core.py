@@ -87,3 +87,22 @@ def test_roe_continuing_and_core_profit_blocks():
 def test_new_dsl_aliases_compile():
     cs = compile_screen("roe continuing > 15 AND credit cost < 2 AND core profit > 100 AND eps > 0")
     assert "roe_continuing" in cs.where_sql and "credit_cost" in cs.where_sql and "core_profit_ttm" in cs.where_sql
+
+
+def test_roic_uses_average_invested_capital_and_roe_closing_equity():
+    """[C16] ROIC on (opening + closing) / 2 invested capital, NULL without an opening balance sheet; ROE on closing."""
+    from financials.fundamentals import invested_capital_at
+
+    end, opening = date(2026, 9, 30), date(2025, 9, 30)
+    b = FactBook("e", "STANDALONE")
+    for d, eq in ((opening, 800), (end, 1000)):
+        for tag, v in {"total_equity": eq, "borrowings_noncurrent": 300, "borrowings_current": 100,
+                       "cash_and_equivalents": 50, "bank_balances_other": 0, "current_investments": 50,
+                       "total_assets": 2000}.items():  # fmt: skip
+            b.instants.setdefault(tag, {})[d] = Decimal(v)
+    assert invested_capital_at(b, end) == Decimal(1300) and invested_capital_at(b, opening) == Decimal(1100)
+    blocks = building_blocks(b, end)
+    assert blocks["invested_capital"] == Decimal(1300) and blocks["avg_invested_capital"] == Decimal(1200)
+    assert blocks["equity_owners"] == Decimal(1000)  # ROE denominator: closing equity
+    del b.instants["total_equity"][opening]
+    assert building_blocks(b, end)["avg_invested_capital"] is None

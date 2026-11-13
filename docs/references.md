@@ -140,11 +140,12 @@ Last reviewed: 2026-11-13.
 | R8 | AMFI publishes no consolidated scheme-wise ISIN file; ~45 AMCs publish separately. | UNVERIFIED | Phase 3 only |
 | R9 | Financial results must be disclosed within 30 minutes of the board meeting ending. | UNVERIFIED | Used only as a conservative-visibility rule (architecture §6.3) |
 | R10 | DVR shares use `INE` ISINs; partly-paid use `IN9`. | UNVERIFIED | |
+| R12 | SEBI Integrated Filing (Financials) applies from the quarter ended 2024-12-31, giving uniform `INTEGRATED_FILING_*` XBRL from then on. | UNVERIFIED, and **partly contradicted**: the Star Health Q3 FY25 (Dec 2024) fixture uses the legacy `GeneralInsurance/2020-03-31` taxonomy [X26, X27]. The C9 cutoff does not rely on it; parsers still route by namespace and quarantine unknown taxonomies. |
 | R11 | Under Ind AS 7, Indian companies may classify interest paid as operating or financing. | VERIFIED as tagged choice (X14) | |
 
 ## 5. Known data limitations (affect results, must be disclosed in any backtest output)
 
-- **L1 Survivorship bias**: `index_constituents_history` starts at the first snapshot date (Phase 1 go-live). Any backtest with an as-of date before that uses today's constituents and is **survivorship-biased** until historical changes are backfilled manually.
+- **L1 Survivorship bias**: `index_constituents_history` starts at the first snapshot date (Phase 1 go-live). The C9 cutoff (2024-10-01) does **not** fix this: no machine-readable history exists, so 2024-10-01 → first snapshot still needs a manual backfill. Any backtest with an as-of date before that uses today's constituents and is **survivorship-biased** until historical changes are backfilled manually.
 - **L2 Restated comparatives**: after demergers or mergers, prior-year quarters are as-reported (pre-restatement) until restated values are captured from a later Reg. 34 annual XBRL (FY level only) or a verified PDF supplement. YoY growth across such events is flagged, not trusted.
 - **L3 Half-yearly balance sheet and cash flow**: in Q1/Q3, balance-sheet and cash-flow inputs are carried forward from the last H1/FY filing; every derived ratio exposes `bs_as_of` / `cf_as_of`.
 - **L4 Quarterly debt excludes leases** (X16) and **cash excludes non-current treasury investments** (X17) until annual notes are parsed.
@@ -160,4 +161,5 @@ Last reviewed: 2026-11-13.
 | C5 | Effective tax rate fallback for loss-makers = 0 (no synthetic tax shield). Statutory 25.17% (Sec. 115BAA) is used only where a ratio explicitly needs a statutory rate. |
 | C6 | Gross profit is computed only for `INDAS_CORP` with (materials + stock-in-trade purchases) ≥ 10% of revenue; otherwise NULL. |
 | C7 | Universe v1: NSE Mainboard `EQ`/`BE`/`BZ`, starting with Nifty 500. SME (`SM`/`ST`) excluded. |
+| C9 | **v1 data scope**: market data, corporate actions and index snapshots from `2024-10-01`; financial statements and shareholding with period end `>= 2024-12-31` (Q3 FY25). Older inputs are vaulted but not parsed, and no legacy-format parsers exist. Gives 8 quarters (Q3 FY25–Q2 FY27) for TTM + YoY TTM as of Nov 2026; 3Y/5Y windows are NULL until enough quarters accumulate. | Owner decision 2026-11-13 |
 | C8 | Personal, single-user research. No redistribution. Polite, rate-limited fetching with on-disk caching. This is not legal compliance with exchange terms, which prohibit automated access. |

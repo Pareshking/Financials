@@ -12,6 +12,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from financials.parsers.indas_corp import period_months
+from financials.scope import financials_in_scope
 
 Period = tuple[date, date]
 
@@ -214,8 +215,28 @@ def building_blocks(book: FactBook, end: date) -> dict[str, Decimal | date | Non
     }
 
 
+def quarters_available_since(end: date, quarters: int) -> bool:
+    """True if the oldest quarter a window needs ends on/after the v1 cutoff [C9]."""
+    oldest_quarter_end = _add_months(end, -3 * (quarters - 1))
+    return financials_in_scope(oldest_quarter_end)
+
+
+def cagr(book: FactBook, tag: str, end: date, years: int, *, min_periods_required: int | None = None) -> Decimal | None:
+    """TTM-on-TTM compound growth over `years`. NULL (never a partial-window number) unless the full
+    history exists: 4 * (years + 1) quarters by default, all ending on/after the v1 cutoff."""
+    required = min_periods_required or 4 * (years + 1)
+    if years < 1 or not quarters_available_since(end, required):
+        return None
+    cur, prev = book.ttm(tag, end), book.ttm(tag, _add_months(end, -12 * years))
+    if cur is None or prev is None or cur <= 0 or prev <= 0:
+        return None
+    return (cur / prev) ** (Decimal(1) / Decimal(years)) - 1
+
+
 def yoy_growth(book: FactBook, tag: str, end: date) -> Decimal | None:
-    """TTM vs TTM a year earlier; needs 8 same-scope quarters (or both YTD bridges) (§6.4)."""
+    """TTM vs TTM a year earlier; needs 8 same-scope quarters (§6.4)."""
+    if not quarters_available_since(end, 8):
+        return None
     cur, prev = book.ttm(tag, end), book.ttm(tag, _add_months(end, -12))
     if cur is None or prev is None or prev <= 0:
         return None

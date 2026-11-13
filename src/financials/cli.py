@@ -19,6 +19,7 @@ from financials.features import materialize
 from financials.fetch.http import PoliteFetcher, Transport
 from financials.fetch.jobs import Jobs
 from financials.promoter import promote
+from financials.scope import MIN_TRADE_DATE
 from financials.staging import read_manifest
 from financials.timeutil import utc_now
 from financials.vault import Vault
@@ -100,12 +101,14 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
         jobs = Jobs(PoliteFetcher(transport), Vault(vault_dir), stage_root)
         staged: list[Path] = []
         if args.cmd == "fetch-days":
-            d, end = args.start, args.end or args.start
+            d, end = max(args.start, MIN_TRADE_DATE), args.end or args.start
+            if args.start < MIN_TRADE_DATE:
+                print(f"note: v1 scope starts {MIN_TRADE_DATE}; earlier dates are not fetched", file=out)
             while d <= end:
                 staged += jobs.market_day(d) or []
                 d += timedelta(days=1)
         elif args.cmd == "fetch-corp-actions":
-            staged += jobs.corp_actions(args.start, args.end)
+            staged += jobs.corp_actions(max(args.start, MIN_TRADE_DATE), args.end)
         elif args.cmd == "fetch-holidays":
             staged += jobs.holidays()
         elif args.cmd == "fetch-index":

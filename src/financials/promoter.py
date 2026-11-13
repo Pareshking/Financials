@@ -23,6 +23,7 @@ from financials.db import fetch_dicts, insert_rows
 from financials.identity import UNIVERSE_SERIES, Interval, SecurityRegistry
 from financials.ids import stable_id
 from financials.parsers.udiff import BhavRow
+from financials.scope import MIN_PERIOD_END_DATE, MIN_TRADE_DATE, financials_in_scope, market_in_scope
 from financials.staging import read_manifest, read_table
 from financials.timeutil import ist_to_utc, utc_now, utc_to_ist_date
 
@@ -74,6 +75,12 @@ def promote(con: duckdb.DuckDBPyConnection, stage_dir: Path) -> PromotionResult:
 
 
 # ── shared helpers ──────────────────────────────────────────────────────
+
+
+def _out_of_scope(con, stage_dir: Path, job: str, reason: str) -> PromotionResult:
+    """v1 scope cutoff [C9]: keep the evidence (blob + filing), parse nothing into canonical tables."""
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings"))
+    return PromotionResult("OUT_OF_SCOPE", job, message=reason)
 
 
 def _insert_vault_rows(con, stage_dir: Path, tables: Iterable[str]) -> None:
@@ -140,6 +147,8 @@ def _load_intervals(con, exchange: str) -> list[Interval]:
 def _promote_market_day(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
     exchange = manifest["exchange"]
     trade_date = date.fromisoformat(manifest["trade_date"])
+    if not market_in_scope(trade_date):
+        return _out_of_scope(con, stage_dir, "market_day", f"trade_date {trade_date} < {MIN_TRADE_DATE}")
     bhav = read_table(con, stage_dir, "raw_cm_bhavcopy")
     deliv = read_table(con, stage_dir, "raw_delivery")
     universe = [r for r in bhav if r["series"] in UNIVERSE_SERIES]
@@ -476,8 +485,12 @@ def _promote_corp_actions(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     _insert_vault_rows(con, stage_dir, ("blobs", "filings"))
     quarantined: list[str] = []
     recorded = 0
+    skipped = 0
     for r in read_table(con, stage_dir, "stg_corp_actions"):
         if r["parse_status"] == "IGNORED":
+            continue
+        if not market_in_scope(r["ex_date"]):
+            skipped += 1
             continue
         secs, method = resolve_corp_action_security(
             con, exchange, r["isin"], r["symbol"], r["ex_date"] - timedelta(days=1)
@@ -532,7 +545,8 @@ def _promote_corp_actions(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
             )
         recorded += 1
     verify_pending_actions(con, exchange)
-    return PromotionResult("PROMOTED", "corp_actions", message=f"{recorded} actions", quarantined=quarantined)
+    message = f"{recorded} actions" + (f", {skipped} before {MIN_TRADE_DATE} skipped" if skipped else "")
+    return PromotionResult("PROMOTED", "corp_actions", message=message, quarantined=quarantined)
 
 
 def _f(x: Decimal | None) -> float | None:
@@ -582,7 +596,22 @@ def _visible_from(
     return ist_to_utc(nxt, time(0, 0)), "BOARD_MEETING_RULE"
 
 
+def _declared_period_end(con, stage_dir: Path) -> date | None:
+    ends = [
+        r["value_text"].strip()
+        for r in read_table(con, stage_dir, "raw_xbrl_facts")
+        if r["element_name"] == "DateOfEndOfReportingPeriod"
+    ]
+    try:
+        return max(date.fromisoformat(e) for e in ends) if ends else None
+    except ValueError:
+        return None
+
+
 def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
+    declared_end = _declared_period_end(con, stage_dir)
+    if declared_end is not None and not financials_in_scope(declared_end):
+        return _out_of_scope(con, stage_dir, "results_xbrl", f"period end {declared_end} < {MIN_PERIOD_END_DATE}")
     _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_xbrl_facts"))
     filing = read_table(con, stage_dir, "filings")[0]
     fid = filing["filing_id"]
@@ -705,6 +734,8 @@ def _promote_holidays(con, stage_dir: Path, manifest: dict[str, Any]) -> Promoti
 def _promote_index_snapshot(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
     index_name = manifest["index_name"]
     snap = date.fromisoformat(manifest["snapshot_date"])
+    if not market_in_scope(snap):
+        return _out_of_scope(con, stage_dir, "index_snapshot", f"snapshot {snap} < {MIN_TRADE_DATE}")
     latest = con.execute(
         "SELECT max(snapshot_date) FROM raw_index_snapshot WHERE index_name = ?", [index_name]
     ).fetchone()[0]
@@ -840,6 +871,11 @@ def cross_check_shares(con, entity_id: str, as_of: date) -> str | None:
 
 
 def _promote_shareholding(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
+    staged_meta = read_table(con, stage_dir, "stg_shp_meta")
+    if staged_meta and not financials_in_scope(staged_meta[0]["as_of_date"]):
+        return _out_of_scope(
+            con, stage_dir, "shareholding", f"as of {staged_meta[0]['as_of_date']} < {MIN_PERIOD_END_DATE}"
+        )
     _insert_vault_rows(con, stage_dir, ("blobs", "filings"))
     filing = read_table(con, stage_dir, "filings")[0]
     fid = filing["filing_id"]

@@ -1,0 +1,12 @@
+# Local data: raw vault, staging, DuckDB, Parquet. Never commit.
+data/
+*.duckdb
+*.duckdb.wal
+*.parquet
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.egg-info/

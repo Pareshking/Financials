@@ -1,0 +1,115 @@
+# References & Evidence Register
+
+Every external claim the design relies on lives here with a status. **Code may only depend
+on VERIFIED claims.** An UNVERIFIED claim may shape a plan, but the code path that relies
+on it must quarantine on surprise and must get a fixture + test before it is trusted.
+
+Status meanings:
+- **VERIFIED**: checked against a real file in `tests/fixtures/` and pinned by a test.
+  Scope is exactly what was tested (e.g. "one Q2 standalone filing"). Not a universal law.
+- **OBSERVED**: seen in live data on a stated date, but not pinned by a committed fixture.
+- **UNVERIFIED**: from documents, memory or another tool's assertion. Do not code against it.
+- **CHOICE**: a methodology decision, not a fact. Changing it is a design change.
+
+Last reviewed: 2026-11-13.
+
+## 1. XBRL quarterly results (fixtures: `tests/fixtures/xbrl/`, tests: `tests/test_xbrl_fixture_facts.py`)
+
+| # | Claim | Status | Evidence / scope |
+|---|---|---|---|
+| X1 | Accounting profile is routable from the `in-capmkt-ent` namespace: `IntegratedFinance_IndAS`, `IntegratedFinance_NBFC`, `IntegratedFinance_Banking` (SEBI `2026-01-31` taxonomy); legacy general insurer uses `bseindia.com/xbrl/GeneralInsurance/2020-03-31`. | VERIFIED | 4 fixtures |
+| X2 | Quarterly XBRL has **no prior-period comparative durations**. Contexts: `OneD` (quarter), `FourD` (FY-to-date), `OneI` (period-end instant). Only prior-period fact: `PY_I` → `CashAndCashEquivalentsCashFlowStatement` (opening cash for the cash-flow statement). | VERIFIED | corp, NBFC, bank fixtures |
+| X3 | Restated prior-year quarters (e.g. after a demerger) are **not available** in quarterly XBRL. | VERIFIED (consequence of X2) | Design consequence: see architecture §7.6 |
+| X4 | Numeric values are **absolute rupees** whatever `LevelOfRounding` says (Millions, Lakhs). | VERIFIED | corp (Millions), bank (Lakhs) |
+| X5 | The `decimals` attribute is inconsistent inside one filing (corp mixes `-4`, `-5`, `-6` under `LevelOfRounding = Millions`). Do not use it for tolerances. | VERIFIED | corp |
+| X6 | Scope is a per-filing text fact `NatureOfReportStandaloneConsolidated`, not a context dimension. Standalone and consolidated are separate filings. | VERIFIED (standalone only) | 4 fixtures; no consolidated fixture yet |
+| X7 | Issuer identifiers are inside the filing: `Symbol`/`NSESymbol`, `ISIN`, `ScripCode` (BSE). | VERIFIED | corp, NBFC, bank, GI |
+| X8 | Filing contains `DateOfStartOfFinancialYear`, `ReportingQuarter`, board meeting start/end date and time, `WhetherResultsAreAuditedOrUnaudited`. | VERIFIED | corp, GI |
+| X9 | Corp P&L identities tie exactly: `Income − Expenses = ProfitBeforeExceptionalItemsAndTax`; `PBEIT + ExceptionalItemsBeforeTax = ProfitBeforeTax`; `PBT − TaxExpense = ProfitLossForPeriodFromContinuingOperations`. | VERIFIED | corp OneD + FourD |
+| X10 | `ExceptionalItemsBeforeTax` sign: positive increases PBT. | VERIFIED (one filing, positive value only) | corp. A loss-valued fixture is still needed. |
+| X11 | `ChangesInInventoriesOfFinishedGoodsWorkInProgressAndStockInTrade` is an expense-signed component of `Expenses` (negative = inventory build-up). | VERIFIED | corp |
+| X12 | H1 corp/NBFC filing has a full balance sheet in `OneI`; `Assets = EquityAndLiabilities` exactly. | VERIFIED | corp, NBFC (Q2) |
+| X13 | Cash flow appears only in `FourD` (YTD), not `OneD`. | VERIFIED | corp Q2 |
+| X14 | Interest classification is tagged: `InterestPaidClassifiedAsOperatingActivities` / `…AsFinancingActivities`, `InterestReceivedClassifiedAsOperatingActivities` / `…AsInvestingActivities`. | VERIFIED | corp (interest paid in financing) |
+| X15 | Cash-flow outflow tags (e.g. `PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities`, `InterestPaidClassifiedAsFinancingActivities`) hold **positive magnitudes**; net totals (`CashFlowsFromUsedInOperatingActivities`) are signed. | VERIFIED (one filing) | corp |
+| X16 | Quarterly corp balance sheet has **no separate lease-liability tag**; leases sit inside other financial liabilities. Only `BorrowingsNoncurrent` / `BorrowingsCurrent` are tagged. | VERIFIED (absence, one filing) | corp |
+| X17 | `NoncurrentInvestments` is a single total, with no split between treasury and strategic holdings. | VERIFIED (one filing) | corp |
+| X18 | Share count derivable: `PaidUpValueOfEquityShareCapital / FaceValueOfEquityShareCapital` (corp: 248,550,000 / 5 = 49,710,000). Wrong for partly-paid shares. | VERIFIED (tags present) | corp |
+| X19 | Related-party transactions (Reg. 23(9)) are inside the Integrated Filing XBRL under `RelatedPartyTransactionAxis` contexts. | VERIFIED | corp, NBFC |
+| X20 | NBFC taxonomy uses `InterestEarned` (not `InterestIncome`), plus `FeesAndCommissionIncome`, `NetGainOnFairValueChanges`, `ImpairmentOnFinancialInstruments`, `FinanceCosts`. | VERIFIED (tags present) | NBFC fixture is an **investment company**, not a lender |
+| X21 | Bank tags: `InterestEarned`, `InterestExpended`, `OperatingExpenses`, `OperatingProfitBeforeProvisionAndContingencies`, `ProvisionsOtherThanTaxAndContingencies`, `GrossNonPerformingAssets`, `NonPerformingAssets`, `PercentageOfGrossNpa`, `PercentageOfNpa`, `ReturnOnAssets`, `CET1Ratio`, `AdditionalTier1Ratio`. Ratios are **fractions** (0.0175 = 1.75%). | VERIFIED | CSB Bank Q1 |
+| X22 | Bank Q1 filing has **no balance sheet** (no advances/deposits) and no `FourD`. | VERIFIED | CSB Bank Q1 |
+| X23 | CASA is **not tagged** in bank quarterly XBRL. | VERIFIED (one Q1 filing) | → `supplemental_kpis` |
+| X24 | Total CRAR tag | UNVERIFIED | Only CET1 and AT1 seen |
+| X25 | Whether bank `ReturnOnAssets` is annualised | UNVERIFIED | |
+| X26 | **Filer defect**: Star Health Q3 FY25 `FourD` context dates say 2024-10-01..2024-12-31 (same as `OneD`), but `DateOfStartOfReportingPeriod@FourI = 2024-04-01` and values are 9-month YTD. | VERIFIED | GI fixture. Context dates cannot be trusted blindly. |
+| X27 | Insurers have moved to the Integrated Filing taxonomy | UNVERIFIED | Fixture is legacy (Jan 2025) |
+| X28 | Life-insurer taxonomy and tags | UNVERIFIED | No fixture |
+| X29 | Consolidated-filing tags (NCI, share of associates placement) | UNVERIFIED | No fixture |
+| X30 | Q1/Q3 corp filings omit the balance sheet and cash flow (SEBI Reg. 33 half-yearly requirement) | UNVERIFIED for corp | Bank Q1 consistent |
+| X31 | `ExciseDuty` tag name in corp taxonomy | UNVERIFIED | Not in ELIN fixture |
+
+## 2. Prices, delivery, identifiers (fixtures: `tests/fixtures/bhavcopy/`, tests: `tests/test_bhavcopy_fixture_facts.py`)
+
+| # | Claim | Status | Evidence / scope |
+|---|---|---|---|
+| P1 | UDiFF CM bhavcopy columns include `TradDt, FinInstrmId, ISIN, TckrSymb, SctySrs, OpnPric, HghPric, LwPric, ClsPric, LastPric, PrvsClsgPric, TtlTradgVol, TtlTrfVal, TtlNbOfTxsExctd`; **no delivery column**. | VERIFIED | 5 fixtures |
+| P2 | `PrvsClsgPric` is **not** adjusted for corporate actions on ex-dates (split, bonus, demerger). | VERIFIED | ADANIPOWER, PIDILITIND, TATAMOTORS |
+| P3 | 23 large ex-date gaps in 28 trading days (2025-09-15..2025-10-17), all with unadjusted `PrvsClsgPric`. | OBSERVED | scratch analysis 2026-11-13 |
+| P4 | Days with \|Open_t/Close_{t−1} − 1\| > 10% among EQ/BE/BZ: 0–7 per day out of ~2,460 (mostly real corporate actions). | OBSERVED | same window |
+| P5 | Split changes ISIN (ADANIPOWER `INE814H01011 → INE814H01029`); symbol and `FinInstrmId` (17388) unchanged. | VERIFIED | fixtures |
+| P6 | Bonus keeps ISIN (PIDILITIND). | VERIFIED | fixtures |
+| P7 | Demerger parent keeps ISIN and symbol on ex-date (TATAMOTORS `INE155A01022`, open 400.00 vs prior close 660.75). | VERIFIED | fixtures |
+| P8 | `FinInstrmId` stable across ISIN change: TATAINVEST (1621) and PIDILITIND (2664) too. | OBSERVED | scratch analysis |
+| P9 | `FinInstrmId` is never reused for a different security | UNVERIFIED | |
+| P10 | `sec_bhavdata_full_DDMMYYYY.csv` has `PREV_CLOSE`, OHLC, `TTL_TRD_QNTY`, `DELIV_QTY`, `DELIV_PER`; **no ISIN**; `PREV_CLOSE` unadjusted on ex-date. Leading spaces after commas. | VERIFIED | 2025-10-14 fixture |
+| P11 | Time of day the bhavcopy and delivery files become available | UNVERIFIED | |
+| P12 | Source for corporate-action records (ratios, ex-dates) | UNVERIFIED | Likely `www.nseindia.com` API → local fetcher |
+
+## 3. Access & discovery
+
+| # | Claim | Status | Evidence |
+|---|---|---|---|
+| A1 | `nsearchives.nseindia.com` returns 200 from a cloud container; `www.nseindia.com` and `api.bseindia.com` return 403. | OBSERVED | 2026-11-13 |
+| A2 | `content/RSS/Financial_Results.xml` items carry no file links (period/scope description only). | OBSERVED | 2026-11-13 |
+| A3 | `content/RSS/Online_announcements.xml` carries direct `corporate/xbrl/*.xml` links for Reg. 30 event filings (54 of ~300 items: analyst meets, KMP changes, orders, board outcomes, demerger, acquisitions). | OBSERVED | 2026-11-13 |
+| A4 | RSS `pubDate` has second precision (`13-Nov-2026 00:25:25`), IST. IST is assumed, not stated in the feed. | OBSERVED | 2026-11-13 |
+| A5 | Late filings exist: results RSS item published 2026-11-03 for period ended 2024-06-30. | OBSERVED | 2026-11-13 |
+| A6 | `content/indices/ind_nifty500list.csv` gives **current** constituents only (`Company Name, Industry, Symbol, Series, ISIN Code`, 501 rows). No machine-readable history found. | OBSERVED | 2026-11-13 |
+| A7 | Results-XBRL discovery needs the `www.nseindia.com` API with browser session cookies. | UNVERIFIED | Inferred from A1/A2 |
+
+## 4. Regulatory and corporate facts (all UNVERIFIED unless noted)
+
+| # | Claim | Status | Note |
+|---|---|---|---|
+| R1 | Single Filing System extended to Reg. 34 Annual Report XBRL (20 Apr 2026) and BRSR (31 Mar 2026); cited as "NSE/CML/2026/08" and "BSE Notice 20260529-28". | UNVERIFIED | The BSE notice date is later than the dates it is cited for. Neither circular has been seen. |
+| R2 | Reg. 34 annual XBRL on exchanges uses the MCA Ind AS taxonomy with Notes and prior-FY comparatives. | UNVERIFIED | Needs Reg. 34 fixture |
+| R3 | Banks and insurers are not on Ind AS. | UNVERIFIED (consistent with X21 tags) | |
+| R4 | SME-listed companies are exempt from Ind AS. | UNVERIFIED | SME out of v1 scope anyway |
+| R5 | Schedule III (FY22+) shows current maturities of long-term debt inside current borrowings. | UNVERIFIED | |
+| R6 | Nestlé India FY2023-24 was 15 months (Jan 2023–Mar 2024). | UNVERIFIED | Test case for `period_months > 12` |
+| R7 | Tata Motors demerger: effective 1 Oct 2025, record/ex-date 14 Oct 2025, TMLCV listing 12 Nov 2025, COA 68.85% / 31.15%. | Ex-date price behaviour VERIFIED (P7); rest UNVERIFIED | |
+| R8 | AMFI publishes no consolidated scheme-wise ISIN file; ~45 AMCs publish separately. | UNVERIFIED | Phase 3 only |
+| R9 | Financial results must be disclosed within 30 minutes of the board meeting ending. | UNVERIFIED | Used only as a conservative-visibility rule (architecture §6.3) |
+| R10 | DVR shares use `INE` ISINs; partly-paid use `IN9`. | UNVERIFIED | |
+| R11 | Under Ind AS 7, Indian companies may classify interest paid as operating or financing. | VERIFIED as tagged choice (X14) | |
+
+## 5. Known data limitations (affect results, must be disclosed in any backtest output)
+
+- **L1 Survivorship bias**: `index_constituents_history` starts at the first snapshot date (Phase 1 go-live). Any backtest with an as-of date before that uses today's constituents and is **survivorship-biased** until historical changes are backfilled manually.
+- **L2 Restated comparatives**: after demergers or mergers, prior-year quarters are as-reported (pre-restatement) until restated values are captured from a later Reg. 34 annual XBRL (FY level only) or a verified PDF supplement. YoY growth across such events is flagged, not trusted.
+- **L3 Half-yearly balance sheet and cash flow**: in Q1/Q3, balance-sheet and cash-flow inputs are carried forward from the last H1/FY filing; every derived ratio exposes `bs_as_of` / `cf_as_of`.
+- **L4 Quarterly debt excludes leases** (X16) and **cash excludes non-current treasury investments** (X17) until annual notes are parsed.
+
+## 6. Methodology choices (CHOICE)
+
+| # | Choice |
+|---|---|
+| C1 | Money is `DECIMAL(20,2)` rupees in DuckDB/Parquet and `decimal.Decimal` in Python. Never float. |
+| C2 | Price series adjusted only for splits, bonuses, rights bonus element and demergers. No dividend adjustment; dividends go to a separate total-return series. |
+| C3 | Demerger price factor = parent's ex-date open / prior close. |
+| C4 | Unconditional gap auditor threshold: \|Open_t / Close_{t−1} − 1\| > 10%. |
+| C5 | Effective tax rate fallback for loss-makers = 0 (no synthetic tax shield). Statutory 25.17% (Sec. 115BAA) is used only where a ratio explicitly needs a statutory rate. |
+| C6 | Gross profit is computed only for `INDAS_CORP` with (materials + stock-in-trade purchases) ≥ 10% of revenue; otherwise NULL. |
+| C7 | Universe v1: NSE Mainboard `EQ`/`BE`/`BZ`, starting with Nifty 500. SME (`SM`/`ST`) excluded. |
+| C8 | Personal, single-user research. No redistribution. Polite, rate-limited fetching with on-disk caching. This is not legal compliance with exchange terms, which prohibit automated access. |

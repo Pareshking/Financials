@@ -1,0 +1,14 @@
+[project]
+name = "financials"
+version = "0.0.0"
+description = "Personal Indian equity research, screening and point-in-time backtesting engine"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+addopts = "-ra --strict-markers"

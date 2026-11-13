@@ -200,3 +200,31 @@ def test_unparsed_purpose_is_quarantined_and_holds_prices(market):
     from financials.promoter import adjusted_closes
 
     assert [d for d, _ in adjusted_closes(market.con, market.security_id("PIDILITIND"))] == [date(2025, 9, 22)]
+
+
+def test_total_return_includes_dividend_but_adjusted_prices_do_not(promoted):
+    """MAHSCOOTER: Rs 160 interim dividend, ex 2025-09-22 (real bhavcopy closes)."""
+    from financials.promoter import adjusted_closes, total_return
+
+    sec = promoted.security_id("MAHSCOOTER")
+    raw = dict(promoted.con.execute("SELECT trade_date, close FROM ohlcv WHERE security_id = ?", [sec]).fetchall())
+    d0, d1 = date(2025, 9, 19), date(2025, 9, 22)
+    adj = dict(adjusted_closes(promoted.con, sec))
+    assert adj[d0] == raw[d0]  # dividends never adjust prices [C2]
+    tr = dict(total_return(promoted.con, sec))
+    assert tr[d0] == 100
+    assert tr[d1] == Decimal(100) * (raw[d1] + 160) / raw[d0]
+    price_only = Decimal(100) * raw[d1] / raw[d0]
+    assert abs((tr[d1] - price_only) - Decimal(100) * 160 / raw[d0]) < Decimal("1e-20")
+
+
+def test_total_return_is_continuous_across_split(promoted):
+    """ADANIPOWER 1:5 split: the TR index must not show the 79% mechanical drop."""
+    from financials.promoter import total_return
+
+    sec = promoted.security_id("ADANIPOWER")
+    tr = dict(total_return(promoted.con, sec))
+    raw = dict(promoted.con.execute("SELECT trade_date, close FROM ohlcv WHERE security_id = ?", [sec]).fetchall())
+    d0, d1 = date(2025, 9, 19), date(2025, 9, 22)
+    assert tr[d1] / tr[d0] == raw[d1] / (raw[d0] * Decimal("0.2"))
+    assert Decimal("0.9") < tr[d1] / tr[d0] < Decimal("1.3")

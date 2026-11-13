@@ -537,6 +537,13 @@ def _f(x: Decimal | None) -> float | None:
     return None if x is None else float(x)
 
 
+def total_return(con, security_id: str, exchange: str = "NSE") -> list[tuple[date, Decimal]]:
+    """Total-return index (base 100) including accepted cash dividends; see financials.returns."""
+    from financials.returns import total_return_index
+
+    return total_return_index(con, security_id, _actions(con, "security_id = ?", [security_id]), exchange)
+
+
 def adjusted_closes(con, security_id: str, exchange: str = "NSE") -> list[tuple[date, Decimal]]:
     """Back-adjusted closes; withheld from the first unresolved GAP quarantine onwards."""
     bars = con.execute(

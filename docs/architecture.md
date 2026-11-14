@@ -614,10 +614,10 @@ Status (2026-11-13): **built and tested end to end** on real fixtures, all liste
 - Feature snapshots.
 
 **Gaps against the owner's master blueprint (reviewed 2026-11-14), still open:**
-- Restatement detector (blueprint §3.2): today a missing quarter is *derived* from YTD differences, which also hides
-  a restated earlier quarter. Needed: a gate that compares a filed YTD with the sum of filed quarters of the same
-  scope and profile, plus triggers on `ProfitLossFromDiscontinuedOperations` ≠ 0 and on a demerger/merger in
-  `corp_actions`; a break freezes TTM for that entity instead of mixing restated and original quarters.
+- Restatement detector (blueprint §3.2): the YTD-vs-quarters identity is **built** [X80] (TTM withheld over a broken
+  year, `CONSISTENCY/YTD_QUARTER_MISMATCH` findings, `audit-ytd`). Still open: the extra triggers on
+  `ProfitLossFromDiscontinuedOperations` ≠ 0 and on a demerger/merger in `corp_actions` when the identity happens to
+  hold, and any recovery of restated quarters (NSE XBRL has no prior-period columns; PDFs are out of scope).
 - AOC-1 subsidiary tree from Reg. 34 (only AOC-1-like elements seen so far [X75]; needs a fixture with the schedule).
 - Merger lineage (`merged_into`, swap ratio, position conversion) and demerger cost-of-acquisition split; today
   `MERGED` exists only for duplicate-security repair.

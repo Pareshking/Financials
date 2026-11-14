@@ -697,7 +697,9 @@ files:
 - INTEGRATED_FILING_GI_1750325_30102026070447_WEB.xml
 - INTEGRATED_FILING_GI_1750334_30102026070831_WEB.xml
 - INTEGRATED_FILING_GI_1750474_30102026082326_WEB.xml
+- INTEGRATED_FILING_INDAS_1489565_21072025071304_WEB.xml
 - INTEGRATED_FILING_INDAS_1506803_08082025045458_WEB.xml
+- INTEGRATED_FILING_INDAS_1511655_13082025060450_WEB.xml
 - INTEGRATED_FILING_INDAS_1574016_13112025070452_WEB.xml
 - INTEGRATED_FILING_INDAS_1574914_14112025041626_WEB.xml
 - INTEGRATED_FILING_INDAS_1574923_14112025041850_WEB.xml
@@ -3333,7 +3335,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 55
+      filings: 56
       first_batch: B1
       line_item_category: OCI
       mapped_to: li_amount_of_item_that_will_not_be_reclassified_to_profit_and_loss
@@ -3386,7 +3388,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PER_SHARE
       mapped_to: eps_basic
@@ -3399,7 +3401,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PER_SHARE
       mapped_to: eps_basic_continuing
@@ -3412,7 +3414,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PER_SHARE
       mapped_to: li_basic_earnings_loss_per_share_from_discontinued_operations
@@ -3617,7 +3619,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PNL_EXPENSE
       mapped_to: changes_in_inventories
@@ -3627,7 +3629,7 @@ profiles:
     ClassOfSecurity:
       context_kinds:
       - duration_3m
-      filings: 57
+      filings: 59
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -3638,7 +3640,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: OCI
       mapped_to: total_comprehensive_income
@@ -3675,7 +3677,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PNL_EXPENSE
       mapped_to: cost_of_materials_consumed
@@ -3738,7 +3740,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PNL
       mapped_to: current_tax
@@ -3768,7 +3770,7 @@ profiles:
     DateOfBoardMeetingWhenFinancialResultsWereApproved:
       context_kinds:
       - duration_3m
-      filings: 57
+      filings: 59
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -3776,7 +3778,7 @@ profiles:
     DateOfEndOfBoardMeeting:
       context_kinds:
       - duration_3m
-      filings: 57
+      filings: 59
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -3784,7 +3786,7 @@ profiles:
     DateOfEndOfFinancialYear:
       context_kinds:
       - duration_3m
-      filings: 57
+      filings: 59
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -3795,7 +3797,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -3811,7 +3813,7 @@ profiles:
     DateOfStartOfBoardMeeting:
       context_kinds:
       - duration_3m
-      filings: 57
+      filings: 59
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -3819,7 +3821,7 @@ profiles:
     DateOfStartOfFinancialYear:
       context_kinds:
       - duration_3m
-      filings: 57
+      filings: 59
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -3830,7 +3832,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -3838,7 +3840,7 @@ profiles:
     DateOnWhichPriorIntimationOfTheMeetingForConsideringFinancialResultsWasInformedToTheExchange:
       context_kinds:
       - duration_3m
-      filings: 56
+      filings: 58
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -3849,7 +3851,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 25
+      filings: 27
       first_batch: B1
       line_item_category: MEMO
       mapped_to: li_debt_equity_ratio
@@ -3862,7 +3864,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 26
+      filings: 28
       first_batch: B1
       line_item_category: MEMO
       mapped_to: li_debt_service_coverage_ratio
@@ -3872,7 +3874,7 @@ profiles:
     DeclarationOfUnmodifiedOpinionOrStatementOnImpactOfAuditQualification:
       context_kinds:
       - duration_3m
-      filings: 57
+      filings: 59
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -3911,7 +3913,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PNL
       mapped_to: deferred_tax
@@ -3944,7 +3946,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PNL_EXPENSE
       mapped_to: depreciation_amortisation
@@ -3954,7 +3956,7 @@ profiles:
     DescriptionOfPresentationCurrency:
       context_kinds:
       - duration_3m
-      filings: 57
+      filings: 59
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -3973,7 +3975,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PER_SHARE
       mapped_to: eps_diluted
@@ -3986,7 +3988,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PER_SHARE
       mapped_to: li_diluted_earnings_loss_per_share_from_continuing_operations
@@ -3999,7 +4001,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PER_SHARE
       mapped_to: li_diluted_earnings_loss_per_share_from_discontinued_operations
@@ -4017,7 +4019,7 @@ profiles:
     DisclosureOfNotesOnFinancialResultsExplanatoryTextBlock:
       context_kinds:
       - duration_3m
-      filings: 32
+      filings: 33
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4080,7 +4082,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PNL_EXPENSE
       mapped_to: employee_benefit_expense
@@ -4090,7 +4092,7 @@ profiles:
     EndTimeOfBoardMeeting:
       context_kinds:
       - duration_3m
-      filings: 57
+      filings: 59
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4141,7 +4143,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PNL
       mapped_to: exceptional_items
@@ -4154,7 +4156,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PNL
       mapped_to: total_expenses
@@ -4167,7 +4169,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: sc
       line_item_category: PER_SHARE
       mapped_to: face_value_per_share
@@ -4180,7 +4182,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PNL_EXPENSE
       mapped_to: finance_costs
@@ -4200,7 +4202,7 @@ profiles:
     ISIN:
       context_kinds:
       - duration_3m
-      filings: 57
+      filings: 59
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4219,7 +4221,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: sc
       line_item_category: PNL
       mapped_to: total_income
@@ -4232,7 +4234,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 54
+      filings: 55
       first_batch: B1
       line_item_category: OCI
       mapped_to: li_income_tax_relating_to_items_that_will_be_reclassified_to_profit_or_loss
@@ -4245,7 +4247,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 56
+      filings: 58
       first_batch: B1
       line_item_category: OCI
       mapped_to: li_income_tax_relating_to_items_that_will_not_be_reclassified_to_profit_or_loss
@@ -4322,7 +4324,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 29
+      filings: 30
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_inter_segment_revenue
@@ -4379,7 +4381,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 26
+      filings: 28
       first_batch: B1
       line_item_category: MEMO
       mapped_to: li_interest_service_coverage_ratio
@@ -4419,7 +4421,7 @@ profiles:
     IsCompanyReportingMultisegmentOrSingleSegment:
       context_kinds:
       - duration_3m
-      filings: 57
+      filings: 59
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4435,7 +4437,7 @@ profiles:
     LevelOfRounding:
       context_kinds:
       - duration_3m
-      filings: 57
+      filings: 59
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4483,7 +4485,7 @@ profiles:
     MSEISymbol:
       context_kinds:
       - duration_3m
-      filings: 57
+      filings: 59
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4523,7 +4525,7 @@ profiles:
     NameOfTheCompany:
       context_kinds:
       - duration_3m
-      filings: 57
+      filings: 59
       first_batch: B1
       mapped_to: null
       numeric: false
@@ -4534,7 +4536,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4545,7 +4547,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PNL
       mapped_to: regulatory_deferral_movement
@@ -4555,7 +4557,7 @@ profiles:
     NetSegmentAssets:
       context_kinds:
       - instant
-      filings: 36
+      filings: 38
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_net_segment_assets
@@ -4565,7 +4567,7 @@ profiles:
     NetSegmentLiabilities:
       context_kinds:
       - instant
-      filings: 36
+      filings: 38
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_net_segment_liabilities
@@ -4645,7 +4647,7 @@ profiles:
     NoteForNonApplicabilityOfTheDisclosureForTheDefaultOnLoansAndDebtSecuritiesToTheEntity:
       context_kinds:
       - duration_3m
-      filings: 15
+      filings: 17
       first_batch: B5
       mapped_to: null
       numeric: false
@@ -4741,7 +4743,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: OCI
       mapped_to: li_other_comprehensive_income
@@ -4754,7 +4756,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: OCI
       mapped_to: oci_net
@@ -4817,7 +4819,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PNL_EXPENSE
       mapped_to: other_expenses
@@ -4830,7 +4832,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: sc
       line_item_category: PNL_INCOME
       mapped_to: other_income
@@ -4925,7 +4927,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 33
+      filings: 35
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_other_unallocable_expenditure_net_off_un_allocable_income
@@ -4938,7 +4940,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: sc
       line_item_category: BALANCE_SHEET
       mapped_to: paid_up_equity_capital
@@ -5157,7 +5159,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PNL
       mapped_to: profit_before_exceptional_and_tax
@@ -5170,7 +5172,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PNL
       mapped_to: pbt
@@ -5183,7 +5185,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PNL
       mapped_to: pat
@@ -5196,7 +5198,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PNL
       mapped_to: pat_continuing
@@ -5209,7 +5211,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PNL
       mapped_to: pat_discontinued
@@ -5222,7 +5224,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PNL
       mapped_to: discontinued_pbt
@@ -5366,7 +5368,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PNL_EXPENSE
       mapped_to: purchases_of_stock_in_trade
@@ -5431,7 +5433,7 @@ profiles:
     ReportingQuarter:
       context_kinds:
       - duration_3m
-      filings: 57
+      filings: 59
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -5452,7 +5454,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PNL_INCOME
       mapped_to: revenue_from_operations
@@ -5462,7 +5464,7 @@ profiles:
     ScripCode:
       context_kinds:
       - duration_3m
-      filings: 57
+      filings: 59
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -5470,7 +5472,7 @@ profiles:
     SegmentAssets:
       context_kinds:
       - instant
-      filings: 36
+      filings: 38
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_segment_assets
@@ -5482,7 +5484,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 33
+      filings: 35
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_segment_finance_costs
@@ -5492,7 +5494,7 @@ profiles:
     SegmentLiabilities:
       context_kinds:
       - instant
-      filings: 36
+      filings: 38
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_segment_liabilities
@@ -5504,7 +5506,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 36
+      filings: 38
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_segment_profit_before_tax
@@ -5516,7 +5518,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 36
+      filings: 38
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_segment_profit_loss_before_tax_and_finance_costs
@@ -5528,7 +5530,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 36
+      filings: 38
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_segment_revenue
@@ -5540,7 +5542,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 36
+      filings: 38
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_segment_revenue_from_operations
@@ -5564,7 +5566,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: PNL
       mapped_to: share_of_associates_jv
@@ -5574,7 +5576,7 @@ profiles:
     StartTimeOfBoardMeeting:
       context_kinds:
       - duration_3m
-      filings: 57
+      filings: 59
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -5582,7 +5584,7 @@ profiles:
     Symbol:
       context_kinds:
       - duration_3m
-      filings: 57
+      filings: 59
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -5593,7 +5595,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: sc
       line_item_category: PNL
       mapped_to: tax_expense
@@ -5606,7 +5608,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: B1
       line_item_category: DISCONTINUED
       mapped_to: li_tax_expense_of_discontinued_operations
@@ -5724,7 +5726,7 @@ profiles:
     TypeOfCompany:
       context_kinds:
       - duration_3m
-      filings: 57
+      filings: 59
       first_batch: B1
       mapped_to: null
       numeric: false
@@ -5732,7 +5734,7 @@ profiles:
     TypeOfReportingPeriod:
       context_kinds:
       - duration_3m
-      filings: 57
+      filings: 59
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -5740,7 +5742,7 @@ profiles:
     UnAllocableAssets:
       context_kinds:
       - instant
-      filings: 36
+      filings: 38
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_un_allocable_assets
@@ -5750,7 +5752,7 @@ profiles:
     UnAllocableLiabilities:
       context_kinds:
       - instant
-      filings: 36
+      filings: 38
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_un_allocable_liabilities
@@ -5795,7 +5797,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 59
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -5811,7 +5813,7 @@ profiles:
     ? WhetherStatementOnDeviationOrVariationForProceedsOfPublicIssueOrRightIssueOrPreferentialIssueOrQIPEtcIsApplicableToTheCompanyForTheCurrentQuarter
     : context_kinds:
       - duration_3m
-      filings: 16
+      filings: 18
       first_batch: B5
       mapped_to: null
       numeric: false
@@ -5843,7 +5845,7 @@ profiles:
     WhetherTheDisclosureForTheDefaultOnLoansAndDebtSecuritiesIsApplicableToTheEntity:
       context_kinds:
       - duration_3m
-      filings: 16
+      filings: 18
       first_batch: B5
       mapped_to: null
       numeric: false

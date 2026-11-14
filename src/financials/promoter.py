@@ -670,6 +670,51 @@ def resolve_security_by_isin(con, exchange: str, isin: str, on_date: date) -> li
     return [r[0] for r in rows]
 
 
+ISIN_TYPO_RULE = "ISIN_TYPO_SYMBOL_MATCH"
+
+
+def is_isin_typo(stated: str, actual: str) -> bool:
+    """X81: the stated ISIN is the actual one with the letter O typed for the digit 0, or with one pair of adjacent
+    characters swapped. Nothing looser (no other substitutions, insertions or deletions)."""
+    if not stated or len(stated) != len(actual) or stated == actual:
+        return False
+    if all(a == b or (a == "O" and b == "0") for a, b in zip(stated, actual, strict=True)):
+        return True
+    diff = [i for i, (a, b) in enumerate(zip(stated, actual, strict=True)) if a != b]
+    return (
+        len(diff) == 2
+        and diff[1] == diff[0] + 1
+        and stated[diff[0]] == actual[diff[1]]
+        and stated[diff[1]] == actual[diff[0]]
+    )
+
+
+def resolve_isin_typo(con, exchange: str, isin: str, symbol: str | None, on_date: date, filing_id: str) -> list[str]:
+    """Rule ISIN_TYPO_SYMBOL_MATCH [X81]: an unknown stated ISIN is accepted only when the stated symbol names exactly
+    one security on `on_date` (else in any interval, as resolve_security_by_isin) and that security's ISIN is the
+    stated one up to an O/0 typo or one adjacent swap. Logged in admin_log; raw keeps the ISIN as sent (invariant 3)."""
+    if not symbol or not isin:
+        return []
+    rows = con.execute(
+        "SELECT DISTINCT security_id, isin FROM security_identifier_history WHERE exchange = ? AND symbol = ? "
+        "AND valid_from <= ? AND (valid_to IS NULL OR valid_to > ?)",
+        [exchange, symbol, on_date, on_date],
+    ).fetchall()
+    if not rows:  # same fallback as resolve_security_by_isin: any interval, still exactly one security
+        rows = con.execute(
+            "SELECT DISTINCT security_id, isin FROM security_identifier_history WHERE exchange = ? AND symbol = ?",
+            [exchange, symbol],
+        ).fetchall()
+    if len({sec for sec, _ in rows}) != 1 or not all(is_isin_typo(isin, actual) for _, actual in rows):
+        return []
+    sec, actual = rows[0]
+    params = json.dumps({"filing_id": filing_id, "stated_isin": isin, "symbol": symbol, "isin": actual,
+                         "security_id": sec}, sort_keys=True)  # fmt: skip
+    row = [stable_id("adm", ISIN_TYPO_RULE, params), "RULE:" + ISIN_TYPO_RULE, params, "X81", utc_now()]
+    con.execute("INSERT OR IGNORE INTO admin_log VALUES (?, ?, ?, NULL, ?, ?)", row)
+    return [sec]
+
+
 def isin_issuer_code(isin: str) -> str:
     """Characters 4-7 of an Indian ISIN identify the issuer; splits keep them [CA7]."""
     return isin[3:7]
@@ -970,6 +1015,11 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
             "JOIN securities s USING (security_id) WHERE h.exchange = ? AND h.isin = ?",
             [filing["exchange"], meta["stated_isin"]],
         ).fetchall()
+        if not ent:
+            typo = resolve_isin_typo(con, filing["exchange"], meta["stated_isin"], meta["stated_symbol"],
+                                     meta["period_end"], fid)  # fmt: skip
+            ent = con.execute("SELECT entity_id FROM securities WHERE security_id IN (SELECT unnest(?))",
+                              [typo]).fetchall()  # fmt: skip
         reason = "UNKNOWN_ISIN" if not ent else "AMBIGUOUS_ISIN"
     ovr = filing_overrides(con, fid)
     if "security_id" in ovr:  # `quarantine resolve --action OVERRIDE` [P2-13]
@@ -1292,6 +1342,9 @@ def _promote_shareholding(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     ).fetchone()[0]:
         return PromotionResult("ALREADY_PROMOTED", "shareholding", message=fid)
     secs = resolve_security_by_isin(con, filing["exchange"], meta["stated_isin"], meta["as_of_date"])
+    if not secs:
+        secs = resolve_isin_typo(con, filing["exchange"], meta["stated_isin"], meta["stated_symbol"],
+                                 meta["as_of_date"], fid)  # fmt: skip
     entities = sorted(
         {con.execute("SELECT entity_id FROM securities WHERE security_id = ?", [s_]).fetchone()[0] for s_ in secs}
     )

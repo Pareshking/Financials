@@ -340,3 +340,21 @@ def test_parallel_workers_keep_one_request_per_host_interval(tmp_path):
     assert set(per_host) == {"www.nseindia.com"}
     ts = sorted(per_host["www.nseindia.com"])
     assert len(ts) == 8 and all(b - a >= 0.049 for a, b in pairwise(ts))
+
+
+def test_a_ledger_entry_without_its_blob_is_fetched_again(tmp_path):
+    """A run killed between download and vault write leaves a 200 in the URL index but no file: fetch it again."""
+    d = date(2025, 10, 17)
+    jobs, t = jobs_for(tmp_path, {bhavcopy_url(d): Response(200, bhav("20251017"))})
+    jobs.vault.record_fetch(bhavcopy_url(d), 200, datetime(2026, 11, 14), bhav("20251017"), "csv.zip")
+    assert not jobs.is_vaulted(bhavcopy_url(d))  # ledger says 200, but no blob on disk
+    assert jobs.market_day(d) and bhavcopy_url(d) in [u for u, _ in t.calls]
+    assert jobs.is_vaulted(bhavcopy_url(d))
+
+
+def test_listing_rows_without_broadcast_time_parse_and_fall_back_to_the_board_meeting_rule():
+    """A7: ADANIGREEN's listing has 10 of 20 rows with broadcast_Date null; they parse with no broadcast time."""
+    p = FIXTURES / "discovery" / "nse_integrated-filing-results_equities_ADANIGREEN_20261114.json"
+    rows = parse_integrated_filing_listing(p.read_bytes(), results_only=False)
+    assert len(rows) == 20 and sum(r.broadcast_ts_ist is None for r in rows) == 10
+    assert all(r.xbrl_url.startswith("https://nsearchives.nseindia.com/corporate/xbrl/") for r in rows)

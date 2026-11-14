@@ -29,7 +29,7 @@ class IntegratedFilingEntry:
     scope: str | None
     filing_type: str
     type_sub: str | None
-    broadcast_ts_ist: datetime
+    broadcast_ts_ist: datetime | None  # null on some rows (ADANIGREEN Q2 FY27): visibility then by board-meeting rule
     xbrl_url: str
 
 
@@ -51,7 +51,9 @@ def parse_integrated_filing_listing(data: bytes, *, results_only: bool = True) -
                     scope=(r.get("consolidated") or None),
                     filing_type=r["type"],
                     type_sub=r.get("type_Sub"),
-                    broadcast_ts_ist=datetime.strptime(r["broadcast_Date"].strip(), "%d-%b-%Y %H:%M:%S"),
+                    broadcast_ts_ist=None
+                    if not r.get("broadcast_Date")
+                    else datetime.strptime(r["broadcast_Date"].strip(), "%d-%b-%Y %H:%M:%S"),
                     xbrl_url=r["xbrl"].strip(),
                 )
             )

@@ -118,7 +118,7 @@ class Jobs:
         """Bytes, or None for an allowed 404. Archive files already vaulted are not downloaded again."""
         immutable = url.startswith(IMMUTABLE_PREFIXES)
         last = self.vault.last_fetch(url) if immutable else None
-        if last and last["status"] == 200:
+        if last and last["status"] == 200 and (self.vault.root / last["storage_path"]).exists():
             return self.vault.read_path(last["storage_path"], last["sha256"])
         if last and last["status"] == 404 and allow_404 and asked_for is not None:
             seen = datetime.fromisoformat(last["fetched_at"]).date()
@@ -126,12 +126,14 @@ class Jobs:
                 return None
         data = self.f.get(url, accept=accept, allow_404=allow_404)
         if immutable:
+            if data is not None:  # the blob is in the vault before the ledger says so (a killed run leaves no lie)
+                self.vault.put(data, ext=self._ext(url), media_type="application/octet-stream", fetched_at=utc_now())
             self.vault.record_fetch(url, 404 if data is None else 200, utc_now(), data, self._ext(url))
         return data
 
     def is_vaulted(self, url: str) -> bool:
         last = self.vault.last_fetch(url)
-        return bool(last and last["status"] == 200)
+        return bool(last and last["status"] == 200 and (self.vault.root / last["storage_path"]).exists())
 
     # ── market data ──
 
@@ -261,7 +263,10 @@ class Jobs:
                 continue
             if (xbrl := self._file(e.xbrl_url)) is None:
                 continue
-            ts = ist_to_utc(e.broadcast_ts_ist.date(), e.broadcast_ts_ist.time())
+            # A null broadcast_Date (A7) stages UNKNOWN: the promoter then uses the board-meeting rule (next session).
+            ts = (
+                None if e.broadcast_ts_ist is None else ist_to_utc(e.broadcast_ts_ist.date(), e.broadcast_ts_ist.time())
+            )
             out.append(
                 stage_results_xbrl(
                     self.vault,
@@ -270,7 +275,7 @@ class Jobs:
                     source_url=e.xbrl_url,
                     fetched_at=utc_now(),
                     broadcast_ts=ts,
-                    broadcast_ts_source="API_FIELD",
+                    broadcast_ts_source="API_FIELD" if ts else "UNKNOWN",
                 )
             )
         return out  # fmt: skip

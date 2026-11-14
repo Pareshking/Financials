@@ -76,10 +76,11 @@ def test_corp_action_resolution_verifies_and_unfreezes(mkt):
     (q,) = [r for r in gap_q(m, "PIDILITIND", date(2025, 9, 23)) if r["reason_code"] == "UNEXPLAINED_GAP"]
     (pid,) = sec(m, "PIDILITIND")
     assert [d for d, _ in adjusted_closes(m.con, pid)] == [date(2025, 9, 22)]  # frozen
+    n_actions = m.con.execute("SELECT count(*) FROM corp_actions").fetchone()[0]  # ETF splits by CA13 on 2026-11-12
     with pytest.raises(AdminError, match="does not explain the gap"):
         resolve_quarantine(m.con, q["quarantine_id"], action="CORP_ACTION", note="wrong ratio",
                            payload={"action_type": "BONUS", "ratio_num": 1, "ratio_den": 2})  # fmt: skip
-    assert m.con.execute("SELECT count(*) FROM corp_actions").fetchone()[0] == 0  # rolled back
+    assert m.con.execute("SELECT count(*) FROM corp_actions").fetchone()[0] == n_actions  # rolled back
     r = resolve_quarantine(m.con, q["quarantine_id"], action="CORP_ACTION", note="1:1 bonus per NSE",
                            payload={"action_type": "BONUS", "ratio_num": 1, "ratio_den": 1})  # fmt: skip
     assert r["status"] == "VERIFIED_MANUAL"

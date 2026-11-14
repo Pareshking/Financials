@@ -286,6 +286,8 @@ def _promote_market_day(con, stage_dir: Path, manifest: dict[str, Any]) -> Promo
     quarantined += _infer_non_sessions(con, exchange, trade_date, filing_id)
     verify_pending_actions(con, exchange)
     quarantined += _audit_gaps(con, exchange, trade_date, obs)
+    resolve_market_moves(con)
+    resolve_isin_changes(con, exchange)
     closed = close_inactive_securities(con, exchange, trade_date)
     message = str(trade_date) + (f", {closed} inactive securities closed" if closed else "")
     return PromotionResult("PROMOTED", "market_day", message=message, quarantined=quarantined)
@@ -340,6 +342,91 @@ def _infer_non_sessions(con, exchange: str, trade_date: date, filing_id: str) ->
             },
         )
     ]
+
+
+# CA12 (live backfill 2024-10 .. 2026-11): of 2,227 open-gap findings, 2,153 were equity shares and 1,997 of them
+# moved <= 20% with no corporate-action record of any kind within 7 days in a feed that covers the date. A missing
+# share-count event is what the auditor exists to catch, and it would sit in that feed; so such a gap is a market move.
+MARKET_MOVE_MAX_GAP = Decimal("0.20")
+MARKET_MOVE_WINDOW_DAYS = 7
+
+
+def resolve_market_moves(con) -> int:
+    """Named rule CA12: close UNEXPLAINED_GAP findings of equity shares (INE ISIN) with |gap| <= 20% when the
+    corporate-action feed covers the date (+/- 7 days) and holds no record for the security in that window.
+    ETF units (INF), larger gaps and gaps near any action stay for a human. One batched statement."""
+    rows = con.execute(
+        f"""WITH cov AS (
+              SELECT CAST(strptime(regexp_extract(source_url, 'from_date=([0-9-]+)', 1), '%d-%m-%Y') AS DATE) f,
+                     CAST(strptime(regexp_extract(source_url, 'to_date=([0-9-]+)', 1), '%d-%m-%Y') AS DATE) t
+              FROM filings WHERE category = 'CORP_ACTIONS' AND source_url LIKE '%from_date=%'),
+            g AS (
+              SELECT q.quarantine_id, q.security_id, CAST(json_extract_string(q.details, '$.trade_date') AS DATE) d,
+                     abs(CAST(json_extract_string(q.details, '$.gap') AS DOUBLE)) a
+              FROM quarantine_queue q
+              WHERE q.stage = 'GAP' AND q.reason_code = 'UNEXPLAINED_GAP' AND q.resolved_at IS NULL)
+           UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE',
+                  resolution_note = 'market move: equity, <= 20%, no action within 7 days in a covering feed [CA12]'
+           WHERE quarantine_id IN (
+             SELECT g.quarantine_id FROM g
+             JOIN security_identifier_history h ON h.security_id = g.security_id AND h.valid_from <= g.d
+                  AND (h.valid_to IS NULL OR h.valid_to > g.d) AND h.isin LIKE 'INE%'
+             WHERE g.a <= {float(MARKET_MOVE_MAX_GAP)}
+               AND EXISTS (SELECT 1 FROM cov WHERE g.d - INTERVAL {MARKET_MOVE_WINDOW_DAYS} DAY BETWEEN cov.f AND cov.t)
+               AND EXISTS (SELECT 1 FROM cov WHERE g.d + INTERVAL {MARKET_MOVE_WINDOW_DAYS} DAY BETWEEN cov.f AND cov.t)
+               AND NOT EXISTS (SELECT 1 FROM corp_actions ca WHERE ca.security_id = g.security_id
+                               AND ca.ex_date BETWEEN g.d - INTERVAL {MARKET_MOVE_WINDOW_DAYS} DAY
+                                                  AND g.d + INTERVAL {MARKET_MOVE_WINDOW_DAYS} DAY))
+           RETURNING 1""",
+        [utc_now()],
+    ).fetchall()
+    return len(rows)
+
+
+# CA13 (live backfill): 15 ETF units (INF ISINs) changed ISIN with an opening price at ~1/10 or ~1/100 of the previous
+# close (GROWWGOLD 2026-02-06: -0.903; LICMFGOLD 2026-03-06: -0.99): unit splits, absent from the equities
+# corporate-action feed. And a re-ISIN without price effect (HDFCLIQUID 2025-02-28: gap 0.0) has nothing to adjust.
+ETF_SPLIT_DIVISORS = (2, 5, 10, 20, 50, 100)
+ETF_SPLIT_TOLERANCE = Decimal("0.10")  # = VERIFY_TOLERANCE: units move on the split day too (NV20 0.106)
+
+
+def resolve_isin_changes(con, exchange: str = "NSE") -> int:
+    """Named rule CA13 for open ISIN_CHANGE_WITHOUT_ACTION findings: (1) an ETF unit (INF ISIN) whose open / previous
+    close is within 10% of 1/k for k in ETF_SPLIT_DIVISORS gets a SPLIT 1:k recorded (verified like any action, which
+    also closes its gap findings); (2) a change with |gap| below the no-effect band closes (nothing to adjust)."""
+    from financials.corp_actions import UNOBSERVABLE_BAND
+
+    rows = con.execute(
+        """SELECT q.quarantine_id, q.security_id, CAST(json_extract_string(q.details, '$.trade_date') AS DATE) d,
+                  CAST(json_extract_string(q.details, '$.gap') AS DOUBLE) gap, h.isin, o.price_filing_id
+           FROM quarantine_queue q
+           JOIN security_identifier_history h ON h.security_id = q.security_id
+                AND h.valid_from <= CAST(json_extract_string(q.details, '$.trade_date') AS DATE)
+                AND (h.valid_to IS NULL OR h.valid_to > CAST(json_extract_string(q.details, '$.trade_date') AS DATE))
+           JOIN ohlcv o ON o.security_id = q.security_id
+                AND o.trade_date = CAST(json_extract_string(q.details, '$.trade_date') AS DATE)
+           WHERE q.reason_code = 'ISIN_CHANGE_WITHOUT_ACTION' AND q.resolved_at IS NULL"""
+    ).fetchall()
+    done = 0
+    for qid, sec, d, gap, isin, filing in rows:
+        if gap is None:
+            continue
+        ratio = Decimal(str(1 + gap))
+        k = next((k for k in ETF_SPLIT_DIVISORS if abs(ratio * k - 1) <= ETF_SPLIT_TOLERANCE), None)
+        if isin.startswith("INF") and k is not None:
+            record_corp_action(con, CorpAction(stable_id("ca", "RULE_CA13", sec, d, k), sec, "SPLIT", d, Decimal(1),
+                                               Decimal(k)), source_filing_id=filing)  # fmt: skip
+            done += 1
+        elif abs(Decimal(str(gap))) < UNOBSERVABLE_BAND:
+            con.execute(
+                "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = "
+                "'ISIN change without price effect [CA13]' WHERE quarantine_id = ?",
+                [utc_now(), qid],
+            )
+            done += 1
+    if done:
+        verify_pending_actions(con, exchange)
+    return done
 
 
 INACTIVITY_TRADING_DAYS = 20  # CHOICE: an open interval with no bar in the last 20 promoted sessions is closed
@@ -686,6 +773,7 @@ def _promote_corp_actions(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
         recorded += 1
     _requeue_orphaned(con)
     verify_pending_actions(con, exchange)
+    resolve_market_moves(con)
     message = f"{recorded} actions" + (f", {skipped} before {MIN_TRADE_DATE} skipped" if skipped else "")
     return PromotionResult("PROMOTED", "corp_actions", message=message, quarantined=quarantined)
 

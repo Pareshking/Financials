@@ -235,6 +235,15 @@ Inspected for Batch 10 but not committed: the other Reg. 30 files listed in docs
 | `discovery/nse_integrated-filing-results_equities_TCS_page2_20261114.json` | A7 pagination (fetched 2026-11-14): `page=2` returns rows 21-22 of `totalCount` 22 (Mar 2025 standalone, Dec 2024 Governance); no overlap with page 1 | `https://www.nseindia.com/api/integrated-filing-results?index=equities&symbol=TCS&page=2` | `38bb3a80b3052f51e813ad73588c537f74dea5e4996054e52be7a90639b54a89` |
 | `discovery/nse_integrated-filing-results_equities_ADANIGREEN_20261114.json` | A7: 10 of 20 rows have `broadcast_Date: null` (totalCount 36: two pages) | `https://www.nseindia.com/api/integrated-filing-results?index=equities&symbol=ADANIGREEN` | `128f7abe359a2ece747b37a36c2245c808b82b255ddfc6747e059d86a2ae65e9` |
 
+## ETF unit splits and re-ISINs (live backfill 2026-11-14)
+
+| File | Why it is here | Source URL | SHA-256 |
+|---|---|---|---|
+| `bhavcopy/BhavCopy_NSE_CM_0_0_0_20260226_F_0000.csv.zip` | Day before five Kotak ETF unit splits (CA13) | `https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20260226_F_0000.csv.zip` | `8ef7902a0ae594af7e432d4beb72050e2ae712a7fac5638849f61b71822d06b5` |
+| `bhavcopy/BhavCopy_NSE_CM_0_0_0_20260227_F_0000.csv.zip` | BANKNIFTY1, CONS, MIDCAP, NV20, SILVER1 re-ISIN at ~1/10 (CA13) | `https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20260227_F_0000.csv.zip` | `64d4c291413416453c97a00196d8f18f772a1daac58328a76a99145137ff710b` |
+| `bhavcopy/BhavCopy_NSE_CM_0_0_0_20250227_F_0000.csv.zip` | Day before HDFCLIQUID re-ISIN (CA13) | `https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20250227_F_0000.csv.zip` | `e0f8d2b6eb79a24e66e2560210357410b129465f8346ae039f979539c7cd7b01` |
+| `bhavcopy/BhavCopy_NSE_CM_0_0_0_20250228_F_0000.csv.zip` | HDFCLIQUID new ISIN, no price effect (CA13) | `https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20250228_F_0000.csv.zip` | `9b32219ea32ccac0952c6d54cbfdd9b89c2f0d552cb6be2bc76103585ff18235` |
+
 ## Corporate-action purpose texts (live backfill 2026-11-14; 30-day API windows, one request each)
 
 | File | Why it is here | Source URL | SHA-256 |

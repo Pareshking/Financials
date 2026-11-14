@@ -21,6 +21,7 @@ import duckdb
 from financials import PARSER_VERSION
 from financials.corp_actions import ACCEPTED_STATUSES, CorpAction, adjust_closes, audit_day, verify_group
 from financials.db import fetch_dicts, insert_rows
+from financials.fundamentals import CURRENT_VERSION
 from financials.identity import UNIVERSE_SERIES, Interval, SecurityRegistry
 from financials.ids import stable_id
 from financials.parsers.udiff import BhavRow
@@ -925,17 +926,45 @@ def _visible_from(
     broadcast_ts: datetime | None,
     board_end: datetime | None,
     board_end_ist_date: date | None,
+    source_url: str | None = None,
 ) -> tuple[datetime | None, str | None]:
-    if broadcast_ts is not None:
-        return broadcast_ts, "BROADCAST"
-    if board_end is None or board_end_ist_date is None:
-        return None, None
-    from financials.calendar import next_trading_day
+    """Earliest time the filing can have been public (UTC) [X83, architecture §6.3].
 
-    nxt = next_trading_day(con, exchange, board_end_ist_date)
-    if nxt is None:
-        return None, None
-    return ist_to_utc(nxt, time(0, 0)), "BOARD_MEETING_RULE"
+    1. The later of the filing's broadcast time and the listing's broadcast/creation time (raw_results_listing):
+       a revised listing row has no broadcast_Date, and a re-uploaded file is created after the broadcast it replaces.
+    2. Without either: the board-meeting rule (board end + next trading day) [R9, UNVERIFIED], lifted to the XBRL file
+       name's upload time read as PM (12-hour clock) when that is later (re-filings uploaded weeks after the meeting).
+    Never earlier than the file name's upload time read as AM: a file cannot be public before it was made.
+    """
+    from financials.calendar import next_trading_day
+    from financials.parsers.discovery import filename_ts_bounds
+
+    listed = (
+        con.execute(
+            "SELECT max(broadcast_ts), max(creation_ts) FROM raw_results_listing WHERE xbrl_url = ?", [source_url]
+        ).fetchone()
+        if source_url
+        else (None, None)
+    )
+    bounds = filename_ts_bounds(source_url) if source_url else None
+    lo, hi = (ist_to_utc(b.date(), b.time()) for b in bounds) if bounds else (None, None)
+    board = None
+    if board_end is not None and board_end_ist_date is not None:
+        nxt = next_trading_day(con, exchange, board_end_ist_date)
+        board = None if nxt is None else ist_to_utc(nxt, time(0, 0))
+    known = [t for t in (broadcast_ts, *listed) if t is not None]
+    if known:
+        visible = max(known)
+        source = "BROADCAST" if visible == broadcast_ts else "LISTING_CREATION"
+    elif board is None:
+        return None, None  # no broadcast, listing or board-meeting evidence: NO_VISIBILITY
+    elif hi is not None and hi > board:
+        visible, source = hi, "FILENAME_TS"
+    else:
+        visible, source = board, "BOARD_MEETING_RULE"
+    if lo is not None and lo > visible:
+        visible, source = lo, "FILENAME_TS"
+    return visible, source
 
 
 def _declared_period_end(con, stage_dir: Path) -> date | None:
@@ -1037,7 +1066,8 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
 
     board_end = meta["board_meeting_end_ts"]
     board_ist_date = utc_to_ist_date(board_end) if board_end is not None else None
-    visible, source = _visible_from(con, filing["exchange"], filing["broadcast_ts"], board_end, board_ist_date)
+    visible, source = _visible_from(con, filing["exchange"], filing["broadcast_ts"], board_end, board_ist_date,
+                                    filing["source_url"])  # fmt: skip
     if visible is None and "broadcast_ts" in ovr:
         visible, source = datetime.fromisoformat(ovr["broadcast_ts"]), "MANUAL_OVERRIDE"
     if visible is None:
@@ -1095,24 +1125,55 @@ def filing_overrides(con, filing_id: str) -> dict[str, str]:
     return dict(rows)
 
 
+def filings_with_later_visibility(con) -> list[str]:
+    """Promoted results filings whose current visibility rule [X83] gives a later time than their latest
+    filing_meta row (backdated re-filings). `restage --category RESULTS_XBRL --visibility` re-parses these."""
+    rows = con.execute(
+        "SELECT m.filing_id, f.exchange, f.broadcast_ts, f.source_url, m.board_meeting_end_ts, m.visible_from_ts "
+        "FROM filing_meta m JOIN filings f USING (filing_id) WHERE f.category = 'RESULTS_XBRL' AND m.parser_version = "
+        "(SELECT max(parser_version) FROM filing_meta x WHERE x.filing_id = m.filing_id) ORDER BY m.filing_id"
+    ).fetchall()
+    out = []
+    for fid, exch, bts, url, board_end, current in rows:
+        board_date = utc_to_ist_date(board_end) if board_end is not None else None
+        visible, _ = _visible_from(con, exch, bts, board_end, board_date, url)
+        if visible is not None and visible > current:
+            out.append(fid)
+    return out
+
+
 def _link_revision(con, fid: str, entity_id: str, meta: dict, visible: datetime) -> None:
-    """Revision chain [E9]: this filing supersedes the latest filing of the same entity, profile, scope and period end
-    that became visible before it. Byte-identical blobs are RESENDs. Append-only link rows; facts need nothing else,
-    because every PIT read already takes the latest version visible at the as-of."""
+    """Revision chain [E9]: a filing supersedes the filings of the same entity, profile, scope and period end that
+    became visible before it. Byte-identical blobs are RESENDs. Linking is order-independent: this filing is linked
+    to the latest earlier-visible one, and the earliest later-visible one already promoted is linked to it, so the
+    chain does not depend on which of the two was promoted first. Append-only link rows (a pair may also be linked
+    across a gap when the middle filing arrives last; "supersedes" is transitive). Facts need nothing else, because
+    every PIT read already takes the latest version visible at the as-of."""
+    key = [entity_id, meta["accounting_profile"], meta["scope"], meta["period_end"], fid]
+    base = ("SELECT m.filing_id, f.sha256 FROM filing_meta m JOIN filings f USING (filing_id) WHERE m.entity_id = ? "
+            "AND m.accounting_profile = ? AND m.scope = ? AND m.period_end = ? AND m.filing_id <> ? ")  # fmt: skip
     prior = con.execute(
-        "SELECT m.filing_id, f.sha256 FROM filing_meta m JOIN filings f USING (filing_id) WHERE m.entity_id = ? "
-        "AND m.accounting_profile = ? AND m.scope = ? AND m.period_end = ? AND m.filing_id <> ? "
-        "AND m.visible_from_ts < ? ORDER BY m.visible_from_ts DESC, m.filing_id DESC LIMIT 1",
-        [entity_id, meta["accounting_profile"], meta["scope"], meta["period_end"], fid, visible],
+        base
+        + "AND (m.visible_from_ts, m.filing_id) < (?, ?) ORDER BY m.visible_from_ts DESC, m.filing_id DESC LIMIT 1",
+        [*key, visible, fid],
     ).fetchone()
-    if prior is None:
-        return
+    later = con.execute(
+        base + "AND (m.visible_from_ts, m.filing_id) > (?, ?) ORDER BY m.visible_from_ts, m.filing_id LIMIT 1",
+        [*key, visible, fid],
+    ).fetchone()
     sha = con.execute("SELECT sha256 FROM filings WHERE filing_id = ?", [fid]).fetchone()[0]
+    rows = []
+    if prior is not None:
+        rows.append((fid, prior[0], sha == prior[1]))
+    if later is not None:
+        rows.append((later[0], fid, sha == later[1]))
+    if not rows:
+        return
     insert_rows(
         con,
         "filing_revisions",
-        [{"filing_id": fid, "supersedes_filing_id": prior[0], "entity_id": entity_id, "period_end": meta["period_end"],
-          "scope": meta["scope"], "relation": "RESEND" if sha == prior[1] else "REVISION"}],
+        [{"filing_id": new, "supersedes_filing_id": old, "entity_id": entity_id, "period_end": meta["period_end"],
+          "scope": meta["scope"], "relation": "RESEND" if same else "REVISION"} for new, old, same in rows],
         or_ignore=True,
     )  # fmt: skip
 
@@ -1124,7 +1185,9 @@ def pit_fact(
     row = con.execute(
         """SELECT coalesce(value_inr, value_other) FROM fact_observations
            WHERE entity_id = ? AND scope = ? AND canonical_tag = ? AND period_start = ? AND period_end = ?
-             AND visible_from_ts <= ?
+             AND visible_from_ts <= ? AND """
+        + CURRENT_VERSION
+        + """
            ORDER BY visible_from_ts DESC, parser_version DESC LIMIT 1""",
         [entity_id, scope, canonical_tag, period_start, period_end, as_of],
     ).fetchone()
@@ -1264,15 +1327,19 @@ def cross_check_shares(con, entity_id: str, as_of: date) -> str | None:
         "ORDER BY o.visible_from_ts DESC, o.parser_version DESC LIMIT 1",
         [entity_id, as_of],
     ).fetchone()
-    res = con.execute(
+    # Every results filing of the latest visibility (standalone and consolidated can both state paid-up capital);
+    # the worst disagreement is reported, so the outcome does not depend on row order.
+    rows = con.execute(
         "SELECT value_other, filing_id FROM fact_observations WHERE entity_id = ? AND canonical_tag = "
-        "'shares_from_paid_up' AND period_end = ? ORDER BY visible_from_ts DESC, parser_version DESC LIMIT 1",
+        "'shares_from_paid_up' AND period_end = ? AND "
+        + CURRENT_VERSION
+        + " QUALIFY visible_from_ts = max(visible_from_ts) OVER () ORDER BY filing_id",
         [entity_id, as_of],
-    ).fetchone()
-    if shp is None or res is None or shp[1]:
+    ).fetchall()
+    if shp is None or not rows or shp[1]:
         return None
-    shp_total, derived = Decimal(shp[0]), Decimal(res[0])
-    diff = abs(shp_total - derived) / shp_total
+    shp_total = Decimal(shp[0])
+    diff, derived, res_filing = max((abs(shp_total - Decimal(v)) / shp_total, Decimal(v), f) for v, f in rows)
     if diff <= SHARE_CROSS_CHECK_TOLERANCE:
         return None
     return _quarantine(
@@ -1286,7 +1353,7 @@ def cross_check_shares(con, entity_id: str, as_of: date) -> str | None:
             "paid_up_over_face_value": derived,
             "relative_diff": diff,
             "shp_filing": shp[2],
-            "results_filing": res[1],
+            "results_filing": res_filing,
         },
     )
 
@@ -1491,7 +1558,7 @@ def _promote_kpis(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionRe
 
 
 def _promote_raw_only(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
-    _insert_vault_rows(con, stage_dir, ("blobs", "filings"))
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_results_listing"))
     return PromotionResult("PROMOTED", "raw_only", message=read_table(con, stage_dir, "filings")[0]["category"])
 
 

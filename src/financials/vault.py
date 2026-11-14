@@ -14,7 +14,8 @@ from pathlib import Path
 
 from financials.ids import stable_id
 
-BROADCAST_SOURCES = {"RSS_PUBDATE", "API_FIELD", "EOD_RULE", "UNKNOWN"}
+# API_CREATION: listing creation_Date, used when it is later than broadcast_Date or that is null [X83]
+BROADCAST_SOURCES = {"RSS_PUBDATE", "API_FIELD", "API_CREATION", "EOD_RULE", "UNKNOWN"}
 
 
 @dataclass(frozen=True)

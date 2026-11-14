@@ -155,6 +155,22 @@ CREATE TABLE IF NOT EXISTS raw_equity_master (
     PRIMARY KEY (filing_id, symbol, series)
 );
 
+-- One row per Integrated Filing listing row (api/integrated-filing-results, vaulted as RESULTS_LISTING) [A7, X83].
+-- `creation_Date` is on every row; `broadcast_Date` is null on revised rows. Times are UTC (listing is IST).
+CREATE TABLE IF NOT EXISTS raw_results_listing (
+    filing_id        VARCHAR NOT NULL REFERENCES filings(filing_id),   -- the vaulted listing JSON
+    xbrl_url         VARCHAR NOT NULL,
+    symbol           VARCHAR NOT NULL,
+    period_end       DATE    NOT NULL,
+    scope            VARCHAR,
+    filing_type      VARCHAR NOT NULL,
+    broadcast_ts     TIMESTAMP,
+    creation_ts      TIMESTAMP,
+    revised_ts       TIMESTAMP,
+    revision_remark  VARCHAR,
+    PRIMARY KEY (filing_id, xbrl_url)
+);
+
 CREATE TABLE IF NOT EXISTS raw_index_snapshot (
     filing_id      VARCHAR NOT NULL REFERENCES filings(filing_id),
     index_name     VARCHAR NOT NULL,

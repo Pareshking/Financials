@@ -102,6 +102,7 @@ TABLE_ORDER = (
     "raw_index_snapshot",
     "index_ohlcv",
     "raw_equity_master",
+    "raw_results_listing",
     "stg_holidays",
     "stg_shp_meta",
     "stg_shp_categories",
@@ -766,3 +767,46 @@ def stage_raw_only(
     return write_stage(
         stage_root, "raw_only", filing.filing_id, {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)]}
     )
+
+
+def _utc(ts: datetime | None) -> datetime | None:
+    return None if ts is None else ist_to_utc(ts.date(), ts.time())
+
+
+def results_listing_rows(listing_filing_id: str, data: bytes) -> list[dict[str, Any]]:
+    """Every row of an integrated-filing-results listing as visibility evidence [A7, X83]; unparsable -> none."""
+    from financials.parsers.discovery import parse_integrated_filing_listing
+
+    try:
+        entries = parse_integrated_filing_listing(data, results_only=False)
+    except ParseError:
+        return []
+    rows = {}
+    for e in entries:
+        rows[e.xbrl_url] = {
+            "filing_id": listing_filing_id, "xbrl_url": e.xbrl_url, "symbol": e.symbol, "period_end": e.period_end,
+            "scope": e.scope, "filing_type": e.filing_type, "broadcast_ts": _utc(e.broadcast_ts_ist),
+            "creation_ts": _utc(e.creation_ts_ist), "revised_ts": _utc(e.revised_ts_ist),
+            "revision_remark": e.revision_remark,
+        }  # fmt: skip
+    return list(rows.values())
+
+
+def stage_results_listing(
+    vault: Vault,
+    stage_root: Path,
+    *,
+    data: bytes,
+    source_url: str,
+    fetched_at: datetime,
+    exchange: str = "NSE",
+    run_suffix: str | None = None,
+) -> Path:
+    """Vault an integrated-filing-results listing (RESULTS_LISTING) and stage its rows as raw_results_listing."""
+    blob = vault.put(data, ext="json", media_type="application/json", fetched_at=fetched_at)
+    filing = make_filing(blob, exchange=exchange, category="RESULTS_LISTING", source_url=source_url,
+                         fetched_at=fetched_at)  # fmt: skip
+    run_id = filing.filing_id if run_suffix is None else f"{filing.filing_id}-{run_suffix}"
+    return write_stage(stage_root, "raw_only", run_id,
+                       {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)],
+                        "raw_results_listing": results_listing_rows(filing.filing_id, data)})  # fmt: skip

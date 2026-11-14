@@ -124,14 +124,16 @@ Other outcomes:
 
 ### 6.2 Deriving quarterly flows
 - Quarter value = `OneD` fact when present.
-- Otherwise quarter = YTD_k − YTD_{k−1}, both in the same FY, scope and profile. The derived row records `source_element = 'DERIVED:YTD_DIFF'`.
+- Otherwise quarter = YTD_k − YTD_{k−1}, both in the same FY, scope and profile, and both starting on a declared fiscal-year start (`filing_meta.fy_start`): an Oct-Mar six-month context in a "Yearly" filing is not a YTD [X82]. The derived row records `source_element = 'DERIVED:YTD_DIFF'`.
 - Q4 is frequently reported as FY − 9M, so the identity `FourD(Qk) = Σ OneD` is **not** a restatement detector.
 
 ### 6.3 Point-in-time visibility
-- `visible_from_ts` = `filings.broadcast_ts` when known.
-- Otherwise `board_meeting_end_ts + 1 trading day`, flagged `BOARD_MEETING_RULE` [R9]. This is conservative: it may hide data a day too long but never shows it early.
-- If neither is known, the filing is quarantined (`PERIOD/NO_VISIBILITY`).
-- Every PIT query filters `visible_from_ts <= :as_of`. The "current view" picks, for each (entity, scope, tag, period), the row with the latest `visible_from_ts`, then the latest `parser_version`.
+- `visible_from_ts` = the latest of `filings.broadcast_ts` and the listing's `broadcast_Date` / `creation_Date` (`raw_results_listing`, filled from every vaulted `RESULTS_LISTING`) [X83]. A revised listing row has no `broadcast_Date`, and a re-uploaded file is created after the broadcast of the row it replaces. Source `BROADCAST` or `LISTING_CREATION`.
+- Otherwise (last resort) `board_meeting_end_ts + 1 trading day`, flagged `BOARD_MEETING_RULE` [R9, UNVERIFIED], lifted to the XBRL file-name upload time read as PM (`FILENAME_TS`) when that is later. The board-meeting rule alone is **not** conservative for re-filings: 408 of 684 such filings were uploaded more than a day after the date it gave (X83).
+- Never earlier than the file-name upload time read as AM (the name is a 12-hour clock without AM/PM).
+- If no broadcast, listing or board-meeting time is known, the filing is quarantined (`PERIOD/NO_VISIBILITY`).
+- Every PIT query filters `visible_from_ts <= :as_of` and reads only each filing's latest `parser_version` (`fundamentals.CURRENT_VERSION`), so a re-parse that moves a filing's visibility later leaves no early row. The "current view" then picks, for each (entity, scope, tag, period), the row with the latest `visible_from_ts`.
+- `restage --category RESULTS_XBRL --visibility` re-parses promoted filings whose rule now gives a later time; `backfill-listing-evidence` stages `raw_results_listing` from vaulted listings first.
 - Precedence for 12-month periods: a Reg. 34 annual fact supersedes the Reg. 33 FY fact **only from its own `visible_from_ts`**.
 
 ### 6.4 Scope continuity
@@ -380,6 +382,11 @@ Ratios still read only curated tags; line items are for statements, sub-rows and
 
 Revisions (E9, E10): `filing_revisions` links a filing to the one it supersedes (REVISION or byte-identical RESEND);
 PIT reads already take the latest version visible at the as-of, so the link is provenance, not a read path.
+Linking is order-independent: a promoted filing is linked to the latest earlier-visible filing of the same key, and
+the earliest later-visible filing already promoted is linked to it (a reverse-order replay gives the same pairs;
+when a middle filing arrives last a non-adjacent pair can also be linked, which "supersedes" allows as transitive).
+A later filing for the same key is **not** always the better one: some companies file a "Fourth quarter" and then a
+"Yearly" XBRL whose quarter column is mis-dated (X82), so the read path never drops a superseded filing wholesale.
 
 ### 10.7 `screener_features` columns in Phase 1
 

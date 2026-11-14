@@ -31,6 +31,7 @@ from financials.staging import (
     stage_market_day,
     stage_raw_only,
     stage_reg30_event,
+    stage_results_listing,
     stage_results_xbrl,
     stage_shareholding,
 )
@@ -288,8 +289,8 @@ class Jobs:
         while True:  # every page until totalCount rows are listed [A7]
             url = results_listing_url(symbol, page)
             listing = self._get(url, accept=JSON)
-            out.append(stage_raw_only(self.vault, self.stage_root, data=listing, ext="json", media_type=JSON,
-                                      category="RESULTS_LISTING", source_url=url, fetched_at=utc_now()))  # fmt: skip
+            out.append(stage_results_listing(self.vault, self.stage_root, data=listing, source_url=url,
+                                             fetched_at=utc_now()))  # fmt: skip
             entries += parse_integrated_filing_listing(listing)
             seen, total = listing_progress(listing)
             if not seen or page * 20 >= total or page >= 10:
@@ -300,10 +301,10 @@ class Jobs:
                 continue
             if (xbrl := self._file(e.xbrl_url)) is None:
                 continue
-            # A null broadcast_Date (A7) stages UNKNOWN: the promoter then uses the board-meeting rule (next session).
-            ts = (
-                None if e.broadcast_ts_ist is None else ist_to_utc(e.broadcast_ts_ist.date(), e.broadcast_ts_ist.time())
-            )
+            # Visibility = later of broadcast_Date and creation_Date (a revised row has no broadcast) [X83].
+            v = e.visible_ts_ist
+            ts = None if v is None else ist_to_utc(v.date(), v.time())
+            src = "UNKNOWN" if ts is None else "API_FIELD" if v == e.broadcast_ts_ist else "API_CREATION"
             out.append(
                 stage_results_xbrl(
                     self.vault,
@@ -312,7 +313,7 @@ class Jobs:
                     source_url=e.xbrl_url,
                     fetched_at=utc_now(),
                     broadcast_ts=ts,
-                    broadcast_ts_source="API_FIELD" if ts else "UNKNOWN",
+                    broadcast_ts_source=src,
                 )
             )
         return out  # fmt: skip

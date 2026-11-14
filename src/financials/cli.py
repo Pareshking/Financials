@@ -145,6 +145,11 @@ def build_parser() -> argparse.ArgumentParser:
     rs.add_argument(
         "--category", choices=["CORP_ACTIONS", "SHP_XBRL", "RESULTS_XBRL"], required=True, help=restage_help
     )
+    rs.add_argument("--visibility", action="store_true",
+                    help="RESULTS_XBRL: instead re-parse promoted filings whose visibility rule now gives a later "
+                         "time (listing creation / file name) [X83]")  # fmt: skip
+    evidence_help = "stage raw_results_listing rows from vaulted RESULTS_LISTING blobs (then promote) [X83]"
+    sub.add_parser("backfill-listing-evidence", help=evidence_help)
     sub.add_parser("audit-ytd", help="raise YTD_QUARTER_MISMATCH findings for every entity and scope [X80]")
     sub.add_parser("promote", help="apply all pending staged batches (single writer)")
     rb = sub.add_parser("rebuild-market", help="roll market-derived state back to a date and replay it (audited)")
@@ -248,13 +253,23 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
 
         con = connect(db_path, read_only=True)
         try:
+            if args.visibility and args.category == "RESULTS_XBRL":
+                from financials.promoter import filings_with_later_visibility
+
+                later = filings_with_later_visibility(con)
+                where = "AND f.filing_id IN (SELECT unnest(?)) "
+                params = [args.category, later]
+            else:
+                open_findings = (
+                    "AND f.filing_id IN (SELECT filing_id FROM quarantine_queue WHERE resolved_at IS NULL "
+                    f"AND stage IN {FILING_FINDING_STAGES}) "
+                )
+                where = open_findings if args.category == "RESULTS_XBRL" else ""
+                params = [args.category]
             rows = con.execute(
                 "SELECT f.source_url, f.fetched_at, b.storage_path, b.sha256, f.broadcast_ts, f.broadcast_ts_source, "
-                "f.exchange FROM filings f JOIN blobs b USING (sha256) WHERE f.category = ? "
-                + ("AND f.filing_id IN (SELECT filing_id FROM quarantine_queue WHERE resolved_at IS NULL "
-                   f"AND stage IN {FILING_FINDING_STAGES}) " if args.category == "RESULTS_XBRL" else "")
-                + "ORDER BY f.source_url",
-                [args.category]).fetchall()  # fmt: skip
+                "f.exchange FROM filings f JOIN blobs b USING (sha256) WHERE f.category = ? " + where
+                + "ORDER BY f.source_url", params).fetchall()  # fmt: skip
         finally:
             con.close()
         vault = Vault(vault_dir)
@@ -271,6 +286,27 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
                                        broadcast_ts=bts, broadcast_ts_source=bsrc, exchange=exch,
                                        run_suffix=PARSER_VERSION)  # fmt: skip
             print(f"staged {s.relative_to(stage_root).as_posix()}", file=out)
+        return 0
+    if args.cmd == "backfill-listing-evidence":
+        from financials.staging import stage_results_listing
+
+        if not db_path.exists():
+            print(f"error: no market database at {db_path}", file=out)
+            return 2
+        con = connect(db_path, read_only=True)
+        try:
+            rows = con.execute(
+                "SELECT f.source_url, f.fetched_at, f.exchange, b.storage_path, b.sha256 FROM filings f "
+                "JOIN blobs b USING (sha256) WHERE f.category = 'RESULTS_LISTING' AND NOT EXISTS "
+                "(SELECT 1 FROM raw_results_listing r WHERE r.filing_id = f.filing_id) ORDER BY f.fetched_at"
+            ).fetchall()
+        finally:
+            con.close()
+        vault = Vault(vault_dir)
+        for url, fetched, exch, path, sha in rows:
+            stage_results_listing(vault, stage_root, data=vault.read_path(path, sha), source_url=url,
+                                  fetched_at=fetched, exchange=exch, run_suffix="evidence")  # fmt: skip
+        print(f"staged {len(rows)} results listings (run promote)", file=out)
         return 0
     if args.cmd == "audit-ytd":
         from financials.promoter import audit_ytd_identity

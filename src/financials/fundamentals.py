@@ -41,6 +41,12 @@ class FactBook:
     durations: dict[str, dict[Period, Decimal]] = field(default_factory=dict)
     instants: dict[str, dict[date, Decimal]] = field(default_factory=dict)
     rounding_unit: Decimal = Decimal(1)  # coarsest LevelOfRounding among this entity's visible filings (scope)
+    # X82: declared fiscal-year starts (filing_meta.fy_start). A >3-month duration is a YTD only when it starts on
+    # one; "Half Yearly"/"Yearly" filings put the Q4 figure in an Oct-Mar context (NETWEB Q4 FY26). Empty = no check.
+    fy_starts: frozenset[date] = frozenset()
+
+    def is_ytd_start(self, start: date) -> bool:
+        return not self.fy_starts or start in self.fy_starts
 
     def ytd_breaks(self, tag: str) -> list[dict]:
         """Every filed YTD (> 3 months, from a fiscal-year start) whose quarters were all filed directly, and whose
@@ -50,7 +56,7 @@ class FactBook:
         out = []
         for (s, e), ytd in d.items():
             m = period_months(s, e)
-            if m is None or m <= 3 or m > 12 or m % 3:
+            if m is None or m <= 3 or m > 12 or m % 3 or not self.is_ytd_start(s):
                 continue
             ends = [_add_months(e, -3 * i) for i in range(m // 3)]
             qs = [d.get((_add_months(date(qe.year, qe.month, 1), -2), qe)) for qe in ends]
@@ -79,7 +85,7 @@ class FactBook:
             return d[(q_start, end)]
         prev_end = _add_months(end, -3)
         for (s, e), v in d.items():
-            if e == end and (s, prev_end) in d and s < q_start:
+            if e == end and (s, prev_end) in d and s < q_start and self.is_ytd_start(s):
                 return v - d[(s, prev_end)]
         return None
 
@@ -101,7 +107,7 @@ class FactBook:
             m = period_months(s, e)
             if m == 12:
                 return v
-            if m is None or m > 12:
+            if m is None or m > 12 or not self.is_ytd_start(s):
                 continue
             fy_prev = (_add_months(s, -12), _prev_day_month_end(s))
             ytd_prev = (_add_months(s, -12), _add_months(e, -12))
@@ -154,27 +160,38 @@ def _prev_day_month_end(d: date) -> date:
 
 
 _ROUNDING_CASE = " ".join(f"WHEN '{k}' THEN {int(v)}" for k, v in ROUNDING_UNITS.items())
+# X83: only each filing's latest parser version is read. A re-parse can move a filing's visibility later (listing
+# creation time instead of the board-meeting rule); the older version's rows must not stay visible earlier.
+CURRENT_VERSION = (
+    "parser_version = coalesce((SELECT max(cv.parser_version) FROM filing_meta cv "
+    "WHERE cv.filing_id = fact_observations.filing_id), parser_version)"
+)
 
 
 def load_factbook(con, entity_id: str, scope: str, as_of: datetime) -> FactBook:
     rows = con.execute(
-        """SELECT canonical_tag, period_type, period_start, period_end, coalesce(value_inr, value_other),
-                  (SELECT max(CASE level_of_rounding """
-        + _ROUNDING_CASE
-        + """ ELSE 1 END) FROM filing_meta
-                   WHERE entity_id = ? AND scope = ? AND visible_from_ts <= ?)
+        """SELECT canonical_tag, period_type, period_start, period_end, coalesce(value_inr, value_other)
            FROM (SELECT *, row_number() OVER (
                     PARTITION BY canonical_tag, period_start, period_end
                     ORDER BY visible_from_ts DESC, parser_version DESC) AS rn
                  FROM fact_observations
-                 WHERE entity_id = ? AND scope = ? AND visible_from_ts <= ?)
+                 WHERE entity_id = ? AND scope = ? AND visible_from_ts <= ? AND """
+        + CURRENT_VERSION
+        + """)
            WHERE rn = 1""",
-        [entity_id, scope, as_of, entity_id, scope, as_of],
+        [entity_id, scope, as_of],
     ).fetchall()
-    book = FactBook(entity_id, scope)
-    if rows and rows[0][5] is not None:
-        book.rounding_unit = Decimal(rows[0][5])
-    for tag, ptype, start, end, value, _unit in rows:
+    unit, fy_starts = con.execute(
+        "SELECT max(CASE level_of_rounding "
+        + _ROUNDING_CASE
+        + " ELSE 1 END), list(DISTINCT fy_start) FROM filing_meta WHERE entity_id = ? AND scope = ? "
+        "AND visible_from_ts <= ?",
+        [entity_id, scope, as_of],
+    ).fetchone()
+    book = FactBook(entity_id, scope, fy_starts=frozenset(fy_starts or ()))
+    if rows and unit is not None:
+        book.rounding_unit = Decimal(unit)
+    for tag, ptype, start, end, value in rows:
         if ptype == "INSTANT":
             book.instants.setdefault(tag, {})[end] = Decimal(value)
         else:

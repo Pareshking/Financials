@@ -26,6 +26,7 @@ from financials.fundamentals import (
     ANNUAL_COLUMNS,
     BANK_COLUMNS,
     CASH_CONVERSION_COLUMNS,
+    CURRENT_VERSION,
     INSURER_COLUMNS,
     NBFC_COLUMNS,
     REVERSE_DCF_TERMINAL_G,
@@ -337,14 +338,18 @@ def _preload(con, as_of_ts: datetime):
         (ent, (Decimal(v), d))
         for ent, v, d in con.execute(
             """SELECT entity_id, arg_max(value_other, period_end), max(period_end) FROM fact_observations
-               WHERE canonical_tag = 'shares_from_paid_up' AND visible_from_ts <= ? GROUP BY entity_id""",
+               WHERE canonical_tag = 'shares_from_paid_up' AND visible_from_ts <= ? AND """
+            + CURRENT_VERSION
+            + " GROUP BY entity_id",
             [as_of_ts],
         ).fetchall()
     )
     quarter_end = dict(
         con.execute(
             """SELECT entity_id, max(period_end) FROM fact_observations WHERE canonical_tag IN ('pat',
-               'revenue_from_operations') AND period_type = 'DURATION' AND visible_from_ts <= ? GROUP BY entity_id""",
+               'revenue_from_operations') AND period_type = 'DURATION' AND visible_from_ts <= ? AND """
+            + CURRENT_VERSION
+            + " GROUP BY entity_id",
             [as_of_ts],
         ).fetchall()
     )

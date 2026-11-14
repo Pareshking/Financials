@@ -557,6 +557,7 @@ def _map_facts(inst: Instance, result: ParsedResults, spec: ProfileSpec | None =
         # Only where owners + NCI = PAT is the profile's identity (corporate, NBFC, annual). Not banks: their
         # PAT precedes the share of associates (PNB Q2 FY27: owners 5,898 Cr = PAT 5,561 - NCI + associates).
         _apply_attribution_recovery_rules(result)
+        _apply_attribution_swap_rule(result)
     preserve_withheld(inst, result, durations=set(declared.values()), instants={period_end})
     result.meta["interest_paid_cfo_class"] = _classify(
         result, "interest_paid_operating", "interest_paid_financing", "FINANCING"
@@ -774,9 +775,12 @@ ATTRIBUTION_WITHHELD_TAG = "attribution_withheld"  # marker (PURE 1): owners/NCI
 
 
 def _replace_attribution(result: ParsedResults, p: tuple, owners: Decimal, nci: Decimal, rule: str) -> None:
+    at = {f.canonical_tag: f for f in result.facts if f.canonical_tag in ("pat_owners", "pat_nci")
+          and (f.period_start, f.period_end) == p}  # fmt: skip
     for tag, value in (("pat_owners", owners), ("pat_nci", nci)):
-        old = next(f for f in result.facts if f.canonical_tag == tag and (f.period_start, f.period_end) == p)
-        result.facts.remove(old)
+        old = at.get(tag) or dataclasses.replace(at["pat_owners"], canonical_tag=tag)  # NCI element not filed
+        if tag in at:
+            result.facts.remove(old)
         result.facts.append(dataclasses.replace(old, value=value, source_element=f"RULE:{rule}"))
 
 
@@ -799,7 +803,9 @@ def _apply_attribution_recovery_rules(result: ParsedResults) -> None:
     withheld = []
     for p in periods:
         pat, owners, nci = (result.value(t, *p) for t in ("pat", "pat_owners", "pat_nci"))
-        if None in (pat, owners, nci) or abs(owners + nci - pat) <= tol:
+        if nci is None:  # no NCI element filed: owners alone must equal PAT (THELEELA Q4 FY26 owners = OCI) [X96]
+            nci = Decimal(0)
+        if None in (pat, owners) or abs(owners + nci - pat) <= tol:
             continue
         oci, t_own, t_nci = (result.value(t, *p) for t in ("oci_net", TCI_OWNERS_KEY, TCI_NCI_KEY))
         if (
@@ -1016,6 +1022,37 @@ CORP_SPEC = ProfileSpec(
 )
 
 EPS_TOLERANCE = Decimal("0.05")
+
+
+SWAP_EPS_AGREE = Decimal("0.02")  # NCI / shares within 2% of the filed EPS (weighted vs period-end shares)
+SWAP_EPS_DISAGREE = Decimal("0.25")  # ... while owners / shares is more than 25% away
+
+
+def _apply_attribution_swap_rule(result: ParsedResults) -> None:
+    """OWNERS_NCI_SWAPPED [X95]: owners and NCI filed in each other's elements. owners + NCI = PAT still holds, so
+    X84-X86 never fire; the filing's own EPS tells them apart. Applied when NCI / period-end shares agrees with the
+    filed basic EPS and owners / shares does not (Glenmark Q4 FY26: owners -0.95 Cr, NCI 3,014.14 Cr; 3,014.14 Cr /
+    28.22 Cr shares = 10.68 = filed EPS). Both values are as filed, only exchanged: an exact recovery."""
+    q = result.meta["quarter_period"]
+    shares = result.value("shares_from_paid_up", q[1], q[1])
+    if not shares or shares <= 0:
+        return
+    tol = identity_tolerance(result.meta["level_of_rounding"], ATTRIBUTION_TERMS)
+    swapped = []
+    for p in sorted({(f.period_start, f.period_end) for f in result.facts if f.canonical_tag == "pat_owners"}):
+        pat, owners, nci, eps = (result.value(t, *p) for t in ("pat", "pat_owners", "pat_nci", "eps_basic"))
+        if None in (pat, owners, nci, eps) or not eps or not nci or p[1] != q[1]:
+            continue
+        if abs(owners + nci - pat) > tol:
+            continue
+        by_nci, by_owners = nci / shares, owners / shares
+        agree = abs(by_nci - eps) <= max(SWAP_EPS_AGREE * abs(eps), Decimal("0.02"))
+        disagree = abs(by_owners - eps) > max(SWAP_EPS_DISAGREE * abs(eps), Decimal("0.50"))
+        if agree and disagree:
+            _replace_attribution(result, p, nci, owners, "OWNERS_NCI_SWAPPED")
+            swapped.append([str(p[0]), str(p[1])])
+    if swapped:
+        result.meta.setdefault("rules_applied", []).append({"rule": "OWNERS_NCI_SWAPPED", "periods": swapped})
 
 
 def _check_eps(result: ParsedResults) -> None:

@@ -1,5 +1,7 @@
 # Owner requirements: Aligning Financial Results Databases (2026-11-14)
 
+Source document (owner-provided, committed at the owner's request 2026-11-14): `docs/inputs/Aligning_Financial_Results_Databases.pdf`.
+
 Source: a long chat between the owner and another AI assistant (26 printed pages), exported 2026-11-14. The owner's own prompts are requirements. The assistant's answers are suggestions and claims: they are **inputs, not evidence** (CLAUDE.md evidence rules 1-4). Nothing here may be coded against until it is VERIFIED in `docs/references.md` with a real fixture and a test.
 
 Every concrete item in the chat is mapped to the repository as of 2026-11-14. The machine-readable version (with page numbers and sources) is the gap table this digest was generated from. Ids are stable (G1..G343). Repeated items are listed where they first appear, or once per distinct claim.

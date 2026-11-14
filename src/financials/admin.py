@@ -157,7 +157,7 @@ def rebuild_market(con, from_date: date, *, note: str = "rebuild-market") -> dic
 # ── reprocess [P1-9] ───────────────────────────────────────────────────────
 
 RETRYABLE = ("UNKNOWN_ISIN", "UNKNOWN_SYMBOL", "AMBIGUOUS_ISIN", "AMBIGUOUS_SYMBOL", "AMBIGUOUS_SECURITY",
-             "STALE_ISIN_OTHER_ISSUER", "NO_VISIBILITY")  # fmt: skip
+             "STALE_ISIN_OTHER_ISSUER", "NO_VISIBILITY", "UNPARSED_PURPOSE")  # fmt: skip
 
 
 def reprocess(con, stage_root) -> dict[str, Any]:

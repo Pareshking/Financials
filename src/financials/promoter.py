@@ -555,6 +555,14 @@ def verify_pending_actions(con, exchange: str) -> int:
                 "AND resolved_at IS NULL AND CAST(json_extract_string(details, '$.trade_date') AS DATE) = ?",
                 [utc_now(), "explained by recorded split/consolidation", sec, ex],
             )
+    con.execute(
+        "UPDATE quarantine_queue q SET resolved_at = ?, resolution = 'FIXED_BY_RULE', "
+        "resolution_note = 'action verified on re-check' WHERE q.reason_code = 'VERIFY_FAILED' "
+        "AND q.resolved_at IS NULL AND EXISTS (SELECT 1 FROM corp_actions a WHERE a.action_id = "
+        "json_extract_string(q.details, '$.action_id') "
+        "AND a.status IN ('VERIFIED', 'UNOBSERVABLE', 'VERIFIED_MANUAL'))",
+        [utc_now()],
+    )
     return decided
 
 
@@ -612,6 +620,7 @@ def _promote_corp_actions(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     skipped = 0
     for r in read_table(con, stage_dir, "stg_corp_actions"):
         if r["parse_status"] == "IGNORED":
+            _retire_ignored(con, stable_id("ca", exchange, r["isin"], r["ex_date"], r["subject"], r["component"]))
             continue
         if not market_in_scope(r["ex_date"]):
             skipped += 1
@@ -648,6 +657,8 @@ def _promote_corp_actions(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
             cash_per_share=r["cash_per_share"],
         )
         unparsed = r["parse_status"] == "UNPARSED"
+        if not unparsed:
+            _upgrade_unparsed(con, action)
         record_corp_action(
             con,
             action,
@@ -673,9 +684,76 @@ def _promote_corp_actions(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
                 )
             )
         recorded += 1
+    _requeue_orphaned(con)
     verify_pending_actions(con, exchange)
     message = f"{recorded} actions" + (f", {skipped} before {MIN_TRADE_DATE} skipped" if skipped else "")
     return PromotionResult("PROMOTED", "corp_actions", message=message, quarantined=quarantined)
+
+
+def _upgrade_unparsed(con, action: CorpAction) -> None:
+    """A record stored as UNKNOWN (unparsed purpose) that a later parser version reads: same action id (same ISIN,
+    ex-date, subject, component), so the ledger row takes the parsed type and ratios, goes back to PENDING for
+    verification, and its UNPARSED_PURPOSE finding closes [CA11]. Manual decisions (SUPERSEDED, REJECTED) stand."""
+    hit = con.execute(
+        "UPDATE corp_actions SET action_type = ?, ratio_num = ?, ratio_den = ?, issue_price = ?, cash_per_share = ?, "
+        "status = 'PENDING', price_factor = NULL, eps_factor = NULL, observed_gap = NULL, decided_at = NULL "
+        "WHERE action_id = ? AND action_type = 'UNKNOWN' AND status = 'QUARANTINED' RETURNING 1",
+        [action.action_type, action.ratio_num, action.ratio_den, action.issue_price, action.cash_per_share,
+         action.action_id],
+    ).fetchall()  # fmt: skip
+    if hit:
+        con.execute(
+            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ? "
+            "WHERE reason_code = 'UNPARSED_PURPOSE' AND resolved_at IS NULL "
+            "AND json_extract_string(details, '$.action_id') = ?",
+            [utc_now(), f"parsed by {action.action_type} rule [CA11]", action.action_id],
+        )
+    if hit:
+        _requeue_siblings(con, action.action_id)
+
+
+def _retire_ignored(con, action_id: str) -> None:
+    """A record once stored as UNKNOWN that the current rules read as no action (an AGM / EGM notice [CA11]):
+    the ledger row is retired (REJECTED, kept for audit) and its UNPARSED_PURPOSE finding closes."""
+    hit = con.execute(
+        "UPDATE corp_actions SET status = 'REJECTED', decided_at = ? WHERE action_id = ? AND action_type = 'UNKNOWN' "
+        "AND status = 'QUARANTINED' RETURNING 1",
+        [utc_now(), action_id],
+    ).fetchall()
+    if hit:
+        con.execute(
+            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = "
+            "'meeting notice, no corporate action [CA11]' WHERE reason_code = 'UNPARSED_PURPOSE' "
+            "AND resolved_at IS NULL AND json_extract_string(details, '$.action_id') = ?",
+            [utc_now(), action_id],
+        )
+    if hit:
+        _requeue_siblings(con, action_id)
+
+
+def _requeue_orphaned(con) -> None:
+    """Quarantined actions whose group was blocked only by an unfactorable (UNKNOWN) record that is no longer
+    quarantined (upgraded or retired [CA11]) go back to PENDING; one batched statement."""
+    con.execute(
+        """UPDATE corp_actions a SET status = 'PENDING', decided_at = NULL
+           WHERE a.status = 'QUARANTINED' AND a.action_type <> 'UNKNOWN'
+             AND EXISTS (SELECT 1 FROM quarantine_queue q WHERE q.reason_code = 'VERIFY_FAILED'
+                         AND q.resolved_at IS NULL AND json_extract_string(q.details, '$.action_id') = a.action_id
+                         AND json_extract_string(q.details, '$.reason') LIKE '%unparsed corporate action%')
+             AND NOT EXISTS (SELECT 1 FROM corp_actions u WHERE u.security_id = a.security_id
+                             AND u.ex_date = a.ex_date AND u.action_type = 'UNKNOWN' AND u.status = 'QUARANTINED')"""
+    )
+
+
+def _requeue_siblings(con, action_id: str) -> None:
+    """Actions of the same security and ex-date that were quarantined only because this record could not be
+    factored go back to PENDING, so the next verification judges the group again (JNKINDIA 2024-10-21)."""
+    con.execute(
+        "UPDATE corp_actions SET status = 'PENDING', decided_at = NULL WHERE status = 'QUARANTINED' "
+        "AND action_type <> 'UNKNOWN' AND (security_id, ex_date) IN "
+        "(SELECT security_id, ex_date FROM corp_actions WHERE action_id = ?)",
+        [action_id],
+    )
 
 
 def _f(x: Decimal | None) -> float | None:

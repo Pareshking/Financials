@@ -24,7 +24,7 @@ from financials.money import to_inr
 from financials.parsers import ParseError
 from financials.parsers.delivery import parse_sec_bhavdata_full
 from financials.parsers.integrated import parse_integrated_results
-from financials.parsers.nse_corp_actions import parse_nse_corp_actions_json
+from financials.parsers.nse_corp_actions import PURPOSE_RULES_VERSION, parse_nse_corp_actions_json
 from financials.parsers.udiff import parse_udiff_cm
 from financials.parsers.xbrl import parse_instance
 from financials.timeutil import ist_to_utc
@@ -422,7 +422,7 @@ def stage_corp_actions(
     return write_stage(
         stage_root,
         "corp_actions",
-        filing.filing_id,
+        f"{filing.filing_id}-{PURPOSE_RULES_VERSION}",
         {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)], "stg_corp_actions": rows},
         extra={"exchange": exchange},
     )

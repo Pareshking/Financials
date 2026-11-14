@@ -24,11 +24,14 @@ from decimal import Decimal
 from financials.parsers import ParseError
 
 UNIVERSE_SERIES = frozenset({"EQ", "BE", "BZ"})
+# Bumped whenever the purpose rules change: a restaged answer is a new batch, so `promote` re-reads it [CA11].
+PURPOSE_RULES_VERSION = "ca-4"
 
 _RS = r"R[SE]\.?\s*"
 _NUM = r"(\d+(?:\.\d+)?)"
+_AMT = rf"(?:OF\s+)?(?:{_RS})?{_NUM}(?:\s*PER\s*SH(?:ARE)?)?"  # "RS 5 PER SHARE", "OF RS 100", "- 4 PER SHARE", "RS 30"
 RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("DIVIDEND", re.compile(rf"^(?:INTERIM |FINAL |SPECIAL )?DIVIDEND\s*-\s*{_RS}{_NUM}\s*PER\s*SH(?:ARE)?$")),
+    ("DIVIDEND", re.compile(rf"^(?:INTERIM |FINAL |SPECIAL )?DIVIDEND\s*(?:-\s*)?{_AMT}$")),
     ("BONUS", re.compile(r"^BONUS\s+(\d+)\s*:\s*(\d+)$")),
     (
         "SPLIT",
@@ -37,10 +40,22 @@ RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
             rf"FROM\s+{_RS}{_NUM}\s*/-\s*PER SHARE\s+TO\s+{_RS}{_NUM}\s*/-\s*PER SHARE$"
         ),
     ),
-    ("RIGHTS", re.compile(rf"^RIGHTS\s+(\d+)\s*:\s*(\d+)\s*@\s*PREMIUM\s+{_RS}{_NUM}\s*/-$")),
+    (
+        "CONSOLIDATION",
+        re.compile(
+            rf"^CONSOLIDATION OF (?:EQUITY )?SHARES FROM {_RS}{_NUM}\s*(?:/-\s*)?PER SHARE "
+            rf"TO {_RS}{_NUM}\s*(?:/-\s*)?PER SHARE$"
+        ),
+    ),
+    ("RIGHTS", re.compile(rf"^RIGHTS\s+(\d+)\s*:\s*(\d+)\s*@\s*(?:PREMIUM|PRM)\s+(?:{_RS})?{_NUM}\s*(?:/-)?$")),
     ("DEMERGER", re.compile(r"^DEMERGER$")),
     ("BUYBACK", re.compile(r"^BUY ?BACK$")),  # RSS 13-Nov-2026 (FDC): no price factor, like a dividend [CA10]
+    ("MEETING", re.compile(r"^(?:ANNUAL|EXTRA ?ORDINARY) GENERAL MEETING$")),  # a notice, not an action [CA11]
 )
+# CA11 (live backfill, 30-day API windows 2024-10 .. 2026-11): typos and joins seen in real purpose texts.
+_TYPOS = ((r"\bINTEREIM\b", "INTERIM"), (r"\bINTERIMDIVIDEND\b", "INTERIM DIVIDEND"),
+          (r"\bINTDIVIDEND\b", "INTERIM DIVIDEND"))  # fmt: skip
+_JOIN = re.compile(r"\s*/(?!-)\s*|\s+&\s+|\s+AND\s+|(?<=PER SHARE)\s+(?=(?:INTERIM |FINAL |SPECIAL )?DIVIDEND)")
 
 
 @dataclass(frozen=True)
@@ -76,10 +91,14 @@ def _date(text: str | None) -> date | None:
 
 def parse_purpose(subject: str, face_value: Decimal | None) -> tuple[str, str | None, tuple[ParsedComponent, ...]]:
     """Return (status, reason, components) for one Purpose/subject string."""
-    parts = [p.strip() for p in re.split(r"\s+/\s+|\s+AND\s+", subject.strip().upper()) if p.strip()]
+    text = re.sub(r"\s+", " ", subject.strip().upper())
+    for rx, repl in _TYPOS:
+        text = re.sub(rx, repl, text)
+    parts = [p.strip() for p in _JOIN.split(text) if p.strip()]
     if not parts:
         return "UNPARSED", "empty purpose", ()
     out: list[ParsedComponent] = []
+    meetings = 0
     for part in parts:
         norm = re.sub(r"\s+", " ", part)
         for kind, rx in RULES:
@@ -93,17 +112,23 @@ def parse_purpose(subject: str, face_value: Decimal | None) -> tuple[str, str | 
                 out.append(ParsedComponent("BONUS", ratio_num=g[0], ratio_den=g[1]))
             elif kind == "SPLIT":
                 out.append(ParsedComponent("SPLIT", ratio_num=g[1], ratio_den=g[0]))  # new FV / old FV
+            elif kind == "CONSOLIDATION":
+                out.append(ParsedComponent("CONSOLIDATION", ratio_num=g[1], ratio_den=g[0]))  # new FV / old FV
             elif kind == "RIGHTS":
                 if face_value is None:
                     return "UNPARSED", "rights premium without face value", ()
                 out.append(ParsedComponent("RIGHTS", ratio_num=g[0], ratio_den=g[1], issue_price=face_value + g[2]))
             elif kind == "BUYBACK":
                 out.append(ParsedComponent("BUYBACK"))
+            elif kind == "MEETING":
+                meetings += 1
             else:
                 out.append(ParsedComponent("DEMERGER"))
             break
         else:
             return "UNPARSED", f"no rule for {norm!r}", ()
+    if not out:
+        return "IGNORED", "meeting notice without a corporate action", ()
     if any(c.ratio_num is not None and c.ratio_num <= 0 for c in out) or any(
         c.ratio_den is not None and c.ratio_den <= 0 for c in out
     ):

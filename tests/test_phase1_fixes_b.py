@@ -358,3 +358,25 @@ def test_listing_rows_without_broadcast_time_parse_and_fall_back_to_the_board_me
     rows = parse_integrated_filing_listing(p.read_bytes(), results_only=False)
     assert len(rows) == 20 and sum(r.broadcast_ts_ist is None for r in rows) == 10
     assert all(r.xbrl_url.startswith("https://nsearchives.nseindia.com/corporate/xbrl/") for r in rows)
+
+
+def test_vault_stores_text_blobs_compressed_and_reads_either_form(tmp_path):
+    """Text blobs (XBRL, JSON, CSV) are stored as <path>.gz; the logical storage path and sha256 stay those of the
+    original bytes, and a blob stored uncompressed earlier still reads."""
+    import gzip
+
+    v = Vault(tmp_path / "vault")
+    data = (FIXTURES / "xbrl" / "SHP_1739151_15102026054406_WEB.xml").read_bytes()
+    b = v.put(data, ext="xml", media_type="application/xml", fetched_at=datetime(2026, 11, 14))
+    gz = tmp_path / "vault" / (b.storage_path + ".gz")
+    assert gz.exists() and not (tmp_path / "vault" / b.storage_path).exists()
+    assert gz.stat().st_size < len(data) / 4 and v.read(b) == data and v.exists(b.storage_path)
+    z = v.put(bhav("20251017"), ext="csv.zip", media_type="application/zip", fetched_at=datetime(2026, 11, 14))
+    assert (tmp_path / "vault" / z.storage_path).exists()  # zips are stored as sent
+    plain = tmp_path / "vault" / "ab" / ("ab" + "0" * 62 + ".csv")
+    plain.parent.mkdir(parents=True)
+    plain.write_bytes(b"x")
+    import hashlib
+
+    assert v.read_path("ab/" + plain.name, hashlib.sha256(b"x").hexdigest()) == b"x"  # legacy uncompressed form
+    assert gzip.decompress(gz.read_bytes()) == data

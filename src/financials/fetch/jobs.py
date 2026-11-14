@@ -118,7 +118,7 @@ class Jobs:
         """Bytes, or None for an allowed 404. Archive files already vaulted are not downloaded again."""
         immutable = url.startswith(IMMUTABLE_PREFIXES)
         last = self.vault.last_fetch(url) if immutable else None
-        if last and last["status"] == 200 and (self.vault.root / last["storage_path"]).exists():
+        if last and last["status"] == 200 and self.vault.exists(last["storage_path"]):
             return self.vault.read_path(last["storage_path"], last["sha256"])
         if last and last["status"] == 404 and allow_404 and asked_for is not None:
             seen = datetime.fromisoformat(last["fetched_at"]).date()
@@ -133,7 +133,7 @@ class Jobs:
 
     def is_vaulted(self, url: str) -> bool:
         last = self.vault.last_fetch(url)
-        return bool(last and last["status"] == 200 and (self.vault.root / last["storage_path"]).exists())
+        return bool(last and last["status"] == 200 and self.vault.exists(last["storage_path"]))
 
     # ── market data ──
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
 import os
@@ -75,7 +76,13 @@ def make_filing(
     )
 
 
+GZIP_EXTS = ("xml", "json", "csv")  # text blobs are stored gzip-compressed (XBRL ~10x); zips are stored as sent
+
+
 class Vault:
+    """`storage_path` (in `blobs`, the URL index and staging) is the logical path `<sha[:2]>/<sha>.<ext>`; a text blob
+    is physically `<storage_path>.gz`. Reads accept either form and always verify the sha256 of the original bytes."""
+
     _index_lock = threading.Lock()  # url_index.jsonl appends from parallel fetch workers
 
     def __init__(self, root: Path) -> None:
@@ -89,16 +96,17 @@ class Vault:
         """Store bytes once; re-putting identical bytes is a no-op returning the same blob."""
         sha = hashlib.sha256(data).hexdigest()
         rel = self.relative_path(sha, ext)
-        path = self.root / rel
-        if path.exists():
-            if hashlib.sha256(path.read_bytes()).hexdigest() != sha:
-                raise RuntimeError(f"vault corruption at {path}")
+        if self.exists(rel):
+            if hashlib.sha256(self._read(rel)).hexdigest() != sha:
+                raise RuntimeError(f"vault corruption at {rel}")
         else:
+            compress = ext.lstrip(".").lower() in GZIP_EXTS
+            path = self.root / (rel + ".gz" if compress else rel)
             path.parent.mkdir(parents=True, exist_ok=True)
             fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".tmp-")
             try:
                 with os.fdopen(fd, "wb") as fh:
-                    fh.write(data)
+                    fh.write(gzip.compress(data, compresslevel=6, mtime=0) if compress else data)
                 os.replace(tmp, path)
             except BaseException:
                 Path(tmp).unlink(missing_ok=True)
@@ -106,11 +114,17 @@ class Vault:
             path.chmod(0o444)
         return Blob(sha, len(data), media_type, rel, fetched_at)
 
+    def exists(self, storage_path: str) -> bool:
+        return (self.root / storage_path).exists() or (self.root / (storage_path + ".gz")).exists()
+
+    def _read(self, storage_path: str) -> bytes:
+        plain = self.root / storage_path
+        if plain.exists():
+            return plain.read_bytes()
+        return gzip.decompress((self.root / (storage_path + ".gz")).read_bytes())
+
     def read(self, blob: Blob) -> bytes:
-        data = (self.root / blob.storage_path).read_bytes()
-        if hashlib.sha256(data).hexdigest() != blob.sha256:
-            raise RuntimeError(f"vault corruption: {blob.storage_path}")
-        return data
+        return self.read_path(blob.storage_path, blob.sha256)
 
     # ── fetch index: which URL gave which blob (or a 404), append-only JSON lines ──
 
@@ -145,7 +159,7 @@ class Vault:
         return self._index.get(url)
 
     def read_path(self, storage_path: str, sha256: str) -> bytes:
-        data = (self.root / storage_path).read_bytes()
+        data = self._read(storage_path)
         if hashlib.sha256(data).hexdigest() != sha256:
             raise RuntimeError(f"vault corruption: {storage_path}")
         return data

@@ -139,6 +139,8 @@ def build_parser() -> argparse.ArgumentParser:
     ib = sub.add_parser("import-bundle", help="load a bundle into a new database and verify checksums")
     ib.add_argument("src", type=Path)
     ib.add_argument("--db", type=Path, required=True)
+    rs = sub.add_parser("restage", help="re-parse vaulted inputs with the current parser (no download)")
+    rs.add_argument("--category", choices=["CORP_ACTIONS"], required=True)
     sub.add_parser("promote", help="apply all pending staged batches (single writer)")
     rb = sub.add_parser("rebuild-market", help="roll market-derived state back to a date and replay it (audited)")
     rb.add_argument("--from", dest="from_date", type=_date, required=True)
@@ -228,6 +230,27 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
         for t, v in m["tables"].items():
             print(f"{t:36s} rows={v['rows']:>10} files={v['files']:>3} {v['bytes'] / 2**20:8.2f} MB", file=out)
         print(f"total {m['total_bytes'] / 2**20:.2f} MB", file=out)
+        return 0
+    if args.cmd == "restage":
+        from financials.staging import stage_corp_actions
+
+        if not db_path.exists():
+            print(f"error: no market database at {db_path}", file=out)
+            return 2
+        con = connect(db_path, read_only=True)
+        try:
+            rows = con.execute(
+                "SELECT f.source_url, f.fetched_at, b.storage_path, b.sha256 FROM filings f "
+                "JOIN blobs b USING (sha256) WHERE f.category = ? ORDER BY f.source_url",
+                [args.category]).fetchall()  # fmt: skip
+        finally:
+            con.close()
+        vault = Vault(vault_dir)
+        for url, fetched, path, sha in rows:
+            s = stage_corp_actions(
+                vault, stage_root, data=vault.read_path(path, sha), source_url=url, fetched_at=fetched
+            )
+            print(f"staged {s.relative_to(stage_root).as_posix()}", file=out)
         return 0
     if args.cmd == "load-kpis":
         from financials.staging import stage_kpis

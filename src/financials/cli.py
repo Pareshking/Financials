@@ -86,11 +86,15 @@ def _date(s: str) -> date:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="financials", description=__doc__.splitlines()[0])
     p.add_argument("--data-dir", type=Path, default=Path("data"))
+    archive_help = "archive host requests/s and connections (owner decision); the API host stays at 1/s"
+    p.add_argument("--archive-rps", type=float, default=1.0, help=archive_help)
+
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("init-db")
     fd = sub.add_parser("fetch-days", help="bhavcopy + delivery for a date range (holidays are skipped)")
     fd.add_argument("start", type=_date)
     fd.add_argument("end", type=_date, nargs="?")
+    fd.add_argument("--workers", type=int, default=1, help="threads (with --archive-rps above 1)")
     fc = sub.add_parser("fetch-corp-actions")
     fc.add_argument("start", type=_date)
     fc.add_argument("end", type=_date)
@@ -118,7 +122,7 @@ def build_parser() -> argparse.ArgumentParser:
     df.add_argument("--kinds", nargs="+", default=["results", "annual", "shareholding"],
                     choices=["results", "annual", "shareholding"])  # fmt: skip
     df.add_argument("--no-events", action="store_true")
-    df.add_argument("--workers", type=int, default=1, help="threads; still 1 request/s per host")
+    df.add_argument("--workers", type=int, default=1, help="threads (per-host limits still apply)")
     df.add_argument("--shp-from", type=_date, help="shareholding quarters from this date (default: latest only)")
     rd = sub.add_parser("run-day", help="holidays, days, corporate actions, discovery, promote, materialize")
     rd.add_argument("--date", type=_date, required=True)
@@ -190,7 +194,10 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
     args = build_parser().parse_args(argv)
     vault_dir, stage_root, db_path = _paths(args.data_dir)
     if args.cmd.startswith(("fetch", "discover")):
-        jobs = Jobs(PoliteFetcher(transport, warmup=WARMUP), Vault(vault_dir), stage_root)
+        jobs = Jobs(
+            PoliteFetcher(transport, warmup=WARMUP, host_limits=archive_limits(args)), Vault(vault_dir), stage_root
+        )
+        jobs.workers = getattr(args, "workers", 1)
         staged, errors = run_fetch(args, jobs, db_path, out)
         for s in staged:
             print(f"staged {s.relative_to(stage_root).as_posix()}", file=out)
@@ -323,6 +330,12 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
     finally:
         con.close()
     return 2
+
+
+def archive_limits(args) -> dict[str, tuple[float, int]] | None:
+    if args.archive_rps <= 1:
+        return None
+    return {"nsearchives.nseindia.com": (args.archive_rps, max(1, int(args.archive_rps)))}
 
 
 def universe_symbols(db_path: Path, name: str, as_of: date) -> list[str]:

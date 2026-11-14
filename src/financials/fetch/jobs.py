@@ -99,6 +99,7 @@ class Jobs:
         self.warnings: list[str] = []
         self.errors: list[str] = []  # per-file failures inside a listing (the rest of the listing goes on)
         self.shp_min_as_of: date | None = None  # discovery: shareholding quarters from this date (None = latest)
+        self.workers = 1  # fetch-days threads (useful only with a host limit above one connection)
 
     def _file(self, url: str) -> bytes | None:
         try:
@@ -157,14 +158,23 @@ class Jobs:
     def market_days(self, start: date, end: date) -> tuple[list[Path], list[str]]:
         """Every date in [start, end] (weekends included: special sessions exist, e.g. Saturday 1 Feb 2025 [CAL2]).
         A failure on one day is reported and the range continues; re-running resumes where it failed."""
-        staged, errors, d = [], [], start
-        while d <= end:
+        days = [start + timedelta(days=i) for i in range((end - start).days + 1)]
+
+        def one(d: date) -> tuple[list[Path], list[str]]:
             try:
-                staged += self.market_day(d) or []
+                return self.market_day(d) or [], []
             except (FetchError, ParseError) as exc:
-                errors.append(f"{d}: {exc}")
-            d += timedelta(days=1)
-        return staged, errors
+                return [], [f"{d}: {exc}"]
+
+        if self.workers > 1:
+            from concurrent.futures import ThreadPoolExecutor
+
+            with ThreadPoolExecutor(max_workers=self.workers) as pool:
+                results = list(pool.map(one, days))
+        else:
+            results = [one(d) for d in days]
+        staged = [p for got, _ in results for p in got]
+        return staged, [e for _, errs in results for e in errs]
 
     def corp_actions(self, start: date, end: date) -> list[Path]:
         """One request per 30-day window [P12]; each answer is its own vaulted, staged batch."""

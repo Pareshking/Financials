@@ -89,7 +89,7 @@ def test_every_batch_promotes_with_only_the_documented_exceptions(unified):
     assert m.pending == 0
     assert Counter(tuple(x) for x in m.log) == {
         ("PROMOTED", "market_day"): 10, ("PROMOTED", "holidays"): 1, ("PROMOTED", "index_snapshot"): 1,
-        ("PROMOTED", "corp_actions"): 1, ("PROMOTED", "results_xbrl"): 63, ("PROMOTED", "shareholding"): 13,
+        ("PROMOTED", "corp_actions"): 1, ("PROMOTED", "results_xbrl"): 67, ("PROMOTED", "shareholding"): 13,
         ("PROMOTED", "reg30_event"): 8,
         ("QUARANTINED", "results_xbrl"): 1,  # OLAELEC: owners + NCI identity fails in the filing itself
         ("OUT_OF_SCOPE", "results_xbrl"): 1,  # Star Health Q3 FY25 legacy GI file (period end before C9)
@@ -115,14 +115,21 @@ def test_quarantine_reasons_are_the_documented_ones(unified):
         "INDEX/PLACEHOLDER_ISIN",
         "INDEX/UNKNOWN_ISIN",  # IDX2, IDX3
         "SHARES/CROSS_CHECK_FAILED",  # Reg. 31 vs paid-up 1.9% apart for one issuer (owner tolerance 0.5%)
+        "CONSISTENCY/YTD_QUARTER_MISMATCH",  # Tata Motors FY26 standalone: Q1 re-presented after the demerger [X80]
     }
+    ytd = unified.con.execute(
+        "SELECT DISTINCT h.symbol, json_extract_string(q.details, '$.tag') FROM quarantine_queue q "
+        "JOIN securities s USING (entity_id) JOIN security_identifier_history h ON h.security_id = s.security_id "
+        "WHERE q.reason_code = 'YTD_QUARTER_MISMATCH'").fetchall()  # fmt: skip
+    assert {t for _, t in ytd} == {"revenue_from_operations", "total_income", "pbt"}
+    assert {s for s, _ in ytd} >= {"TATAMOTORS"}
 
 
 def test_all_profiles_and_scopes_land_without_collisions(unified):
     con = unified.con
     assert dict(((p, s), n) for p, s, n in con.execute(
         "SELECT accounting_profile, scope, count(*) FROM filing_meta GROUP BY ALL").fetchall()) == {
-        ("INDAS_CORP", "CONSOLIDATED"): 24, ("INDAS_CORP", "STANDALONE"): 6, ("INDAS_NBFC", "CONSOLIDATED"): 5,
+        ("INDAS_CORP", "CONSOLIDATED"): 24, ("INDAS_CORP", "STANDALONE"): 10, ("INDAS_NBFC", "CONSOLIDATED"): 5,
         ("INDAS_NBFC", "STANDALONE"): 2, ("IGAAP_BANK", "CONSOLIDATED"): 5, ("IGAAP_BANK", "STANDALONE"): 5,
         ("IRDAI_LIFE", "CONSOLIDATED"): 1, ("IRDAI_LIFE", "STANDALONE"): 3, ("IRDAI_GENERAL", "CONSOLIDATED"): 1,
         ("IRDAI_GENERAL", "STANDALONE"): 3, ("INDAS_INSURANCE", "STANDALONE"): 2,

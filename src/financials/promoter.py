@@ -905,6 +905,23 @@ def _declared_period_end(con, stage_dir: Path) -> date | None:
         return None
 
 
+def audit_ytd_identity(con, pairs: Iterable[tuple[str, str]]) -> list[str]:
+    """X80 / blueprint §3.2: for each (entity, scope), every filed YTD whose quarters were all filed directly must
+    equal their sum. Each break is a CONSISTENCY/YTD_QUARTER_MISMATCH finding (deterministic id, so a re-run raises
+    nothing new); TTM over that year is withheld by FactBook whatever the finding's status. A corrected or revised
+    filing that restores the identity is the only fix."""
+    from financials.fundamentals import YTD_GUARDED_TAGS, load_factbook
+
+    rows = []
+    for entity_id, scope in pairs:
+        book = load_factbook(con, entity_id, scope, datetime(9999, 12, 31))
+        for tag in sorted(YTD_GUARDED_TAGS):
+            for b in book.ytd_breaks(tag):
+                rows.append(_quarantine_row(stage="CONSISTENCY", reason_code="YTD_QUARTER_MISMATCH",
+                                            entity_id=entity_id, details={"scope": scope, **b}))  # fmt: skip
+    return _quarantine_many(con, rows) if rows else []
+
+
 def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
     declared_end = _declared_period_end(con, stage_dir)
     if declared_end is not None and not financials_in_scope(declared_end):
@@ -1015,8 +1032,9 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     facts = read_table(con, stage_dir, "stg_xbrl_facts")
     insert_rows(con, "fact_observations", [{**f, "entity_id": entity_id, "visible_from_ts": visible} for f in facts])
     _close_filing_findings(con, fid, f"parser {meta['parser_version']}: promoted")
+    qs = audit_ytd_identity(con, [(entity_id, meta["scope"])])
     q = cross_check_shares(con, entity_id, meta["period_end"])
-    return PromotionResult("PROMOTED", "results_xbrl", message=fid, quarantined=[q] if q else [])
+    return PromotionResult("PROMOTED", "results_xbrl", message=fid, quarantined=qs + ([q] if q else []))
 
 
 def filing_overrides(con, filing_id: str) -> dict[str, str]:

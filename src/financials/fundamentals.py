@@ -11,10 +11,16 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
+from financials.money import ROUNDING_UNITS
 from financials.parsers.indas_corp import period_months
 from financials.scope import financials_in_scope
 
 Period = tuple[date, date]
+# YTD identity (blueprint §3.2, [X80]): a filed YTD must equal the sum of its directly filed quarters within the
+# rounding of the filings (half a LevelOfRounding unit per term), but never tighter than this share of the YTD.
+# Design parameter (2026-11-14): on the live backfill 94% of 8,081 comparisons agree to the rupee, 4% within 0.5%.
+YTD_IDENTITY_REL_TOLERANCE = Decimal("0.005")
+YTD_GUARDED_TAGS = frozenset({"revenue_from_operations", "total_income", "pat", "pbt", "pat_owners"})
 
 
 def _add_months(d: date, months: int) -> date:
@@ -34,6 +40,35 @@ class FactBook:
     scope: str
     durations: dict[str, dict[Period, Decimal]] = field(default_factory=dict)
     instants: dict[str, dict[date, Decimal]] = field(default_factory=dict)
+    rounding_unit: Decimal = Decimal(1)  # coarsest LevelOfRounding among this entity's visible filings (scope)
+
+    def ytd_breaks(self, tag: str) -> list[dict]:
+        """Every filed YTD (> 3 months, from a fiscal-year start) whose quarters were all filed directly, and whose
+        value differs from their sum by more than the tolerance. A break means a restated or mis-filed quarter
+        (or YTD); which one is wrong cannot be told from the numbers, so nothing is corrected [X80]."""
+        d = self.durations.get(tag, {})
+        out = []
+        for (s, e), ytd in d.items():
+            m = period_months(s, e)
+            if m is None or m <= 3 or m > 12 or m % 3:
+                continue
+            ends = [_add_months(e, -3 * i) for i in range(m // 3)]
+            qs = [d.get((_add_months(date(qe.year, qe.month, 1), -2), qe)) for qe in ends]
+            if None in qs:
+                continue
+            total = sum(qs, Decimal(0))
+            tol = max(self.rounding_unit * (len(qs) + 1) / 2, abs(ytd) * YTD_IDENTITY_REL_TOLERANCE)
+            if abs(ytd - total) > tol:
+                out.append({"tag": tag, "ytd_period": [str(s), str(e)], "ytd": str(ytd), "quarters_sum": str(total),
+                            "quarters": len(qs), "tolerance": str(tol)})  # fmt: skip
+        return out
+
+    def _ytd_consistent(self, tag: str, end: date) -> bool:
+        """False when any YTD ending inside the 4 quarters to `end` breaks the identity (guarded tags only)."""
+        if tag not in YTD_GUARDED_TAGS:
+            return True
+        window = {_add_months(end, -3 * i) for i in range(4)}
+        return not any(date.fromisoformat(b["ytd_period"][1]) in window for b in self.ytd_breaks(tag))
 
     # ── flows ──
     def quarter(self, tag: str, end: date) -> Decimal | None:
@@ -50,6 +85,8 @@ class FactBook:
 
     def ttm(self, tag: str, end: date) -> Decimal | None:
         """Sum of the 4 quarters ending `end`; falls back to the YTD bridge for H1/FY-only flows."""
+        if not self._ytd_consistent(tag, end):
+            return None  # X80: a restated / mis-filed quarter inside the window; never sum inconsistent quarters
         qs = [self.quarter(tag, _add_months(end, -3 * i)) for i in range(4)]
         if None not in qs:
             return sum(qs, Decimal(0))
@@ -116,19 +153,28 @@ def _prev_day_month_end(d: date) -> date:
     return date(prev.year, prev.month, calendar.monthrange(prev.year, prev.month)[1])
 
 
+_ROUNDING_CASE = " ".join(f"WHEN '{k}' THEN {int(v)}" for k, v in ROUNDING_UNITS.items())
+
+
 def load_factbook(con, entity_id: str, scope: str, as_of: datetime) -> FactBook:
     rows = con.execute(
-        """SELECT canonical_tag, period_type, period_start, period_end, coalesce(value_inr, value_other)
+        """SELECT canonical_tag, period_type, period_start, period_end, coalesce(value_inr, value_other),
+                  (SELECT max(CASE level_of_rounding """
+        + _ROUNDING_CASE
+        + """ ELSE 1 END) FROM filing_meta
+                   WHERE entity_id = ? AND scope = ? AND visible_from_ts <= ?)
            FROM (SELECT *, row_number() OVER (
                     PARTITION BY canonical_tag, period_start, period_end
                     ORDER BY visible_from_ts DESC, parser_version DESC) AS rn
                  FROM fact_observations
                  WHERE entity_id = ? AND scope = ? AND visible_from_ts <= ?)
            WHERE rn = 1""",
-        [entity_id, scope, as_of],
+        [entity_id, scope, as_of, entity_id, scope, as_of],
     ).fetchall()
     book = FactBook(entity_id, scope)
-    for tag, ptype, start, end, value in rows:
+    if rows and rows[0][5] is not None:
+        book.rounding_unit = Decimal(rows[0][5])
+    for tag, ptype, start, end, value, _unit in rows:
         if ptype == "INSTANT":
             book.instants.setdefault(tag, {})[end] = Decimal(value)
         else:

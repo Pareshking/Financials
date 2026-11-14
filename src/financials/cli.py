@@ -145,6 +145,7 @@ def build_parser() -> argparse.ArgumentParser:
     rs.add_argument(
         "--category", choices=["CORP_ACTIONS", "SHP_XBRL", "RESULTS_XBRL"], required=True, help=restage_help
     )
+    sub.add_parser("audit-ytd", help="raise YTD_QUARTER_MISMATCH findings for every entity and scope [X80]")
     sub.add_parser("promote", help="apply all pending staged batches (single writer)")
     rb = sub.add_parser("rebuild-market", help="roll market-derived state back to a date and replay it (audited)")
     rb.add_argument("--from", dest="from_date", type=_date, required=True)
@@ -270,6 +271,19 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
                                        broadcast_ts=bts, broadcast_ts_source=bsrc, exchange=exch,
                                        run_suffix=PARSER_VERSION)  # fmt: skip
             print(f"staged {s.relative_to(stage_root).as_posix()}", file=out)
+        return 0
+    if args.cmd == "audit-ytd":
+        from financials.promoter import audit_ytd_identity
+
+        con = connect(db_path)
+        try:
+            pairs = con.execute("SELECT DISTINCT entity_id, scope FROM filing_meta ORDER BY 1, 2").fetchall()
+            con.execute("BEGIN")
+            ids = audit_ytd_identity(con, pairs)
+            con.execute("COMMIT")
+        finally:
+            con.close()
+        print(f"{len(ids)} YTD_QUARTER_MISMATCH findings over {len(pairs)} entity-scopes", file=out)
         return 0
     if args.cmd == "load-kpis":
         from financials.staging import stage_kpis

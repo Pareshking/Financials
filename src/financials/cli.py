@@ -20,7 +20,7 @@ from financials.dsl import run_screen
 from financials.features import materialize
 from financials.fetch.http import PoliteFetcher, Transport
 from financials.fetch.jobs import WARMUP, Jobs
-from financials.promoter import close_wrong_template_duplicates, promote
+from financials.promoter import close_resolved_share_findings, close_wrong_template_duplicates, promote
 from financials.scope import MIN_TRADE_DATE
 from financials.staging import read_manifest
 from financials.timeutil import utc_now
@@ -79,6 +79,10 @@ def promote_pending(con, stage_root: Path, out=sys.stdout) -> int:
         results_seen = results_seen or r.job == "results_xbrl"
     if results_seen and (n := close_wrong_template_duplicates(con)):
         print(f"{'FIXED_BY_RULE':16s} {'results_xbrl':14s} {n} wrong-template duplicate(s) closed [X89]", file=out)
+    if n := close_resolved_share_findings(con):
+        print(
+            f"{'FIXED_BY_RULE':16s} {'shares':14s} {n} share cross-check finding(s) agree on re-check [X103]", file=out
+        )
     return pending
 
 
@@ -332,10 +336,12 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
             pairs = con.execute("SELECT DISTINCT entity_id, scope FROM filing_meta ORDER BY 1, 2").fetchall()
             con.execute("BEGIN")
             ids = audit_ytd_identity(con, pairs)
+            closed = close_resolved_share_findings(con)
             con.execute("COMMIT")
         finally:
             con.close()
         print(f"{len(ids)} YTD_QUARTER_MISMATCH findings over {len(pairs)} entity-scopes", file=out)
+        print(f"{closed} share cross-check finding(s) closed on re-check [X103]", file=out)
         return 0
     if args.cmd == "load-kpis":
         from financials.staging import stage_kpis

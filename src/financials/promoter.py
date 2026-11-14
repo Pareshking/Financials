@@ -1457,12 +1457,12 @@ def index_members(con, index_name: str, as_of: date, *, allow_survivorship_bias:
 SHARE_CROSS_CHECK_TOLERANCE = Decimal("0.005")  # 0.5% relative (owner decision)
 
 
-def cross_check_shares(con, entity_id: str, as_of: date) -> str | None:
-    """Compare Reg. 31 total shares with results-derived paid-up / face value for the same date.
-
-    Returns a quarantine id on disagreement, else None. Skipped when partly-paid shares exist
-    (paid-up / face value is then not a share count [X18]) or either side is missing.
-    """
+def share_disagreement(con, entity_id: str, as_of: date) -> dict | None:
+    """Reg. 31 total shares vs results-derived paid-up / face value for the same date: the disagreement details, or
+    None when they agree, partly-paid shares exist (paid-up / face value is then not a share count [X18]) or either
+    side is missing. X103: shares held by an employee benefit trust are treasury shares under Ind AS 32, deducted
+    from equity share capital but counted in the Reg. 31 total (EMPLOYEE_TRUSTS), so paid-up / face value may equal
+    the total less those shares (101 open findings, 19 companies, matched exactly, live 2026-11-14)."""
     shp = con.execute(
         "SELECT o.shares, m.has_partly_paid, o.filing_id FROM shareholding_observations o "
         "JOIN shareholding_meta m USING (filing_id, parser_version) "
@@ -1482,23 +1482,51 @@ def cross_check_shares(con, entity_id: str, as_of: date) -> str | None:
     if shp is None or not rows or shp[1]:
         return None
     shp_total = Decimal(shp[0])
-    diff, derived, res_filing = max((abs(shp_total - Decimal(v)) / shp_total, Decimal(v), f) for v, f in rows)
+    trust = con.execute(
+        "SELECT max(shares) FROM shareholding_observations WHERE filing_id = ? AND category = 'EMPLOYEE_TRUSTS'",
+        [shp[2]],
+    ).fetchone()[0]
+    totals = [shp_total] + ([shp_total - Decimal(trust)] if trust else [])
+    diff, derived, res_filing = max(
+        (min(abs(t - Decimal(v)) / t for t in totals), Decimal(v), f) for v, f in rows
+    )  # fmt: skip
     if diff <= SHARE_CROSS_CHECK_TOLERANCE:
         return None
-    return _quarantine(
-        con,
-        stage="SHARES",
-        reason_code="CROSS_CHECK_FAILED",
-        entity_id=entity_id,
-        details={
-            "as_of": as_of,
-            "reg31_total": shp_total,
-            "paid_up_over_face_value": derived,
-            "relative_diff": diff,
-            "shp_filing": shp[2],
-            "results_filing": res_filing,
-        },
-    )
+    return {
+        "as_of": as_of,
+        "reg31_total": shp_total,
+        "employee_trust_shares": Decimal(trust) if trust else None,
+        "paid_up_over_face_value": derived,
+        "relative_diff": diff,
+        "shp_filing": shp[2],
+        "results_filing": res_filing,
+    }
+
+
+def cross_check_shares(con, entity_id: str, as_of: date) -> str | None:
+    """Quarantine id when Reg. 31 total shares and paid-up / face value disagree (share_disagreement), else None."""
+    details = share_disagreement(con, entity_id, as_of)
+    if details is None:
+        return None
+    return _quarantine(con, stage="SHARES", reason_code="CROSS_CHECK_FAILED", entity_id=entity_id, details=details)
+
+
+def close_resolved_share_findings(con) -> int:
+    """Re-run the share cross-check for every open CROSS_CHECK_FAILED finding and close those that now agree (a
+    later rule such as X103, or a corrected filing). Returns how many were closed."""
+    rows = con.execute(
+        "SELECT quarantine_id, entity_id, CAST(json_extract_string(details, '$.as_of') AS DATE) "
+        "FROM quarantine_queue WHERE reason_code = 'CROSS_CHECK_FAILED' AND resolved_at IS NULL"
+    ).fetchall()
+    fixed = [q for q, ent, as_of in rows if ent is not None and share_disagreement(con, ent, as_of) is None]
+    if fixed:
+        con.execute(
+            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = "
+            "'share cross-check agrees on re-check (X103 employee trust shares)' "
+            "WHERE quarantine_id IN (SELECT unnest(?))",
+            [utc_now(), fixed],
+        )
+    return len(fixed)
 
 
 SHP_PARSE_FINDINGS = ("PARSE_ERROR", "CONTEXT_CONFLICT", "MISSING_CRITICAL", "PCT_SCALE_UNKNOWN")

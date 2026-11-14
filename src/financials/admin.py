@@ -70,10 +70,18 @@ def backfill_index(
         ).fetchone()[0]
         if first is None:
             raise AdminError(f"no snapshot for {index_name}: promote a constituents snapshot first")
-        current = index_members(con, index_name, first)
+        # Members outside the equity universe (REITs, series RR, in the Nifty 500 since 2026-09-30 [IDX8]) count
+        # towards the index size but have no security in this database: virtual keys, never written as rows.
+        outside = {sym for (sym,) in con.execute(
+            "SELECT DISTINCT symbol FROM raw_index_snapshot WHERE index_name = ? AND isin LIKE 'IN%' "
+            "AND series NOT IN ('EQ', 'BE', 'BZ') AND snapshot_date = (SELECT max(snapshot_date) FROM "
+            "raw_index_snapshot WHERE index_name = ?)", [index_name, index_name]).fetchall()}  # fmt: skip
+        current = [*index_members(con, index_name, first), *(f"OUTSIDE:{s}" for s in sorted(outside))]
         intervals, steps = reconstruct_backward(
-            current, first, events, start, lambda s, d: resolve_symbol(con, s, d), expected_count=expected_count
-        )
+            current, first, events, start,
+            lambda s, d: f"OUTSIDE:{s}" if s in outside else resolve_symbol(con, s, d), expected_count=expected_count,
+        )  # fmt: skip
+        intervals = [iv for iv in intervals if not str(iv.key).startswith("OUTSIDE:")]
         con.execute(
             "DELETE FROM index_constituents_history WHERE index_name = ? AND source = 'MANUAL_BACKFILL'", [index_name]
         )

@@ -254,3 +254,23 @@ def test_tax_copied_from_prior_year_is_raised_and_withheld(unified):
 
     assert (date(2026, 7, 1), date(2026, 9, 30)) not in book.durations["pat"]
     assert book.durations["pbt"][(date(2026, 7, 1), date(2026, 9, 30))] == 39925220000
+
+
+def test_restage_all_selects_every_parsed_or_open_results_filing(unified):
+    """`restage --category RESULTS_XBRL --all` (parser 0.10.0 adds segment rows to clean filings): every filing with
+    filing_meta or an open filing finding; the default keeps selecting only open findings."""
+    from financials.cli import restage_rows
+
+    con = unified.con
+    every = {r[0] for r in restage_rows(con, "RESULTS_XBRL", "ALL")}
+    default = {r[0] for r in restage_rows(con, "RESULTS_XBRL")}
+    parsed = {
+        u
+        for (u,) in con.execute(
+            "SELECT DISTINCT f.source_url FROM filings f JOIN filing_meta m USING (filing_id) "
+            "WHERE f.category = 'RESULTS_XBRL'"
+        ).fetchall()
+    }
+    assert parsed <= every and default <= every
+    assert len(every) == len(parsed | default)
+    assert len(every) > len(default)

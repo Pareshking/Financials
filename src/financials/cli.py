@@ -151,6 +151,9 @@ def build_parser() -> argparse.ArgumentParser:
     rs.add_argument("--visibility", action="store_true",
                     help="RESULTS_XBRL: instead re-parse promoted filings whose visibility rule now gives a later "
                          "time (listing creation / file name) [X83]")  # fmt: skip
+    rs.add_argument("--all", action="store_true",
+                    help="RESULTS_XBRL: re-parse every results / annual filing (after a parser change that adds "
+                         "output to clean filings, e.g. segment rows in 0.10.0)")  # fmt: skip
     evidence_help = "stage raw_results_listing rows from vaulted RESULTS_LISTING blobs (then promote) [X83]"
     sub.add_parser("backfill-listing-evidence", help=evidence_help)
     sub.add_parser("audit-ytd", help="raise YTD_QUARTER_MISMATCH findings for every entity and scope [X80]")
@@ -205,6 +208,32 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def restage_rows(con, category: str, mode: str = "OPEN_FINDINGS") -> list[tuple]:
+    """Vaulted filings to re-parse: (source_url, fetched_at, storage_path, sha256, broadcast_ts, broadcast_ts_source,
+    exchange). RESULTS_XBRL: OPEN_FINDINGS (default) = filings with open parse / identity / period findings;
+    VISIBILITY = promoted filings whose visibility rule now gives a later time [X83]; ALL = every results and annual
+    filing that has filing_meta (parsed, not OUT_OF_SCOPE) or an open finding. Other categories: every filing."""
+    from financials.promoter import FILING_FINDING_STAGES
+
+    where, params = "", [category]
+    open_findings = (
+        "f.filing_id IN (SELECT filing_id FROM quarantine_queue WHERE resolved_at IS NULL "
+        f"AND stage IN {FILING_FINDING_STAGES}) "
+    )
+    if category == "RESULTS_XBRL" and mode == "VISIBILITY":
+        from financials.promoter import filings_with_later_visibility
+
+        where, params = "AND f.filing_id IN (SELECT unnest(?)) ", [category, filings_with_later_visibility(con)]
+    elif category == "RESULTS_XBRL" and mode == "ALL":
+        where = "AND (f.filing_id IN (SELECT filing_id FROM filing_meta) OR " + open_findings + ") "
+    elif category == "RESULTS_XBRL":
+        where = "AND " + open_findings
+    return con.execute(
+        "SELECT f.source_url, f.fetched_at, b.storage_path, b.sha256, f.broadcast_ts, f.broadcast_ts_source, "
+        "f.exchange FROM filings f JOIN blobs b USING (sha256) WHERE f.category = ? " + where
+        + "ORDER BY f.source_url", params).fetchall()  # fmt: skip
+
+
 def main(argv: Sequence[str] | None = None, *, transport: Transport | None = None, out=sys.stdout) -> int:
     args = build_parser().parse_args(argv)
     vault_dir, stage_root, db_path = _paths(args.data_dir)
@@ -251,28 +280,12 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
             print(f"error: no market database at {db_path}", file=out)
             return 2
         from financials import PARSER_VERSION
-        from financials.promoter import FILING_FINDING_STAGES
         from financials.staging import stage_results_xbrl, stage_shareholding
 
         con = connect(db_path, read_only=True)
         try:
-            if args.visibility and args.category == "RESULTS_XBRL":
-                from financials.promoter import filings_with_later_visibility
-
-                later = filings_with_later_visibility(con)
-                where = "AND f.filing_id IN (SELECT unnest(?)) "
-                params = [args.category, later]
-            else:
-                open_findings = (
-                    "AND f.filing_id IN (SELECT filing_id FROM quarantine_queue WHERE resolved_at IS NULL "
-                    f"AND stage IN {FILING_FINDING_STAGES}) "
-                )
-                where = open_findings if args.category == "RESULTS_XBRL" else ""
-                params = [args.category]
-            rows = con.execute(
-                "SELECT f.source_url, f.fetched_at, b.storage_path, b.sha256, f.broadcast_ts, f.broadcast_ts_source, "
-                "f.exchange FROM filings f JOIN blobs b USING (sha256) WHERE f.category = ? " + where
-                + "ORDER BY f.source_url", params).fetchall()  # fmt: skip
+            mode = "VISIBILITY" if args.visibility else "ALL" if args.all else "OPEN_FINDINGS"
+            rows = restage_rows(con, args.category, mode)
         finally:
             con.close()
         vault = Vault(vault_dir)

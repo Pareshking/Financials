@@ -911,6 +911,9 @@ SCREENER_CONVENTION_COLUMNS = (
 )  # fmt: skip
 
 
+COGS_MIN_SHARE = Decimal("0.01")  # S23 CHOICE: below 1% of sales, inventory / payable days are not meaningful
+
+
 class _BookAsResult:
     """Lets the parity-tested statement builders (statements/*) read a FactBook: same rows, same definitions.
 
@@ -944,11 +947,9 @@ def screener_convention_ratios(book: FactBook, on_or_before: date) -> dict:
     Working Capital = Other Assets - Other Liabilities (rupees). Kept beside our own ratios, not instead of them:
     `roce` excludes other income and uses closing capital.
 
-    Days ratios on the same Sales denominator as the export's Debtor Days [S23, our definitions; the website's
-    are UNVERIFIED]: Inventory Days = closing Inventory / (Sales / 365); Days Payable = closing trade payables /
-    (Sales / 365); Cash Conversion Cycle = Debtor + Inventory - Payable days (differs from the website for TCS:
-    72 vs 93, the website leaves inventory and payable days blank); Working Capital Days = (current assets - cash &
-    bank - current investments - current liabilities) / (Sales / 365), observed to match the website on TCS.
+    Days ratios as on the website [S23]: Inventory / Payable Days = closing inventory / trade payables over COGS / 365
+    (NULL when COGS < 1% of sales); Cash Conversion Cycle = Debtor + Inventory - Payable days (blanks as 0); Working
+    Capital Days = (current assets - cash & bank - current investments - current liabilities) / (Sales / 365).
     Schedule III omits nil lines, so a filed balance sheet without an inventory or payables line means 0 days
     [C23]."""
     from financials.statements.balance_sheet import balance_sheet
@@ -972,11 +973,18 @@ def screener_convention_ratios(book: FactBook, on_or_before: date) -> dict:
         out["inventory_turnover"] = sales / stock if stock else None
         per_day = sales / 365
         payables = bs.rows["Other Liabilities"].parts.get("Trade payables")
-        out["inventory_days"] = stock / per_day if stock is not None else None
-        out["days_payable"] = payables / per_day if payables is not None else None
-        parts = (out["debtor_days"], out["inventory_days"], out["days_payable"])
-        if None not in parts:
-            out["cash_conversion_cycle"] = parts[0] + parts[1] - parts[2]
+        # S23: inventory and payable days are on COGS = materials consumed + purchases of stock-in-trade + change in
+        # inventories (ITC FY26 consolidated: 208.8 / 63.2 = the website's 209 / 63). With COGS under 1% of sales
+        # (services: TCS 41 Cr on 267,021 Cr) they are NULL, as the website leaves them blank (CHOICE threshold).
+        cogs = sum((_fy(book, t, fy) or Decimal(0) for t in _COGS), Decimal(0))
+        if cogs > 0 and cogs >= COGS_MIN_SHARE * sales:
+            cogs_day = cogs / 365
+            out["inventory_days"] = stock / cogs_day if stock is not None else None
+            out["days_payable"] = payables / cogs_day if payables is not None else None
+        if out["debtor_days"] is not None:  # blank inventory / payable days count as 0, as on the website
+            out["cash_conversion_cycle"] = (
+                out["debtor_days"] + (out["inventory_days"] or 0) - (out["days_payable"] or 0)
+            )
         ca, cl = (
             book.instants.get("current_assets", {}).get(fy[1]),
             book.instants.get("current_liabilities", {}).get(fy[1]),

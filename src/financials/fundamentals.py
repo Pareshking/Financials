@@ -251,6 +251,10 @@ _ANNUAL_LAST = (
 def load_factbook(con, entity_id: str, scope: str, as_of: datetime) -> FactBook:
     """Latest visible value per (tag, period), from filings on the accounting basis of the entity's latest
     quarterly filing (X90): after a change of basis the older basis drops out, so quarters and TTM rebuild."""
+    cached = _PREFETCH.get((id(con), as_of))
+    if cached is not None:
+        unit, fy_starts = cached["meta"].get((entity_id, scope), (None, None))
+        return _build_book(entity_id, scope, cached["facts"].get((entity_id, scope), []), unit, fy_starts)
     rows = con.execute(
         """SELECT canonical_tag, period_type, period_start, period_end, coalesce(value_inr, value_other)
            FROM (SELECT *, row_number() OVER (
@@ -276,6 +280,10 @@ def load_factbook(con, entity_id: str, scope: str, as_of: datetime) -> FactBook:
         "AND visible_from_ts <= ?",
         [entity_id, scope, as_of],
     ).fetchone()
+    return _build_book(entity_id, scope, rows, unit, fy_starts)
+
+
+def _build_book(entity_id: str, scope: str, rows, unit, fy_starts) -> FactBook:
     book = FactBook(entity_id, scope, fy_starts=frozenset(fy_starts or ()))
     if rows and unit is not None:
         book.rounding_unit = Decimal(unit)
@@ -289,6 +297,65 @@ def load_factbook(con, entity_id: str, scope: str, as_of: datetime) -> FactBook:
         book.durations[PBT_INCL_JV] = {p: v + jv.get(p, Decimal(0)) for p, v in book.durations["pbt"].items()}
     book.withhold_tax_copies()
     return book
+
+
+# Batch reads for materialisation: per-entity queries scan fact_observations once per call (no index on entity), so
+# a day of the full universe ran ~1,700 full scans (~45 s/day, 2026-11-14). prefetch_fundamentals() reads every
+# entity's factbook rows, rounding / FY starts and scope anchors in one pass per as_of; load_factbook and
+# scope_policy read from it while it is active. The SQL is the per-entity query with entity and scope correlated
+# (same ranking, CURRENT_VERSION, SAME_BASIS and X100), checked equal on the live database and by a test.
+_PREFETCH: dict[tuple[int, datetime], dict] = {}
+_BATCH_SAME_BASIS = SAME_BASIS.replace(
+    "l.entity_id = ? AND l.scope = ?", "l.entity_id = fact_observations.entity_id AND l.scope = fact_observations.scope"
+)
+
+
+def prefetch_fundamentals(con, as_of: datetime) -> None:
+    facts: dict[tuple[str, str], list] = {}
+    for ent, scope, *row in con.execute(
+        """SELECT entity_id, scope, canonical_tag, period_type, period_start, period_end,
+                  coalesce(value_inr, value_other)
+           FROM (SELECT *, row_number() OVER (
+                    PARTITION BY entity_id, scope, canonical_tag, period_start, period_end
+                    ORDER BY """
+        + _ANNUAL_LAST
+        + """, visible_from_ts DESC, """
+        + version_key()
+        + """ DESC) AS rn
+                 FROM fact_observations
+                 WHERE visible_from_ts <= ? AND """
+        + CURRENT_VERSION
+        + " AND "
+        + _BATCH_SAME_BASIS
+        + """)
+           WHERE rn = 1""",
+        [as_of, as_of],
+    ).fetchall():
+        facts.setdefault((ent, scope), []).append(tuple(row))
+    meta = {
+        (e, s): (u, f)
+        for e, s, u, f in con.execute(
+            "SELECT entity_id, scope, max(CASE level_of_rounding "
+            + _ROUNDING_CASE
+            + " ELSE 1 END), list(DISTINCT fy_start) FROM filing_meta WHERE visible_from_ts <= ? GROUP BY ALL",
+            [as_of],
+        ).fetchall()
+    }
+    anchors: dict[str, list] = {}
+    for ent, months, scope, end in con.execute(
+        """SELECT entity_id, period_months, scope, period_end FROM fact_observations
+           WHERE canonical_tag = ? AND period_type = 'DURATION' AND period_months IN (3, 12)
+             AND visible_from_ts <= ? GROUP BY entity_id, period_months, scope, period_end""",
+        [ANCHOR_TAG, as_of],
+    ).fetchall():
+        anchors.setdefault(ent, []).append((months, scope, end))
+    overrides = {e: (q, a) for e, q, a in con.execute(
+        "SELECT entity_id, quarterly_scope, annual_scope FROM entity_scope_override").fetchall()}  # fmt: skip
+    _PREFETCH[(id(con), as_of)] = {"facts": facts, "meta": meta, "anchors": anchors, "overrides": overrides}
+
+
+def clear_prefetch(con, as_of: datetime) -> None:
+    _PREFETCH.pop((id(con), as_of), None)
 
 
 SEGMENT_CURRENT_VERSION = CURRENT_VERSION.replace("fact_observations.", "segment_observations.")
@@ -359,17 +426,24 @@ class ScopeDecision:
 
 
 def scope_policy(con, entity_id: str, as_of: datetime) -> ScopePolicy:
-    row = con.execute(
-        "SELECT quarterly_scope, annual_scope FROM entity_scope_override WHERE entity_id = ?", [entity_id]
-    ).fetchone()
+    cached = _PREFETCH.get((id(con), as_of))
+    if cached is not None:
+        row = cached["overrides"].get(entity_id)
+    else:
+        row = con.execute(
+            "SELECT quarterly_scope, annual_scope FROM entity_scope_override WHERE entity_id = ?", [entity_id]
+        ).fetchone()
     if row:
         return ScopePolicy(row[0], row[1], "OVERRIDE")
-    rows = con.execute(
-        """SELECT period_months, scope, period_end FROM fact_observations
-           WHERE entity_id = ? AND canonical_tag = ? AND period_type = 'DURATION' AND period_months IN (3, 12)
-             AND visible_from_ts <= ? GROUP BY period_months, scope, period_end""",
-        [entity_id, ANCHOR_TAG, as_of],
-    ).fetchall()
+    if cached is not None:
+        rows = cached["anchors"].get(entity_id, [])
+    else:
+        rows = con.execute(
+            """SELECT period_months, scope, period_end FROM fact_observations
+               WHERE entity_id = ? AND canonical_tag = ? AND period_type = 'DURATION' AND period_months IN (3, 12)
+                 AND visible_from_ts <= ? GROUP BY period_months, scope, period_end""",
+            [entity_id, ANCHOR_TAG, as_of],
+        ).fetchall()
     ends: dict[tuple[int, str], set[date]] = {}
     for months, scope, end in rows:
         ends.setdefault((months, scope), set()).add(end)

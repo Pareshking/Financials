@@ -38,12 +38,14 @@ from financials.fundamentals import (
     bank_blocks,
     building_blocks,
     cash_conversion_blocks,
+    clear_prefetch,
     insurer_basis,
     insurer_blocks,
     load_factbook,
     nbfc_blocks,
     newgen_inputs,
     percentile_rank,
+    prefetch_fundamentals,
     resolve_scope,
     reverse_dcf_implied_growth,
     safe_div,
@@ -426,6 +428,18 @@ def compute_rows(con, as_of: date, exchange: str = "NSE", *, knowledge: str = "v
     curated = _curated_archetypes()
     arch_override = dict(con.execute("SELECT entity_id, valuation_archetype FROM entity_archetype_override").fetchall())
     fundamentals_cache: dict[str, dict] = {}
+    rows = []
+    prefetch_fundamentals(con, as_of_ts)  # one pass instead of a per-entity scan [benchmarks]
+    try:
+        rows = _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all, paid_up, quarter_end,
+                     events, kpis, history, curated, arch_override, fundamentals_cache)  # fmt: skip
+    finally:
+        clear_prefetch(con, as_of_ts)
+    return rows
+
+
+def _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all, paid_up, quarter_end, events, kpis,
+          history, curated, arch_override, fundamentals_cache) -> list[dict]:  # fmt: skip
     rows = []
     for sec, ent, symbol, series in universe:
         b = bars.get(sec, [])

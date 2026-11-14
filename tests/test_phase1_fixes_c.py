@@ -106,7 +106,8 @@ def test_override_broadcast_ts_is_applied_by_promoting_the_filing_again(tmp_path
 def test_override_security_id_maps_a_filing_whose_isin_is_unknown(tmp_path):
     m = Market(tmp_path)
     promote(m.con, m.stage_day("20251014"))
-    data = CORP.read_bytes().replace(b"INE050401020", b"INE999Z01019")  # in memory: an ISIN not on record
+    # In memory: an ISIN not on record and a symbol not on record (with ELIN's symbol, X88 would resolve it).
+    data = CORP.read_bytes().replace(b"INE050401020", b"INE999Z01019").replace(b">ELIN<", b">ELINX<")
     stage_results_xbrl(m.vault, m.stage_root, data=data, source_url="memory://elin-unknown-isin", fetched_at=FETCHED_AT,
                        broadcast_ts=datetime(2026, 11, 5, 12, 36), broadcast_ts_source="API_FIELD")  # fmt: skip
     promote_pending(m.con, m.stage_root, io.StringIO())

@@ -20,7 +20,7 @@ from financials.dsl import run_screen
 from financials.features import materialize
 from financials.fetch.http import PoliteFetcher, Transport
 from financials.fetch.jobs import WARMUP, Jobs
-from financials.promoter import promote
+from financials.promoter import close_wrong_template_duplicates, promote
 from financials.scope import MIN_TRADE_DATE
 from financials.staging import read_manifest
 from financials.timeutil import utc_now
@@ -56,7 +56,7 @@ def promote_pending(con, stage_root: Path, out=sys.stdout) -> int:
     Market days are promoted strictly in date order. When one aborts (e.g. G1 on a half-published file), every
     later market day waits instead of promoting: promoting it would put the failed day permanently behind the
     ORDER gate. Batches for the same date are still tried (a complete re-fetch can replace a trimmed one)."""
-    pending = 0
+    pending, results_seen = 0, False
     blocked_after: str | None = None
     for d in pending_stages(con, stage_root):
         rel = d.relative_to(stage_root).as_posix()
@@ -76,6 +76,9 @@ def promote_pending(con, stage_root: Path, out=sys.stdout) -> int:
             blocked_after = None  # a complete batch for the blocked date went through
         con.execute("INSERT OR REPLACE INTO promotion_log VALUES (?, ?, ?, ?, ?)",
                     [rel, r.job, r.status, r.message, utc_now()])  # fmt: skip
+        results_seen = results_seen or r.job == "results_xbrl"
+    if results_seen and (n := close_wrong_template_duplicates(con)):
+        print(f"{'FIXED_BY_RULE':16s} {'results_xbrl':14s} {n} wrong-template duplicate(s) closed [X89]", file=out)
     return pending
 
 

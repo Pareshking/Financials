@@ -56,8 +56,13 @@ def test_typo_filings_promote_to_the_symbols_entity(market, name, symbol):
 
 
 def test_a_looser_mismatch_stays_quarantined(market):
+    """Not an X81 typo; since X88 an unregistered ISIN with the symbol's issuer code is accepted, so the boundary is
+    now: another issuer code (INE999Z) and another company name stay UNKNOWN_ISIN."""
     promote(market.con, market.stage_day("20250228"))
-    data = (XBRL_DIR / AVANTI).read_bytes().replace(b"INE871CO1038", b"INE871CX1038")  # in-memory only
+    data = (XBRL_DIR / AVANTI).read_bytes().replace(b"INE871CO1038", b"INE999Z01019")  # in-memory only
+    data = data.replace(b"Avanti Feeds Limited", b"Avanti Industries Limited").replace(
+        b"AVANTI FEEDS LIMITED", b"AVANTI INDUSTRIES LIMITED"
+    )
     r = promote(market.con, _stage(market, AVANTI, data))
     assert r.status == "QUARANTINED"
     assert market.con.execute(

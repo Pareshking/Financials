@@ -89,8 +89,10 @@ def test_every_batch_promotes_with_only_the_documented_exceptions(unified):
     assert m.pending == 0
     assert Counter(tuple(x) for x in m.log) == {
         ("PROMOTED", "market_day"): 10, ("PROMOTED", "holidays"): 1, ("PROMOTED", "index_snapshot"): 1,
-        ("PROMOTED", "corp_actions"): 1, ("PROMOTED", "results_xbrl"): 76, ("PROMOTED", "shareholding"): 13,
+        ("PROMOTED", "corp_actions"): 1, ("PROMOTED", "results_xbrl"): 81, ("PROMOTED", "shareholding"): 13,
         ("PROMOTED", "reg30_event"): 8,
+        ("QUARANTINED", "results_xbrl"): 2,  # MRPL Q1 FY26 on the non-Ind AS template (UNKNOWN_TAXONOMY) [X89]
+        ("FIXED_BY_RULE", "results_xbrl"): 1,  # ... closed once its Ind AS re-filing is promoted [X89]
         ("OUT_OF_SCOPE", "results_xbrl"): 1,  # Star Health Q3 FY25 legacy GI file (period end before C9)
         ("QUARANTINED", "reg30_event"): 1,  # SHANTHALA fraud disclosure: SME series, outside the universe
     }  # fmt: skip
@@ -128,8 +130,8 @@ def test_all_profiles_and_scopes_land_without_collisions(unified):
     con = unified.con
     assert dict(((p, s), n) for p, s, n in con.execute(
         "SELECT accounting_profile, scope, count(*) FROM filing_meta GROUP BY ALL").fetchall()) == {
-        ("INDAS_CORP", "CONSOLIDATED"): 28, ("INDAS_CORP", "STANDALONE"): 15, ("INDAS_NBFC", "CONSOLIDATED"): 5,
-        ("INDAS_NBFC", "STANDALONE"): 2, ("IGAAP_BANK", "CONSOLIDATED"): 5, ("IGAAP_BANK", "STANDALONE"): 5,
+        ("INDAS_CORP", "CONSOLIDATED"): 30, ("INDAS_CORP", "STANDALONE"): 17, ("INDAS_NBFC", "CONSOLIDATED"): 5,
+        ("INDAS_NBFC", "STANDALONE"): 3, ("IGAAP_BANK", "CONSOLIDATED"): 5, ("IGAAP_BANK", "STANDALONE"): 5,
         ("IRDAI_LIFE", "CONSOLIDATED"): 1, ("IRDAI_LIFE", "STANDALONE"): 3, ("IRDAI_GENERAL", "CONSOLIDATED"): 1,
         ("IRDAI_GENERAL", "STANDALONE"): 3, ("INDAS_INSURANCE", "STANDALONE"): 2,
         ("REG34_ANNUAL", "CONSOLIDATED"): 4, ("REG34_ANNUAL", "STANDALONE"): 2,

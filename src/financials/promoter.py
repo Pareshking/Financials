@@ -8,6 +8,7 @@ G4 (null spike) and G5 (atomic universe) run in feature materialisation (financi
 from __future__ import annotations
 
 import json
+import re
 import statistics
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -716,6 +717,64 @@ def resolve_isin_typo(con, exchange: str, isin: str, symbol: str | None, on_date
     return [sec]
 
 
+UNREGISTERED_ISIN_RULE = "UNREGISTERED_ISIN_SYMBOL_MATCH"
+_NAME_SUFFIXES = {"LTD", "LIMITED", "L"}
+
+
+def _name_tokens(name: str) -> list[str]:
+    tokens = re.sub(r"[^A-Z0-9 ]", " ", name.upper().replace(".", "")).split()
+    while tokens and tokens[-1] in _NAME_SUFFIXES:
+        tokens.pop()
+    return tokens
+
+
+def names_agree(stated: str | None, legal: str | None) -> bool:
+    """Exchange names are abbreviated ("KRISHNA INST OF MED SCI L"): every legal-name word must be a prefix of the
+    stated word in the same position, after dropping punctuation and a trailing LTD / LIMITED / L."""
+    if not stated or not legal:
+        return False
+    a, b = _name_tokens(stated), _name_tokens(legal)
+    return bool(b) and len(a) == len(b) and all(x.startswith(y) for x, y in zip(a, b, strict=True))
+
+
+def resolve_unregistered_isin(
+    con, exchange: str, isin: str, symbol: str | None, company_name: str | None, on_date: date, filing_id: str
+) -> list[str]:
+    """Rule UNREGISTERED_ISIN_SYMBOL_MATCH [X88]: the stated ISIN belongs to no security we know (any exchange, any
+    time), so it cannot name another listed issuer; the stated symbol names exactly one security (on `on_date`, else
+    any interval) and that security has the same ISIN issuer code or the same company name (names_agree). Covers
+    garbled ISINs, a bond ISIN (HDB Financial INE756I08058) and a pre-split ISIN (Persistent INE262H01016).
+    Logged in admin_log; raw keeps the ISIN as sent (invariant 3)."""
+    if not symbol or not isin:
+        return []
+    if con.execute("SELECT count(*) FROM security_identifier_history WHERE isin = ?", [isin]).fetchone()[0]:
+        return []
+    rows = (
+        con.execute(
+            "SELECT DISTINCT h.security_id, h.isin, e.legal_name FROM security_identifier_history h "
+            "JOIN securities s USING (security_id) JOIN entity_master e USING (entity_id) WHERE h.exchange = ? "
+            "AND h.symbol = ? AND h.valid_from <= ? AND (h.valid_to IS NULL OR h.valid_to > ?)",
+            [exchange, symbol, on_date, on_date],
+        ).fetchall()
+        or con.execute(
+            "SELECT DISTINCT h.security_id, h.isin, e.legal_name FROM security_identifier_history h "
+            "JOIN securities s USING (security_id) JOIN entity_master e USING (entity_id) WHERE h.exchange = ? "
+            "AND h.symbol = ?",
+            [exchange, symbol],
+        ).fetchall()
+    )
+    if len({sec for sec, _, _ in rows}) != 1:
+        return []
+    sec, actual, legal = rows[0]
+    if isin_issuer_code(actual) != isin_issuer_code(isin) and not names_agree(company_name, legal):
+        return []
+    params = json.dumps({"filing_id": filing_id, "stated_isin": isin, "symbol": symbol, "isin": actual,
+                         "security_id": sec, "company_name": company_name}, sort_keys=True)  # fmt: skip
+    row = [stable_id("adm", UNREGISTERED_ISIN_RULE, params), "RULE:" + UNREGISTERED_ISIN_RULE, params, "X88", utc_now()]
+    con.execute("INSERT OR IGNORE INTO admin_log VALUES (?, ?, ?, NULL, ?, ?)", row)
+    return [sec]
+
+
 def isin_issuer_code(isin: str) -> str:
     """Characters 4-7 of an Indian ISIN identify the issuer; splits keep them [CA7]."""
     return isin[3:7]
@@ -1067,6 +1126,9 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
         if not ent:
             typo = resolve_isin_typo(con, filing["exchange"], meta["stated_isin"], meta["stated_symbol"],
                                      meta["period_end"], fid)  # fmt: skip
+            typo = typo or resolve_unregistered_isin(con, filing["exchange"], meta["stated_isin"],
+                                                     meta["stated_symbol"], meta.get("company_name"),
+                                                     meta["period_end"], fid)  # fmt: skip
             ent = con.execute("SELECT entity_id FROM securities WHERE security_id IN (SELECT unnest(?))",
                               [typo]).fetchall()  # fmt: skip
         reason = "UNKNOWN_ISIN" if not ent else "AMBIGUOUS_ISIN"
@@ -1400,6 +1462,44 @@ def _close_shp_parse_findings(con, filing_id: str, note: str) -> None:
     )
 
 
+WRONG_TEMPLATE_RULE = "WRONG_TEMPLATE_DUPLICATE"
+WRONG_TEMPLATE_NS = "IntegratedFinance_OtherThanBank"
+
+
+def close_wrong_template_duplicates(con) -> int:
+    """Rule WRONG_TEMPLATE_DUPLICATE [X89]: an Ind AS company that first files its results on the non-Ind AS
+    template (SEBI `IntegratedFinance_OtherThanBank` taxonomy: ExtraordinaryItems, ...BeforeMinorityInterest) and
+    then on the Ind AS template for the same entity, scope and period end. The UNKNOWN_TAXONOMY finding of the
+    wrong-template filing is closed once such a promoted filing exists, whichever arrived first (Aarti, Kansai,
+    KIMS, MRPL, Rajesh Exports). Without one (L&T Q4 FY25) it stays open. Run once per promote batch."""
+    rows = con.execute(
+        f"""WITH wt AS (
+              SELECT q.quarantine_id,
+                     max(CASE WHEN r.element_name = 'ISIN' THEN r.value_text END) AS isin,
+                     max(CASE WHEN r.element_name = 'NatureOfReportStandaloneConsolidated'
+                              THEN upper(r.value_text) END) AS scope,
+                     max(CASE WHEN r.element_name = 'DateOfEndOfReportingPeriod' THEN r.value_text END) AS pe
+              FROM quarantine_queue q JOIN raw_xbrl_facts r USING (filing_id)
+              WHERE q.stage = 'PARSE' AND q.reason_code = 'UNKNOWN_TAXONOMY' AND q.resolved_at IS NULL
+                AND json_extract_string(q.details, '$.entity_namespace') LIKE '%{WRONG_TEMPLATE_NS}%'
+                AND r.element_name IN ('ISIN', 'NatureOfReportStandaloneConsolidated', 'DateOfEndOfReportingPeriod')
+              GROUP BY q.quarantine_id)
+            SELECT wt.quarantine_id, min(m.filing_id)
+            FROM wt JOIN security_identifier_history h ON h.isin = wt.isin
+            JOIN securities s ON s.security_id = h.security_id
+            JOIN filing_meta m ON m.entity_id = s.entity_id AND m.scope = wt.scope
+                               AND m.period_end = try_cast(wt.pe AS DATE) AND m.accounting_profile <> 'REG34_ANNUAL'
+            GROUP BY wt.quarantine_id"""
+    ).fetchall()
+    for qid, correct in rows:
+        con.execute(
+            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ? "
+            "WHERE quarantine_id = ?",
+            [utc_now(), f"X89 {WRONG_TEMPLATE_RULE}: Ind AS filing {correct} for the same entity, scope, period", qid],
+        )
+    return len(rows)
+
+
 def _close_filing_findings(con, filing_id: str, note: str, keep: list[str] | None = None) -> None:
     """A results filing that now promotes (or is now known to be out of scope) closes the open parse, identity and
     period findings an earlier parser_version raised for it, except the non-blocking findings this promotion raises
@@ -1444,6 +1544,8 @@ def _promote_shareholding(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     if not secs:
         secs = resolve_isin_typo(con, filing["exchange"], meta["stated_isin"], meta["stated_symbol"],
                                  meta["as_of_date"], fid)  # fmt: skip
+        secs = secs or resolve_unregistered_isin(con, filing["exchange"], meta["stated_isin"], meta["stated_symbol"],
+                                                 meta.get("company_name"), meta["as_of_date"], fid)  # fmt: skip
     entities = sorted(
         {con.execute("SELECT entity_id FROM securities WHERE security_id = ?", [s_]).fetchone()[0] for s_ in secs}
     )

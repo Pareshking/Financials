@@ -222,6 +222,27 @@ SAME_BASIS = (
 )
 
 
+# X100: for a period both cover, the quarterly results filing outranks the Reg. 34 annual report on income-statement
+# lines. The annual taxonomy books the JV share inside exceptional items / PBT (NTPC FY26 PBT 27,133.56 vs the Q4
+# filing's 24,269.46 Cr = + JV 2,864.10; Cummins, Eicher) and so breaks the YTD identity of the quarters; the annual
+# report still wins (latest) on cash-flow lines, line-item detail and everything the results filing does not state
+# (Eternal FY26 files cash-flow placeholders of 0 in its Q4 results).
+NOT_RESULTS_RANKED = (
+    "borrowings_proceeds", "borrowings_repayments", "capex_intangibles", "capex_ppe", "cash_generated_from_operations",
+    "cff", "cfi", "cfo", "dividends_paid", "dividends_received_investing", "dividends_received_operating",
+    "fx_effect_on_cash", "income_taxes_paid", "interest_paid_financing", "interest_paid_operating",
+    "interest_received_investing", "interest_received_operating", "lease_payments", "net_cash_flow",
+    "net_cash_flow_after_fx", "ppe_disposals", "share_based_payments_addback", "share_issue_proceeds",
+    "rpt_total_amount", "face_value_per_share", "paid_up_equity_capital",
+)  # fmt: skip
+_ANNUAL_LAST = (
+    "CASE WHEN period_type = 'DURATION' AND canonical_tag NOT LIKE 'cf\\_%' ESCAPE '\\' "
+    "AND canonical_tag NOT LIKE 'li\\_%' ESCAPE '\\' AND canonical_tag NOT LIKE 'asfiled\\_%' ESCAPE '\\' "
+    "AND canonical_tag NOT IN (" + ", ".join(f"'{t}'" for t in NOT_RESULTS_RANKED) + ") "
+    "AND filing_id IN (SELECT filing_id FROM filing_meta WHERE accounting_profile = 'REG34_ANNUAL') THEN 1 ELSE 0 END"
+)
+
+
 def load_factbook(con, entity_id: str, scope: str, as_of: datetime) -> FactBook:
     """Latest visible value per (tag, period), from filings on the accounting basis of the entity's latest
     quarterly filing (X90): after a change of basis the older basis drops out, so quarters and TTM rebuild."""
@@ -229,7 +250,9 @@ def load_factbook(con, entity_id: str, scope: str, as_of: datetime) -> FactBook:
         """SELECT canonical_tag, period_type, period_start, period_end, coalesce(value_inr, value_other)
            FROM (SELECT *, row_number() OVER (
                     PARTITION BY canonical_tag, period_start, period_end
-                    ORDER BY visible_from_ts DESC, """
+                    ORDER BY """
+        + _ANNUAL_LAST
+        + """, visible_from_ts DESC, """
         + version_key()
         + """ DESC) AS rn
                  FROM fact_observations

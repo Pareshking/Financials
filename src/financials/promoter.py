@@ -775,6 +775,40 @@ def resolve_unregistered_isin(
     return [sec]
 
 
+ISIN_OF_OTHER_ISSUER_RULE = "ISIN_OF_OTHER_ISSUER"
+
+
+def resolve_isin_symbol_conflict(
+    con, exchange: str, isin_entity: str, symbol: str | None, company_name: str | None, on_date: date, filing_id: str
+) -> tuple[str | None, dict | None]:
+    """[X101] The stated ISIN names one entity; the stated symbol may name another (Gillette Q1 FY26 1498822: symbol
+    GILLETTE, company "Gillette India Limited", ISIN INE179A01014 = P&G Hygiene). Invariant 3: identifiers that
+    disagree quarantine, except under the named rule ISIN_OF_OTHER_ISSUER: the symbol names exactly one entity
+    whose legal name agrees with the filed company name, and the ISIN entity's does not. Returns (entity_id, None)
+    to promote, or (None, details) to quarantine as IDENTITY/ISIN_SYMBOL_CONFLICT. An unknown symbol is no conflict."""
+    if not symbol:
+        return isin_entity, None
+    q = ("SELECT DISTINCT s.entity_id, s.security_id, e.legal_name FROM security_identifier_history h "
+         "JOIN securities s USING (security_id) JOIN entity_master e USING (entity_id) WHERE h.exchange = ? "
+         "AND h.symbol = ?")  # fmt: skip
+    on = " AND h.valid_from <= ? AND (h.valid_to IS NULL OR h.valid_to > ?)"
+    rows = con.execute(q + on, [exchange, symbol, on_date, on_date]).fetchall()
+    rows = rows or con.execute(q, [exchange, symbol]).fetchall()
+    ents = {e for e, _, _ in rows}
+    if not ents or isin_entity in ents:
+        return isin_entity, None
+    isin_legal = con.execute("SELECT legal_name FROM entity_master WHERE entity_id = ?", [isin_entity]).fetchone()
+    details = {"isin_entity": isin_entity, "symbol": symbol, "symbol_entities": sorted(ents),
+               "company_name": company_name}  # fmt: skip
+    if len(ents) == 1 and names_agree(company_name, rows[0][2]) and not names_agree(company_name, isin_legal[0]):
+        params = json.dumps({"filing_id": filing_id, **details}, sort_keys=True)
+        row = [stable_id("adm", ISIN_OF_OTHER_ISSUER_RULE, params), "RULE:" + ISIN_OF_OTHER_ISSUER_RULE, params,
+               "X101", utc_now()]  # fmt: skip
+        con.execute("INSERT OR IGNORE INTO admin_log VALUES (?, ?, ?, NULL, ?, ?)", row)
+        return rows[0][0], None
+    return None, details
+
+
 def isin_issuer_code(isin: str) -> str:
     """Characters 4-7 of an Indian ISIN identify the issuer; splits keep them [CA7]."""
     return isin[3:7]
@@ -1137,16 +1171,24 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
                               [typo]).fetchall()  # fmt: skip
         reason = "UNKNOWN_ISIN" if not ent else "AMBIGUOUS_ISIN"
     ovr = filing_overrides(con, fid)
+    conflict = None
     if "security_id" in ovr:  # `quarantine resolve --action OVERRIDE` [P2-13]
         ent = con.execute("SELECT entity_id FROM securities WHERE security_id = ?", [ovr["security_id"]]).fetchall()
+    elif len(ent) == 1 and meta["stated_isin"] is not None:
+        resolved, conflict = resolve_isin_symbol_conflict(
+            con, filing["exchange"], ent[0][0], meta["stated_symbol"], meta.get("company_name"), meta["period_end"], fid
+        )
+        ent = [(resolved,)] if resolved else []
+        reason = "ISIN_SYMBOL_CONFLICT"
     if len(ent) != 1:
         q = _quarantine(
             con,
             stage="IDENTITY",
             reason_code=reason,
             filing_id=fid,
-            details={"isin": meta["stated_isin"], "symbol": meta["stated_symbol"], "cin": meta.get("stated_cin")},
-        )
+            details={"isin": meta["stated_isin"], "symbol": meta["stated_symbol"], "cin": meta.get("stated_cin"),
+                     **(conflict or {})},
+        )  # fmt: skip
         return PromotionResult("QUARANTINED", "results_xbrl", message=fid, quarantined=[q])
     entity_id = ent[0][0]
 

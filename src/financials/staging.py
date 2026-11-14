@@ -261,8 +261,10 @@ def stage_results_xbrl(
     broadcast_ts: datetime | None = None,
     broadcast_ts_source: str = "UNKNOWN",
     exchange: str = "NSE",
+    run_suffix: str | None = None,
 ) -> Path:
-    """Vault + parse one quarterly results XBRL. Parse problems are staged as issues, not raised."""
+    """Vault + parse one quarterly results XBRL. Parse problems are staged as issues, not raised.
+    `run_suffix` (restage) gives a re-parse its own batch, promoted as a new parser_version."""
     blob = vault.put(data, ext="xml", media_type="application/xml", fetched_at=fetched_at)
     filing = make_filing(
         blob,
@@ -275,6 +277,7 @@ def stage_results_xbrl(
     )
     tables: dict[str, list[dict[str, Any]]] = {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)]}
     fid = filing.filing_id
+    run_id = fid if run_suffix is None else f"{fid}-{run_suffix}"
 
     try:
         inst = parse_instance(data)
@@ -287,7 +290,7 @@ def stage_results_xbrl(
                 "details": json.dumps({"error": str(exc)}),
             }
         ]
-        return write_stage(stage_root, "results_xbrl", fid, tables)
+        return write_stage(stage_root, "results_xbrl", run_id, tables)
 
     tables["raw_xbrl_facts"] = _raw_fact_rows(fid, inst)
 
@@ -302,7 +305,7 @@ def stage_results_xbrl(
                 "details": json.dumps({"error": str(exc)}),
             }
         ]
-        return write_stage(stage_root, "results_xbrl", fid, tables)
+        return write_stage(stage_root, "results_xbrl", run_id, tables)
 
     if parsed.issues:
         tables["stg_issues"] = [
@@ -314,7 +317,7 @@ def stage_results_xbrl(
             }
             for i in parsed.issues
         ]
-        return write_stage(stage_root, "results_xbrl", fid, tables)
+        return write_stage(stage_root, "results_xbrl", run_id, tables)
 
     m = parsed.meta
     tables["stg_xbrl_filing"] = [
@@ -361,7 +364,7 @@ def stage_results_xbrl(
         for f in parsed.facts
     ]
     _assert_exact(tables["stg_xbrl_facts"], parsed)
-    return write_stage(stage_root, "results_xbrl", fid, tables)
+    return write_stage(stage_root, "results_xbrl", run_id, tables)
 
 
 def _assert_exact(rows: list[dict[str, Any]], parsed) -> None:

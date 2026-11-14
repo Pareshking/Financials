@@ -89,7 +89,7 @@ def test_every_batch_promotes_with_only_the_documented_exceptions(unified):
     assert m.pending == 0
     assert Counter(tuple(x) for x in m.log) == {
         ("PROMOTED", "market_day"): 10, ("PROMOTED", "holidays"): 1, ("PROMOTED", "index_snapshot"): 1,
-        ("PROMOTED", "corp_actions"): 1, ("PROMOTED", "results_xbrl"): 62, ("PROMOTED", "shareholding"): 13,
+        ("PROMOTED", "corp_actions"): 1, ("PROMOTED", "results_xbrl"): 63, ("PROMOTED", "shareholding"): 13,
         ("PROMOTED", "reg30_event"): 8,
         ("QUARANTINED", "results_xbrl"): 1,  # OLAELEC: owners + NCI identity fails in the filing itself
         ("OUT_OF_SCOPE", "results_xbrl"): 1,  # Star Health Q3 FY25 legacy GI file (period end before C9)
@@ -126,7 +126,7 @@ def test_all_profiles_and_scopes_land_without_collisions(unified):
         ("INDAS_NBFC", "STANDALONE"): 2, ("IGAAP_BANK", "CONSOLIDATED"): 5, ("IGAAP_BANK", "STANDALONE"): 5,
         ("IRDAI_LIFE", "CONSOLIDATED"): 1, ("IRDAI_LIFE", "STANDALONE"): 3, ("IRDAI_GENERAL", "CONSOLIDATED"): 1,
         ("IRDAI_GENERAL", "STANDALONE"): 3, ("INDAS_INSURANCE", "STANDALONE"): 2,
-        ("REG34_ANNUAL", "CONSOLIDATED"): 4, ("REG34_ANNUAL", "STANDALONE"): 1,
+        ("REG34_ANNUAL", "CONSOLIDATED"): 4, ("REG34_ANNUAL", "STANDALONE"): 2,
     }  # fmt: skip
     # one results profile per entity (Reg. 34 annual sits beside its company's quarterly profile)
     assert (

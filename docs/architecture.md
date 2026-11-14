@@ -613,6 +613,23 @@ Status (2026-11-13): **built and tested end to end** on real fixtures, all liste
 - RPT ratios, forensic scores and the remaining §10 ratios.
 - Feature snapshots.
 
+**Gaps against the owner's master blueprint (reviewed 2026-11-14), still open:**
+- Restatement detector (blueprint §3.2): today a missing quarter is *derived* from YTD differences, which also hides
+  a restated earlier quarter. Needed: a gate that compares a filed YTD with the sum of filed quarters of the same
+  scope and profile, plus triggers on `ProfitLossFromDiscontinuedOperations` ≠ 0 and on a demerger/merger in
+  `corp_actions`; a break freezes TTM for that entity instead of mixing restated and original quarters.
+- AOC-1 subsidiary tree from Reg. 34 (only AOC-1-like elements seen so far [X75]; needs a fixture with the schedule).
+- Merger lineage (`merged_into`, swap ratio, position conversion) and demerger cost-of-acquisition split; today
+  `MERGED` exists only for duplicate-security repair.
+- Reg. 76 exact share count (F09 UNVERIFIED); Reg. 31 cross-checked with paid-up capital stands in.
+- The blueprint files AMFI holdings, PIT/SAST/SDD and bulk/block deals under Phase 2; they stay in Phase 3 here
+  because their sources are UNVERIFIED (F11, F13, R8) or only OBSERVED (F14).
+- Deliberate divergences: special dividends never adjust prices (invariant 8; the blueprint's §4.2 factor is not
+  used), and context ids (`OneD`, `FourD`, `OneI`) are never trusted as period labels (invariant 6; [SHP16]).
+
+**Pre-work before Phase 3:** a verified Nifty 500 TRI source (F29) for backtest benchmarks; real fixtures for PIT
+(F11), SDD (F13), credit-rating and debt XBRL (F22) and BRSR (F24); a per-AMC adapter plan for monthly portfolios (R8).
+
 **Phase 3: catalysts, flows and backtesting**
 - Reg. 30 event XBRL via RSS; insider/SAST/SDD.
 - F&O and SLBM; per-AMC portfolio adapters.

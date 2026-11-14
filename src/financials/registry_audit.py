@@ -29,8 +29,8 @@ REASONS = {
     "DISCONTINUED_DETAIL": "A detail of discontinued operations; pat_discontinued and discontinued_pbt are mapped.",
     "INSURANCE_SCHEDULE_DETAIL": "An IRDAI revenue/appropriation/fund-analysis schedule line under a mapped total.",
     # Reg. 34 annual-report notes (REG34_ANNUAL only) [X76]
-    "ANNUAL_ASSET_MOVEMENT": "A roll-forward line (additions, disposals, impairment, transfers) of a fixed-asset or "
-    "provision schedule whose closing balances are mapped.",
+    "ANNUAL_ASSET_MOVEMENT": "A roll-forward line (additions, disposals, impairment, transfers) or note disclosure "
+    "(revalued, idle, fully depreciated) of a fixed-asset or provision schedule whose closing balances are mapped.",
     "ANNUAL_TAX_NOTE": "An income-tax note line (rate reconciliation, current/deferred split) under mapped tax totals.",
     "ANNUAL_SHARE_CAPITAL_NOTE": "A share-capital note line (authorised/issued/called values, issues, holders).",
     "ANNUAL_SHARE_BASED_PAYMENT_NOTE": "An ESOP note line (options, exercise prices, fair values).",
@@ -116,7 +116,9 @@ RULES: tuple[tuple[str, str, frozenset | None], ...] = (
         r"|DecreaseThrough|^Writedowns|^ImpairmentLoss(?!Reversal.*TradeReceivables|OnNonFinancial|RecognisedInProfitOrLoss$)"
         r"|^ReversalOfImpairment|^Depreciation(PropertyPlant|RecognisedAs|RecognisedIn)|^AmortisationOtherIntangible"
         r"|^ProvisionUsed|^OtherProvisionsCreated|^NewProvisions|^UnusedProvisionReversed|^AdditionalProvisions"
-        r"|^IncreaseDecreaseInExistingProvisions|^DeductionsInEquityShareWarrants)",
+        r"|^IncreaseDecreaseInExistingProvisions|^DeductionsInEquityShareWarrants"
+        r"|^PropertyPlantAndEquipment(CarryingAmount|GrossCarryingAmountFullyDepreciated|TemporarilyIdle"
+        r"|RevaluationSurplus|ExpendituresRecognisedForConstructions))",
         "ANNUAL_ASSET_MOVEMENT",
         ANNUAL,
     ),
@@ -141,13 +143,13 @@ RULES: tuple[tuple[str, str, frozenset | None], ...] = (
         r"|^IncreaseDecreaseIn(EquityShareCapital|NumberOf)|^OtherDecreaseInAmountOfShares|^AggregateAmountOfIncrease"
         r"|PercentageOfCapitalReduction|UncalledLiability|(PaidUp|Share)CapitalHeldByForeign|PercentageOf(PaidUp|Share)"
         r"Capital|^AmountRaisedFrom|^AmountRemainingUnutilised|^AmountUtilisedTowards|SharePremium|BonusShares"
-        r"|BonusIssue|^AggregateNumberOf)",
+        r"|BonusIssue|^AggregateNumberOf|^OriginalPaidUpValueOfForfeitedShares)",
         "ANNUAL_SHARE_CAPITAL_NOTE",
         ANNUAL,
     ),
     (
         r"(KeyManagementPersonnel|Remuneration|DirectorsSittingFees|SalaryToDirectors|OtherBenefitsTo(Directors|Manager)"
-        r"|CommissionToDirectors|PercentageIncreaseInMedian|AveragePercentileIncrease)",
+        r"|CommissionToDirectors|PercentageIncreaseInMedian|AveragePercentileIncrease|^SalaryToManager$)",
         "ANNUAL_REMUNERATION_NOTE",
         ANNUAL,
     ),
@@ -156,7 +158,9 @@ RULES: tuple[tuple[str, str, frozenset | None], ...] = (
         r"|Appropriation|^AmountOfDividendsProposed|^PercentageOfProposedDividend|^DividendsProposed"
         r"|^TransferToRetainedEarnings|AdditionsToReserves|DeductionsToReserves|^OtherChangesInEquity"
         r"|^OtherEquityBalances|^IncreaseDecreaseThroughTransfersAndOtherChangesEquity"
-        r"|^IncreaseDecreaseThroughChangesInOwnershipInterests|^ChangesInEquity$|RelatingToItemsChargedOrCredited)",
+        r"|^IncreaseDecreaseThroughChangesInOwnershipInterests|^ChangesInEquity$|RelatingToItemsChargedOrCredited"
+        r"|^CorrectionOfPriorPeriodErrors$|^EffectOfChangesInAccountingPolicy$|^EquityBeforeRestatement$"
+        r"|^OtherUtilisationOfSecuritiesPremium)",
         "ANNUAL_EQUITY_NOTE",
         ANNUAL,
     ),

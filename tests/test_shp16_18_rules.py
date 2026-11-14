@@ -94,3 +94,34 @@ def test_shp17_needs_the_declared_event_date():
                                         b">2026-03-31</in-bse-shp:DateOfListing>")  # fmt: skip
     p = parse_shareholding(data)
     assert {i.reason_code for i in p.issues} >= {"CONTEXT_CONFLICT"}
+
+
+def test_restaged_filing_promotes_as_new_parser_version_and_closes_old_findings(market):
+    """`restage --category SHP_XBRL`: the same filing, staged again under a run suffix, promotes as a new parser
+    version and closes the parse finding an earlier parser raised for it (FIXED_BY_RULE)."""
+    from datetime import datetime
+
+    from financials.promoter import _quarantine, promote
+    from financials.staging import stage_shareholding
+
+    promote(market.con, market.stage_day("20250228"))
+    url = "https://nsearchives.nseindia.com/corporate/xbrl/" + REL_Q4FY25
+    kw = dict(data=_read(REL_Q4FY25), source_url=url, fetched_at=datetime(2026, 11, 14, 6, 0),
+              broadcast_ts=datetime(2025, 4, 21, 4, 10), broadcast_ts_source="API_FIELD")  # fmt: skip
+    first = stage_shareholding(market.vault, market.stage_root, **kw)
+    fid = first.name
+    # what parser 0.6.0 raised for this filing
+    _quarantine(market.con, stage="PARSE", reason_code="PARSE_ERROR", filing_id=fid,
+                details={"error": "fact references unknown context OneD"})  # fmt: skip
+    again = stage_shareholding(market.vault, market.stage_root, run_suffix="0.7.0", **kw)
+    assert again.name == f"{fid}-0.7.0" and again != first
+    r = promote(market.con, again)
+    assert r.status == "PROMOTED", r
+    open_, note = market.con.execute(
+        "SELECT count(*) FILTER (WHERE resolved_at IS NULL), any_value(resolution_note) FROM quarantine_queue "
+        "WHERE filing_id = ? AND reason_code = 'PARSE_ERROR'", [fid]).fetchone()  # fmt: skip
+    assert open_ == 0 and "SHP16_UNDECLARED_ENTITY_CONTEXTS" in note
+    pct = market.con.execute(
+        "SELECT pct FROM shareholding_observations WHERE filing_id = ? AND category = 'PROMOTER'", [fid]
+    ).fetchone()[0]
+    assert abs(pct - 0.5011) < 1e-9  # stored as a fraction (SHP18)

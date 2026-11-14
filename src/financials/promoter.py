@@ -1014,6 +1014,7 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     _link_revision(con, fid, entity_id, meta, visible)
     facts = read_table(con, stage_dir, "stg_xbrl_facts")
     insert_rows(con, "fact_observations", [{**f, "entity_id": entity_id, "visible_from_ts": visible} for f in facts])
+    _close_filing_findings(con, fid, f"parser {meta['parser_version']}: promoted")
     q = cross_check_shares(con, entity_id, meta["period_end"])
     return PromotionResult("PROMOTED", "results_xbrl", message=fid, quarantined=[q] if q else [])
 
@@ -1223,6 +1224,7 @@ def cross_check_shares(con, entity_id: str, as_of: date) -> str | None:
 
 
 SHP_PARSE_FINDINGS = ("PARSE_ERROR", "CONTEXT_CONFLICT", "MISSING_CRITICAL", "PCT_SCALE_UNKNOWN")
+FILING_FINDING_STAGES = ("PARSE", "IDENTITY", "PERIOD")
 
 
 def _close_shp_parse_findings(con, filing_id: str, note: str) -> None:
@@ -1230,6 +1232,16 @@ def _close_shp_parse_findings(con, filing_id: str, note: str) -> None:
     con.execute(
         "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ? "
         f"WHERE filing_id = ? AND resolved_at IS NULL AND reason_code IN {SHP_PARSE_FINDINGS}",
+        [utc_now(), note, filing_id],
+    )
+
+
+def _close_filing_findings(con, filing_id: str, note: str) -> None:
+    """A results filing that now promotes (or is now known to be out of scope) closes the open parse, identity and
+    period findings an earlier parser_version raised for it. Share cross-checks (stage SHARES) are untouched."""
+    con.execute(
+        "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ? "
+        f"WHERE filing_id = ? AND resolved_at IS NULL AND stage IN {FILING_FINDING_STAGES}",
         [utc_now(), note, filing_id],
     )
 

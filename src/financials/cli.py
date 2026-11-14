@@ -141,7 +141,10 @@ def build_parser() -> argparse.ArgumentParser:
     ib.add_argument("src", type=Path)
     ib.add_argument("--db", type=Path, required=True)
     rs = sub.add_parser("restage", help="re-parse vaulted inputs with the current parser (no download)")
-    rs.add_argument("--category", choices=["CORP_ACTIONS", "SHP_XBRL"], required=True)
+    restage_help = "RESULTS_XBRL re-parses only filings with open parse / identity / period findings"
+    rs.add_argument(
+        "--category", choices=["CORP_ACTIONS", "SHP_XBRL", "RESULTS_XBRL"], required=True, help=restage_help
+    )
     sub.add_parser("promote", help="apply all pending staged batches (single writer)")
     rb = sub.add_parser("rebuild-market", help="roll market-derived state back to a date and replay it (audited)")
     rb.add_argument("--from", dest="from_date", type=_date, required=True)
@@ -239,13 +242,17 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
             print(f"error: no market database at {db_path}", file=out)
             return 2
         from financials import PARSER_VERSION
-        from financials.staging import stage_shareholding
+        from financials.promoter import FILING_FINDING_STAGES
+        from financials.staging import stage_results_xbrl, stage_shareholding
 
         con = connect(db_path, read_only=True)
         try:
             rows = con.execute(
                 "SELECT f.source_url, f.fetched_at, b.storage_path, b.sha256, f.broadcast_ts, f.broadcast_ts_source, "
-                "f.exchange FROM filings f JOIN blobs b USING (sha256) WHERE f.category = ? ORDER BY f.source_url",
+                "f.exchange FROM filings f JOIN blobs b USING (sha256) WHERE f.category = ? "
+                + ("AND f.filing_id IN (SELECT filing_id FROM quarantine_queue WHERE resolved_at IS NULL "
+                   f"AND stage IN {FILING_FINDING_STAGES}) " if args.category == "RESULTS_XBRL" else "")
+                + "ORDER BY f.source_url",
                 [args.category]).fetchall()  # fmt: skip
         finally:
             con.close()
@@ -254,6 +261,10 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
             data = vault.read_path(path, sha)
             if args.category == "CORP_ACTIONS":
                 s = stage_corp_actions(vault, stage_root, data=data, source_url=url, fetched_at=fetched)
+            elif args.category == "RESULTS_XBRL":
+                s = stage_results_xbrl(vault, stage_root, data=data, source_url=url, fetched_at=fetched,
+                                       broadcast_ts=bts, broadcast_ts_source=bsrc, exchange=exch,
+                                       run_suffix=PARSER_VERSION)  # fmt: skip
             else:  # same filing (blob, URL, broadcast time); a new parser_version batch
                 s = stage_shareholding(vault, stage_root, data=data, source_url=url, fetched_at=fetched,
                                        broadcast_ts=bts, broadcast_ts_source=bsrc, exchange=exch,

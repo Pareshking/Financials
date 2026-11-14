@@ -35,6 +35,8 @@ from financials.parsers.indas_corp import (
     CanonicalFact,
     Issue,
     ParsedResults,
+    _apply_owners_tci_rule,
+    _apply_zero_attribution_rule,
     _check,
     _check_eps,
     _check_identities,
@@ -158,6 +160,8 @@ def parse_reg34_annual(data: bytes, file_name: str | None = None) -> ParsedResul
     _geographic(inst, result)
     _label_rules(inst, result)
     _apply_contingent_placeholder_rule(result)
+    _apply_zero_attribution_rule(result)  # X78: X48 / X56 per annual year, before withheld values are preserved
+    _apply_owners_tci_rule(result)
     preserve_withheld(inst, result, durations=set(result.meta["in_scope_periods"]),
                       instants=set(result.meta["in_scope_instants"]))  # fmt: skip
     enrich_line_items(result)

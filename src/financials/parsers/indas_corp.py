@@ -768,7 +768,9 @@ def _apply_owners_tci_rule(result: ParsedResults) -> None:
     for f in [f for f in result.facts if f.canonical_tag == "pat_owners"]:
         p = (f.period_start, f.period_end)
         pat, nci, tci = (result.value(t, *p) for t in ("pat", "pat_nci", "total_comprehensive_income"))
-        if None in (pat, nci, tci) or nci != 0:
+        if nci is None:  # no NCI element filed counts as 0 [X96, X105]: Premier Energies Q2 FY26 owners = TCI
+            nci = Decimal(0)
+        if None in (pat, tci) or nci != 0:
             continue
         if abs(f.value - tci) <= tol and abs(f.value - pat) > tol:
             fixed.append((f, pat))
@@ -821,7 +823,8 @@ def _apply_attribution_recovery_rules(result: ParsedResults) -> None:
     withheld = []
     for p in periods:
         pat, owners, nci = (result.value(t, *p) for t in ("pat", "pat_owners", "pat_nci"))
-        if nci is None:  # no NCI element filed: owners alone must equal PAT (THELEELA Q4 FY26 owners = OCI) [X96]
+        nci_missing = nci is None
+        if nci_missing:  # no NCI element filed: owners alone must equal PAT (THELEELA Q4 FY26 owners = OCI) [X96]
             nci = Decimal(0)
         if None in (pat, owners) or abs(owners + nci - pat) <= tol:
             continue
@@ -843,7 +846,7 @@ def _apply_attribution_recovery_rules(result: ParsedResults) -> None:
             _replace_attribution(result, p, *flips[0], "ATTRIBUTION_SIGN_FLIP")
             applied.setdefault("ATTRIBUTION_SIGN_FLIP", []).append([str(p[0]), str(p[1])])
             continue
-        if abs(nci - pat) <= tol and abs(owners - pat) > tol:  # X91: NCI filed = PAT
+        if nci != 0 and abs(nci - pat) <= tol:  # X91: NCI filed = PAT (X105: also when owners = PAT, NCI := 0)
             _replace_attribution(result, p, owners, pat - owners, "NCI_TAGGED_AS_PAT")
             applied.setdefault("NCI_TAGGED_AS_PAT", []).append([str(p[0]), str(p[1])])
             continue
@@ -853,6 +856,10 @@ def _apply_attribution_recovery_rules(result: ParsedResults) -> None:
             # is 0 (ATUL, ACC, L&T Finance), off by that share otherwise (Brigade Q2 FY27: 193.62 vs PDF 193.60 Cr).
             _replace_attribution(result, p, pat - nci, nci, "OWNERS_AND_NCI_TAGGED_AS_TCI")
             applied.setdefault("OWNERS_AND_NCI_TAGGED_AS_TCI", []).append([str(p[0]), str(p[1])])
+            continue
+        if nci_missing:
+            # X105: no NCI element and no exact recovery: owners stay as filed and NCI stays absent, as before X96
+            # (Oberoi Realty FY26 owners 2,224.05 vs PAT 2,225.51 Cr; the untagged NCI is the difference).
             continue
         withheld.append((p, owners, nci, pat))
     for p, owners, nci, pat in withheld:

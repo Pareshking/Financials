@@ -21,7 +21,7 @@ import duckdb
 
 from financials import PARSER_VERSION
 from financials.corp_actions import ACCEPTED_STATUSES, CorpAction, adjust_closes, audit_day, verify_group
-from financials.db import fetch_dicts, insert_rows
+from financials.db import fetch_dicts, insert_rows, version_key
 from financials.fundamentals import CURRENT_VERSION
 from financials.identity import UNIVERSE_SERIES, Interval, SecurityRegistry
 from financials.ids import stable_id
@@ -1197,6 +1197,10 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     _link_revision(con, fid, entity_id, meta, visible)
     facts = read_table(con, stage_dir, "stg_xbrl_facts")
     insert_rows(con, "fact_observations", [{**f, "entity_id": entity_id, "visible_from_ts": visible} for f in facts])
+    # Segment / geography rows [X97]: same entity, scope, visibility and parser version as the filing; a separate
+    # table that never feeds fact_observations or a ratio.
+    segs = read_table(con, stage_dir, "stg_segments")
+    insert_rows(con, "segment_observations", [{**r, "entity_id": entity_id, "visible_from_ts": visible} for r in segs])
     # Non-blocking parse findings (X86 ATTRIBUTION_WITHHELD): the filing is promoted, the finding stays open.
     finding_rows = [
         _quarantine_row(stage=i["stage"], reason_code=i["reason_code"], filing_id=fid, entity_id=entity_id,
@@ -1226,7 +1230,8 @@ def filings_with_later_visibility(con) -> list[str]:
     rows = con.execute(
         "SELECT m.filing_id, f.exchange, f.broadcast_ts, f.source_url, m.board_meeting_end_ts, m.visible_from_ts "
         "FROM filing_meta m JOIN filings f USING (filing_id) WHERE f.category = 'RESULTS_XBRL' AND m.parser_version = "
-        "(SELECT max(parser_version) FROM filing_meta x WHERE x.filing_id = m.filing_id) ORDER BY m.filing_id"
+        "(SELECT arg_max(x.parser_version, " + version_key("x.parser_version") + ") FROM filing_meta x "
+        "WHERE x.filing_id = m.filing_id) ORDER BY m.filing_id"
     ).fetchall()
     out = []
     for fid, exch, bts, url, board_end, current in rows:
@@ -1282,8 +1287,9 @@ def pit_fact(
            WHERE entity_id = ? AND scope = ? AND canonical_tag = ? AND period_start = ? AND period_end = ?
              AND visible_from_ts <= ? AND """
         + CURRENT_VERSION
-        + """
-           ORDER BY visible_from_ts DESC, parser_version DESC LIMIT 1""",
+        + " ORDER BY visible_from_ts DESC, "
+        + version_key()
+        + " DESC LIMIT 1",
         [entity_id, scope, canonical_tag, period_start, period_end, as_of],
     ).fetchone()
     return None if row is None else row[0]
@@ -1419,7 +1425,7 @@ def cross_check_shares(con, entity_id: str, as_of: date) -> str | None:
         "SELECT o.shares, m.has_partly_paid, o.filing_id FROM shareholding_observations o "
         "JOIN shareholding_meta m USING (filing_id, parser_version) "
         "WHERE o.entity_id = ? AND o.as_of_date = ? AND o.category = 'TOTAL' "
-        "ORDER BY o.visible_from_ts DESC, o.parser_version DESC LIMIT 1",
+        "ORDER BY o.visible_from_ts DESC, " + version_key("o.parser_version") + " DESC LIMIT 1",
         [entity_id, as_of],
     ).fetchone()
     # Every results filing of the latest visibility (standalone and consolidated can both state paid-up capital);

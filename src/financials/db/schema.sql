@@ -294,6 +294,35 @@ CREATE TABLE IF NOT EXISTS fact_observations (
     CHECK (period_months IS NULL OR period_months BETWEEN 1 AND 18)
 );
 
+-- Ind AS 108 segment and geography disclosures (parsers/segments.py) [X49, X97-X99]: one row per member fact, axis,
+-- member, label and element exactly as filed; no cross-company segment taxonomy. Promoted with its filing (same
+-- entity, scope, visibility and parser version). Never feeds fact_observations, the factbook or any ratio (§14b-1).
+CREATE TABLE IF NOT EXISTS segment_observations (
+    filing_id        VARCHAR NOT NULL REFERENCES filings(filing_id),
+    parser_version   VARCHAR NOT NULL,
+    entity_id        VARCHAR NOT NULL REFERENCES entity_master(entity_id),
+    scope            VARCHAR NOT NULL,
+    axis_kind        VARCHAR NOT NULL,          -- BUSINESS | GEOGRAPHY
+    axis             VARCHAR NOT NULL,          -- dimension QName as filed (in-capmkt:ReportableSegmentsAxis, ...)
+    member           VARCHAR NOT NULL,          -- member QName as filed
+    member_role      VARCHAR NOT NULL,          -- from the member name: SEGMENT | UNALLOCATED | ELIMINATION | RECONCILING | DOMICILE | FOREIGN_TOTAL | FOREIGN | AREA
+    label            VARCHAR,                   -- DescriptionOfReportableSegment / NatureOfReportableSegment / country, as filed
+    element          VARCHAR NOT NULL,          -- as filed
+    canonical_metric VARCHAR NOT NULL,          -- segments.SEGMENT_METRICS: REVENUE | RESULT | ASSETS | ...
+    period_type      VARCHAR NOT NULL,          -- DURATION | INSTANT
+    period_start     DATE NOT NULL,             -- = period_end for INSTANT
+    period_end       DATE NOT NULL,
+    period_months    INTEGER,                   -- NULL for INSTANT; 1..18
+    value_inr        DECIMAL(20,2) NOT NULL,
+    visible_from_ts  TIMESTAMP NOT NULL,
+    PRIMARY KEY (filing_id, parser_version, axis, member, element, period_start, period_end),
+    CHECK (axis_kind IN ('BUSINESS', 'GEOGRAPHY')),
+    CHECK (period_type IN ('DURATION', 'INSTANT')),
+    CHECK ((period_type = 'INSTANT') = (period_months IS NULL)),
+    CHECK ((period_type = 'INSTANT') = (period_start = period_end)),
+    CHECK (period_months IS NULL OR period_months BETWEEN 1 AND 18)
+);
+
 CREATE TABLE IF NOT EXISTS shareholding_meta (
     filing_id               VARCHAR NOT NULL REFERENCES filings(filing_id),
     parser_version          VARCHAR NOT NULL,

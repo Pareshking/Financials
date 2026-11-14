@@ -18,6 +18,11 @@ def connect(path: str | Path = ":memory:", *, read_only: bool = False) -> duckdb
     return duckdb.connect(str(path), read_only=read_only)
 
 
+def version_key(column: str = "parser_version") -> str:
+    """SQL sort key for a dotted parser version: '0.10.0' sorts after '0.9.0' (a string sort would not)."""
+    return "(" + " || '.' || ".join(f"lpad(split_part({column}, '.', {i}), 9, '0')" for i in (1, 2, 3)) + ")"
+
+
 def apply_schema(con: duckdb.DuckDBPyConnection) -> list[str]:
     """Create missing tables, then add columns that schema.sql declares but an existing database lacks.
 

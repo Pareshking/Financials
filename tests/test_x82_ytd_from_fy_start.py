@@ -50,3 +50,29 @@ def test_quarter_is_not_derived_from_a_non_ytd_duration():
     book = _book([Q3, HALF_YEARLY], frozenset({FY_START}))
     assert book.quarter("pat", date(2026, 3, 31)) == Decimal("2058160000") - Decimal("1352230000")
     assert book.quarter("pat", date(2026, 3, 31)) == Decimal("705930000")
+
+
+def test_re_audit_closes_a_ytd_finding_that_no_longer_reproduces():
+    """A YTD_QUARTER_MISMATCH raised before X82 (NETWEB's Oct-Mar "YTD") is closed when the audit of that entity and
+    scope no longer raises it; findings of entities not audited stay open."""
+    from financials.db import apply_schema, connect
+    from financials.promoter import _quarantine_many, _quarantine_row, audit_ytd_identity
+
+    con = connect()
+    apply_schema(con)
+    old = _quarantine_row(
+        stage="CONSISTENCY",
+        reason_code="YTD_QUARTER_MISMATCH",
+        entity_id="ent_netweb",
+        details={"scope": "STANDALONE", "tag": "pat", "ytd_period": ["2025-10-01", "2026-03-31"]},
+    )
+    other = _quarantine_row(
+        stage="CONSISTENCY",
+        reason_code="YTD_QUARTER_MISMATCH",
+        entity_id="ent_other",
+        details={"scope": "STANDALONE", "tag": "pat", "ytd_period": ["2025-04-01", "2026-03-31"]},
+    )
+    _quarantine_many(con, [old, other])
+    assert audit_ytd_identity(con, [("ent_netweb", "STANDALONE")]) == []
+    status = dict(con.execute("SELECT entity_id, resolution FROM quarantine_queue").fetchall())
+    assert status == {"ent_netweb": "FIXED_BY_RULE", "ent_other": None}

@@ -986,14 +986,34 @@ def audit_ytd_identity(con, pairs: Iterable[tuple[str, str]]) -> list[str]:
     filing that restores the identity is the only fix."""
     from financials.fundamentals import YTD_GUARDED_TAGS, load_factbook
 
-    rows = []
+    rows, pairs = [], list(pairs)
     for entity_id, scope in pairs:
         book = load_factbook(con, entity_id, scope, datetime(9999, 12, 31))
         for tag in sorted(YTD_GUARDED_TAGS):
             for b in book.ytd_breaks(tag):
                 rows.append(_quarantine_row(stage="CONSISTENCY", reason_code="YTD_QUARTER_MISMATCH",
                                             entity_id=entity_id, details={"scope": scope, **b}))  # fmt: skip
+    _close_stale_ytd_findings(con, pairs, {r["quarantine_id"] for r in rows})
     return _quarantine_many(con, rows) if rows else []
+
+
+def _close_stale_ytd_findings(con, pairs: list[tuple[str, str]], current: set[str]) -> None:
+    """An open YTD_QUARTER_MISMATCH of an audited (entity, scope) that the audit no longer raises is closed: a
+    corrected filing or a later rule (X82: a non-FY-start duration is not a YTD) removed the break."""
+    if not pairs:
+        return
+    open_rows = con.execute(
+        "SELECT quarantine_id, entity_id, json_extract_string(details, '$.scope') FROM quarantine_queue "
+        "WHERE stage = 'CONSISTENCY' AND reason_code = 'YTD_QUARTER_MISMATCH' AND resolved_at IS NULL"
+    ).fetchall()
+    audited = set(pairs)
+    stale = [q for q, e, s in open_rows if (e, s) in audited and q not in current]
+    if stale:
+        con.execute(
+            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', "
+            "resolution_note = 'YTD identity holds on re-audit' WHERE quarantine_id IN (SELECT unnest(?))",
+            [utc_now(), stale],
+        )
 
 
 def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:

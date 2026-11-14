@@ -90,6 +90,9 @@ CREATE TABLE stg_kpis (
 CREATE TABLE stg_issues (
     filing_id VARCHAR, stage VARCHAR NOT NULL, reason_code VARCHAR NOT NULL, details JSON NOT NULL
 );
+CREATE TABLE stg_findings (
+    filing_id VARCHAR, stage VARCHAR NOT NULL, reason_code VARCHAR NOT NULL, details JSON NOT NULL
+);
 """
 
 # Insertion order respects foreign keys.
@@ -114,6 +117,7 @@ TABLE_ORDER = (
     "stg_events",
     "stg_kpis",
     "stg_issues",
+    "stg_findings",
 )
 
 
@@ -320,6 +324,16 @@ def stage_results_xbrl(
         ]
         return write_stage(stage_root, "results_xbrl", run_id, tables)
 
+    if getattr(parsed, "findings", None):  # non-blocking: promoted, each opens a quarantine row [X86]
+        tables["stg_findings"] = [
+            {
+                "filing_id": fid,
+                "stage": i.stage,
+                "reason_code": i.reason_code,
+                "details": json.dumps(i.details, default=str, sort_keys=True),
+            }
+            for i in parsed.findings
+        ]
     m = parsed.meta
     tables["stg_xbrl_filing"] = [
         {

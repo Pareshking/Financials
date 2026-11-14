@@ -21,6 +21,8 @@ Period = tuple[date, date]
 # Design parameter (2026-11-14): on the live backfill 94% of 8,081 comparisons agree to the rupee, 4% within 0.5%.
 YTD_IDENTITY_REL_TOLERANCE = Decimal("0.005")
 YTD_GUARDED_TAGS = frozenset({"revenue_from_operations", "total_income", "pat", "pbt", "pat_owners"})
+ATTRIBUTION_WITHHELD_TAG = "attribution_withheld"  # X86 marker (parsers.indas_corp)
+ATTRIBUTION_TAGS = frozenset({"pat_owners", "pat_nci"})
 
 
 def _add_months(d: date, months: int) -> date:
@@ -125,7 +127,9 @@ class FactBook:
         if key not in self.durations:
             primary = self.durations.get(tag, {})
             base = self.durations.get(fallback, {}) if fallback else self.durations.get("revenue_from_operations", {})
-            out = {p: primary.get(p, base[p] if fallback else Decimal(0)) for p in base}
+            # X86: where the owners / NCI split is withheld, neither the split nor a fallback to PAT is used.
+            blocked = self.durations.get(ATTRIBUTION_WITHHELD_TAG, {}) if tag in ATTRIBUTION_TAGS else {}
+            out = {p: primary.get(p, base[p] if fallback else Decimal(0)) for p in base if p not in blocked}
             out.update(primary)
             self.durations[key] = out
         return key
@@ -888,7 +892,8 @@ def _year(book: FactBook, p: tuple[date, date]) -> dict[str, Decimal | None]:
         "ltd": _at(book, "borrowings_noncurrent", end), "rec": _at(book, "trade_receivables_current", end),
         "share_capital": _at(book, "equity_share_capital", end),
         "equity_owners": _at(book, "equity_attributable_to_owners", end) or _at(book, "total_equity", end),
-        "pat_owners": _fy(book, "pat_owners", p) or _fy(book, "pat", p),
+        "pat_owners": None if _fy(book, ATTRIBUTION_WITHHELD_TAG, p)
+        else (_fy(book, "pat_owners", p) or _fy(book, "pat", p)),
         "goodwill": _at(book, "goodwill", end), "intangibles": _at(book, "other_intangibles", end),
         "cwip": _at(book, "cwip", end), "gross_block": _at(book, "ppe_gross_block", end),
         "contingent": _at(book, "contingent_liabilities", end),

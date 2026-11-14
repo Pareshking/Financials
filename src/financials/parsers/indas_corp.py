@@ -262,6 +262,8 @@ class ParsedResults:
     meta: dict[str, Any] = field(default_factory=dict)
     facts: list[CanonicalFact] = field(default_factory=list)
     issues: list[Issue] = field(default_factory=list)
+    # Non-blocking findings: the filing is promoted and each finding opens a quarantine row [X86].
+    findings: list[Issue] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -518,6 +520,10 @@ def _map_facts(inst: Instance, result: ParsedResults, spec: ProfileSpec | None =
         )
     _apply_zero_attribution_rule(result)
     _apply_owners_tci_rule(result)
+    if spec is None or spec.identities is None:
+        # Only where owners + NCI = PAT is the profile's identity (corporate, NBFC, annual). Not banks: their
+        # PAT precedes the share of associates (PNB Q2 FY27: owners 5,898 Cr = PAT 5,561 - NCI + associates).
+        _apply_attribution_recovery_rules(result)
     preserve_withheld(inst, result, durations=set(declared.values()), instants={period_end})
     result.meta["interest_paid_cfo_class"] = _classify(
         result, "interest_paid_operating", "interest_paid_financing", "FINANCING"
@@ -723,6 +729,80 @@ def _apply_owners_tci_rule(result: ParsedResults) -> None:
     result.meta.setdefault("rules_applied", []).append(
         {"rule": "OWNERS_TAGGED_AS_TCI", "periods": [[str(f.period_start), str(f.period_end)] for f, _ in fixed]}
     )
+
+
+TCI_OWNERS_KEY = "li_comprehensive_income_for_the_period_attributable_to_owners_of_parent"
+TCI_NCI_KEY = "li_comprehensive_income_for_the_period_attributable_to_owners_of_parent_non_controlling_interests"
+ATTRIBUTION_WITHHELD_TAG = "attribution_withheld"  # marker (PURE 1): owners/NCI for the period are not usable [X86]
+
+
+def _replace_attribution(result: ParsedResults, p: tuple, owners: Decimal, nci: Decimal, rule: str) -> None:
+    for tag, value in (("pat_owners", owners), ("pat_nci", nci)):
+        old = next(f for f in result.facts if f.canonical_tag == tag and (f.period_start, f.period_end) == p)
+        result.facts.remove(old)
+        result.facts.append(dataclasses.replace(old, value=value, source_element=f"RULE:{rule}"))
+
+
+def _apply_attribution_recovery_rules(result: ParsedResults) -> None:
+    """Exact recovery of a mis-tagged profit attribution, then withholding of what cannot be recovered.
+
+    Run after X48 / X56. For each period whose owners + NCI differs from PAT:
+    - ATTRIBUTION_TAGGED_AS_OCI [X84]: the owners/NCI profit elements carry the OCI attribution (owners + NCI =
+      OCI). Profit attribution = TCI attribution - OCI attribution, accepted only when that sums to PAT
+      (Adani Ports Q4 FY26: 4,567.63 - 1,238.67 = 3,328.96 cr owners; 158.48 - 179.14 = -20.66 cr NCI, as in the PDF).
+    - ATTRIBUTION_SIGN_FLIP [X85]: flipping the sign of exactly one of owners / NCI makes owners + NCI = PAT
+      (Godrej Agrovet H1 FY27: 249.71 - 18.65 = 231.06 cr). Ambiguous or zero flips are not applied.
+    - ATTRIBUTION_WITHHELD [X86]: otherwise drop owners and NCI for the period and add the marker fact, so readers
+      neither use the split nor fall back to PAT; the rest of the filing is promoted and the finding stays open
+      (owner decision 2026-11-14, superseding 2026-11-13 for the non-zero NCI case). Raw facts stay as filed.
+    """
+    tol = identity_tolerance(result.meta["level_of_rounding"], 3)
+    periods = sorted({(f.period_start, f.period_end) for f in result.facts if f.canonical_tag == "pat_owners"})
+    applied: dict[str, list] = {}
+    withheld = []
+    for p in periods:
+        pat, owners, nci = (result.value(t, *p) for t in ("pat", "pat_owners", "pat_nci"))
+        if None in (pat, owners, nci) or abs(owners + nci - pat) <= tol:
+            continue
+        oci, t_own, t_nci = (result.value(t, *p) for t in ("oci_net", TCI_OWNERS_KEY, TCI_NCI_KEY))
+        if (
+            None not in (oci, t_own, t_nci)
+            and abs(owners + nci - oci) <= tol
+            and abs((t_own - owners) + (t_nci - nci) - pat) <= tol
+        ):
+            _replace_attribution(result, p, t_own - owners, t_nci - nci, "ATTRIBUTION_TAGGED_AS_OCI")
+            applied.setdefault("ATTRIBUTION_TAGGED_AS_OCI", []).append([str(p[0]), str(p[1])])
+            continue
+        flips = [
+            (o, n)
+            for o, n, flipped in ((owners, -nci, nci), (-owners, nci, owners))
+            if abs(flipped) > tol and abs(o + n - pat) <= tol
+        ]
+        if len(flips) == 1:
+            _replace_attribution(result, p, *flips[0], "ATTRIBUTION_SIGN_FLIP")
+            applied.setdefault("ATTRIBUTION_SIGN_FLIP", []).append([str(p[0]), str(p[1])])
+            continue
+        withheld.append((p, owners, nci, pat))
+    for p, owners, nci, pat in withheld:
+        kept = [
+            f
+            for f in result.facts
+            if f.canonical_tag in ("pat_owners", "pat_nci") and (f.period_start, f.period_end) == p
+        ]
+        for f in kept:
+            result.facts.remove(f)
+        f = kept[0]
+        marker = CanonicalFact(ATTRIBUTION_WITHHELD_TAG, f.period_type, f.period_start, f.period_end,
+                               f.period_months, "PURE", Decimal(1), "RULE:ATTRIBUTION_WITHHELD")  # fmt: skip
+        result.facts.append(marker)
+        result.findings.append(
+            Issue("IDENTITY", "ATTRIBUTION_WITHHELD",
+                  {"period": [str(p[0]), str(p[1])], "owners": str(owners), "nci": str(nci), "pat": str(pat),
+                   "tolerance": str(tol)})
+        )  # fmt: skip
+        applied.setdefault("ATTRIBUTION_WITHHELD", []).append([str(p[0]), str(p[1])])
+    for rule, ps in applied.items():
+        result.meta.setdefault("rules_applied", []).append({"rule": rule, "periods": ps})
 
 
 def _classify(result: ParsedResults, op_tag: str, other_tag: str, other_label: str) -> str | None:

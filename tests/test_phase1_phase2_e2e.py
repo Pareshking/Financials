@@ -89,9 +89,8 @@ def test_every_batch_promotes_with_only_the_documented_exceptions(unified):
     assert m.pending == 0
     assert Counter(tuple(x) for x in m.log) == {
         ("PROMOTED", "market_day"): 10, ("PROMOTED", "holidays"): 1, ("PROMOTED", "index_snapshot"): 1,
-        ("PROMOTED", "corp_actions"): 1, ("PROMOTED", "results_xbrl"): 72, ("PROMOTED", "shareholding"): 13,
+        ("PROMOTED", "corp_actions"): 1, ("PROMOTED", "results_xbrl"): 76, ("PROMOTED", "shareholding"): 13,
         ("PROMOTED", "reg30_event"): 8,
-        ("QUARANTINED", "results_xbrl"): 1,  # OLAELEC: owners + NCI identity fails in the filing itself
         ("OUT_OF_SCOPE", "results_xbrl"): 1,  # Star Health Q3 FY25 legacy GI file (period end before C9)
         ("QUARANTINED", "reg30_event"): 1,  # SHANTHALA fraud disclosure: SME series, outside the universe
     }  # fmt: skip
@@ -110,7 +109,7 @@ def test_quarantine_reasons_are_the_documented_ones(unified):
         "GAP/ISIN_CHANGE_WITHOUT_ACTION",  # mostly across those missing sessions
         "CORP_ACTION/STALE_ISIN_OTHER_ISSUER",  # PREMIERPOL changed issuer code [CA7]
         "IDENTIFIER/ISIN_COLLISION",  # SIGMA split + series change [P14]
-        "IDENTITY/OWNERS_PLUS_NCI",
+        "IDENTITY/ATTRIBUTION_WITHHELD",  # Coforge Q4 FY26: owners + NCI = TCI; split withheld, filing promoted (X86)
         "IDENTITY/UNKNOWN_SYMBOL",  # OLAELEC, SHANTHALA
         "INDEX/PLACEHOLDER_ISIN",
         "INDEX/UNKNOWN_ISIN",  # IDX2, IDX3
@@ -129,7 +128,7 @@ def test_all_profiles_and_scopes_land_without_collisions(unified):
     con = unified.con
     assert dict(((p, s), n) for p, s, n in con.execute(
         "SELECT accounting_profile, scope, count(*) FROM filing_meta GROUP BY ALL").fetchall()) == {
-        ("INDAS_CORP", "CONSOLIDATED"): 24, ("INDAS_CORP", "STANDALONE"): 15, ("INDAS_NBFC", "CONSOLIDATED"): 5,
+        ("INDAS_CORP", "CONSOLIDATED"): 28, ("INDAS_CORP", "STANDALONE"): 15, ("INDAS_NBFC", "CONSOLIDATED"): 5,
         ("INDAS_NBFC", "STANDALONE"): 2, ("IGAAP_BANK", "CONSOLIDATED"): 5, ("IGAAP_BANK", "STANDALONE"): 5,
         ("IRDAI_LIFE", "CONSOLIDATED"): 1, ("IRDAI_LIFE", "STANDALONE"): 3, ("IRDAI_GENERAL", "CONSOLIDATED"): 1,
         ("IRDAI_GENERAL", "STANDALONE"): 3, ("INDAS_INSURANCE", "STANDALONE"): 2,

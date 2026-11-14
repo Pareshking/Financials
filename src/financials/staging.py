@@ -100,6 +100,8 @@ TABLE_ORDER = (
     "raw_delivery",
     "raw_xbrl_facts",
     "raw_index_snapshot",
+    "index_ohlcv",
+    "raw_equity_master",
     "stg_holidays",
     "stg_shp_meta",
     "stg_shp_categories",
@@ -701,6 +703,41 @@ def stage_kpis(vault: Vault, stage_root: Path, *, data: bytes, source_url: str, 
         stage_root, "kpis", filing.filing_id,
         {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)],
          "stg_kpis": [{"filing_id": filing.filing_id, **asdict(r)} for r in rows]},
+    )  # fmt: skip
+
+
+def stage_index_closes(vault: Vault, stage_root: Path, *, data: bytes, source_url: str, fetched_at: datetime) -> Path:
+    """Vault + parse one ind_close_all_DDMMYYYY.csv [IDX9]."""
+    from financials.parsers.indices import parse_index_closes
+
+    rows = parse_index_closes(data)
+    blob = vault.put(data, ext="csv", media_type="text/csv", fetched_at=fetched_at)
+    eod = ist_to_utc(rows[0].trade_date, time(23, 59, 59))
+    filing = make_filing(blob, exchange="NSE", category="INDEX_CLOSE", source_url=source_url, fetched_at=fetched_at,
+                         broadcast_ts=eod, broadcast_ts_source="EOD_RULE")  # fmt: skip
+    day = rows[0].trade_date
+    return write_stage(
+        stage_root, "index_close", f"{day:%Y%m%d}-{blob.sha256[:12]}",
+        {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)],
+         "index_ohlcv": [{**asdict(r), "filing_id": filing.filing_id} for r in rows]},
+        extra={"trade_date": day.isoformat()},
+    )  # fmt: skip
+
+
+def stage_equity_master(vault: Vault, stage_root: Path, *, data: bytes, source_url: str, fetched_at: datetime) -> Path:
+    """Vault + parse EQUITY_L.csv [IDX10]; the snapshot date is the IST date of the fetch."""
+    from financials.parsers.indices import parse_equity_master
+    from financials.timeutil import utc_to_ist_date
+
+    rows = parse_equity_master(data)
+    blob = vault.put(data, ext="csv", media_type="text/csv", fetched_at=fetched_at)
+    filing = make_filing(blob, exchange="NSE", category="EQUITY_MASTER", source_url=source_url, fetched_at=fetched_at)
+    snap = utc_to_ist_date(fetched_at)
+    return write_stage(
+        stage_root, "equity_master", f"{snap:%Y%m%d}-{blob.sha256[:12]}",
+        {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)],
+         "raw_equity_master": [{**asdict(r), "filing_id": filing.filing_id, "snapshot_date": snap} for r in rows]},
+        extra={"snapshot_date": snap.isoformat()},
     )  # fmt: skip
 
 

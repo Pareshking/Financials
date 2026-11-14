@@ -123,6 +123,38 @@ CREATE TABLE IF NOT EXISTS calendar_coverage (   -- years for which a holiday li
     PRIMARY KEY (exchange, cal_year)
 );
 
+-- Daily index levels from content/indices/ind_close_all_DDMMYYYY.csv [IDX9] (price indices; no TRI rows). L1, append-only.
+CREATE TABLE IF NOT EXISTS index_ohlcv (
+    index_name    VARCHAR NOT NULL,
+    trade_date    DATE    NOT NULL,
+    open          DECIMAL(18,4),
+    high          DECIMAL(18,4),
+    low           DECIMAL(18,4),
+    close         DECIMAL(18,4) NOT NULL,
+    volume        BIGINT,
+    turnover_inr  DECIMAL(24,2),                 -- filed in Rs crore
+    pe            DOUBLE,
+    pb            DOUBLE,
+    div_yield     DOUBLE,
+    filing_id     VARCHAR NOT NULL REFERENCES filings(filing_id),
+    PRIMARY KEY (index_name, trade_date, filing_id)
+);
+
+-- NSE equity master content/equities/EQUITY_L.csv [IDX10]: listing date, face value, ISIN per symbol. L1, append-only.
+CREATE TABLE IF NOT EXISTS raw_equity_master (
+    filing_id      VARCHAR NOT NULL REFERENCES filings(filing_id),
+    snapshot_date  DATE    NOT NULL,
+    symbol         VARCHAR NOT NULL,
+    name           VARCHAR NOT NULL,
+    series         VARCHAR NOT NULL,
+    listing_date   DATE,
+    paid_up_value  DECIMAL(18,4),
+    market_lot     INTEGER,
+    isin           VARCHAR NOT NULL,
+    face_value     DECIMAL(18,4),
+    PRIMARY KEY (filing_id, symbol, series)
+);
+
 CREATE TABLE IF NOT EXISTS raw_index_snapshot (
     filing_id      VARCHAR NOT NULL REFERENCES filings(filing_id),
     index_name     VARCHAR NOT NULL,

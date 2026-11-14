@@ -28,8 +28,8 @@ from financials.vault import Vault
 
 UNIVERSES = ("nifty500", "active")
 
-JOB_ORDER = {"holidays": 0, "market_day": 1, "index_snapshot": 2, "corp_actions": 3, "results_xbrl": 4,
-             "shareholding": 5, "raw_only": 6, "kpis": 7}  # fmt: skip
+JOB_ORDER = {"holidays": 0, "market_day": 1, "index_close": 2, "index_snapshot": 2, "corp_actions": 3,
+             "results_xbrl": 4, "shareholding": 5, "raw_only": 6, "kpis": 7, "equity_master": 8}  # fmt: skip
 
 
 def _paths(data_dir: Path) -> tuple[Path, Path, Path]:
@@ -99,6 +99,7 @@ def build_parser() -> argparse.ArgumentParser:
     fc.add_argument("start", type=_date)
     fc.add_argument("end", type=_date)
     sub.add_parser("fetch-holidays")
+    sub.add_parser("fetch-equity-master", help="NSE equity master EQUITY_L.csv (listing date, face value, ISIN)")
     fi = sub.add_parser("fetch-index")
     fi.add_argument("--as-of", type=_date, default=date.today())
     fs = sub.add_parser("fetch-shareholding")
@@ -402,6 +403,8 @@ def run_fetch(args, jobs: Jobs, db_path: Path, out) -> tuple[list[Path], list[st
         staged += jobs.corp_actions(max(args.start, MIN_TRADE_DATE), args.end)
     elif args.cmd == "fetch-holidays":
         staged += jobs.holidays()
+    elif args.cmd == "fetch-equity-master":
+        staged += jobs.equity_master()
     elif args.cmd == "fetch-index":
         staged += jobs.index_snapshot(args.as_of)
     elif args.cmd == "fetch-shareholding":

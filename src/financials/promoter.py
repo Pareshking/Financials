@@ -61,6 +61,8 @@ def promote(con: duckdb.DuckDBPyConnection, stage_dir: Path) -> PromotionResult:
         "reg30_event": _promote_reg30_event,
         "raw_only": _promote_raw_only,
         "kpis": _promote_kpis,
+        "index_close": _promote_vault_and_raw,
+        "equity_master": _promote_vault_and_raw,
     }.get(job)
     if handler is None:
         raise ValueError(f"unknown job {job!r}")
@@ -1330,6 +1332,13 @@ def _promote_shareholding(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     )
     q = cross_check_shares(con, entity_id, meta["as_of_date"])
     return PromotionResult("PROMOTED", "shareholding", message=fid, quarantined=[q] if q else [])
+
+
+def _promote_vault_and_raw(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
+    """Raw-only feeds (index closes [IDX9], equity master [IDX10]): vault rows + the raw table, append-only."""
+    tables = {"index_close": "index_ohlcv", "equity_master": "raw_equity_master"}
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings", tables[manifest["job"]]))
+    return PromotionResult("PROMOTED", manifest["job"], message=manifest.get("trade_date") or manifest["snapshot_date"])
 
 
 def _promote_kpis(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:

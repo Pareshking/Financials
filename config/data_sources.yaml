@@ -403,3 +403,48 @@ feeds:
     verification_status: PLANNED
     evidence: []
     notes: AMFI consolidated file not believed to exist (R8, UNVERIFIED).
+
+  - feed_id: F27
+    name: Daily index closes (all NSE price indices)
+    exchange_or_agency: NSE Indices via NSE archives
+    url_or_endpoint_pattern: "https://nsearchives.nseindia.com/content/indices/ind_close_all_DDMMYYYY.csv"
+    format: CSV
+    cadence: Daily (trading days)
+    fetch_runtime: CONTAINER_DIRECT
+    join_keys: [Index Name, Index Date]
+    target_tables: [index_ohlcv]
+    unlocked_metrics: [Nifty 500 / sector index levels, index P/E, P/B, dividend yield, relative strength]
+    phase: 1
+    verification_status: VERIFIED
+    evidence: [IDX9]
+    notes: Fetched by fetch-days with each trading day's bhavcopy. Price indices only; no total-return rows (F29).
+
+  - feed_id: F28
+    name: NSE equity master (EQUITY_L.csv)
+    exchange_or_agency: NSE
+    url_or_endpoint_pattern: "https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv"
+    format: CSV
+    cadence: Snapshot (current list)
+    fetch_runtime: CONTAINER_DIRECT
+    join_keys: [SYMBOL, SERIES, ISIN NUMBER]
+    target_tables: [raw_equity_master]
+    unlocked_metrics: [listing date, face value, market lot, company legal name]
+    phase: 1
+    verification_status: VERIFIED
+    evidence: [IDX10]
+    notes: fetch-equity-master. Current listings only; header fields carry a leading space after each comma.
+
+  - feed_id: F29
+    name: Nifty 500 total-return index (TRI)
+    exchange_or_agency: NSE Indices
+    url_or_endpoint_pattern: endpoint TBD (not in ind_close_all; niftyindices.com historical TRI not probed)
+    format: UNKNOWN
+    cadence: Daily
+    fetch_runtime: UNKNOWN
+    join_keys: [index name, date]
+    target_tables: [(planned) index_ohlcv]
+    unlocked_metrics: [benchmark total return for backtests]
+    phase: 1
+    verification_status: UNVERIFIED
+    evidence: []
+    notes: Per-stock total return is computed from prices and accepted dividends (financials.returns); the index TRI needs a verified source.

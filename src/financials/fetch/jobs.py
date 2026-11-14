@@ -24,7 +24,9 @@ from financials.scope import MIN_PERIOD_END_DATE
 from financials.staging import (
     read_manifest,
     stage_corp_actions,
+    stage_equity_master,
     stage_holidays,
+    stage_index_closes,
     stage_index_snapshot,
     stage_market_day,
     stage_raw_only,
@@ -41,7 +43,8 @@ JSON = "application/json"
 WARMUP = {"www.nseindia.com": "https://www.nseindia.com/"}  # session cookies for the API host [A1]
 CORP_ACTION_CHUNK_DAYS = 30  # the API answer was verified on a one-month window [P12]
 IMMUTABLE_PREFIXES = (f"{ARCHIVE}/content/cm/BhavCopy_", f"{ARCHIVE}/products/content/sec_bhavdata_full_",
-                      f"{ARCHIVE}/corporate/xbrl/")  # fmt: skip
+                      f"{ARCHIVE}/corporate/xbrl/", f"{ARCHIVE}/content/indices/ind_close_all_")  # fmt: skip
+EQUITY_MASTER_URL = f"{ARCHIVE}/content/equities/EQUITY_L.csv"  # [IDX10]
 NOT_FOUND_SETTLE_DAYS = 2  # a 404 counts as final only when observed this long after the requested date [P11]
 
 
@@ -51,6 +54,10 @@ def bhavcopy_url(d: date) -> str:
 
 def delivery_url(d: date) -> str:
     return f"{ARCHIVE}/products/content/sec_bhavdata_full_{d:%d%m%Y}.csv"
+
+
+def index_close_url(d: date) -> str:
+    return f"{ARCHIVE}/content/indices/ind_close_all_{d:%d%m%Y}.csv"  # [IDX9]
 
 
 def corp_actions_url(start: date, end: date) -> str:
@@ -141,11 +148,14 @@ class Jobs:
         """None when no bhavcopy exists (holiday/weekend): nothing is staged. A bhavcopy staged without delivery
         is staged again once the delivery file appears [P0-2]; a fully fetched day is not fetched again."""
         b_url, d_url = bhavcopy_url(d), delivery_url(d)
+        closes = self._index_closes(d) if self.is_vaulted(b_url) else []
         if self.is_vaulted(b_url) and self.is_vaulted(d_url):
-            return []
+            return closes
         bhav = self._get(b_url, allow_404=True, asked_for=d)
         if bhav is None:
             return None
+        if not closes:
+            closes = self._index_closes(d)
         deliv = self._get(d_url, allow_404=True, asked_for=d)
         stage = stage_market_day(
             self.vault, self.stage_root, bhavcopy=bhav, bhavcopy_url=b_url, delivery=deliv,
@@ -155,7 +165,22 @@ class Jobs:
         if traded != d.isoformat():
             # NSE can answer a non-trading date with another day's file; the batch is filed under its own TradDt.
             self.warnings.append(f"{d}: file holds TradDt {traded}; staged under {traded}")
-        return [stage]
+        return [stage, *closes]
+
+    def _index_closes(self, d: date) -> list[Path]:
+        """The day's ind_close_all [IDX9], fetched only for a date with a bhavcopy; vaulted files are not refetched."""
+        url = index_close_url(d)
+        if self.is_vaulted(url):
+            return []
+        data = self._get(url, allow_404=True, asked_for=d)
+        if data is None:
+            return []
+        return [stage_index_closes(self.vault, self.stage_root, data=data, source_url=url, fetched_at=utc_now())]
+
+    def equity_master(self) -> list[Path]:
+        data = self._get(EQUITY_MASTER_URL)
+        return [stage_equity_master(self.vault, self.stage_root, data=data, source_url=EQUITY_MASTER_URL,
+                                    fetched_at=utc_now())]  # fmt: skip
 
     def market_days(self, start: date, end: date) -> tuple[list[Path], list[str]]:
         """Every date in [start, end] (weekends included: special sessions exist, e.g. Saturday 1 Feb 2025 [CAL2]).

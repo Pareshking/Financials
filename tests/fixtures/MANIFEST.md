@@ -235,6 +235,13 @@ Inspected for Batch 10 but not committed: the other Reg. 30 files listed in docs
 | `discovery/nse_integrated-filing-results_equities_TCS_page2_20261114.json` | A7 pagination (fetched 2026-11-14): `page=2` returns rows 21-22 of `totalCount` 22 (Mar 2025 standalone, Dec 2024 Governance); no overlap with page 1 | `https://www.nseindia.com/api/integrated-filing-results?index=equities&symbol=TCS&page=2` | `38bb3a80b3052f51e813ad73588c537f74dea5e4996054e52be7a90639b54a89` |
 | `discovery/nse_integrated-filing-results_equities_ADANIGREEN_20261114.json` | A7: 10 of 20 rows have `broadcast_Date: null` (totalCount 36: two pages) | `https://www.nseindia.com/api/integrated-filing-results?index=equities&symbol=ADANIGREEN` | `128f7abe359a2ece747b37a36c2245c808b82b255ddfc6747e059d86a2ae65e9` |
 
+## Index closes and equity master (fetched 2026-11-14, one request each)
+
+| File | Why it is here | Source URL | SHA-256 |
+|---|---|---|---|
+| `indices/ind_close_all_13112026.csv` | IDX9: daily index closes (167 indices) | `https://nsearchives.nseindia.com/content/indices/ind_close_all_13112026.csv` | `5aa75542683abc5c13c7906bc14f81639cb80a9eff31a1cf78b9af4028485dbf` |
+| `indices/nse_EQUITY_L_20261114.csv` | IDX10: NSE equity master (2,635 listings) | `https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv` | `c78517837fe47a29a2b4cbb970899c202eb45fab827134aacf8287835ec5acee` |
+
 ## ETF unit splits and re-ISINs (live backfill 2026-11-14)
 
 | File | Why it is here | Source URL | SHA-256 |

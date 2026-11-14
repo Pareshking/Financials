@@ -118,11 +118,22 @@ def build_parser() -> argparse.ArgumentParser:
     df.add_argument("--kinds", nargs="+", default=["results", "annual", "shareholding"],
                     choices=["results", "annual", "shareholding"])  # fmt: skip
     df.add_argument("--no-events", action="store_true")
+    df.add_argument("--workers", type=int, default=1, help="threads; still 1 request/s per host")
     rd = sub.add_parser("run-day", help="holidays, days, corporate actions, discovery, promote, materialize")
     rd.add_argument("--date", type=_date, required=True)
     rd.add_argument("--lookback-days", type=int, default=7)
     lk = sub.add_parser("load-kpis", help="stage a supplemental KPI file (CSV/JSON: parsers.kpis) for promote")
     lk.add_argument("path", type=Path)
+    eb = sub.add_parser(
+        "export-bundle", help="zstd Parquet shards of the database (local / private storage, never git)"
+    )
+    eb.add_argument("--out", type=Path, required=True)
+    eb.add_argument("--include-raw", action="store_true")
+    eb.add_argument("--max-file-mb", type=float, default=50)
+    eb.add_argument("--max-total-mb", type=float, default=250)
+    ib = sub.add_parser("import-bundle", help="load a bundle into a new database and verify checksums")
+    ib.add_argument("src", type=Path)
+    ib.add_argument("--db", type=Path, required=True)
     sub.add_parser("promote", help="apply all pending staged batches (single writer)")
     rb = sub.add_parser("rebuild-market", help="roll market-derived state back to a date and replay it (audited)")
     rb.add_argument("--from", dest="from_date", type=_date, required=True)
@@ -187,6 +198,29 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
         for e in errors:
             print(f"error: {e}", file=out)
         return 1 if errors else 0
+    if args.cmd in ("export-bundle", "import-bundle"):
+        from financials.bundle import BundleError, export_bundle, import_bundle
+
+        try:
+            if args.cmd == "import-bundle":
+                print(json.dumps(import_bundle(args.src, args.db)), file=out)
+                return 0
+            if not db_path.exists():
+                print(f"error: no market database at {db_path}", file=out)
+                return 2
+            con = connect(db_path, read_only=True)
+            try:
+                m = export_bundle(con, args.out, include_raw=args.include_raw, max_file_mb=args.max_file_mb,
+                                  max_total_mb=args.max_total_mb)  # fmt: skip
+            finally:
+                con.close()
+        except BundleError as exc:
+            print(f"error: {exc}", file=out)
+            return 1
+        for t, v in m["tables"].items():
+            print(f"{t:36s} rows={v['rows']:>10} files={v['files']:>3} {v['bytes'] / 2**20:8.2f} MB", file=out)
+        print(f"total {m['total_bytes'] / 2**20:.2f} MB", file=out)
+        return 0
     if args.cmd == "load-kpis":
         from financials.staging import stage_kpis
 
@@ -354,7 +388,7 @@ def run_fetch(args, jobs: Jobs, db_path: Path, out) -> tuple[list[Path], list[st
         syms = _symbols(args, db_path, args.symbols)
         if args.from_rss:
             syms += [s for s in jobs.symbols_from_rss() if s not in syms]
-        staged, errors = jobs.discover(syms, args.kinds, events=not args.no_events)
+        staged, errors = jobs.discover(syms, args.kinds, events=not args.no_events, workers=args.workers)
     return staged, errors
 
 

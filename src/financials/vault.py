@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import tempfile
+import threading
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -75,6 +76,8 @@ def make_filing(
 
 
 class Vault:
+    _index_lock = threading.Lock()  # url_index.jsonl appends from parallel fetch workers
+
     def __init__(self, root: Path) -> None:
         self.root = Path(root)
 
@@ -123,11 +126,16 @@ class Vault:
             sha = hashlib.sha256(data).hexdigest()
             entry |= {"sha256": sha, "storage_path": self.relative_path(sha, ext)}
         self.root.mkdir(parents=True, exist_ok=True)
-        with self.index_path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(entry, sort_keys=True) + "\n")
-        self._index = None
+        with self._index_lock:
+            with self.index_path.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(entry, sort_keys=True) + "\n")
+            self._index = None
 
     def last_fetch(self, url: str) -> dict | None:
+        with self._index_lock:
+            return self._last_fetch(url)
+
+    def _last_fetch(self, url: str) -> dict | None:
         if getattr(self, "_index", None) is None:
             self._index = {}
             if self.index_path.exists():

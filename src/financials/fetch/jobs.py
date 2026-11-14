@@ -284,10 +284,13 @@ class Jobs:
 
     def discover(
         self, symbols: Iterable[str], kinds: Iterable[str] = ("results", "annual", "shareholding"), *,
-        events: bool = True,
+        events: bool = True, workers: int = 1,
     ) -> tuple[list[Path], list[str]]:  # fmt: skip
         """discover-filings: per-symbol listings (results [A7], annual [A8], shareholding [SHP6]) plus the Reg. 30
-        events of the announcements RSS. Per-symbol failures are reported and the rest continues."""
+        events of the announcements RSS. Per-symbol failures are reported and the rest continues.
+
+        `workers` > 1 runs symbols on a thread pool. The fetcher still sends at most one request per host at a time,
+        >= 1 s apart, so workers only overlap the API host (listings) with the archive host (files)."""
         staged: list[Path] = []
         errors: list[str] = []
         self.errors = []
@@ -297,12 +300,28 @@ class Jobs:
             except (FetchError, ParseError) as exc:
                 errors.append(f"events: {exc}")
         jobs = {"results": self.results, "annual": self.annual_reports, "shareholding": self.shareholding}
-        for sym in symbols:
+        kinds = list(kinds)
+
+        def one(sym: str) -> tuple[list[Path], list[str]]:
+            got, errs = [], []
             for k in kinds:
                 try:
-                    staged += jobs[k](sym)
+                    got += jobs[k](sym)
                 except (FetchError, ParseError) as exc:
-                    errors.append(f"{sym} {k}: {exc}")
+                    errs.append(f"{sym} {k}: {exc}")
+            return got, errs
+
+        symbols = list(symbols)
+        if workers > 1:
+            from concurrent.futures import ThreadPoolExecutor
+
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                results = list(pool.map(one, symbols))
+        else:
+            results = [one(s) for s in symbols]
+        for got, errs in results:  # input order, whatever the completion order
+            staged += got
+            errors += errs
         return staged, errors + self.errors
 
     def symbols_from_rss(self) -> list[str]:

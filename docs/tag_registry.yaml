@@ -795,6 +795,8 @@ files:
 - INTEGRATED_FILING_INDAS_1756234_11112026070341_WEB.xml
 - INTEGRATED_FILING_INDAS_1756932_12112026075230_WEB.xml
 - INTEGRATED_FILING_INDAS_1757301_13112026033904_WEB.xml
+- INTEGRATED_FILING_LI_1600999_14012026055812_WEB.xml
+- INTEGRATED_FILING_LI_1601820_15012026075716_WEB.xml
 - INTEGRATED_FILING_LI_1736933_13102026040430_WEB.xml
 - INTEGRATED_FILING_LI_1739355_15102026072525_WEB.xml
 - INTEGRATED_FILING_LI_1739360_15102026072721_WEB.xml
@@ -12814,7 +12816,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_administration_expenses
@@ -12835,7 +12838,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_advertisement_and_publicity
@@ -12846,7 +12850,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_allocation_of_bonus_to_policyholders
@@ -12877,7 +12882,7 @@ profiles:
       context_kinds:
       - instant
       duplicate_of: total_assets
-      filings: 5
+      filings: 7
       first_batch: sc
       line_item_category: SUBTOTAL
       mapped_to: li_assets
@@ -12897,7 +12902,7 @@ profiles:
     AssetsHeldToCoverLinkedLiabilities:
       context_kinds:
       - instant
-      filings: 5
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_assets_held_to_cover_linked_liabilities
@@ -12908,7 +12913,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B6
       line_item_category: PER_SHARE
       mapped_to: eps_basic
@@ -12919,7 +12925,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B6
       line_item_category: PER_SHARE
       mapped_to: li_basic_and_diluted_eps_before_extraordinary_items_net_of_tax_expense_for_the_period_not_to_be_annualized
@@ -12930,7 +12937,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: BALANCE_SHEET
       mapped_to: benefits_paid_net
@@ -13071,7 +13079,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: BALANCE_SHEET
       mapped_to: change_in_actuarial_liability
@@ -13091,7 +13100,7 @@ profiles:
     ClassOfSecurity:
       context_kinds:
       - duration_3m
-      filings: 5
+      filings: 7
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -13100,7 +13109,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B6
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_commission
@@ -13111,7 +13121,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_commission_first_year_premium
@@ -13122,7 +13133,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_commission_renewal_premium
@@ -13133,7 +13145,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_commission_single_premium
@@ -13144,7 +13157,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: BALANCE_SHEET
       mapped_to: conservation_ratio
@@ -13225,7 +13239,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B1
       line_item_category: PNL
       mapped_to: current_tax
@@ -13236,7 +13251,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: BALANCE_SHEET
       mapped_to: li_current_taxes
@@ -13246,7 +13262,7 @@ profiles:
     DateOfBoardMeetingWhenFinancialResultsWereApproved:
       context_kinds:
       - duration_3m
-      filings: 5
+      filings: 7
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -13254,7 +13270,7 @@ profiles:
     DateOfEndOfBoardMeeting:
       context_kinds:
       - duration_3m
-      filings: 5
+      filings: 7
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -13262,7 +13278,7 @@ profiles:
     DateOfEndOfFinancialYear:
       context_kinds:
       - duration_3m
-      filings: 5
+      filings: 7
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -13271,7 +13287,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -13279,7 +13296,7 @@ profiles:
     DateOfStartOfBoardMeeting:
       context_kinds:
       - duration_3m
-      filings: 5
+      filings: 7
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -13287,7 +13304,7 @@ profiles:
     DateOfStartOfFinancialYear:
       context_kinds:
       - duration_3m
-      filings: 5
+      filings: 7
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -13296,7 +13313,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -13304,7 +13322,7 @@ profiles:
     DateOnWhichPriorIntimationOfTheMeetingForConsideringFinancialResultsWasInformedToTheExchange:
       context_kinds:
       - duration_3m
-      filings: 5
+      filings: 7
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -13322,7 +13340,7 @@ profiles:
     DeclarationOfUnmodifiedOpinionOrStatementOnImpactOfAuditQualification:
       context_kinds:
       - duration_3m
-      filings: 5
+      filings: 7
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -13349,7 +13367,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: BALANCE_SHEET
       mapped_to: li_deffered_tax
@@ -13360,7 +13379,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: BALANCE_SHEET
       mapped_to: li_deffered_taxes
@@ -13370,7 +13390,7 @@ profiles:
     DescriptionOfPresentationCurrency:
       context_kinds:
       - duration_3m
-      filings: 5
+      filings: 7
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -13378,7 +13398,7 @@ profiles:
     DisclosureOfNotesOnFinancialResultsExplanatoryTextBlock:
       context_kinds:
       - duration_3m
-      filings: 4
+      filings: 6
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -13386,7 +13406,7 @@ profiles:
     DisclosureOfNotesOnSegmentAssetsExplanatoryTextBlock:
       context_kinds:
       - instant
-      filings: 2
+      filings: 3
       first_batch: FIXTURES
       mapped_to: null
       numeric: false
@@ -13394,7 +13414,7 @@ profiles:
     DisclosureOfNotesOnSegmentIncomeExplanatoryTextBlock:
       context_kinds:
       - instant
-      filings: 3
+      filings: 5
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -13402,7 +13422,7 @@ profiles:
     DisclosureOfNotesOnSegmentLiabilitiesExplanatoryTextBlock:
       context_kinds:
       - instant
-      filings: 2
+      filings: 3
       first_batch: FIXTURES
       mapped_to: null
       numeric: false
@@ -13410,7 +13430,7 @@ profiles:
     DisclosureOfNotesOnSegmentSurplusDeficitExplanatoryTextBlock:
       context_kinds:
       - instant
-      filings: 2
+      filings: 3
       first_batch: FIXTURES
       mapped_to: null
       numeric: false
@@ -13477,7 +13497,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B6
       line_item_category: PNL_EXPENSE
       mapped_to: employee_benefit_expense
@@ -13487,7 +13508,7 @@ profiles:
     EndTimeOfBoardMeeting:
       context_kinds:
       - duration_3m
-      filings: 5
+      filings: 7
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -13496,7 +13517,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B1
       line_item_category: PNL
       mapped_to: total_expenses
@@ -13507,7 +13529,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: BALANCE_SHEET
       mapped_to: expenses_of_management
@@ -13518,7 +13541,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B6
       line_item_category: BALANCE_SHEET
       mapped_to: expenses_of_management_ratio
@@ -13529,7 +13553,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_expenses_other_than_those_related_to_insurance_business
@@ -13540,7 +13565,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: BALANCE_SHEET
       mapped_to: extraordinary_items
@@ -13550,7 +13576,7 @@ profiles:
     FairValueChangeAccountAndRevaluationReserveShareholders:
       context_kinds:
       - instant
-      filings: 5
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_fair_value_change_account_and_revaluation_reserve_shareholders
@@ -13561,7 +13587,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B6
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_final_dividend
@@ -13582,7 +13609,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: BALANCE_SHEET
       mapped_to: funds_for_future_appropriation_flow
@@ -13603,7 +13631,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_goods_and_service_tax_charge_on_linked_charges
@@ -13614,7 +13643,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: MEMO
       mapped_to: li_gross_np_as_shareholders_fund
@@ -13625,7 +13655,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: BALANCE_SHEET
       mapped_to: gross_premium
@@ -13635,7 +13666,7 @@ profiles:
     ISIN:
       context_kinds:
       - duration_3m
-      filings: 5
+      filings: 7
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -13652,7 +13683,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: sc
       line_item_category: PNL
       mapped_to: total_income
@@ -13663,7 +13695,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: BALANCE_SHEET
       mapped_to: first_year_premium
@@ -13674,7 +13707,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B6
       line_item_category: BALANCE_SHEET
       mapped_to: investment_income_policyholders
@@ -13685,7 +13719,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: BALANCE_SHEET
       mapped_to: renewal_premium
@@ -13696,7 +13731,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: BALANCE_SHEET
       mapped_to: single_premium
@@ -13737,7 +13773,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_income_under_shareholders_account
@@ -13818,7 +13855,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_interim_bonus_paid
@@ -13829,7 +13867,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B6
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_interim_dividend
@@ -13840,7 +13879,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B6
       line_item_category: BALANCE_SHEET
       mapped_to: investment_income_shareholders
@@ -13850,7 +13890,7 @@ profiles:
     Investments:
       context_kinds:
       - instant
-      filings: 5
+      filings: 7
       first_batch: sc
       line_item_category: SUBTOTAL
       mapped_to: li_investments
@@ -13870,7 +13910,7 @@ profiles:
     InvestmentsPolicyholdersFundExcludingLinkedAssets:
       context_kinds:
       - instant
-      filings: 5
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_investments_policyholders_fund_excluding_linked_assets
@@ -13890,7 +13930,7 @@ profiles:
     InvestmentsShareholdersFund:
       context_kinds:
       - instant
-      filings: 5
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_investments_shareholders_fund
@@ -13908,7 +13948,7 @@ profiles:
     LevelOfRounding:
       context_kinds:
       - duration_3m
-      filings: 5
+      filings: 7
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -13927,7 +13967,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: MEMO
       mapped_to: li_linked_non_participating_policyholders_fund_gross_np_as
@@ -13938,7 +13979,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: MEMO
       mapped_to: li_linked_non_participating_policyholders_fund_net_np_as
@@ -13949,7 +13991,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: MEMO
       mapped_to: li_linked_non_participating_policyholders_fund_percentage_of_gross_np_as
@@ -13960,7 +14003,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: MEMO
       mapped_to: li_linked_non_participating_policyholders_fund_percentage_of_net_np_as
@@ -13971,7 +14015,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_linked_non_participating_policyholders_fund_with_unrealised_gains
@@ -13982,7 +14027,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_linked_non_participating_policyholders_fund_without_unrealised_gains
@@ -13993,7 +14039,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: MEMO
       mapped_to: li_linked_participating_policyholders_fund_gross_np_as
@@ -14004,7 +14051,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: MEMO
       mapped_to: li_linked_participating_policyholders_fund_net_np_as
@@ -14015,7 +14063,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: MEMO
       mapped_to: li_linked_participating_policyholders_fund_percentage_of_gross_np_as
@@ -14026,7 +14075,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: MEMO
       mapped_to: li_linked_participating_policyholders_fund_percentage_of_net_np_as
@@ -14037,7 +14087,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_linked_participating_policyholders_fund_with_unrealised_gains
@@ -14048,7 +14099,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_linked_participating_policyholders_fund_without_unrealised_gains
@@ -14068,7 +14120,7 @@ profiles:
     MSEISymbol:
       context_kinds:
       - duration_3m
-      filings: 5
+      filings: 7
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -14086,7 +14138,7 @@ profiles:
     NameOfTheCompany:
       context_kinds:
       - duration_3m
-      filings: 5
+      filings: 7
       first_batch: B1
       mapped_to: null
       numeric: false
@@ -14095,7 +14147,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -14104,7 +14157,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B6
       line_item_category: BALANCE_SHEET
       mapped_to: net_commission
@@ -14125,7 +14179,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: MEMO
       mapped_to: li_net_np_as_shareholders_fund
@@ -14136,7 +14191,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: BALANCE_SHEET
       mapped_to: net_premium
@@ -14147,17 +14203,18 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: BALANCE_SHEET
       mapped_to: net_surplus
       numeric: true
       parent_subtotal: total_assets
-      seen_negative: false
+      seen_negative: true
     NoOfInvestorComplaints:
       context_kinds:
       - instant
-      filings: 5
+      filings: 7
       first_batch: B6
       line_item_category: COUNT
       mapped_to: li_no_of_investor_complaints
@@ -14168,7 +14225,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B6
       line_item_category: COUNT
       mapped_to: li_no_of_investor_complaints_disposed_off_during_the_period
@@ -14179,7 +14237,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B6
       line_item_category: COUNT
       mapped_to: li_no_of_investor_complaints_during_the_period
@@ -14190,7 +14249,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B6
       line_item_category: COUNT
       mapped_to: li_no_of_investor_complaints_received_during_the_period
@@ -14201,7 +14261,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: MEMO
       mapped_to: li_non_linked_non_participating_policyholders_fund_gross_np_as
@@ -14212,7 +14273,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: MEMO
       mapped_to: li_non_linked_non_participating_policyholders_fund_net_np_as
@@ -14223,7 +14285,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: MEMO
       mapped_to: li_non_linked_non_participating_policyholders_fund_percentage_of_gross_np_as
@@ -14234,7 +14297,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: MEMO
       mapped_to: li_non_linked_non_participating_policyholders_fund_percentage_of_net_np_as
@@ -14245,7 +14309,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_non_linked_non_participating_policyholders_fund_with_unrealised_gains
@@ -14256,7 +14321,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_non_linked_non_participating_policyholders_fund_without_unrealised_gains
@@ -14267,7 +14333,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: MEMO
       mapped_to: li_non_linked_participating_policyholders_fund_gross_np_as
@@ -14278,7 +14345,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: MEMO
       mapped_to: li_non_linked_participating_policyholders_fund_net_np_as
@@ -14289,7 +14357,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: MEMO
       mapped_to: li_non_linked_participating_policyholders_fund_percentage_of_gross_np_as
@@ -14300,7 +14369,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: MEMO
       mapped_to: li_non_linked_participating_policyholders_fund_percentage_of_net_np_as
@@ -14311,7 +14381,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_non_linked_participating_policyholders_fund_with_unrealised_gains
@@ -14322,7 +14393,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_non_linked_participating_policyholders_fund_without_unrealised_gains
@@ -14332,7 +14404,7 @@ profiles:
     NoteForNonApplicabilityOfTheDisclosureForTheDefaultOnLoansAndDebtSecuritiesToTheEntity:
       context_kinds:
       - duration_3m
-      filings: 4
+      filings: 5
       first_batch: B5
       mapped_to: null
       numeric: false
@@ -14341,7 +14413,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B6
       line_item_category: BALANCE_SHEET
       mapped_to: operating_expenses_insurance
@@ -14351,7 +14424,7 @@ profiles:
     OtherAssetsNetOfCurrentLiabilitiesAndProvisions:
       context_kinds:
       - instant
-      filings: 5
+      filings: 7
       first_batch: B6
       line_item_category: SUBTOTAL
       mapped_to: li_other_assets_net_of_current_liabilities_and_provisions
@@ -14452,7 +14525,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: sc
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_other_operating_expenses
@@ -14472,7 +14546,7 @@ profiles:
     PaidUpEquityShareCapital:
       context_kinds:
       - instant
-      filings: 5
+      filings: 7
       first_batch: FIXTURES
       line_item_category: SUBTOTAL
       mapped_to: li_paid_up_equity_share_capital
@@ -14573,7 +14647,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: MEMO
       mapped_to: li_percentage_of_gross_np_as_shareholders_fund
@@ -14584,7 +14659,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: MEMO
       mapped_to: li_percentage_of_net_np_as_shareholders_fund
@@ -14595,7 +14671,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B6
       line_item_category: BALANCE_SHEET
       mapped_to: govt_holding_pct
@@ -14606,7 +14683,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: BALANCE_SHEET
       mapped_to: persistency_13m
@@ -14617,7 +14695,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: BALANCE_SHEET
       mapped_to: persistency_25m
@@ -14628,7 +14707,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: BALANCE_SHEET
       mapped_to: persistency_37m
@@ -14639,7 +14719,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: BALANCE_SHEET
       mapped_to: persistency_49m
@@ -14650,7 +14731,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: BALANCE_SHEET
       mapped_to: persistency_61m
@@ -14671,7 +14753,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: PNL_INCOME
       mapped_to: other_income_policyholders
@@ -14692,7 +14775,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_policyholders_liabilities_to_shareholders_fund
@@ -14833,7 +14917,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: PNL
       mapped_to: pat
@@ -14844,7 +14929,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: PNL
       mapped_to: pat_before_extraordinary
@@ -14855,7 +14941,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B6
       line_item_category: PNL
       mapped_to: pbt
@@ -14866,7 +14953,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B6
       line_item_category: SUBTOTAL
       mapped_to: li_profit_loss_carried_to_balance_sheet
@@ -14887,7 +14975,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B6
       line_item_category: BALANCE_SHEET
       mapped_to: tax_policyholders
@@ -14908,7 +14997,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B6
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_provisions_for_diminution_in_value_of_investments
@@ -14919,7 +15009,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B6
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_provisions_for_doubtful_debts_including_bad_debts_written_off
@@ -14930,7 +15021,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_provisions_for_doubtful_debts_including_write_off
@@ -14941,7 +15033,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: PNL
       mapped_to: tax_expense
@@ -15071,7 +15164,7 @@ profiles:
     ReportingQuarter:
       context_kinds:
       - duration_3m
-      filings: 5
+      filings: 7
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -15090,7 +15183,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B6
       line_item_category: MEMO
       mapped_to: li_reserves_and_surplus_excluding_revaluation_reserve
@@ -15110,7 +15204,7 @@ profiles:
     ScripCode:
       context_kinds:
       - duration_3m
-      filings: 5
+      filings: 7
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -15139,18 +15233,20 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: BALANCE_SHEET
       mapped_to: shareholders_expenses
       numeric: true
       parent_subtotal: total_assets
-      seen_negative: false
+      seen_negative: true
     ShareholdersAccountIncome:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: BALANCE_SHEET
       mapped_to: shareholders_income
@@ -15161,7 +15257,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B6
       line_item_category: PNL_INCOME
       mapped_to: other_income
@@ -15172,7 +15269,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_shareholders_account_provisions_for_diminution_in_value_of_investments
@@ -15183,7 +15281,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_shareholders_fund_with_unrealised_gains
@@ -15194,7 +15293,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_shareholders_fund_without_unrealised_gains
@@ -15215,7 +15315,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: B6
       line_item_category: BALANCE_SHEET
       mapped_to: solvency_ratio
@@ -15235,7 +15336,7 @@ profiles:
     StartTimeOfBoardMeeting:
       context_kinds:
       - duration_3m
-      filings: 5
+      filings: 7
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -15244,7 +15345,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: SUBTOTAL
       mapped_to: li_surplus_deficit
@@ -15255,17 +15357,18 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: SUBTOTAL
       mapped_to: li_surplus_shown_in_the_revenue_account
       numeric: true
       parent_subtotal: null
-      seen_negative: false
+      seen_negative: true
     Symbol:
       context_kinds:
       - duration_3m
-      filings: 5
+      filings: 7
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -15274,7 +15377,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_terminal_bonus_paid
@@ -15285,18 +15389,20 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_transfer_from_policyholders_account
       numeric: true
       parent_subtotal: pat
-      seen_negative: false
+      seen_negative: true
     TransferOfFundsFromShareholdersAccount:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: BALANCE_SHEET
       mapped_to: transfer_from_shareholders
@@ -15307,7 +15413,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: INSURANCE_SCHEDULE
       mapped_to: li_transfer_of_funds_to_policyholders_account
@@ -15318,13 +15425,14 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: FIXTURES
       line_item_category: BALANCE_SHEET
       mapped_to: transfer_to_shareholders
       numeric: true
       parent_subtotal: total_assets
-      seen_negative: false
+      seen_negative: true
     TypeOfCashFlowStatement:
       context_kinds:
       - duration_3m
@@ -15336,7 +15444,7 @@ profiles:
     TypeOfCompany:
       context_kinds:
       - duration_3m
-      filings: 5
+      filings: 7
       first_batch: B1
       mapped_to: null
       numeric: false
@@ -15344,7 +15452,7 @@ profiles:
     TypeOfInsurance:
       context_kinds:
       - instant
-      filings: 5
+      filings: 7
       first_batch: B6
       mapped_to: null
       numeric: false
@@ -15352,7 +15460,7 @@ profiles:
     TypeOfReportingPeriod:
       context_kinds:
       - duration_3m
-      filings: 5
+      filings: 7
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -15393,7 +15501,8 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 5
+      - duration_9m
+      filings: 7
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -15409,7 +15518,7 @@ profiles:
     ? WhetherStatementOnDeviationOrVariationForProceedsOfPublicIssueOrRightIssueOrPreferentialIssueOrQIPEtcIsApplicableToTheCompanyForTheCurrentQuarter
     : context_kinds:
       - duration_3m
-      filings: 4
+      filings: 5
       first_batch: B5
       mapped_to: null
       numeric: false
@@ -15441,7 +15550,7 @@ profiles:
     WhetherTheDisclosureForTheDefaultOnLoansAndDebtSecuritiesIsApplicableToTheEntity:
       context_kinds:
       - duration_3m
-      filings: 4
+      filings: 5
       first_batch: B5
       mapped_to: null
       numeric: false

@@ -89,7 +89,7 @@ def test_every_batch_promotes_with_only_the_documented_exceptions(unified):
     assert m.pending == 0
     assert Counter(tuple(x) for x in m.log) == {
         ("PROMOTED", "market_day"): 10, ("PROMOTED", "holidays"): 1, ("PROMOTED", "index_snapshot"): 1,
-        ("PROMOTED", "corp_actions"): 1, ("PROMOTED", "results_xbrl"): 104, ("PROMOTED", "shareholding"): 14,
+        ("PROMOTED", "corp_actions"): 1, ("PROMOTED", "results_xbrl"): 106, ("PROMOTED", "shareholding"): 14,
         ("PROMOTED", "reg30_event"): 8,
         ("QUARANTINED", "results_xbrl"): 2,  # MRPL Q1 FY26 on the non-Ind AS template (UNKNOWN_TAXONOMY) [X89]
         ("FIXED_BY_RULE", "results_xbrl"): 1,  # ... closed once its Ind AS re-filing is promoted [X89]
@@ -133,7 +133,7 @@ def test_all_profiles_and_scopes_land_without_collisions(unified):
         "SELECT accounting_profile, scope, count(*) FROM filing_meta GROUP BY ALL").fetchall()) == {
         ("INDAS_CORP", "CONSOLIDATED"): 45, ("INDAS_CORP", "STANDALONE"): 20, ("INDAS_NBFC", "CONSOLIDATED"): 5,
         ("INDAS_NBFC", "STANDALONE"): 5, ("IGAAP_BANK", "CONSOLIDATED"): 5, ("IGAAP_BANK", "STANDALONE"): 5,
-        ("IRDAI_LIFE", "CONSOLIDATED"): 1, ("IRDAI_LIFE", "STANDALONE"): 3, ("IRDAI_GENERAL", "CONSOLIDATED"): 1,
+        ("IRDAI_LIFE", "CONSOLIDATED"): 2, ("IRDAI_LIFE", "STANDALONE"): 4, ("IRDAI_GENERAL", "CONSOLIDATED"): 1,
         ("IRDAI_GENERAL", "STANDALONE"): 4, ("INDAS_INSURANCE", "STANDALONE"): 2,
         ("REG34_ANNUAL", "CONSOLIDATED"): 6, ("REG34_ANNUAL", "STANDALONE"): 2,
     }  # fmt: skip
@@ -175,7 +175,7 @@ def test_segment_rows_land_with_their_filings(unified):
 # Rows per profile / axis kind: IRDAI_LIFE files segment assets and liabilities only; geography exists only in the
 # Reg. 34 annual filings (TCS, Eternal, SRF).
 SEGMENT_ROWS = {
-    "INDAS_CORP/BUSINESS": 888, "INDAS_NBFC/BUSINESS": 38, "IGAAP_BANK/BUSINESS": 332, "IRDAI_LIFE/BUSINESS": 116,
+    "INDAS_CORP/BUSINESS": 888, "INDAS_NBFC/BUSINESS": 38, "IGAAP_BANK/BUSINESS": 332, "IRDAI_LIFE/BUSINESS": 176,
     "REG34_ANNUAL/BUSINESS": 300, "REG34_ANNUAL/GEOGRAPHY": 66,
 }  # fmt: skip
 

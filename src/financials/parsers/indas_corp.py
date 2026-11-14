@@ -296,6 +296,23 @@ def _parse_date(text: str | None) -> date | None:
     return date.fromisoformat(text) if text else None
 
 
+def _apply_day_month_swap_rule(inst: Instance, result: ParsedResults, declared: dict) -> None:
+    """DECLARED_DATE_DAY_MONTH_SWAP [X104]: a declared DateOfStartOfReportingPeriod whose day and month, swapped,
+    give the start of the same family's duration context (and whose end matches it) is that context date. ICICI Pru
+    Life and HDFC Life Q3 / Q4 FY26 declare 2025-01-10 / 2025-01-04 for contexts starting 2025-10-01 / 2025-04-01;
+    the filing was quarantined whole as YTD_NOT_FROM_FY_START (4 filings, live 2026-11-14)."""
+    fixed = []
+    for family, (start, end) in list(declared.items()):
+        ctx = inst.contexts.get(family + "D")
+        if ctx is None or ctx.start is None or ctx.start == start or ctx.end != end or start.day > 12:
+            continue
+        if date(start.year, start.day, start.month) == ctx.start:
+            declared[family] = (ctx.start, end)
+            fixed.append({"family": family, "declared": str(start), "context": str(ctx.start)})
+    if fixed:
+        result.meta.setdefault("rules_applied", []).append({"rule": "DECLARED_DATE_DAY_MONTH_SWAP", "fixed": fixed})
+
+
 def _declared_periods(inst: Instance) -> dict[str, tuple[date, date]]:
     """Declared (start, end) per context family, from DateOf{Start,End}OfReportingPeriod."""
     out: dict[str, tuple[date, date]] = {}
@@ -402,6 +419,7 @@ def _parse_meta(inst: Instance, result: ParsedResults) -> None:
         result.issues.append(Issue("PARSE", "UNKNOWN_ROUNDING", {"value": rounding}))
 
     declared = _declared_periods(inst)
+    _apply_day_month_swap_rule(inst, result, declared)
     if "One" not in declared:
         result.issues.append(Issue("PERIOD", "NO_DECLARED_PERIOD", {}))
         return

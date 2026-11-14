@@ -92,7 +92,7 @@ This section only records the decisions; it does not duplicate the DDL.
 | L1 | `raw_cm_bhavcopy`, `raw_delivery`, `raw_xbrl_facts`. Keyed by source identifiers plus `filing_id`. No surrogate IDs. |
 | L2 identity | `entity_master`, `securities`, `security_identifier_history` (date-bounded; `valid_to` exclusive), `trading_calendar` |
 | L2 market | `ohlcv` (resolved, unadjusted; delivery joined) |
-| L2 fundamentals | `filing_meta` (per filing × parser_version), `fact_observations` (long format) |
+| L2 fundamentals | `filing_meta` (per filing × parser_version), `fact_observations` (long format), `segment_observations` (Ind AS 108 segment and geography rows, §14b-1) |
 | Control | `corp_actions`, `quarantine_queue`, `company_overrides` |
 | L2 calendar/index | `trading_calendar`, `calendar_coverage`, `raw_index_snapshot`, `index_constituents_history` |
 | L2 shareholding | `shareholding_meta`, `shareholding_observations` |
@@ -549,12 +549,42 @@ Banks, NBFCs, life and general insurers use the raw-element formulas in S4–S7 
 (fixed-asset schedule, notes) are NULL on quarterly statements. The Screener export carries only the
 Data Sheet rows, so golden parity covers top-level rows only. Sub-rows are checked by summation, not by golden values.
 
-### 14b-1. Expense sub-rows and segments (X49, X50)
+### 14b-1. Expense sub-rows and segments (X49, X50, X95-X97)
 
 Expenses sub-rows add **Power and fuel** and **Freight** when the filer labels them (named label rules). They stay NULL
-when it doesn't, and the rest of other expenses absorbs them, so the sub-rows still sum to Expenses. Segments
-(`parsers/segments.py`) are parsed and checked against filed totals and the balance sheet, but are not persisted
-until a segment table is agreed. They are never used to fill P&L rows.
+when it doesn't, and the rest of other expenses absorbs them, so the sub-rows still sum to Expenses.
+
+**Segments are persisted** (owner decision 2026-11-14) in `segment_observations`, one row per member fact:
+`axis_kind` (BUSINESS | GEOGRAPHY), `axis`, `member`, `label` and `element` exactly as filed, `member_role` derived from
+the member name only (SEGMENT, UNALLOCATED, ELIMINATION, RECONCILING; DOMICILE, FOREIGN_TOTAL, FOREIGN, AREA),
+`canonical_metric` derived from the element only (`segments.SEGMENT_METRICS`), periods as in `fact_observations`
+(instants store `period_start = period_end`), `value_inr DECIMAL(20,2)`, and the filing's `entity_id`, `scope`,
+`parser_version` and `visible_from_ts`. Primary key (filing_id, parser_version, axis, member, element, period_start,
+period_end): no nullable key column.
+- **Sources.** Quarterly results (every profile that files the four `ReportableSegment*Axis` elements: corporate,
+  NBFC, bank, life insurer) and Reg. 34 annual (`EntitySReportableSegmentsAxis`, `GeographicalAreasAxis`). The
+  Integrated Filing has no geography axis. Elements no committed fixture shows (e.g. segment tax, capex additions,
+  equity-method investments) are not mapped; they stay in `raw_xbrl_facts`.
+- **How.** `parsers/segments.py` is pure (bytes -> rows + findings) and keeps only facts in the periods the filing's
+  own parser validated (`Windows.from_meta`: declared quarter / YTD and period end, or the Reg. 34 in-scope years);
+  a declared pre-cutoff year is skipped (C9), any other context outside the declared periods is a finding.
+  `stage_results_xbrl` stages `stg_segments` with the filing and the promoter inserts them in the same transaction
+  as `fact_observations`. A quarantined or out-of-scope filing promotes none. PARSER_VERSION 0.10.0 restages.
+- **Checks (non-blocking findings, stage `SEGMENT`).** SEGMENT_SUM (members vs the filed non-dimensional total,
+  within the LevelOfRounding tolerance; with unallocated / elimination members also accepted), SEGMENT_RECONCILING
+  (reconciling = unallocated + eliminations), GEOGRAPHY_FOREIGN_SUM (ForeignCountriesMember = its ForeignCountryN
+  children), SEGMENT_ASSETS (segment + unallocable = net segment assets). A finding is promoted with the filing and
+  opens a quarantine row; it never blocks the filing or corrects a value. Net segment assets vs total assets is a
+  warning only.
+- **Reader.** `fundamentals.load_segments(con, entity_id, scope, as_of)`: each filing's current parser version,
+  `visible_from_ts <= as_of`, and per (axis, element, period) every member of the latest visible filing. Members are
+  per-filing ids (`ReportableSegments1Member` may be another business in another filing), so two filings' members are
+  never mixed.
+- **What is never done with them.** Segment rows never feed `fact_observations`, the factbook, a P&L row, a ratio or a
+  screen, and no cross-company segment taxonomy is built: labels are free text. Segment totals are not P&L
+  substitutes (Cummins: segment revenue is before inter-segment elimination; segment PBT includes associates).
+  Unchanged from C24: labelled quarterly members also appear in `fact_observations` as `oth_segment_*` line items, and
+  Reg. 34 domicile / foreign revenue as `revenue_domestic` / `revenue_foreign` [X75].
 
 ### 14c. Annual statements and conventions (S10-S15)
 

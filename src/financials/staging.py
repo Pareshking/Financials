@@ -25,6 +25,7 @@ from financials.parsers import ParseError
 from financials.parsers.delivery import parse_sec_bhavdata_full
 from financials.parsers.integrated import parse_integrated_results
 from financials.parsers.nse_corp_actions import PURPOSE_RULES_VERSION, parse_nse_corp_actions_json
+from financials.parsers.segments import Windows, parse_segments
 from financials.parsers.udiff import parse_udiff_cm
 from financials.parsers.xbrl import parse_instance
 from financials.timeutil import ist_to_utc
@@ -44,6 +45,13 @@ CREATE TABLE stg_xbrl_facts (
     canonical_tag VARCHAR NOT NULL, period_type VARCHAR NOT NULL, period_start DATE NOT NULL,
     period_end DATE NOT NULL, period_months INTEGER, unit VARCHAR NOT NULL, value_inr DECIMAL(20,2),
     value_other DECIMAL(28,8), source_element VARCHAR NOT NULL, line_item_category VARCHAR, parent_subtotal VARCHAR
+);
+CREATE TABLE stg_segments (
+    filing_id VARCHAR NOT NULL, parser_version VARCHAR NOT NULL, scope VARCHAR NOT NULL, axis_kind VARCHAR NOT NULL,
+    axis VARCHAR NOT NULL, member VARCHAR NOT NULL, member_role VARCHAR NOT NULL, label VARCHAR,
+    element VARCHAR NOT NULL, canonical_metric VARCHAR NOT NULL, period_type VARCHAR NOT NULL,
+    period_start DATE NOT NULL, period_end DATE NOT NULL, period_months INTEGER, value_inr DECIMAL(20,2) NOT NULL,
+    PRIMARY KEY (filing_id, axis, member, element, period_start, period_end)
 );
 CREATE TABLE stg_corp_actions (
     filing_id VARCHAR NOT NULL, seq INTEGER NOT NULL, component INTEGER NOT NULL, exchange VARCHAR NOT NULL,
@@ -113,6 +121,7 @@ TABLE_ORDER = (
     "stg_shp_line_items",
     "stg_xbrl_filing",
     "stg_xbrl_facts",
+    "stg_segments",
     "stg_corp_actions",
     "stg_events",
     "stg_kpis",
@@ -379,7 +388,44 @@ def stage_results_xbrl(
         for f in parsed.facts
     ]
     _assert_exact(tables["stg_xbrl_facts"], parsed)
+    _stage_segments(tables, fid, inst, parsed)
     return write_stage(stage_root, "results_xbrl", run_id, tables)
+
+
+def _stage_segments(tables: dict[str, list[dict[str, Any]]], fid: str, inst, parsed) -> None:
+    """Segment / geography rows of a filing that parsed [X49, X95-X97], in the periods its parser validated. A sum
+    check that fails is a non-blocking finding (promoted, opens a quarantine row); it never blocks the filing and
+    never changes a P&L fact."""
+    m = parsed.meta
+    windows = Windows.from_meta(m)
+    if windows is None:
+        return
+    report = parse_segments(inst, windows, level_of_rounding=m.get("level_of_rounding"))
+    tables["stg_segments"] = [
+        {
+            "filing_id": fid,
+            "parser_version": PARSER_VERSION,
+            "scope": m["scope"],
+            "axis_kind": f.axis_kind,
+            "axis": f.axis,
+            "member": f.member,
+            "member_role": f.member_role,
+            "label": f.label,
+            "element": f.element,
+            "canonical_metric": f.canonical_metric,
+            "period_type": f.period_type,
+            "period_start": f.period_start or f.period_end,
+            "period_end": f.period_end,
+            "period_months": f.period_months,
+            "value_inr": f.value,
+        }
+        for f in report.facts
+    ]
+    tables.setdefault("stg_findings", []).extend(
+        {"filing_id": fid, "stage": "SEGMENT", "reason_code": code,
+         "details": json.dumps(details, default=str, sort_keys=True)}
+        for code, details in report.issues
+    )  # fmt: skip
 
 
 def _assert_exact(rows: list[dict[str, Any]], parsed) -> None:

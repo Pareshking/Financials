@@ -89,7 +89,7 @@ def test_every_batch_promotes_with_only_the_documented_exceptions(unified):
     assert m.pending == 0
     assert Counter(tuple(x) for x in m.log) == {
         ("PROMOTED", "market_day"): 10, ("PROMOTED", "holidays"): 1, ("PROMOTED", "index_snapshot"): 1,
-        ("PROMOTED", "corp_actions"): 1, ("PROMOTED", "results_xbrl"): 93, ("PROMOTED", "shareholding"): 13,
+        ("PROMOTED", "corp_actions"): 1, ("PROMOTED", "results_xbrl"): 94, ("PROMOTED", "shareholding"): 13,
         ("PROMOTED", "reg30_event"): 8,
         ("QUARANTINED", "results_xbrl"): 2,  # MRPL Q1 FY26 on the non-Ind AS template (UNKNOWN_TAXONOMY) [X89]
         ("FIXED_BY_RULE", "results_xbrl"): 1,  # ... closed once its Ind AS re-filing is promoted [X89]
@@ -135,7 +135,7 @@ def test_all_profiles_and_scopes_land_without_collisions(unified):
         ("INDAS_NBFC", "STANDALONE"): 5, ("IGAAP_BANK", "CONSOLIDATED"): 5, ("IGAAP_BANK", "STANDALONE"): 5,
         ("IRDAI_LIFE", "CONSOLIDATED"): 1, ("IRDAI_LIFE", "STANDALONE"): 3, ("IRDAI_GENERAL", "CONSOLIDATED"): 1,
         ("IRDAI_GENERAL", "STANDALONE"): 4, ("INDAS_INSURANCE", "STANDALONE"): 2,
-        ("REG34_ANNUAL", "CONSOLIDATED"): 4, ("REG34_ANNUAL", "STANDALONE"): 2,
+        ("REG34_ANNUAL", "CONSOLIDATED"): 5, ("REG34_ANNUAL", "STANDALONE"): 2,
     }  # fmt: skip
     # one results profile per entity (Reg. 34 annual sits beside its company's quarterly profile), except the
     # documented change of basis of general insurers to Ind AS 117 in FY27 (Go Digit), which FactBook keeps apart [X90]
@@ -154,6 +154,32 @@ def test_all_profiles_and_scopes_land_without_collisions(unified):
     )
 
 
+def test_segment_rows_land_with_their_filings(unified):
+    """[X95-X97] Segment / geography rows of every promoted results and annual filing: same entity, scope, parser
+    version and visibility as the filing; no SEGMENT finding on any committed filing."""
+    con = unified.con
+    counts = dict(con.execute(
+        "SELECT m.accounting_profile || '/' || s.axis_kind, count(*) FROM segment_observations s "
+        "JOIN filing_meta m USING (filing_id, parser_version) GROUP BY 1").fetchall())  # fmt: skip
+    assert counts == SEGMENT_ROWS
+    assert (
+        con.execute(
+            "SELECT count(*) FROM segment_observations s JOIN filing_meta m USING (filing_id, parser_version) "
+            "WHERE s.entity_id <> m.entity_id OR s.scope <> m.scope OR s.visible_from_ts <> m.visible_from_ts"
+        ).fetchone()[0]
+        == 0
+    )
+    assert con.execute("SELECT count(*) FROM quarantine_queue WHERE stage = 'SEGMENT'").fetchone()[0] == 0
+
+
+# Rows per profile / axis kind: IRDAI_LIFE files segment assets and liabilities only; geography exists only in the
+# Reg. 34 annual filings (TCS, Eternal, SRF).
+SEGMENT_ROWS = {
+    "INDAS_CORP/BUSINESS": 810, "INDAS_NBFC/BUSINESS": 38, "IGAAP_BANK/BUSINESS": 332, "IRDAI_LIFE/BUSINESS": 116,
+    "REG34_ANNUAL/BUSINESS": 280, "REG34_ANNUAL/GEOGRAPHY": 66,
+}  # fmt: skip
+
+
 def test_materialised_universe_spans_every_archetype_and_screens_run(unified):
     m = unified
     assert m.materialized.status == "PROMOTED" and m.materialized.rows > 2900
@@ -165,8 +191,9 @@ def test_materialised_universe_spans_every_archetype_and_screens_run(unified):
     def syms(q):
         return {r["symbol"] for r in run_screen(m.con, q)}
 
-    # Reg. 34 annual; SPARC FY26 as filed: PBT 15,530,099,000 on revenue 18,791,683,000 (FY25 PBT -3,427,812,000)
-    assert syms("Piotroski F score >= 0 AND ROCE screener > 0") == {"TCS", "ETERNAL", "SPARC"}
+    # Reg. 34 annual; SPARC FY26 as filed: PBT 15,530,099,000 on revenue 18,791,683,000 (FY25 PBT -3,427,812,000);
+    # SRF FY26 consolidated (the segment fixture, X96) has FY25 and FY26 in scope too
+    assert syms("Piotroski F score >= 0 AND ROCE screener > 0") == {"TCS", "ETERNAL", "SPARC", "SRF"}
     assert syms("Debtor days > 0") >= {"TCS", "ITC", "RELIANCE"}  # industrial, incl. excise FMCG
     assert syms("GNPA > 0") >= {"HDFCBANK", "PNB"}  # private + PSU banks
     assert syms("Solvency ratio > 0") >= {"HDFCLIFE", "SBILIFE", "ICICIGI"}  # life + general insurers

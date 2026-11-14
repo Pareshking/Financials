@@ -21,7 +21,7 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
 from financials.corp_actions import ACCEPTED_STATUSES
-from financials.db import insert_rows, table_columns
+from financials.db import insert_rows, table_columns, version_key
 from financials.fundamentals import (
     ANNUAL_COLUMNS,
     BANK_COLUMNS,
@@ -314,7 +314,9 @@ def _preload(con, as_of_ts: datetime):
         """WITH f AS (
                SELECT entity_id, as_of_date, filing_id, parser_version FROM (
                    SELECT entity_id, as_of_date, filing_id, parser_version, row_number() OVER (
-                       PARTITION BY entity_id, as_of_date ORDER BY visible_from_ts DESC, parser_version DESC,
+                       PARTITION BY entity_id, as_of_date ORDER BY visible_from_ts DESC, """
+        + version_key()
+        + """ DESC,
                        filing_id DESC) AS rn
                    FROM shareholding_meta WHERE visible_from_ts <= ?) WHERE rn = 1),
            r AS (SELECT *, row_number() OVER (PARTITION BY entity_id ORDER BY as_of_date DESC) AS r FROM f)

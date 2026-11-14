@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
+from financials.db import version_key
 from financials.money import ROUNDING_UNITS
 from financials.parsers.indas_corp import period_months
 from financials.scope import financials_in_scope
@@ -202,8 +203,8 @@ _ROUNDING_CASE = " ".join(f"WHEN '{k}' THEN {int(v)}" for k, v in ROUNDING_UNITS
 # X83: only each filing's latest parser version is read. A re-parse can move a filing's visibility later (listing
 # creation time instead of the board-meeting rule); the older version's rows must not stay visible earlier.
 CURRENT_VERSION = (
-    "parser_version = coalesce((SELECT max(cv.parser_version) FROM filing_meta cv "
-    "WHERE cv.filing_id = fact_observations.filing_id), parser_version)"
+    "parser_version = coalesce((SELECT arg_max(cv.parser_version, " + version_key("cv.parser_version") + ") "
+    "FROM filing_meta cv WHERE cv.filing_id = fact_observations.filing_id), parser_version)"
 )
 
 
@@ -228,7 +229,9 @@ def load_factbook(con, entity_id: str, scope: str, as_of: datetime) -> FactBook:
         """SELECT canonical_tag, period_type, period_start, period_end, coalesce(value_inr, value_other)
            FROM (SELECT *, row_number() OVER (
                     PARTITION BY canonical_tag, period_start, period_end
-                    ORDER BY visible_from_ts DESC, parser_version DESC) AS rn
+                    ORDER BY visible_from_ts DESC, """
+        + version_key()
+        + """ DESC) AS rn
                  FROM fact_observations
                  WHERE entity_id = ? AND scope = ? AND visible_from_ts <= ? AND """
         + CURRENT_VERSION
@@ -255,6 +258,51 @@ def load_factbook(con, entity_id: str, scope: str, as_of: datetime) -> FactBook:
             book.durations.setdefault(tag, {})[(start, end)] = Decimal(value)
     book.withhold_tax_copies()
     return book
+
+
+SEGMENT_CURRENT_VERSION = CURRENT_VERSION.replace("fact_observations.", "segment_observations.")
+
+
+@dataclass(frozen=True)
+class SegmentRow:
+    axis_kind: str
+    axis: str
+    member: str
+    member_role: str
+    label: str | None
+    element: str
+    canonical_metric: str
+    period_type: str
+    period_start: date
+    period_end: date
+    period_months: int | None
+    value_inr: Decimal
+    filing_id: str
+    visible_from_ts: datetime
+
+
+def load_segments(
+    con, entity_id: str, scope: str, as_of: datetime, *, axis_kind: str | None = None
+) -> list[SegmentRow]:
+    """Segment / geography rows as known at `as_of` [X95]: each filing's current parser version only, visible_from_ts
+    <= as_of. Per (axis, element, period) every member of the latest visible filing that reports it, so a revision or
+    a restated comparative replaces the whole breakdown: members are per-filing ids (`ReportableSegments1Member` can
+    be a different business in another filing), so members of two filings are never mixed. Labels as filed.
+    A separate read: these rows never enter the factbook, a P&L line or a ratio (architecture §14b-1)."""
+    rows = con.execute(
+        """SELECT axis_kind, axis, member, member_role, label, element, canonical_metric, period_type, period_start,
+                  period_end, period_months, value_inr, filing_id, visible_from_ts
+           FROM segment_observations
+           WHERE entity_id = ? AND scope = ? AND visible_from_ts <= ? AND (? IS NULL OR axis_kind = ?) AND """
+        + SEGMENT_CURRENT_VERSION
+        + """
+           QUALIFY dense_rank() OVER (
+               PARTITION BY axis_kind, axis, element, period_start, period_end
+               ORDER BY visible_from_ts DESC, filing_id DESC) = 1
+           ORDER BY axis_kind, period_end, period_start, axis, member, element""",
+        [entity_id, scope, as_of, axis_kind, axis_kind],
+    ).fetchall()
+    return [SegmentRow(*r) for r in rows]
 
 
 SCOPES = ("CONSOLIDATED", "STANDALONE")

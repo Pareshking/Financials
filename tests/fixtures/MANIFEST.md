@@ -312,6 +312,12 @@ Inspected for Batch 10 but not committed: the other Reg. 30 files listed in docs
 | `corp_actions/nse_corporateActions_equities_30-12-2024_28-01-2025.json` | Live backfill 2026-11-14: real purpose texts for the CA11 rules (AGM/EGM, dividend combinations, typos, rights, consolidation) | `https://www.nseindia.com/api/corporates-corporateActions?index=equities&from_date=30-12-2024&to_date=28-01-2025` | `3be4f001d7c6bc52dfd76d67c4a0845628295902aac78038580b75f2e2fc34a8` |
 | `corp_actions/nse_corporateActions_equities_31-10-2024_29-11-2024.json` | Live backfill 2026-11-14: real purpose texts for the CA11 rules (AGM/EGM, dividend combinations, typos, rights, consolidation) | `https://www.nseindia.com/api/corporates-corporateActions?index=equities&from_date=31-10-2024&to_date=29-11-2024` | `14e8a44caf65f07112e64d179da25cb1c8b80f3adeec588a58608eef5844493d` |
 
+## Segment and geography tables (copied 2026-11-14 from the local vault blob, gunzipped, sha256 verified)
+
+| File | Why it is here | Source URL | SHA-256 |
+|---|---|---|---|
+| `xbrl/AR_XBRL_SRF_09082026022508.xml` | X95-X97: SRF FY26 consolidated Reg. 34 annual (fetched 2026-11-14T04:35:26Z; inspected for Batch 9, now committed). Business segments with `UnallocatedAmountsMember`, `EliminationOfIntersegmentAmountsMember` and `MaterialReconcilingItemsMember`; geography with country labels on `GeographicalAreasAxis` | `https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_SRF_09082026022508.xml` | `9cd7592d33a6e62a4162ef662ad21c7e63c91133e406db78ea60e5a143965b98` |
+
 ## Screener goldens (local only, not committed)
 
 The repository is public, so the user-supplied Screener Excel exports (2026-11-13; 42 distinct files, some uploaded twice)

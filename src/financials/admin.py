@@ -583,8 +583,8 @@ def _merge_securities(con, q: dict, details: dict, note: str) -> dict:
         ).fetchone()[0]
         and drop_entity != keep_entity
     ):
-        for table in ("filing_meta", "fact_observations", "shareholding_meta", "shareholding_observations",
-                      "corp_actions", "company_overrides"):  # fmt: skip
+        for table in ("filing_meta", "fact_observations", "segment_observations", "shareholding_meta",
+                      "shareholding_observations", "corp_actions", "company_overrides"):  # fmt: skip
             con.execute(f"UPDATE {table} SET entity_id = ? WHERE entity_id = ?", [keep_entity, drop_entity])
         con.execute(
             "UPDATE entity_master SET status = 'MERGED', inactive_date = ?, exit_reason = ? WHERE entity_id = ?",

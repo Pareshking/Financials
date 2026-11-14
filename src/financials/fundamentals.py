@@ -23,6 +23,14 @@ YTD_IDENTITY_REL_TOLERANCE = Decimal("0.005")
 YTD_GUARDED_TAGS = frozenset({"revenue_from_operations", "total_income", "pat", "pbt", "pat_owners"})
 ATTRIBUTION_WITHHELD_TAG = "attribution_withheld"  # X86 marker (parsers.indas_corp)
 ATTRIBUTION_TAGS = frozenset({"pat_owners", "pat_nci"})
+# X94: tax lines copied from the comparative (prior-year) column. PBT is current, tax is last year's, so PAT and TCI
+# (= PBT - tax) are wrong while PBT - tax = PAT still holds (Muthoot standalone Q2 / H1 FY27). Withheld, not corrected:
+# the true tax is not in the file.
+TAX_COPY_COMPONENTS = ("current_tax", "deferred_tax")
+TAX_COPY_WITHHELD_TAGS = frozenset(
+    {"tax_expense", "current_tax", "deferred_tax", "pat", "pat_continuing", "pat_owners", "pat_nci",
+     "total_comprehensive_income"}
+)  # fmt: skip
 
 
 def _add_months(d: date, months: int) -> date:
@@ -46,6 +54,33 @@ class FactBook:
     # X82: declared fiscal-year starts (filing_meta.fy_start). A >3-month duration is a YTD only when it starts on
     # one; "Half Yearly"/"Yearly" filings put the Q4 figure in an Oct-Mar context (NETWEB Q4 FY26). Empty = no check.
     fy_starts: frozenset[date] = frozenset()
+
+    tax_copied: list[dict] = field(default_factory=list)  # X94 breaks found (and withheld) by load_factbook
+
+    def tax_copy_breaks(self) -> list[dict]:
+        """X94: periods whose current and deferred tax both equal, to the rupee and non-zero, those of the same-length
+        period one year earlier while PBT differs. Two independent non-zero components matching exactly is a copied
+        comparative column, not a coincidence (a lone zero deferred tax with a round 1 Cr current tax is, DALBHARAT)."""
+        cur, dfd, pbt = (self.durations.get(t, {}) for t in (*TAX_COPY_COMPONENTS, "pbt"))
+        out = []
+        for (s, e), c in cur.items():
+            prior = (_add_months(s, -12), _add_months(e, -12))
+            d, pc, pd = dfd.get((s, e)), cur.get(prior), dfd.get(prior)
+            if not c or not d or c != pc or d != pd:
+                continue
+            if pbt.get((s, e)) is None or pbt.get((s, e)) == pbt.get(prior):
+                continue
+            out.append({"period": [str(s), str(e)], "prior_period": [str(prior[0]), str(prior[1])],
+                        "current_tax": str(c), "deferred_tax": str(d), "pbt": str(pbt[(s, e)]),
+                        "prior_pbt": str(pbt.get(prior))})  # fmt: skip
+        return out
+
+    def withhold_tax_copies(self) -> None:
+        self.tax_copied = self.tax_copy_breaks()
+        for b in self.tax_copied:
+            p = (date.fromisoformat(b["period"][0]), date.fromisoformat(b["period"][1]))
+            for tag in TAX_COPY_WITHHELD_TAGS:
+                self.durations.get(tag, {}).pop(p, None)
 
     def is_ytd_start(self, start: date) -> bool:
         return not self.fy_starts or start in self.fy_starts
@@ -218,6 +253,7 @@ def load_factbook(con, entity_id: str, scope: str, as_of: datetime) -> FactBook:
             book.instants.setdefault(tag, {})[end] = Decimal(value)
         else:
             book.durations.setdefault(tag, {})[(start, end)] = Decimal(value)
+    book.withhold_tax_copies()
     return book
 
 

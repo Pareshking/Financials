@@ -89,7 +89,7 @@ def test_every_batch_promotes_with_only_the_documented_exceptions(unified):
     assert m.pending == 0
     assert Counter(tuple(x) for x in m.log) == {
         ("PROMOTED", "market_day"): 10, ("PROMOTED", "holidays"): 1, ("PROMOTED", "index_snapshot"): 1,
-        ("PROMOTED", "corp_actions"): 1, ("PROMOTED", "results_xbrl"): 91, ("PROMOTED", "shareholding"): 13,
+        ("PROMOTED", "corp_actions"): 1, ("PROMOTED", "results_xbrl"): 93, ("PROMOTED", "shareholding"): 13,
         ("PROMOTED", "reg30_event"): 8,
         ("QUARANTINED", "results_xbrl"): 2,  # MRPL Q1 FY26 on the non-Ind AS template (UNKNOWN_TAXONOMY) [X89]
         ("FIXED_BY_RULE", "results_xbrl"): 1,  # ... closed once its Ind AS re-filing is promoted [X89]
@@ -116,6 +116,7 @@ def test_quarantine_reasons_are_the_documented_ones(unified):
         "INDEX/PLACEHOLDER_ISIN",
         "INDEX/UNKNOWN_ISIN",  # IDX2, IDX3
         "SHARES/CROSS_CHECK_FAILED",  # Reg. 31 vs paid-up 1.9% apart for one issuer (owner tolerance 0.5%)
+        "CONSISTENCY/TAX_COPIED_FROM_PRIOR_YEAR",  # Muthoot standalone Q2 / H1 FY27 repeat FY26's tax lines [X94]
         "CONSISTENCY/YTD_QUARTER_MISMATCH",  # Tata Motors FY26 standalone: Q1 re-presented after the demerger [X80]
     }
     ytd = unified.con.execute(
@@ -131,7 +132,7 @@ def test_all_profiles_and_scopes_land_without_collisions(unified):
     assert dict(((p, s), n) for p, s, n in con.execute(
         "SELECT accounting_profile, scope, count(*) FROM filing_meta GROUP BY ALL").fetchall()) == {
         ("INDAS_CORP", "CONSOLIDATED"): 38, ("INDAS_CORP", "STANDALONE"): 18, ("INDAS_NBFC", "CONSOLIDATED"): 5,
-        ("INDAS_NBFC", "STANDALONE"): 3, ("IGAAP_BANK", "CONSOLIDATED"): 5, ("IGAAP_BANK", "STANDALONE"): 5,
+        ("INDAS_NBFC", "STANDALONE"): 5, ("IGAAP_BANK", "CONSOLIDATED"): 5, ("IGAAP_BANK", "STANDALONE"): 5,
         ("IRDAI_LIFE", "CONSOLIDATED"): 1, ("IRDAI_LIFE", "STANDALONE"): 3, ("IRDAI_GENERAL", "CONSOLIDATED"): 1,
         ("IRDAI_GENERAL", "STANDALONE"): 4, ("INDAS_INSURANCE", "STANDALONE"): 2,
         ("REG34_ANNUAL", "CONSOLIDATED"): 4, ("REG34_ANNUAL", "STANDALONE"): 2,
@@ -208,3 +209,21 @@ def test_bundle_round_trip_reproduces_every_table(unified, tmp_path):
         copy.close()
     with pytest.raises(BundleError, match="budget"):
         export_bundle(unified.con, tmp_path / "small", max_total_mb=0.1)
+
+
+def test_tax_copied_from_prior_year_is_raised_and_withheld(unified):
+    """X94 end to end: the audit raises one finding per copied period and readers never see the wrong PAT."""
+    from datetime import datetime
+
+    from financials.fundamentals import load_factbook
+
+    rows = unified.con.execute(
+        "SELECT entity_id, json_extract_string(details, '$.period') FROM quarantine_queue "
+        "WHERE reason_code = 'TAX_COPIED_FROM_PRIOR_YEAR' AND resolved_at IS NULL ORDER BY 2"
+    ).fetchall()
+    assert [p for _, p in rows] == ['["2026-04-01","2026-09-30"]', '["2026-07-01","2026-09-30"]']
+    book = load_factbook(unified.con, rows[0][0], "STANDALONE", datetime(9999, 12, 31))
+    from datetime import date
+
+    assert (date(2026, 7, 1), date(2026, 9, 30)) not in book.durations["pat"]
+    assert book.durations["pbt"][(date(2026, 7, 1), date(2026, 9, 30))] == 39925220000

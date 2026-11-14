@@ -1052,6 +1052,9 @@ def audit_ytd_identity(con, pairs: Iterable[tuple[str, str]]) -> list[str]:
             for b in book.ytd_breaks(tag):
                 rows.append(_quarantine_row(stage="CONSISTENCY", reason_code="YTD_QUARTER_MISMATCH",
                                             entity_id=entity_id, details={"scope": scope, **b}))  # fmt: skip
+        for b in book.tax_copied:  # X94: already withheld by load_factbook; the finding makes it visible
+            rows.append(_quarantine_row(stage="CONSISTENCY", reason_code="TAX_COPIED_FROM_PRIOR_YEAR",
+                                        entity_id=entity_id, details={"scope": scope, **b}))  # fmt: skip
     _close_stale_ytd_findings(con, pairs, {r["quarantine_id"] for r in rows})
     return _quarantine_many(con, rows) if rows else []
 
@@ -1063,14 +1066,15 @@ def _close_stale_ytd_findings(con, pairs: list[tuple[str, str]], current: set[st
         return
     open_rows = con.execute(
         "SELECT quarantine_id, entity_id, json_extract_string(details, '$.scope') FROM quarantine_queue "
-        "WHERE stage = 'CONSISTENCY' AND reason_code = 'YTD_QUARTER_MISMATCH' AND resolved_at IS NULL"
+        "WHERE stage = 'CONSISTENCY' AND reason_code IN ('YTD_QUARTER_MISMATCH', 'TAX_COPIED_FROM_PRIOR_YEAR') "
+        "AND resolved_at IS NULL"
     ).fetchall()
     audited = set(pairs)
     stale = [q for q, e, s in open_rows if (e, s) in audited and q not in current]
     if stale:
         con.execute(
             "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', "
-            "resolution_note = 'YTD identity holds on re-audit' WHERE quarantine_id IN (SELECT unnest(?))",
+            "resolution_note = 'consistency holds on re-audit' WHERE quarantine_id IN (SELECT unnest(?))",
             [utc_now(), stale],
         )
 

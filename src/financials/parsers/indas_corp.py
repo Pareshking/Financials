@@ -316,6 +316,31 @@ def _family(context_id: str) -> str | None:
     return None
 
 
+def _stale_context_dates(inst: Instance, declared: dict, period_end: date) -> tuple[dict, date | None]:
+    """Named rule STALE_CONTEXT_DATES [X87]: every period context of the filing still carries an earlier filing's
+    dates (Siemens Q3 FY26: OneD Apr-Jun 2025 and FourD Oct 2024-Jun 2025, declared Oct-Dec 2025 and the 15-month
+    Oct 2024-Dec 2025; the results PDF shows the XBRL values, 33,985 / 179,167 Mn revenue, for the declared periods).
+    Applies only when each period family has one context period, none equals its declared period, all share one end
+    date before the declared period end, and every declared period ends on it. Returns (family -> stale period,
+    stale end) or ({}, None)."""
+    periods: dict[str, set] = {}
+    for fact in inst.facts:
+        ctx = inst.contexts[fact.context_id]
+        if fact.is_numeric and not ctx.dimensions and not ctx.is_instant and (family := _family(ctx.id)):
+            periods.setdefault(family, set()).add((ctx.start, ctx.end))
+    if not periods or any(len(v) != 1 for v in periods.values()):
+        return {}, None
+    stale = {f: next(iter(v)) for f, v in periods.items()}
+    ends = {p[1] for p in stale.values()}
+    if (
+        len(ends) != 1
+        or any(declared.get(f) is None or declared[f] == p or declared[f][1] != period_end for f, p in stale.items())
+        or not next(iter(ends)) < period_end
+    ):
+        return {}, None
+    return stale, next(iter(ends))
+
+
 def parse_indas_corp_results(data: bytes) -> ParsedResults:
     """Corporate (Schedule III Division II) filings only; other profiles are routed, not parsed."""
     return parse_with_spec(data, CORP_SPEC)
@@ -437,6 +462,11 @@ def _map_facts(inst: Instance, result: ParsedResults, spec: ProfileSpec | None =
     declared = {"One": result.meta["quarter_period"], "Four": result.meta["ytd_period"]}
     period_end: date = result.meta["period_end"]
     seen: dict[tuple[str, date, date], CanonicalFact] = {}
+    stale, stale_end = _stale_context_dates(inst, declared, period_end)
+    if stale:
+        result.meta.setdefault("rules_applied", []).append(
+            {"rule": "STALE_CONTEXT_DATES", "periods": {f: [str(d) for d in p] for f, p in sorted(stale.items())}}
+        )
 
     for fact in inst.facts:
         if not fact.is_numeric:
@@ -446,9 +476,10 @@ def _map_facts(inst: Instance, result: ParsedResults, spec: ProfileSpec | None =
             continue  # raw-only (RPT detail, segment, OCI breakdowns)
         if ctx.is_instant:
             mapping = spec.instant_tags.get(fact.name)
-            if mapping is None or ctx.instant != period_end:
+            instant = period_end if stale and ctx.instant == stale_end else ctx.instant  # X87
+            if mapping is None or instant != period_end:
                 continue  # e.g. PY_I opening cash: raw-only [X2]
-            start = end = ctx.instant
+            start = end = instant
             months = None
             ptype = "INSTANT"
         else:
@@ -458,6 +489,8 @@ def _map_facts(inst: Instance, result: ParsedResults, spec: ProfileSpec | None =
             family = _family(ctx.id)
             expected = declared.get(family) if family else None
             actual = (ctx.start, ctx.end)
+            if family in stale and actual == stale[family]:
+                actual = expected  # X87: re-dated to the declared period
             if expected is None or actual != expected:
                 result.issues.append(
                     Issue(
@@ -731,6 +764,10 @@ def _apply_owners_tci_rule(result: ParsedResults) -> None:
     )
 
 
+# X93: owners + NCI = PAT holds to 3 rounding units, not the 1.5 of a three-term sum: companies round each line from
+# unrounded books and file a 2-3 unit gap that their own PDF shows too (SPARC Q1 FY27 -20.76 vs PAT -20.78 Lakhs ->
+# 2 lakh; RPower Q4 FY25 125.60 vs 125.57 Cr in Lakhs -> 3 lakh).
+ATTRIBUTION_TERMS = 6
 TCI_OWNERS_KEY = "li_comprehensive_income_for_the_period_attributable_to_owners_of_parent"
 TCI_NCI_KEY = "li_comprehensive_income_for_the_period_attributable_to_owners_of_parent_non_controlling_interests"
 ATTRIBUTION_WITHHELD_TAG = "attribution_withheld"  # marker (PURE 1): owners/NCI for the period are not usable [X86]
@@ -756,7 +793,7 @@ def _apply_attribution_recovery_rules(result: ParsedResults) -> None:
       neither use the split nor fall back to PAT; the rest of the filing is promoted and the finding stays open
       (owner decision 2026-11-14, superseding 2026-11-13 for the non-zero NCI case). Raw facts stay as filed.
     """
-    tol = identity_tolerance(result.meta["level_of_rounding"], 3)
+    tol = identity_tolerance(result.meta["level_of_rounding"], ATTRIBUTION_TERMS)
     periods = sorted({(f.period_start, f.period_end) for f in result.facts if f.canonical_tag == "pat_owners"})
     applied: dict[str, list] = {}
     withheld = []
@@ -781,6 +818,17 @@ def _apply_attribution_recovery_rules(result: ParsedResults) -> None:
         if len(flips) == 1:
             _replace_attribution(result, p, *flips[0], "ATTRIBUTION_SIGN_FLIP")
             applied.setdefault("ATTRIBUTION_SIGN_FLIP", []).append([str(p[0]), str(p[1])])
+            continue
+        if abs(nci - pat) <= tol and abs(owners - pat) > tol:  # X91: NCI filed = PAT
+            _replace_attribution(result, p, owners, pat - owners, "NCI_TAGGED_AS_PAT")
+            applied.setdefault("NCI_TAGGED_AS_PAT", []).append([str(p[0]), str(p[1])])
+            continue
+        tci = result.value("total_comprehensive_income", *p)
+        if nci != 0 and tci is not None and abs(owners + nci - tci) <= tol and abs(tci - pat) > tol:
+            # X92: owners + NCI = TCI with NCI != 0. Owners := PAT - NCI as filed; exact when the NCI's share of OCI
+            # is 0 (ATUL, ACC, L&T Finance), off by that share otherwise (Brigade Q2 FY27: 193.62 vs PDF 193.60 Cr).
+            _replace_attribution(result, p, pat - nci, nci, "OWNERS_AND_NCI_TAGGED_AS_TCI")
+            applied.setdefault("OWNERS_AND_NCI_TAGGED_AS_TCI", []).append([str(p[0]), str(p[1])])
             continue
         withheld.append((p, owners, nci, pat))
     for p, owners, nci, pat in withheld:
@@ -868,7 +916,7 @@ def _check_identities(result: ParsedResults, spec: ProfileSpec | None = None) ->
             _check(result, "PAT_CHAIN", pat_c + rest, pat, 4, p)
         owners, nci = v("pat_owners"), v("pat_nci")
         if None not in (owners, nci, pat):
-            _check(result, "OWNERS_PLUS_NCI", owners + nci, pat, 3, p)
+            _check(result, "OWNERS_PLUS_NCI", owners + nci, pat, ATTRIBUTION_TERMS, p)
         adj, cgo = v("cf_adjustments_total"), v("cash_generated_from_operations")
         if None not in (pbt, adj, cgo):
             # Indirect method starts from PBT (before associates) [X45]

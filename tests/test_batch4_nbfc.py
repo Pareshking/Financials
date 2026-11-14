@@ -92,9 +92,9 @@ def test_chola_owners_tagged_as_tci_is_fixed_by_the_named_rule():
 
 
 def test_owners_tci_rule_needs_zero_nci():
-    """With a non-zero NCI the replacement would not be exact, so OWNERS_TAGGED_AS_TCI does not apply. Since the
-    owner decision of 2026-11-14 (X86) the filing is no longer blocked: the owners / NCI split of that period is
-    withheld (no fallback to PAT) and a non-blocking ATTRIBUTION_WITHHELD finding is raised."""
+    """With a non-zero NCI, OWNERS_TAGGED_AS_TCI (owners := PAT) would not be exact and does not apply. Owners + NCI
+    still equals TCI, so OWNERS_AND_NCI_TAGGED_AS_TCI (X92) recovers owners := PAT - NCI, off at most by the NCI's
+    share of OCI (owner decision 2026-11-14; before it the split was withheld, before that the filing quarantined)."""
     data = CHOLA.read_bytes()
     marker = b"ProfitOrLossAttributableToNonControllingInterests"
     i = data.index(marker)
@@ -102,11 +102,10 @@ def test_owners_tci_rule_needs_zero_nci():
     k = data.index(b"<", j)
     tampered = data[:j] + b"1000000" + data[k:]  # in memory only; the fixture is untouched
     r = parse_indas_nbfc_results(tampered)
-    assert not r.issues
-    assert [(x.reason_code, x.details["period"]) for x in r.findings] == [("ATTRIBUTION_WITHHELD", [str(d) for d in Q])]
-    assert r.value("pat_owners", *Q) is None and r.value("pat_nci", *Q) is None
-    assert r.value("attribution_withheld", *Q) == 1
-    assert r.value("pat", *Q) == Decimal("16303400000")
+    assert not r.issues and not r.findings
+    assert r.value("pat_nci", *Q) == Decimal("1000000")
+    assert r.value("pat_owners", *Q) == Decimal("16303400000") - Decimal("1000000")
+    assert {"rule": "OWNERS_AND_NCI_TAGGED_AS_TCI", "periods": [[str(d) for d in Q]]} in r.meta["rules_applied"]
 
 
 def test_investment_holding_company_is_not_a_lender():

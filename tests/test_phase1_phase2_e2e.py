@@ -89,7 +89,7 @@ def test_every_batch_promotes_with_only_the_documented_exceptions(unified):
     assert m.pending == 0
     assert Counter(tuple(x) for x in m.log) == {
         ("PROMOTED", "market_day"): 10, ("PROMOTED", "holidays"): 1, ("PROMOTED", "index_snapshot"): 1,
-        ("PROMOTED", "corp_actions"): 1, ("PROMOTED", "results_xbrl"): 81, ("PROMOTED", "shareholding"): 13,
+        ("PROMOTED", "corp_actions"): 1, ("PROMOTED", "results_xbrl"): 91, ("PROMOTED", "shareholding"): 13,
         ("PROMOTED", "reg30_event"): 8,
         ("QUARANTINED", "results_xbrl"): 2,  # MRPL Q1 FY26 on the non-Ind AS template (UNKNOWN_TAXONOMY) [X89]
         ("FIXED_BY_RULE", "results_xbrl"): 1,  # ... closed once its Ind AS re-filing is promoted [X89]
@@ -130,20 +130,19 @@ def test_all_profiles_and_scopes_land_without_collisions(unified):
     con = unified.con
     assert dict(((p, s), n) for p, s, n in con.execute(
         "SELECT accounting_profile, scope, count(*) FROM filing_meta GROUP BY ALL").fetchall()) == {
-        ("INDAS_CORP", "CONSOLIDATED"): 30, ("INDAS_CORP", "STANDALONE"): 17, ("INDAS_NBFC", "CONSOLIDATED"): 5,
+        ("INDAS_CORP", "CONSOLIDATED"): 38, ("INDAS_CORP", "STANDALONE"): 18, ("INDAS_NBFC", "CONSOLIDATED"): 5,
         ("INDAS_NBFC", "STANDALONE"): 3, ("IGAAP_BANK", "CONSOLIDATED"): 5, ("IGAAP_BANK", "STANDALONE"): 5,
         ("IRDAI_LIFE", "CONSOLIDATED"): 1, ("IRDAI_LIFE", "STANDALONE"): 3, ("IRDAI_GENERAL", "CONSOLIDATED"): 1,
-        ("IRDAI_GENERAL", "STANDALONE"): 3, ("INDAS_INSURANCE", "STANDALONE"): 2,
+        ("IRDAI_GENERAL", "STANDALONE"): 4, ("INDAS_INSURANCE", "STANDALONE"): 2,
         ("REG34_ANNUAL", "CONSOLIDATED"): 4, ("REG34_ANNUAL", "STANDALONE"): 2,
     }  # fmt: skip
-    # one results profile per entity (Reg. 34 annual sits beside its company's quarterly profile)
-    assert (
-        con.execute(
-            "SELECT count(*) FROM (SELECT entity_id FROM filing_meta WHERE accounting_profile <> 'REG34_ANNUAL' "
-            "GROUP BY 1 HAVING count(DISTINCT accounting_profile) > 1)"
-        ).fetchone()[0]
-        == 0
-    )
+    # one results profile per entity (Reg. 34 annual sits beside its company's quarterly profile), except the
+    # documented change of basis of general insurers to Ind AS 117 in FY27 (Go Digit), which FactBook keeps apart [X90]
+    assert con.execute(
+        "SELECT list(DISTINCT p ORDER BY p) FROM (SELECT entity_id, list(DISTINCT accounting_profile "
+        "ORDER BY accounting_profile) AS p FROM filing_meta WHERE accounting_profile <> 'REG34_ANNUAL' "
+        "GROUP BY 1 HAVING count(DISTINCT accounting_profile) > 1)"
+    ).fetchone()[0] in (None, [["INDAS_INSURANCE", "IRDAI_GENERAL"]])
     # every filing's facts belong to the entity of that filing
     assert (
         con.execute(

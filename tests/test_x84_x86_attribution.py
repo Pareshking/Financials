@@ -15,6 +15,7 @@ from financials.parsers.indas_corp import parse_indas_corp_results
 ADANIPORTS_Q4FY26 = XBRL_DIR / "INTEGRATED_FILING_INDAS_1662399_30042026063302_WEB.xml"
 GODREJAGRO_Q2FY27 = XBRL_DIR / "INTEGRATED_FILING_INDAS_1754829_06112026051018_WEB.xml"
 COFORGE_Q4FY26 = XBRL_DIR / "INTEGRATED_FILING_INDAS_1663900_05052026095708_WEB.xml"
+TECHM_Q4FY25 = XBRL_DIR / "INTEGRATED_FILING_INDAS_1424350_24042025113829_WEB.xml"
 
 Q4FY26, FY26 = ("2026-01-01", "2026-03-31"), ("2025-04-01", "2026-03-31")
 
@@ -67,18 +68,27 @@ def test_godrej_agrovet_nci_filed_with_the_wrong_sign():
     assert q2["pat_owners"][0] + q2["pat_nci"][0] == q2["pat"][0]
 
 
-def test_coforge_unrecoverable_split_is_withheld_and_the_filing_still_parses():
-    """Q4 FY26: owners 5,722,000,000 + NCI 608,000,000 = TCI 6,330,000,000, not PAT 6,662,000,000; the OCI split is
-    not tagged, so no exact recovery exists. Owners / NCI are withheld (no fallback to PAT); PAT stays."""
+def test_coforge_owners_and_nci_tagged_as_tci_is_recovered_by_x92():
+    """Q4 FY26: owners 5,722,000,000 + NCI 608,000,000 = TCI 6,330,000,000, not PAT 6,662,000,000. Withheld under
+    X86 alone; since X92 owners := PAT - NCI = 6,054,000,000 (the PDF's text layer has no attribution rows)."""
     r = parse_indas_corp_results(COFORGE_Q4FY26.read_bytes())
+    assert r.ok and not r.issues and not r.findings
+    q = _split(r, *Q4FY26)
+    assert q["pat_owners"] == (Decimal("6054000000"), "RULE:OWNERS_AND_NCI_TAGGED_AS_TCI")
+    assert q["pat_nci"][0] == Decimal("608000000")
+
+
+def test_tech_mahindra_unrecoverable_split_is_withheld_and_the_filing_still_parses():
+    """Q4 FY25: owners 2,026,000,000 + NCI 34,000,000 = OCI 2,060,000,000, the TCI split is not tagged, so no rule
+    recovers it (PDF: owners 1,166.7 Cr, NCI (24.8) Cr). Owners / NCI are withheld (no fallback to PAT); PAT stays."""
+    r = parse_indas_corp_results(TECHM_Q4FY25.read_bytes())
     assert r.ok and not r.issues
-    for period in (Q4FY26, FY26):
+    for period in (("2025-01-01", "2025-03-31"), ("2024-04-01", "2025-03-31")):
         s = _split(r, *period)
         assert set(s) == {"pat", "attribution_withheld"}
         assert s["attribution_withheld"] == (Decimal(1), "RULE:ATTRIBUTION_WITHHELD")
-    assert sorted(f.details["period"] for f in r.findings) == sorted([list(Q4FY26), list(FY26)])
     assert {(f.stage, f.reason_code) for f in r.findings} == {("IDENTITY", "ATTRIBUTION_WITHHELD")}
-    assert _split(r, *Q4FY26)["pat"][0] == Decimal("6662000000")
+    assert _split(r, "2025-01-01", "2025-03-31")["pat"][0] == Decimal("11418960000")
 
 
 def test_withheld_split_does_not_fall_back_to_pat_in_readers():

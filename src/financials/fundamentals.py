@@ -172,7 +172,23 @@ CURRENT_VERSION = (
 )
 
 
+# Accounting basis of a profile (invariant 6: never combine profiles). Go Digit and Star Health moved from IRDAI
+# Indian-GAAP insurer filings to Ind AS in FY27; their Q1 IRDAI PBT and the Ind AS H1 cannot be combined [X90].
+_BASIS = (
+    "CASE accounting_profile WHEN 'IRDAI_GENERAL' THEN 'IRDAI' WHEN 'IRDAI_LIFE' THEN 'IRDAI' "
+    "WHEN 'IGAAP_BANK' THEN 'IGAAP_BANK' ELSE 'INDAS' END"
+)
+SAME_BASIS = (
+    "(NOT EXISTS (SELECT 1 FROM filing_meta b WHERE b.filing_id = fact_observations.filing_id) OR "
+    "(SELECT any_value(" + _BASIS + ") FROM filing_meta b WHERE b.filing_id = fact_observations.filing_id) = "
+    "coalesce((SELECT arg_max(" + _BASIS + ", visible_from_ts) FROM filing_meta l WHERE l.entity_id = ? "
+    "AND l.scope = ? AND l.visible_from_ts <= ? AND l.accounting_profile <> 'REG34_ANNUAL'), 'INDAS'))"
+)
+
+
 def load_factbook(con, entity_id: str, scope: str, as_of: datetime) -> FactBook:
+    """Latest visible value per (tag, period), from filings on the accounting basis of the entity's latest
+    quarterly filing (X90): after a change of basis the older basis drops out, so quarters and TTM rebuild."""
     rows = con.execute(
         """SELECT canonical_tag, period_type, period_start, period_end, coalesce(value_inr, value_other)
            FROM (SELECT *, row_number() OVER (
@@ -181,9 +197,11 @@ def load_factbook(con, entity_id: str, scope: str, as_of: datetime) -> FactBook:
                  FROM fact_observations
                  WHERE entity_id = ? AND scope = ? AND visible_from_ts <= ? AND """
         + CURRENT_VERSION
+        + " AND "
+        + SAME_BASIS
         + """)
            WHERE rn = 1""",
-        [entity_id, scope, as_of],
+        [entity_id, scope, as_of, entity_id, scope, as_of],
     ).fetchall()
     unit, fy_starts = con.execute(
         "SELECT max(CASE level_of_rounding "

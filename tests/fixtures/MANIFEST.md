@@ -235,6 +235,12 @@ Inspected for Batch 10 but not committed: the other Reg. 30 files listed in docs
 | `discovery/nse_integrated-filing-results_equities_TCS_page2_20261114.json` | A7 pagination (fetched 2026-11-14): `page=2` returns rows 21-22 of `totalCount` 22 (Mar 2025 standalone, Dec 2024 Governance); no overlap with page 1 | `https://www.nseindia.com/api/integrated-filing-results?index=equities&symbol=TCS&page=2` | `38bb3a80b3052f51e813ad73588c537f74dea5e4996054e52be7a90639b54a89` |
 | `discovery/nse_integrated-filing-results_equities_ADANIGREEN_20261114.json` | A7: 10 of 20 rows have `broadcast_Date: null` (totalCount 36: two pages) | `https://www.nseindia.com/api/integrated-filing-results?index=equities&symbol=ADANIGREEN` | `128f7abe359a2ece747b37a36c2245c808b82b255ddfc6747e059d86a2ae65e9` |
 
+## Live-backfill parser regressions (fetched 2026-11-14)
+
+| File | Why it is here | Source URL | SHA-256 |
+|---|---|---|---|
+| `xbrl/AR_XBRL_SPARC_08092026160440.xml` | X77: `NumberOfShareholdersOfCompany` filed under an INR unit with sub-paise digits (1.42865); the whole annual filing failed to stage | `https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_SPARC_08092026160440.xml` | `afce2599db7364ffa7c1609ca539b5bc1a8be2c764ec7ddc062dccbb05c9badc` |
+
 ## Index closes and equity master (fetched 2026-11-14, one request each)
 
 | File | Why it is here | Source URL | SHA-256 |

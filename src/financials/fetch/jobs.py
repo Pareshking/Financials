@@ -138,6 +138,16 @@ class Jobs:
             self.vault.record_fetch(url, 404 if data is None else 200, utc_now(), data, self._ext(url))
         return data
 
+    def is_done(self, url: str, job: str) -> bool:
+        """Vaulted and staged. A file vaulted whose staging failed (e.g. a parser fixed since) is staged again from the
+        vault, never downloaded again."""
+        last = self.vault.last_fetch(url)
+        if not (last and last["status"] == 200 and self.vault.exists(last["storage_path"])):
+            return False
+        from financials.ids import stable_id
+
+        return (self.stage_root / job / stable_id("fil", "NSE", url, last["sha256"])).exists()
+
     def is_vaulted(self, url: str) -> bool:
         last = self.vault.last_fetch(url)
         return bool(last and last["status"] == 200 and self.vault.exists(last["storage_path"]))
@@ -239,7 +249,7 @@ class Jobs:
         elif latest_only:
             entries = entries[:1]
         for e in entries:
-            if self.is_vaulted(e.xbrl_url) or (xbrl := self._file(e.xbrl_url)) is None:
+            if self.is_done(e.xbrl_url, "shareholding") or (xbrl := self._file(e.xbrl_url)) is None:
                 continue
             out.append(
                 stage_shareholding(
@@ -258,7 +268,9 @@ class Jobs:
         out = [stage_raw_only(self.vault, self.stage_root, data=listing, ext="json", media_type=JSON,
                               category="ANNUAL_LISTING", source_url=url, fetched_at=utc_now())]  # fmt: skip
         for e in parse_annual_listing(listing):
-            if e.to_year < min_to_year or self.is_vaulted(e.xbrl_url) or (xbrl := self._file(e.xbrl_url)) is None:
+            if e.to_year < min_to_year or self.is_done(e.xbrl_url, "results_xbrl"):
+                continue
+            if (xbrl := self._file(e.xbrl_url)) is None:
                 continue
             out.append(
                 stage_results_xbrl(
@@ -284,7 +296,7 @@ class Jobs:
                 break
             page += 1
         for e in entries:
-            if e.period_end < MIN_PERIOD_END_DATE or self.is_vaulted(e.xbrl_url):
+            if e.period_end < MIN_PERIOD_END_DATE or self.is_done(e.xbrl_url, "results_xbrl"):
                 continue
             if (xbrl := self._file(e.xbrl_url)) is None:
                 continue

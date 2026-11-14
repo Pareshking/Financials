@@ -555,6 +555,7 @@ def map_line_items(inst: Instance, result: ParsedResults, curated: dict, *, dura
     result.facts[:] = enriched
     seen = {(f.canonical_tag, f.period_start, f.period_end) for f in result.facts}
     conflicts: dict[tuple, set] = {}
+    subpaise: list[str] = []
     pending: dict[tuple, CanonicalFact] = {}
 
     def period_of(ctx):
@@ -615,6 +616,11 @@ def map_line_items(inst: Instance, result: ParsedResults, curated: dict, *, dura
             value = f.decimal()
         except ParseError:
             continue
+        if unit == "INR" and value != value.quantize(Decimal("0.01")):
+            # X77: XBRL rupees are absolute, so a value with sub-paise digits under an INR unit is a mis-tagged count
+            # or quantity (BBTC NumberOfMeetingsOfBoard, ELECON product quantity): kept exactly, never as money.
+            unit = "INR_SUBPAISE"
+            subpaise.append(f.name)
         cf = CanonicalFact(key, ptype, start, end, months, unit, value, f.name, cat, parent)
         if k in pending and pending[k].value != value:
             conflicts.setdefault(k, set()).update({str(pending[k].value), str(value)})
@@ -627,6 +633,8 @@ def map_line_items(inst: Instance, result: ParsedResults, curated: dict, *, dura
         result.meta.setdefault("warnings", []).append(
             {"code": "LINE_ITEM_CONFLICT", "keys": sorted(f"{k[0]}@{k[2]}" for k in conflicts)}
         )
+    if subpaise:
+        result.meta.setdefault("warnings", []).append({"code": "INR_UNIT_SUBPAISE", "elements": sorted(set(subpaise))})
 
 
 def enrich_line_items(result: ParsedResults) -> None:

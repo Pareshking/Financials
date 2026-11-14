@@ -649,6 +649,7 @@ files:
 - AR_XBRL_MARUTI_08102026183654.xml
 - AR_XBRL_NAUKRI_23092026174127.xml
 - AR_XBRL_RELIANCE_16072026204945.xml
+- AR_XBRL_SPARC_08092026160440.xml
 - AR_XBRL_SRF_09082026022508.xml
 - AR_XBRL_SUNPHARMA_30102026194751.xml
 - AR_XBRL_TATAPOWER_06082025142114.xml
@@ -17435,7 +17436,7 @@ profiles:
     AdditionsOtherThanThroughBusinessCombinationsOtherIntangibleAssets:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_additions_other_than_through_business_combinations_other_intangible_assets
@@ -17445,7 +17446,7 @@ profiles:
     AdditionsOtherThanThroughBusinessCombinationsPropertyPlantAndEquipment:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_additions_other_than_through_business_combinations_property_plant_and_equipment
@@ -17455,7 +17456,7 @@ profiles:
     AdditionsToEquityShareWarrantsDuringPeriod:
       context_kinds:
       - duration_12m
-      filings: 5
+      filings: 6
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_additions_to_equity_share_warrants_during_period
@@ -17491,7 +17492,7 @@ profiles:
     AddressOfRegisteredOfficeOfCompany:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -17499,7 +17500,7 @@ profiles:
     AdjustedWeightedAverageShares:
       context_kinds:
       - duration_12m
-      filings: 7
+      filings: 8
       first_batch: B9
       line_item_category: PER_SHARE
       mapped_to: li_adjusted_weighted_average_shares
@@ -17529,7 +17530,7 @@ profiles:
     AdjustmentsForDecreaseIncreaseInOtherCurrentAssets:
       context_kinds:
       - duration_12m
-      filings: 8
+      filings: 9
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_other_current_assets
@@ -17549,7 +17550,7 @@ profiles:
     AdjustmentsForDecreaseIncreaseInTradeReceivablesCurrent:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_trade_receivables_current
@@ -17569,7 +17570,7 @@ profiles:
     AdjustmentsForDepreciationAndAmortisationExpense:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: cf_adj_depreciation
@@ -17599,7 +17600,7 @@ profiles:
     AdjustmentsForFinanceCosts:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: cf_adj_finance_costs
@@ -17619,7 +17620,7 @@ profiles:
     AdjustmentsForIncreaseDecreaseInOtherCurrentLiabilities:
       context_kinds:
       - duration_12m
-      filings: 8
+      filings: 9
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_other_current_liabilities
@@ -17639,7 +17640,7 @@ profiles:
     AdjustmentsForIncreaseDecreaseInTradePayablesCurrent:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_trade_payables_current
@@ -17649,7 +17650,7 @@ profiles:
     AdjustmentsForInterestIncome:
       context_kinds:
       - duration_12m
-      filings: 12
+      filings: 13
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: cf_adj_interest_income_deducted
@@ -17699,7 +17700,7 @@ profiles:
     AdjustmentsForProvisionsCurrent:
       context_kinds:
       - duration_12m
-      filings: 6
+      filings: 7
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_provisions_current
@@ -17719,7 +17720,7 @@ profiles:
     AdjustmentsForReconcileProfitLoss:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: cf_adjustments_total
@@ -17749,7 +17750,7 @@ profiles:
     AdjustmentsForUnrealisedForeignExchangeLossesGains:
       context_kinds:
       - duration_12m
-      filings: 10
+      filings: 11
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: li_adjustments_for_unrealised_foreign_exchange_losses_gains
@@ -17759,7 +17760,7 @@ profiles:
     AdvanceReceivedFromCustomers:
       context_kinds:
       - instant
-      filings: 10
+      filings: 11
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: advance_from_customers
@@ -17799,7 +17800,7 @@ profiles:
     AggregateAmountOfIncreaseInEquityShareCapitalDuringPeriod:
       context_kinds:
       - duration_12m
-      filings: 9
+      filings: 10
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_aggregate_amount_of_increase_in_equity_share_capital_during_period
@@ -17809,7 +17810,7 @@ profiles:
     AggregateAmountOfQuotedCurrentInvestments:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_aggregate_amount_of_quoted_current_investments
@@ -17829,7 +17830,7 @@ profiles:
     AggregateAmountOfUnquotedCurrentInvestments:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_aggregate_amount_of_unquoted_current_investments
@@ -17879,7 +17880,7 @@ profiles:
     AggregateNumberOfSharesIssuedDuringPeriod:
       context_kinds:
       - duration_12m
-      filings: 11
+      filings: 12
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_aggregate_number_of_shares_issued_during_period
@@ -17889,7 +17890,7 @@ profiles:
     AggregateProvisionForDiminutionInValueOfCurrentInvestments:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_aggregate_provision_for_diminution_in_value_of_current_investments
@@ -17929,17 +17930,17 @@ profiles:
     AmortisationExpense:
       context_kinds:
       - duration_12m
-      filings: 8
+      filings: 9
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_amortisation_expense
       numeric: true
-      parent_subtotal: other_expenses
+      parent_subtotal: depreciation_amortisation
       seen_negative: false
     AmortisationMethodOtherIntangibleAssets:
       context_kinds:
       - duration_12m
-      filings: 4
+      filings: 5
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -17947,7 +17948,7 @@ profiles:
     AmortisationOtherIntangibleAssets:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_amortisation_other_intangible_assets
@@ -17977,7 +17978,7 @@ profiles:
     AmountDueForTransferToInvestorEducationAndProtectionFund:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_amount_due_for_transfer_to_investor_education_and_protection_fund
@@ -17997,7 +17998,7 @@ profiles:
     AmountOfDividendsProposedToBeDistributedToEquityShareholders:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: EQUITY_NOTE
       mapped_to: li_amount_of_dividends_proposed_to_be_distributed_to_equity_shareholders
@@ -18027,7 +18028,7 @@ profiles:
     AmountOfOtherIssuesDuringPeriod:
       context_kinds:
       - duration_12m
-      filings: 7
+      filings: 8
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_amount_of_other_issues_during_period
@@ -18057,7 +18058,7 @@ profiles:
     AmountOfPerShareDividendProposedToBeDistributedToEquityShareholders:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PER_SHARE
       mapped_to: li_amount_of_per_share_dividend_proposed_to_be_distributed_to_equity_shareholders
@@ -18067,7 +18068,7 @@ profiles:
     AmountOfPerShareDividendProposedToBeDistributedToPreferenceShareholders:
       context_kinds:
       - duration_12m
-      filings: 5
+      filings: 6
       first_batch: B9
       line_item_category: PER_SHARE
       mapped_to: li_amount_of_per_share_dividend_proposed_to_be_distributed_to_preference_shareholders
@@ -18117,7 +18118,7 @@ profiles:
     AmountOfShareApplicationMoneyReceivedBackDuringYear:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_amount_of_share_application_money_received_back_during_year
@@ -18127,7 +18128,7 @@ profiles:
     AmountOfShareApplicationMoneyRepaidReturnedBackDuringYear:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_amount_of_share_application_money_repaid_returned_back_during_year
@@ -18147,7 +18148,7 @@ profiles:
     AmountOfSharesIssuedUnderEmployeeStockOptionPlan:
       context_kinds:
       - duration_12m
-      filings: 9
+      filings: 10
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_amount_of_shares_issued_under_employee_stock_option_plan
@@ -18237,7 +18238,7 @@ profiles:
     ApplicationMoneyReceivedForAllotmentOfSecuritiesAndDueForRefundAndInterestAccruedThereon:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_application_money_received_for_allotment_of_securities_and_due_for_refund_and_interest_accrued_thereon
@@ -18257,7 +18258,7 @@ profiles:
     ApplicationMoneyReceivedForAllotmentOfSecuritiesAndDueForRefundPrincipal:
       context_kinds:
       - instant
-      filings: 4
+      filings: 5
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_application_money_received_for_allotment_of_securities_and_due_for_refund_principal
@@ -18287,7 +18288,7 @@ profiles:
     Assets:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: total_assets
@@ -18317,7 +18318,7 @@ profiles:
     AverageEffectiveTaxRate:
       context_kinds:
       - duration_12m
-      filings: 6
+      filings: 7
       first_batch: B9
       line_item_category: TAX_NOTE
       mapped_to: li_average_effective_tax_rate
@@ -18347,7 +18348,7 @@ profiles:
     BadDebtsOfRelatedParties:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_bad_debts_of_related_parties
@@ -18357,7 +18358,7 @@ profiles:
     BalanceWithBanks:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_balance_with_banks
@@ -18387,7 +18388,7 @@ profiles:
     BalancesHeldWithBanksToExtentHeldAsMarginMoney:
       context_kinds:
       - instant
-      filings: 5
+      filings: 6
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_balances_held_with_banks_to_extent_held_as_margin_money
@@ -18397,7 +18398,7 @@ profiles:
     BalancesHeldWithBanksToExtentHeldAsMarginMoneyOrSecurityAgainstBorrowingsGuaranteesOrOtherCommitments:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_balances_held_with_banks_to_extent_held_as_margin_money_or_security_against_borrowings_guarantees_or_other_commitments
@@ -18407,7 +18408,7 @@ profiles:
     BankBalanceOtherThanCashAndCashEquivalents:
       context_kinds:
       - instant
-      filings: 12
+      filings: 13
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: bank_balances_other
@@ -18427,7 +18428,7 @@ profiles:
     BankDepositsWithMoreThan12MonthsMaturity:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_bank_deposits_with_more_than12_months_maturity
@@ -18447,23 +18448,23 @@ profiles:
     BasicEarningsLossPerShare:
       context_kinds:
       - duration_12m
-      filings: 11
+      filings: 12
       first_batch: B9
       line_item_category: PER_SHARE
       mapped_to: li_basic_earnings_loss_per_share
       numeric: true
       parent_subtotal: pat
-      seen_negative: false
+      seen_negative: true
     BasicEarningsLossPerShareFromContinuingOperations:
       context_kinds:
       - duration_12m
-      filings: 11
+      filings: 12
       first_batch: B9
       line_item_category: PER_SHARE
       mapped_to: eps_basic_continuing
       numeric: true
       parent_subtotal: pat
-      seen_negative: false
+      seen_negative: true
     BasicEarningsLossPerShareFromDiscontinuedOperations:
       context_kinds:
       - duration_12m
@@ -18515,7 +18516,7 @@ profiles:
     BorrowingsCurrent:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: borrowings_current
@@ -18525,7 +18526,7 @@ profiles:
     BorrowingsNoncurrent:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: borrowings_noncurrent
@@ -18535,7 +18536,7 @@ profiles:
     CSRExpenditure:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_csr_expenditure
@@ -18615,7 +18616,7 @@ profiles:
     CapitalSubsidiesOrGrantsReceivedFromGovernmentAuthorities:
       context_kinds:
       - duration_12m
-      filings: 7
+      filings: 8
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_capital_subsidies_or_grants_received_from_government_authorities
@@ -18625,7 +18626,7 @@ profiles:
     CapitalWorkInProgress:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: cwip
@@ -18655,7 +18656,7 @@ profiles:
     CashAndBankBalances:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_cash_and_bank_balances
@@ -18665,7 +18666,7 @@ profiles:
     CashAndCashEquivalents:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: cash_and_equivalents
@@ -18675,7 +18676,7 @@ profiles:
     CashAndCashEquivalentsCashFlowStatement:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: cash_cf_statement
@@ -18715,7 +18716,7 @@ profiles:
     CashFlowsFromUsedInFinancingActivities:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: cff
@@ -18725,7 +18726,7 @@ profiles:
     CashFlowsFromUsedInFinancingActivitiesContinuingOperations:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: li_cash_flows_from_used_in_financing_activities_continuing_operations
@@ -18745,7 +18746,7 @@ profiles:
     CashFlowsFromUsedInInvestingActivities:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: cfi
@@ -18755,7 +18756,7 @@ profiles:
     CashFlowsFromUsedInInvestingActivitiesContinuingOperations:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: li_cash_flows_from_used_in_investing_activities_continuing_operations
@@ -18775,23 +18776,23 @@ profiles:
     CashFlowsFromUsedInOperatingActivities:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: cfo
       numeric: true
       parent_subtotal: net_cash_flow
-      seen_negative: false
+      seen_negative: true
     CashFlowsFromUsedInOperatingActivitiesContinuingOperations:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: li_cash_flows_from_used_in_operating_activities_continuing_operations
       numeric: true
       parent_subtotal: cfo
-      seen_negative: false
+      seen_negative: true
     CashFlowsFromUsedInOperatingActivitiesDiscontinuedOperations:
       context_kinds:
       - duration_12m
@@ -18805,13 +18806,13 @@ profiles:
     CashFlowsFromUsedInOperations:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: cash_generated_from_operations
       numeric: true
       parent_subtotal: net_cash_flow
-      seen_negative: false
+      seen_negative: true
     CashFlowsUsedInObtainingControlOfSubsidiariesOrOtherBusinessesClassifiedAsInvestingActivities:
       context_kinds:
       - duration_12m
@@ -18825,7 +18826,7 @@ profiles:
     CashOnHand:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_cash_on_hand
@@ -18853,7 +18854,7 @@ profiles:
     ChangesInComprehensiveIncomeComponents:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: OCI
       mapped_to: li_changes_in_comprehensive_income_components
@@ -18863,7 +18864,7 @@ profiles:
     ChangesInEquity:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: EQUITY_NOTE
       mapped_to: li_changes_in_equity
@@ -18873,7 +18874,7 @@ profiles:
     ChangesInEquityShareWarrantsDuringPeriod:
       context_kinds:
       - duration_12m
-      filings: 5
+      filings: 6
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_changes_in_equity_share_warrants_during_period
@@ -18898,12 +18899,12 @@ profiles:
       line_item_category: PNL_EXPENSE
       mapped_to: li_changes_in_inventories_of_finished_goods
       numeric: true
-      parent_subtotal: other_expenses
+      parent_subtotal: changes_in_inventories
       seen_negative: true
     ChangesInInventoriesOfFinishedGoodsWorkInProgressAndStockInTrade:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: changes_in_inventories
@@ -18918,7 +18919,7 @@ profiles:
       line_item_category: PNL_EXPENSE
       mapped_to: li_changes_in_inventories_of_stock_in_trade
       numeric: true
-      parent_subtotal: other_expenses
+      parent_subtotal: changes_in_inventories
       seen_negative: true
     ChangesInInventoriesOfWorkInProgress:
       context_kinds:
@@ -18928,12 +18929,12 @@ profiles:
       line_item_category: PNL_EXPENSE
       mapped_to: li_changes_in_inventories_of_work_in_progress
       numeric: true
-      parent_subtotal: other_expenses
+      parent_subtotal: changes_in_inventories
       seen_negative: true
     ChangesInOtherIntangibleAssets:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_changes_in_other_intangible_assets
@@ -18943,12 +18944,12 @@ profiles:
     ChangesInOtherInventories:
       context_kinds:
       - duration_12m
-      filings: 3
+      filings: 4
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_changes_in_other_inventories
       numeric: true
-      parent_subtotal: other_expenses
+      parent_subtotal: changes_in_inventories
       seen_negative: true
     ChangesInOtherProvisions:
       context_kinds:
@@ -18963,7 +18964,7 @@ profiles:
     ChangesInPropertyPlantAndEquipment:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_changes_in_property_plant_and_equipment
@@ -18973,7 +18974,7 @@ profiles:
     ChangesOfNumberOfOtherEquityInstrumentsOutstandingInSharebasedPaymentArrangement:
       context_kinds:
       - duration_12m
-      filings: 6
+      filings: 7
       first_batch: B9
       line_item_category: SHARE_BASED_PAYMENT_NOTE
       mapped_to: li_changes_of_number_of_other_equity_instruments_outstanding_in_sharebased_payment_arrangement
@@ -19073,7 +19074,7 @@ profiles:
     Commitments:
       context_kinds:
       - instant
-      filings: 11
+      filings: 12
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_commitments
@@ -19091,7 +19092,7 @@ profiles:
     ComprehensiveIncome:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: OCI
       mapped_to: li_comprehensive_income
@@ -19141,7 +19142,7 @@ profiles:
     ComprehensiveIncomeEquity:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: OCI
       mapped_to: li_comprehensive_income_equity
@@ -19151,7 +19152,7 @@ profiles:
     ConsumptionOfStoresAndSpareParts:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_consumption_of_stores_and_spare_parts
@@ -19161,7 +19162,7 @@ profiles:
     ContentOfReport:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -19169,7 +19170,7 @@ profiles:
     ContingentLiabilities:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: contingent_liabilities
@@ -19179,7 +19180,7 @@ profiles:
     ContingentLiabilitiesAndCommitments:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: contingent_liabilities_and_commitments
@@ -19209,7 +19210,7 @@ profiles:
     ContractCost:
       context_kinds:
       - duration_12m
-      filings: 5
+      filings: 6
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_contract_cost
@@ -19219,7 +19220,7 @@ profiles:
     ContributionToProvidentAndOtherFunds:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_contribution_to_provident_and_other_funds
@@ -19229,7 +19230,7 @@ profiles:
     ContributionToProvidentAndOtherFundsForOthers:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_contribution_to_provident_and_other_funds_for_others
@@ -19249,7 +19250,7 @@ profiles:
     CorporateIdentityNumber:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -19287,12 +19288,22 @@ profiles:
     CostOfMaterialsConsumed:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: cost_of_materials_consumed
       numeric: true
       parent_subtotal: total_expenses
+      seen_negative: false
+    CostOtherTransporting:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: live-x77
+      line_item_category: PNL_EXPENSE
+      mapped_to: li_cost_other_transporting
+      numeric: true
+      parent_subtotal: other_expenses
       seen_negative: false
     CostRepairsMaintenanceOtherAssets:
       context_kinds:
@@ -19337,7 +19348,7 @@ profiles:
     CostTransportation:
       context_kinds:
       - duration_12m
-      filings: 6
+      filings: 7
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_cost_transportation
@@ -19383,7 +19394,7 @@ profiles:
     CurrentAdvances:
       context_kinds:
       - instant
-      filings: 12
+      filings: 13
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_current_advances
@@ -19393,7 +19404,7 @@ profiles:
     CurrentAndDeferredTaxRelatingToItemsChargedOrCreditedDirectlyToEquity:
       context_kinds:
       - duration_12m
-      filings: 4
+      filings: 5
       first_batch: B9
       line_item_category: EQUITY_NOTE
       mapped_to: li_current_and_deferred_tax_relating_to_items_charged_or_credited_directly_to_equity
@@ -19403,7 +19414,7 @@ profiles:
     CurrentAssets:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: current_assets
@@ -19413,7 +19424,7 @@ profiles:
     CurrentFinancialAssets:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: SUBTOTAL
       mapped_to: li_current_financial_assets
@@ -19423,7 +19434,7 @@ profiles:
     CurrentFinancialLiabilities:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: SUBTOTAL
       mapped_to: li_current_financial_liabilities
@@ -19433,7 +19444,7 @@ profiles:
     CurrentInvestments:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: current_investments
@@ -19443,7 +19454,7 @@ profiles:
     CurrentLiabilities:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: current_liabilities
@@ -19453,7 +19464,7 @@ profiles:
     CurrentLiabilitiesPortionOfShareApplicationMoneyPendingAllotment:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_current_liabilities_portion_of_share_application_money_pending_allotment
@@ -19473,17 +19484,17 @@ profiles:
     CurrentTax:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL
       mapped_to: current_tax
       numeric: true
       parent_subtotal: pat
-      seen_negative: false
+      seen_negative: true
     CurrentTaxAssets:
       context_kinds:
       - instant
-      filings: 4
+      filings: 5
       first_batch: B9
       line_item_category: TAX_NOTE
       mapped_to: li_current_tax_assets
@@ -19493,7 +19504,7 @@ profiles:
     CurrentTaxExpenseIncome:
       context_kinds:
       - duration_12m
-      filings: 11
+      filings: 12
       first_batch: B9
       line_item_category: TAX_NOTE
       mapped_to: li_current_tax_expense_income
@@ -19503,7 +19514,7 @@ profiles:
     CurrentTaxExpenseIncomeAndAdjustmentsForCurrentTaxOfPriorPeriods:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: TAX_NOTE
       mapped_to: li_current_tax_expense_income_and_adjustments_for_current_tax_of_prior_periods
@@ -19513,7 +19524,7 @@ profiles:
     CurrentTaxLiabilities:
       context_kinds:
       - instant
-      filings: 11
+      filings: 12
       first_batch: B9
       line_item_category: TAX_NOTE
       mapped_to: li_current_tax_liabilities
@@ -19523,13 +19534,13 @@ profiles:
     CurrentTaxPertainingToCurrentYear:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: TAX_NOTE
       mapped_to: li_current_tax_pertaining_to_current_year
       numeric: true
       parent_subtotal: tax_expense
-      seen_negative: false
+      seen_negative: true
     CurrentTaxPertainingToPreviousYears:
       context_kinds:
       - duration_12m
@@ -19559,7 +19570,7 @@ profiles:
     DateOfEndOfReportingPeriod:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -19583,7 +19594,7 @@ profiles:
     DateOfStartOfReportingPeriod:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -19591,7 +19602,7 @@ profiles:
     DebenturesClaimedButNotPaid:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_debentures_claimed_but_not_paid
@@ -19611,7 +19622,7 @@ profiles:
     DecreaseInEquityShareCapitalDuringPeriod:
       context_kinds:
       - duration_12m
-      filings: 9
+      filings: 10
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_decrease_in_equity_share_capital_during_period
@@ -19621,7 +19632,7 @@ profiles:
     DecreaseInNumberOfSharesDuringPeriod:
       context_kinds:
       - duration_12m
-      filings: 9
+      filings: 10
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_decrease_in_number_of_shares_during_period
@@ -19701,7 +19712,7 @@ profiles:
     DeductionsInEquityShareWarrantsDuringPeriod:
       context_kinds:
       - duration_12m
-      filings: 5
+      filings: 6
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_deductions_in_equity_share_warrants_during_period
@@ -19731,7 +19742,7 @@ profiles:
     DeferredTax:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL
       mapped_to: deferred_tax
@@ -19751,7 +19762,7 @@ profiles:
     DeferredTaxAssetsNet:
       context_kinds:
       - instant
-      filings: 10
+      filings: 11
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: deferred_tax_assets
@@ -19821,7 +19832,7 @@ profiles:
     DeferredTaxRelatingToItemsChargedOrCreditedDirectlyToEquity:
       context_kinds:
       - duration_12m
-      filings: 2
+      filings: 3
       first_batch: B9
       line_item_category: TAX_NOTE
       mapped_to: li_deferred_tax_relating_to_items_charged_or_credited_directly_to_equity
@@ -19836,12 +19847,12 @@ profiles:
       line_item_category: PNL_EXPENSE
       mapped_to: li_depletion_expense
       numeric: true
-      parent_subtotal: other_expenses
+      parent_subtotal: depreciation_amortisation
       seen_negative: true
     DepositsAcceptedOrRenewedDuringPeriod:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_deposits_accepted_or_renewed_during_period
@@ -19851,7 +19862,7 @@ profiles:
     DepositsMaturedAndClaimedButNotPaid:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_deposits_matured_and_claimed_but_not_paid
@@ -19861,7 +19872,7 @@ profiles:
     DepositsMaturedAndClaimedButNotPaidDuringPeriod:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_deposits_matured_and_claimed_but_not_paid_during_period
@@ -19871,7 +19882,7 @@ profiles:
     DepositsMaturedButNotClaimed:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_deposits_matured_but_not_claimed
@@ -19901,7 +19912,7 @@ profiles:
     DepreciationDepletionAndAmortisationExpense:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: depreciation_amortisation
@@ -19911,17 +19922,17 @@ profiles:
     DepreciationExpense:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_depreciation_expense
       numeric: true
-      parent_subtotal: other_expenses
+      parent_subtotal: depreciation_amortisation
       seen_negative: false
     DepreciationMethodBiologicalAssetsOtherThanBearerPlantsAtCost:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -19929,7 +19940,7 @@ profiles:
     DepreciationMethodInvestmentPropertyCostModel:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -19937,7 +19948,7 @@ profiles:
     DepreciationMethodPropertyPlantAndEquipment:
       context_kinds:
       - duration_12m
-      filings: 10
+      filings: 11
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -19945,7 +19956,7 @@ profiles:
     DepreciationPropertyPlantAndEquipment:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_depreciation_property_plant_and_equipment
@@ -19965,7 +19976,7 @@ profiles:
     DepreciationRecognisedInProfitOrLoss:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_depreciation_recognised_in_profit_or_loss
@@ -19995,7 +20006,7 @@ profiles:
     DerivativeLiabilities:
       context_kinds:
       - instant
-      filings: 6
+      filings: 7
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_derivative_liabilities
@@ -20012,6 +20023,14 @@ profiles:
       numeric: true
       parent_subtotal: total_liabilities
       seen_negative: false
+    DescriptionOfAccountingPolicyForBorrowingCostsExplanatory:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: live-x77
+      mapped_to: null
+      numeric: false
+      seen_negative: false
     DescriptionOfAccountingPolicyForBusinessCombinationsExplanatory:
       context_kinds:
       - duration_12m
@@ -20023,7 +20042,7 @@ profiles:
     DescriptionOfAccountingPolicyForContingentLiabilitiesAndContingentAssetsExplanatory:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20031,8 +20050,16 @@ profiles:
     DescriptionOfAccountingPolicyForDeferredIncomeTaxExplanatory:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: B9
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DescriptionOfAccountingPolicyForDerecognitionOfFinancialInstrumentsExplanatory:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: live-x77
       mapped_to: null
       numeric: false
       seen_negative: false
@@ -20055,7 +20082,7 @@ profiles:
     DescriptionOfAccountingPolicyForEmployeeBenefitsExplanatory:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20071,7 +20098,7 @@ profiles:
     DescriptionOfAccountingPolicyForFinancialAssetsExplanatory:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20087,7 +20114,7 @@ profiles:
     DescriptionOfAccountingPolicyForFinancialLiabilitiesExplanatory:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20095,7 +20122,7 @@ profiles:
     DescriptionOfAccountingPolicyForForeignCurrencyTranslationExplanatory:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20103,7 +20130,7 @@ profiles:
     DescriptionOfAccountingPolicyForGovernmentGrantsExplanatory:
       context_kinds:
       - duration_12m
-      filings: 5
+      filings: 6
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20111,7 +20138,7 @@ profiles:
     DescriptionOfAccountingPolicyForImpairmentOfFinancialAssetsExplanatory:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20119,7 +20146,7 @@ profiles:
     DescriptionOfAccountingPolicyForImpairmentOfNonfinancialAssetsExplanatory:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20127,7 +20154,7 @@ profiles:
     DescriptionOfAccountingPolicyForIncomeTaxExplanatory:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20140,10 +20167,18 @@ profiles:
       mapped_to: null
       numeric: false
       seen_negative: false
-    DescriptionOfAccountingPolicyForLeasesExplanatory:
+    DescriptionOfAccountingPolicyForIntangibleAssetsOtherThanGoodwillExplanatory:
       context_kinds:
       - duration_12m
       filings: 1
+      first_batch: live-x77
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DescriptionOfAccountingPolicyForLeasesExplanatory:
+      context_kinds:
+      - duration_12m
+      filings: 2
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20167,7 +20202,7 @@ profiles:
     DescriptionOfAccountingPolicyForPropertyPlantAndEquipmentExplanatory:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20175,23 +20210,39 @@ profiles:
     DescriptionOfAccountingPolicyForProvisionsExplanatory:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: B9
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DescriptionOfAccountingPolicyForReclassificationOfFinancialInstrumentsExplanatory:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: live-x77
       mapped_to: null
       numeric: false
       seen_negative: false
     DescriptionOfAccountingPolicyForRecognitionOfRevenueExplanatory:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: B9
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DescriptionOfAccountingPolicyForResearchAndDevelopmentExpenseExplanatory:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: live-x77
       mapped_to: null
       numeric: false
       seen_negative: false
     DescriptionOfAccountingPolicyForSegmentReportingExplanatory:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20225,7 +20276,7 @@ profiles:
     DescriptionOfExpiryDateOfTemporaryDifferencesUnusedTaxLossesAndUnusedTaxCredits:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20241,7 +20292,7 @@ profiles:
     DescriptionOfManagingLiquidityRiskExplanatory:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20257,7 +20308,7 @@ profiles:
     DescriptionOfNatureAndExtentOfGovernmentGrantsRecognisedInFinancialStatements:
       context_kinds:
       - duration_12m
-      filings: 5
+      filings: 6
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20307,7 +20358,7 @@ profiles:
     DescriptionOfOtherAccountingPoliciesRelevantToUnderstandingOfFinancialStatementsExplanatory:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20339,7 +20390,7 @@ profiles:
     DescriptionOfPresentationCurrency:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20437,7 +20488,7 @@ profiles:
     DetailsOfNatureOfExceptionalItems:
       context_kinds:
       - duration_12m
-      filings: 9
+      filings: 10
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20509,23 +20560,23 @@ profiles:
     DilutedEarningsLossPerShare:
       context_kinds:
       - duration_12m
-      filings: 11
+      filings: 12
       first_batch: B9
       line_item_category: PER_SHARE
       mapped_to: li_diluted_earnings_loss_per_share
       numeric: true
       parent_subtotal: pat
-      seen_negative: false
+      seen_negative: true
     DilutedEarningsLossPerShareFromContinuingOperations:
       context_kinds:
       - duration_12m
-      filings: 11
+      filings: 12
       first_batch: B9
       line_item_category: PER_SHARE
       mapped_to: li_diluted_earnings_loss_per_share_from_continuing_operations
       numeric: true
       parent_subtotal: pat
-      seen_negative: false
+      seen_negative: true
     DilutedEarningsLossPerShareFromDiscontinuedOperations:
       context_kinds:
       - duration_12m
@@ -20569,7 +20620,7 @@ profiles:
     DirectorsSittingFees:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: REMUNERATION_NOTE
       mapped_to: li_directors_sitting_fees
@@ -20587,7 +20638,7 @@ profiles:
     DisclosureInAuditorsReportExplanatory:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20619,7 +20670,7 @@ profiles:
     DisclosureOfAdditionalBalanceSheetNotesExplanatory:
       context_kinds:
       - duration_12m
-      filings: 11
+      filings: 12
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20667,7 +20718,7 @@ profiles:
     DisclosureOfChangesInAccountingPoliciesAccountingEstimatesAndErrorsExplanatory:
       context_kinds:
       - duration_12m
-      filings: 2
+      filings: 3
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20707,7 +20758,7 @@ profiles:
     DisclosureOfCorporateInformationNotesAndOtherExplanatoryInformation:
       context_kinds:
       - duration_12m
-      filings: 8
+      filings: 9
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20723,7 +20774,7 @@ profiles:
     DisclosureOfCreditRiskExplanatory:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20771,7 +20822,7 @@ profiles:
     DisclosureOfEmployeeBenefitsExplanatory:
       context_kinds:
       - duration_12m
-      filings: 12
+      filings: 13
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20779,7 +20830,7 @@ profiles:
     DisclosureOfEntitysReportableSegmentsExplanatory:
       context_kinds:
       - duration_12m
-      filings: 10
+      filings: 11
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20811,7 +20862,7 @@ profiles:
     DisclosureOfFairValueMeasurementExplanatory:
       context_kinds:
       - duration_12m
-      filings: 4
+      filings: 5
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20819,7 +20870,7 @@ profiles:
     DisclosureOfFinancialInstrumentsByTypeOfInterestRateExplanatory:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20827,7 +20878,7 @@ profiles:
     DisclosureOfFinancialInstrumentsExplanatory:
       context_kinds:
       - duration_12m
-      filings: 9
+      filings: 10
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20915,7 +20966,7 @@ profiles:
     DisclosureOfLeasesExplanatory:
       context_kinds:
       - duration_12m
-      filings: 8
+      filings: 9
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20923,7 +20974,7 @@ profiles:
     DisclosureOfNatureAndExtentOfRisksArisingFromFinancialInstrumentsExplanatory:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20955,7 +21006,7 @@ profiles:
     DisclosureOfNotesOnCashAndBankBalancesExplanatory:
       context_kinds:
       - duration_12m
-      filings: 3
+      filings: 4
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -20963,7 +21014,7 @@ profiles:
     DisclosureOfNotesOnChangesInEquityExplanatory:
       context_kinds:
       - duration_12m
-      filings: 11
+      filings: 12
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -21011,7 +21062,7 @@ profiles:
     DisclosureOfNotesOnEquityShareCapitalExplanatory:
       context_kinds:
       - duration_12m
-      filings: 11
+      filings: 12
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -21027,7 +21078,7 @@ profiles:
     DisclosureOfNotesOnLoansExplanatory:
       context_kinds:
       - duration_12m
-      filings: 4
+      filings: 5
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -21123,7 +21174,7 @@ profiles:
     DisclosureOfNotesOnTradeReceivablesExplanatory:
       context_kinds:
       - duration_12m
-      filings: 7
+      filings: 8
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -21141,6 +21192,14 @@ profiles:
       - duration_12m
       filings: 1
       first_batch: B9
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DisclosureOfObjectivesPoliciesAndProcessesForManagingCapitalExplanatory:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: live-x77
       mapped_to: null
       numeric: false
       seen_negative: false
@@ -21179,7 +21238,7 @@ profiles:
     DisclosureOfOtherProvisionsContingentLiabilitiesAndContingentAssetsExplanatory:
       context_kinds:
       - duration_12m
-      filings: 4
+      filings: 5
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -21203,7 +21262,7 @@ profiles:
     DisclosureOfPropertyPlantAndEquipmentExplanatory:
       context_kinds:
       - duration_12m
-      filings: 12
+      filings: 13
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -21243,7 +21302,7 @@ profiles:
     DisclosureOfRelatedPartyExplanatory:
       context_kinds:
       - duration_12m
-      filings: 10
+      filings: 11
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -21259,7 +21318,7 @@ profiles:
     DisclosureOfRevenueExplanatory:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -21267,7 +21326,7 @@ profiles:
     DisclosureOfSegmentsMajorCustomersExplanatory:
       context_kinds:
       - duration_12m
-      filings: 2
+      filings: 3
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -21331,8 +21390,16 @@ profiles:
     DisclosureOfSummaryOfSignificantAccountingPoliciesExplanatory:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DisclosureOfTemporaryDifferenceUnusedTaxLossesAndUnusedTaxCreditsExplanatory:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: live-x77
       mapped_to: null
       numeric: false
       seen_negative: false
@@ -21341,6 +21408,14 @@ profiles:
       - duration_12m
       filings: 3
       first_batch: B9
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DisclosureOfWhetherAllAssetsAndLiabilitiesAreRegisteredWithCompany:
+      context_kinds:
+      - instant
+      filings: 1
+      first_batch: live-x77
       mapped_to: null
       numeric: false
       seen_negative: false
@@ -21408,10 +21483,20 @@ profiles:
       mapped_to: null
       numeric: false
       seen_negative: false
+    DiscountIssueDebenturesWrittenOff:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: live-x77
+      line_item_category: PNL_EXPENSE
+      mapped_to: li_discount_issue_debentures_written_off
+      numeric: true
+      parent_subtotal: other_expenses
+      seen_negative: false
     DiscountIssueSharesDebenturesWrittenOff:
       context_kinds:
       - duration_12m
-      filings: 4
+      filings: 5
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_discount_issue_shares_debentures_written_off
@@ -21441,7 +21526,7 @@ profiles:
     DisposalsAndRetirementsPropertyPlantAndEquipment:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_disposals_and_retirements_property_plant_and_equipment
@@ -21471,7 +21556,7 @@ profiles:
     DisposalsPropertyPlantAndEquipment:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_disposals_property_plant_and_equipment
@@ -21491,7 +21576,7 @@ profiles:
     DividendIncome:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_dividend_income
@@ -21541,7 +21626,7 @@ profiles:
     DividendIncomeNoncurrentEquitySecurities:
       context_kinds:
       - duration_12m
-      filings: 2
+      filings: 3
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_dividend_income_noncurrent_equity_securities
@@ -21551,7 +21636,7 @@ profiles:
     DividendIncomeNoncurrentInvestments:
       context_kinds:
       - duration_12m
-      filings: 10
+      filings: 11
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_dividend_income_noncurrent_investments
@@ -21561,10 +21646,30 @@ profiles:
     DividendIncomeNoncurrentInvestmentsFromOthers:
       context_kinds:
       - duration_12m
-      filings: 4
+      filings: 5
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_dividend_income_noncurrent_investments_from_others
+      numeric: true
+      parent_subtotal: other_income
+      seen_negative: false
+    DividendIncomeNoncurrentInvestmentsFromSubsidiaries:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: live-x77
+      line_item_category: PNL_INCOME
+      mapped_to: li_dividend_income_noncurrent_investments_from_subsidiaries
+      numeric: true
+      parent_subtotal: other_income
+      seen_negative: false
+    DividendIncomeNoncurrentMutualFunds:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: live-x77
+      line_item_category: PNL_INCOME
+      mapped_to: li_dividend_income_noncurrent_mutual_funds
       numeric: true
       parent_subtotal: other_income
       seen_negative: false
@@ -21651,7 +21756,7 @@ profiles:
     DomesticRevenueServices:
       context_kinds:
       - duration_12m
-      filings: 12
+      filings: 13
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_domestic_revenue_services
@@ -21719,7 +21824,7 @@ profiles:
     EffectOfExchangeRateChangesOnCashAndCashEquivalents:
       context_kinds:
       - duration_12m
-      filings: 8
+      filings: 9
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: fx_effect_on_cash
@@ -21747,7 +21852,7 @@ profiles:
     EmployeeBenefitExpense:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: employee_benefit_expense
@@ -21797,17 +21902,17 @@ profiles:
     Equity:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: total_equity
       numeric: true
       parent_subtotal: null
-      seen_negative: false
+      seen_negative: true
     EquityAndLiabilities:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: total_equity_and_liabilities
@@ -21837,13 +21942,13 @@ profiles:
     EquityAttributableToOwnersOfParent:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: equity_attributable_to_owners
       numeric: true
       parent_subtotal: total_equity
-      seen_negative: false
+      seen_negative: true
     EquityDividendTaxAppropriation:
       context_kinds:
       - duration_12m
@@ -21857,7 +21962,7 @@ profiles:
     EquityShareCapital:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: equity_share_capital
@@ -21867,7 +21972,7 @@ profiles:
     EquityShareWarrants:
       context_kinds:
       - instant
-      filings: 6
+      filings: 7
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_equity_share_warrants
@@ -21877,7 +21982,7 @@ profiles:
     EquityShareWarrantsForExistingMembers:
       context_kinds:
       - instant
-      filings: 6
+      filings: 7
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_equity_share_warrants_for_existing_members
@@ -21887,7 +21992,7 @@ profiles:
     EquityShareWarrantsForOthers:
       context_kinds:
       - instant
-      filings: 6
+      filings: 7
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_equity_share_warrants_for_others
@@ -21897,7 +22002,7 @@ profiles:
     EstimatedAmountOfContractsRemainingToBeExecutedOnCapitalAccountAndNotProvidedFor:
       context_kinds:
       - instant
-      filings: 11
+      filings: 12
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_estimated_amount_of_contracts_remaining_to_be_executed_on_capital_account_and_not_provided_for
@@ -21918,7 +22023,7 @@ profiles:
       context_kinds:
       - duration_12m
       duplicate_of: exceptional_items
-      filings: 10
+      filings: 11
       first_batch: B9
       line_item_category: SUBTOTAL
       mapped_to: li_exceptional_items
@@ -21928,7 +22033,7 @@ profiles:
     ExceptionalItemsBeforeTax:
       context_kinds:
       - duration_12m
-      filings: 9
+      filings: 10
       first_batch: B9
       line_item_category: PNL
       mapped_to: exceptional_items
@@ -22005,6 +22110,16 @@ profiles:
       numeric: true
       parent_subtotal: null
       seen_negative: false
+    ExpenditureOnProductionTransportationAndOtherExpenditurePertainingToExplorationAndProductionActivities:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: live-x77
+      line_item_category: PNL_EXPENSE
+      mapped_to: li_expenditure_on_production_transportation_and_other_expenditure_pertaining_to_exploration_and_production_activities
+      numeric: true
+      parent_subtotal: other_expenses
+      seen_negative: false
     ExpenseArisingFromExplorationForAndEvaluationOfMineralResources:
       context_kinds:
       - duration_12m
@@ -22028,7 +22143,7 @@ profiles:
     Expenses:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL
       mapped_to: total_expenses
@@ -22054,7 +22169,7 @@ profiles:
     ExplanationOfUnfulfilledConditionsAndOtherContingenciesAttachingToGovernmentAssistance:
       context_kinds:
       - duration_12m
-      filings: 5
+      filings: 6
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -22062,7 +22177,7 @@ profiles:
     ExportRevenueServices:
       context_kinds:
       - duration_12m
-      filings: 5
+      filings: 6
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_export_revenue_services
@@ -22082,7 +22197,7 @@ profiles:
     ExportSaleTradedGoods:
       context_kinds:
       - duration_12m
-      filings: 2
+      filings: 3
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_export_sale_traded_goods
@@ -22092,7 +22207,7 @@ profiles:
     ExportTurnoverGoodsGross:
       context_kinds:
       - duration_12m
-      filings: 9
+      filings: 10
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_export_turnover_goods_gross
@@ -22132,7 +22247,7 @@ profiles:
     FinanceCosts:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: finance_costs
@@ -22142,7 +22257,7 @@ profiles:
     FixedDepositsWithBanks:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_fixed_deposits_with_banks
@@ -22172,7 +22287,7 @@ profiles:
     GainOnDisposalOfIntangibleAssets:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_gain_on_disposal_of_intangible_assets
@@ -22192,7 +22307,7 @@ profiles:
     GainsLossesOnChangeInFairValueOfDerivatives:
       context_kinds:
       - duration_12m
-      filings: 4
+      filings: 5
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_gains_losses_on_change_in_fair_value_of_derivatives
@@ -22232,7 +22347,7 @@ profiles:
     GainsLossesOnDisposalsOfInvestments:
       context_kinds:
       - duration_12m
-      filings: 4
+      filings: 5
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_gains_losses_on_disposals_of_investments
@@ -22242,7 +22357,7 @@ profiles:
     GainsLossesOnDisposalsOfNoncurrentAssets:
       context_kinds:
       - duration_12m
-      filings: 4
+      filings: 5
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_gains_losses_on_disposals_of_noncurrent_assets
@@ -22252,7 +22367,7 @@ profiles:
     GainsLossesOnDisposalsOfPropertyPlantAndEquipment:
       context_kinds:
       - duration_12m
-      filings: 4
+      filings: 5
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_gains_losses_on_disposals_of_property_plant_and_equipment
@@ -22262,7 +22377,7 @@ profiles:
     GainsLossesOnExchangeDifferencesOnTranslationBeforeTax:
       context_kinds:
       - duration_12m
-      filings: 7
+      filings: 8
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_gains_losses_on_exchange_differences_on_translation_before_tax
@@ -22292,7 +22407,7 @@ profiles:
     GainsLossesOnLitigationSettlements:
       context_kinds:
       - duration_12m
-      filings: 4
+      filings: 5
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_gains_losses_on_litigation_settlements
@@ -22302,7 +22417,7 @@ profiles:
     GainsOnDisposalsOfInvestments:
       context_kinds:
       - duration_12m
-      filings: 2
+      filings: 3
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_gains_on_disposals_of_investments
@@ -22312,7 +22427,7 @@ profiles:
     GainsOnDisposalsOfPropertyPlantAndEquipment:
       context_kinds:
       - duration_12m
-      filings: 2
+      filings: 3
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_gains_on_disposals_of_property_plant_and_equipment
@@ -22332,7 +22447,7 @@ profiles:
     Goodwill:
       context_kinds:
       - instant
-      filings: 10
+      filings: 11
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: goodwill
@@ -22382,7 +22497,7 @@ profiles:
     GrossValueOfTransactionWithRelatedParties:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_gross_value_of_transaction_with_related_parties
@@ -22392,17 +22507,17 @@ profiles:
     GrossValueOfTransactionsWithRelatedParties:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_gross_value_of_transactions_with_related_parties
       numeric: true
       parent_subtotal: null
-      seen_negative: false
+      seen_negative: true
     Guarantees:
       context_kinds:
       - instant
-      filings: 4
+      filings: 5
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_guarantees
@@ -22436,7 +22551,7 @@ profiles:
     ImpairmentLossOnFinancialAssets:
       context_kinds:
       - duration_12m
-      filings: 6
+      filings: 7
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_impairment_loss_on_financial_assets
@@ -22456,7 +22571,7 @@ profiles:
     ImpairmentLossOnFinancialAssetsOther:
       context_kinds:
       - duration_12m
-      filings: 2
+      filings: 3
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_impairment_loss_on_financial_assets_other
@@ -22466,10 +22581,20 @@ profiles:
     ImpairmentLossOnNonFinancialAssets:
       context_kinds:
       - duration_12m
-      filings: 5
+      filings: 6
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_impairment_loss_on_non_financial_assets
+      numeric: true
+      parent_subtotal: other_expenses
+      seen_negative: false
+    ImpairmentLossOnNonFinancialAssetsOthers:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: live-x77
+      line_item_category: PNL_EXPENSE
+      mapped_to: li_impairment_loss_on_non_financial_assets_others
       numeric: true
       parent_subtotal: other_expenses
       seen_negative: false
@@ -22546,7 +22671,7 @@ profiles:
     ImpairmentLossReversalOfImpairmentLossRecognisedInProfitOrLossTradeReceivables:
       context_kinds:
       - duration_12m
-      filings: 4
+      filings: 5
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_impairment_loss_reversal_of_impairment_loss_recognised_in_profit_or_loss_trade_receivables
@@ -22556,7 +22681,7 @@ profiles:
     Income:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL
       mapped_to: total_income
@@ -22606,7 +22731,7 @@ profiles:
     IncomeTaxExpenseContinuingOperations:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: TAX_NOTE
       mapped_to: li_income_tax_expense_continuing_operations
@@ -22706,13 +22831,13 @@ profiles:
     IncomeTaxesPaidRefund:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: income_taxes_paid_total
       numeric: true
       parent_subtotal: net_cash_flow
-      seen_negative: false
+      seen_negative: true
     IncomeTaxesPaidRefundClassifiedAsInvestingActivities:
       context_kinds:
       - duration_12m
@@ -22726,17 +22851,17 @@ profiles:
     IncomeTaxesPaidRefundClassifiedAsOperatingActivities:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: income_taxes_paid
       numeric: true
       parent_subtotal: net_cash_flow
-      seen_negative: false
+      seen_negative: true
     IncreaseDecreaseInCashAndCashEquivalents:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: net_cash_flow_after_fx
@@ -22746,7 +22871,7 @@ profiles:
     IncreaseDecreaseInCashAndCashEquivalentsBeforeEffectOfExchangeRateChanges:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: net_cash_flow
@@ -22776,7 +22901,7 @@ profiles:
     IncreaseDecreaseInEquityShareCapital:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_increase_decrease_in_equity_share_capital
@@ -22816,7 +22941,7 @@ profiles:
     IncreaseDecreaseInNumberOfSharesOutstanding:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_increase_decrease_in_number_of_shares_outstanding
@@ -22896,13 +23021,13 @@ profiles:
     IncreaseDecreaseThroughNetExchangeDifferencesPropertyPlantAndEquipment:
       context_kinds:
       - duration_12m
-      filings: 6
+      filings: 7
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_increase_decrease_through_net_exchange_differences_property_plant_and_equipment
       numeric: true
       parent_subtotal: ppe_net
-      seen_negative: false
+      seen_negative: true
     IncreaseDecreaseThroughOtherChangesGoodwill:
       context_kinds:
       - duration_12m
@@ -22926,7 +23051,7 @@ profiles:
     IncreaseDecreaseThroughOtherChangesPropertyPlantAndEquipment:
       context_kinds:
       - duration_12m
-      filings: 9
+      filings: 10
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_increase_decrease_through_other_changes_property_plant_and_equipment
@@ -22976,7 +23101,7 @@ profiles:
     IncreaseDecreaseThroughTransfersAndOtherChangesPropertyPlantAndEquipment:
       context_kinds:
       - duration_12m
-      filings: 11
+      filings: 12
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_increase_decrease_through_transfers_and_other_changes_property_plant_and_equipment
@@ -23036,7 +23161,7 @@ profiles:
     IndicationOfOtherFormsOfGovernmentAssistanceWithDirectBenefitsForEntity:
       context_kinds:
       - duration_12m
-      filings: 5
+      filings: 6
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -23054,7 +23179,7 @@ profiles:
     Insurance:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_insurance
@@ -23064,7 +23189,7 @@ profiles:
     IntangibleAssetsUnderDevelopment:
       context_kinds:
       - instant
-      filings: 7
+      filings: 8
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: intangibles_under_development
@@ -23074,7 +23199,7 @@ profiles:
     InterestAccruedOnBorrowings:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_interest_accrued_on_borrowings
@@ -23084,7 +23209,7 @@ profiles:
     InterestAccruedOnPublicDeposits:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_interest_accrued_on_public_deposits
@@ -23094,7 +23219,7 @@ profiles:
     InterestAccruedOthers:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_interest_accrued_others
@@ -23124,7 +23249,7 @@ profiles:
     InterestExpense:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_interest_expense
@@ -23144,7 +23269,7 @@ profiles:
     InterestExpenseBorrowings:
       context_kinds:
       - duration_12m
-      filings: 4
+      filings: 5
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_interest_expense_borrowings
@@ -23254,7 +23379,7 @@ profiles:
     InterestIncome:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_interest_income
@@ -23274,7 +23399,7 @@ profiles:
     InterestIncomeOnCurrentInvestments:
       context_kinds:
       - duration_12m
-      filings: 12
+      filings: 13
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_interest_income_on_current_investments
@@ -23284,7 +23409,7 @@ profiles:
     InterestIncomeOnNoncurrentInvestments:
       context_kinds:
       - duration_12m
-      filings: 7
+      filings: 8
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_interest_income_on_noncurrent_investments
@@ -23294,7 +23419,7 @@ profiles:
     InterestLeaseFinancing:
       context_kinds:
       - duration_12m
-      filings: 8
+      filings: 9
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_interest_lease_financing
@@ -23324,7 +23449,7 @@ profiles:
     InterestOnDepositsAccruedAndDueButNotPaid:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_interest_on_deposits_accrued_and_due_but_not_paid
@@ -23334,7 +23459,7 @@ profiles:
     InterestOnFixedDepositsCurrentInvestments:
       context_kinds:
       - duration_12m
-      filings: 10
+      filings: 11
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_interest_on_fixed_deposits_current_investments
@@ -23394,7 +23519,7 @@ profiles:
     InterestOnOtherCurrentInvestments:
       context_kinds:
       - duration_12m
-      filings: 8
+      filings: 9
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_interest_on_other_current_investments
@@ -23404,7 +23529,7 @@ profiles:
     InterestOnOtherNoncurrentInvestments:
       context_kinds:
       - duration_12m
-      filings: 6
+      filings: 7
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_interest_on_other_noncurrent_investments
@@ -23414,7 +23539,7 @@ profiles:
     InterestPaidClassifiedAsFinancingActivities:
       context_kinds:
       - duration_12m
-      filings: 11
+      filings: 12
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: interest_paid_financing
@@ -23424,7 +23549,7 @@ profiles:
     InterestReceivedClassifiedAsInvestingActivities:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: interest_received_investing
@@ -23454,7 +23579,7 @@ profiles:
     InterestUnclaimedAmount:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_interest_unclaimed_amount
@@ -23484,7 +23609,7 @@ profiles:
     Inventories:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: inventories
@@ -23514,7 +23639,7 @@ profiles:
     InvestmentInGovernmentCompanies:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_investment_in_government_companies
@@ -23524,7 +23649,7 @@ profiles:
     InvestmentInSubsidiaryCompanies:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_investment_in_subsidiary_companies
@@ -23534,7 +23659,7 @@ profiles:
     InvestmentProperty:
       context_kinds:
       - instant
-      filings: 6
+      filings: 7
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: investment_property
@@ -23624,7 +23749,7 @@ profiles:
     LevelOfRoundingUsedInFinancialStatements:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -23632,7 +23757,7 @@ profiles:
     Liabilities:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: total_liabilities
@@ -23692,7 +23817,7 @@ profiles:
     LoansCurrent:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: loans_current
@@ -23702,7 +23827,7 @@ profiles:
     LoansNoncurrent:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: loans_noncurrent
@@ -23720,7 +23845,7 @@ profiles:
     LossOnDisposalDiscardDemolishmentAndDestructionOfDepreciablePropertyPlantAndEquipment:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_loss_on_disposal_discard_demolishment_and_destruction_of_depreciable_property_plant_and_equipment
@@ -23730,17 +23855,57 @@ profiles:
     LossOnDisposalOfIntangibleAssets:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_loss_on_disposal_of_intangible_assets
       numeric: true
       parent_subtotal: other_income
       seen_negative: false
+    LossesOnChangeInFairValueOfDerivatives:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: live-x77
+      line_item_category: PNL_EXPENSE
+      mapped_to: li_losses_on_change_in_fair_value_of_derivatives
+      numeric: true
+      parent_subtotal: other_expenses
+      seen_negative: false
+    LossesOnDisposalsOfNoncurrentAssets:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: live-x77
+      line_item_category: ASSET_MOVEMENT
+      mapped_to: li_losses_on_disposals_of_noncurrent_assets
+      numeric: true
+      parent_subtotal: ppe_net
+      seen_negative: false
+    LossesOnDisposalsOfPropertyPlantAndEquipment:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: live-x77
+      line_item_category: ASSET_MOVEMENT
+      mapped_to: li_losses_on_disposals_of_property_plant_and_equipment
+      numeric: true
+      parent_subtotal: ppe_net
+      seen_negative: false
+    LossesOnLitigationSettlements:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: live-x77
+      line_item_category: PNL_EXPENSE
+      mapped_to: li_losses_on_litigation_settlements
+      numeric: true
+      parent_subtotal: other_expenses
+      seen_negative: false
     ManagerialRemuneration:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: REMUNERATION_NOTE
       mapped_to: li_managerial_remuneration
@@ -23750,7 +23915,7 @@ profiles:
     MarketValueOfQuotedCurrentInvestments:
       context_kinds:
       - instant
-      filings: 12
+      filings: 13
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_market_value_of_quoted_current_investments
@@ -23788,7 +23953,7 @@ profiles:
     MaturityAnalysisForNonderivativeFinancialLiabilitiesExplanatory:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -23856,7 +24021,7 @@ profiles:
     MiscellaneousExpenses:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_miscellaneous_expenses
@@ -23866,7 +24031,7 @@ profiles:
     MiscellaneousOtherNonoperatingIncome:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_miscellaneous_other_nonoperating_income
@@ -23876,7 +24041,7 @@ profiles:
     MiscellaneousOtherOperatingRevenues:
       context_kinds:
       - duration_12m
-      filings: 10
+      filings: 11
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_miscellaneous_other_operating_revenues
@@ -23910,7 +24075,7 @@ profiles:
     NameOfCompany:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -23982,7 +24147,7 @@ profiles:
     NatureOfReportStandaloneConsolidated:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -23998,7 +24163,7 @@ profiles:
     NetGainLossOnForeignCurrencyFluctuationsTreatedAsOtherIncome:
       context_kinds:
       - duration_12m
-      filings: 7
+      filings: 8
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_net_gain_loss_on_foreign_currency_fluctuations_treated_as_other_income
@@ -24028,7 +24193,7 @@ profiles:
     NetGainLossOnSaleOfCurrentInvestments:
       context_kinds:
       - duration_12m
-      filings: 9
+      filings: 10
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_net_gain_loss_on_sale_of_current_investments
@@ -24038,7 +24203,7 @@ profiles:
     NetGainLossOnSaleOfInvestments:
       context_kinds:
       - duration_12m
-      filings: 12
+      filings: 13
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_net_gain_loss_on_sale_of_investments
@@ -24078,7 +24243,7 @@ profiles:
     NetProvisionsCharged:
       context_kinds:
       - duration_12m
-      filings: 6
+      filings: 7
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_net_provisions_charged
@@ -24088,7 +24253,7 @@ profiles:
     NetWorthOfCompany:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_net_worth_of_company
@@ -24108,7 +24273,7 @@ profiles:
     NonControllingInterest:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: non_controlling_interest
@@ -24118,7 +24283,7 @@ profiles:
     NoncurrentAdvances:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_noncurrent_advances
@@ -24128,7 +24293,7 @@ profiles:
     NoncurrentAssets:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: noncurrent_assets
@@ -24158,7 +24323,7 @@ profiles:
     NoncurrentFinancialAssets:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: SUBTOTAL
       mapped_to: li_noncurrent_financial_assets
@@ -24168,7 +24333,7 @@ profiles:
     NoncurrentFinancialLiabilities:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: SUBTOTAL
       mapped_to: li_noncurrent_financial_liabilities
@@ -24178,7 +24343,7 @@ profiles:
     NoncurrentInvestments:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: noncurrent_investments
@@ -24188,7 +24353,7 @@ profiles:
     NoncurrentLiabilities:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: noncurrent_liabilities
@@ -24198,7 +24363,7 @@ profiles:
     NumberOfAllotteesInCaseOfPreferentialAllotment:
       context_kinds:
       - duration_12m
-      filings: 5
+      filings: 6
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_number_of_allottees_in_case_of_preferential_allotment
@@ -24228,7 +24393,7 @@ profiles:
     NumberOfOtherEquityInstrumentsExpiredInSharebasedPaymentArrangement:
       context_kinds:
       - duration_12m
-      filings: 2
+      filings: 3
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_number_of_other_equity_instruments_expired_in_sharebased_payment_arrangement
@@ -24238,7 +24403,7 @@ profiles:
     NumberOfOtherEquityInstrumentsOutstandingInSharebasedPaymentArrangement:
       context_kinds:
       - instant
-      filings: 2
+      filings: 3
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_number_of_other_equity_instruments_outstanding_in_sharebased_payment_arrangement
@@ -24258,7 +24423,7 @@ profiles:
     NumberOfOtherIssuesOfShares:
       context_kinds:
       - duration_12m
-      filings: 7
+      filings: 8
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_number_of_other_issues_of_shares
@@ -24288,7 +24453,7 @@ profiles:
     NumberOfPersonShareApplicationMoneyPaidAsAtEndOfYear:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_number_of_person_share_application_money_paid_as_at_end_of_year
@@ -24298,7 +24463,7 @@ profiles:
     NumberOfPersonShareApplicationMoneyPaidDuringYear:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_number_of_person_share_application_money_paid_during_year
@@ -24308,7 +24473,7 @@ profiles:
     NumberOfPersonShareApplicationMoneyReceivedAsAtEndOfYear:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_number_of_person_share_application_money_received_as_at_end_of_year
@@ -24318,7 +24483,7 @@ profiles:
     NumberOfPersonShareApplicationMoneyReceivedDuringYear:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_number_of_person_share_application_money_received_during_year
@@ -24388,7 +24553,7 @@ profiles:
     NumberOfShareholdersOfCompany:
       context_kinds:
       - instant
-      filings: 5
+      filings: 6
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_number_of_shareholders_of_company
@@ -24428,7 +24593,7 @@ profiles:
     NumberOfSharesAuthorised:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_number_of_shares_authorised
@@ -24448,7 +24613,7 @@ profiles:
     NumberOfSharesIssued:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_number_of_shares_issued
@@ -24538,7 +24703,7 @@ profiles:
     NumberOfSharesIssuedUnderEmployeeStockOptionPlan:
       context_kinds:
       - duration_12m
-      filings: 9
+      filings: 10
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_number_of_shares_issued_under_employee_stock_option_plan
@@ -24558,7 +24723,7 @@ profiles:
     NumberOfSharesOutstanding:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_number_of_shares_outstanding
@@ -24568,7 +24733,7 @@ profiles:
     NumberOfSharesPaidUp:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_number_of_shares_paid_up
@@ -24578,7 +24743,7 @@ profiles:
     NumberOfSharesProposedToBeIssued:
       context_kinds:
       - instant
-      filings: 5
+      filings: 6
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_number_of_shares_proposed_to_be_issued
@@ -24588,7 +24753,7 @@ profiles:
     NumberOfSharesSubscribed:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_number_of_shares_subscribed
@@ -24598,7 +24763,7 @@ profiles:
     NumberOfSharesSubscribedAndFullyPaid:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_number_of_shares_subscribed_and_fully_paid
@@ -24608,7 +24773,7 @@ profiles:
     NumberOfSharesSubscribedButNotFullyPaid:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_number_of_shares_subscribed_but_not_fully_paid
@@ -24618,7 +24783,7 @@ profiles:
     NumberOfSubsidiaryCompanies:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_number_of_subsidiary_companies
@@ -24628,7 +24793,7 @@ profiles:
     NumberOfWarrantsConvertedIntoDebenturesDuringPeriod:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_number_of_warrants_converted_into_debentures_during_period
@@ -24638,7 +24803,7 @@ profiles:
     NumberOfWarrantsConvertedIntoEquitySharesDuringPeriod:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_number_of_warrants_converted_into_equity_shares_during_period
@@ -24648,7 +24813,7 @@ profiles:
     NumberOfWarrantsConvertedIntoPreferenceSharesDuringPeriod:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_number_of_warrants_converted_into_preference_shares_during_period
@@ -24658,7 +24823,7 @@ profiles:
     NumberOfWarrantsIssuedDuringPeriodINR:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_number_of_warrants_issued_during_period_inr
@@ -24668,7 +24833,7 @@ profiles:
     NumberOfWarrantsIssuedDuringPeriodInForeignCurrency:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_number_of_warrants_issued_during_period_in_foreign_currency
@@ -24678,7 +24843,7 @@ profiles:
     OtherAdditionsToReserves:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: EQUITY_NOTE
       mapped_to: li_other_additions_to_reserves
@@ -24688,7 +24853,7 @@ profiles:
     OtherAdjustmentsForNoncashItems:
       context_kinds:
       - duration_12m
-      filings: 12
+      filings: 13
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: li_other_adjustments_for_noncash_items
@@ -24698,7 +24863,7 @@ profiles:
     OtherAdjustmentsForWhichCashEffectsAreInvestingOrFinancingCashFlow:
       context_kinds:
       - duration_12m
-      filings: 10
+      filings: 11
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: li_other_adjustments_for_which_cash_effects_are_investing_or_financing_cash_flow
@@ -24718,7 +24883,7 @@ profiles:
     OtherAdvance:
       context_kinds:
       - instant
-      filings: 11
+      filings: 12
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_advance
@@ -24728,7 +24893,7 @@ profiles:
     OtherAllowancesDeductionOtherIncome:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_other_allowances_deduction_other_income
@@ -24738,7 +24903,7 @@ profiles:
     OtherBalancesWithBanks:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_balances_with_banks
@@ -24748,7 +24913,7 @@ profiles:
     OtherBenefitsToDirectors:
       context_kinds:
       - duration_12m
-      filings: 2
+      filings: 3
       first_batch: B9
       line_item_category: REMUNERATION_NOTE
       mapped_to: li_other_benefits_to_directors
@@ -24758,7 +24923,7 @@ profiles:
     OtherBenefitsToManager:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: B9
       line_item_category: REMUNERATION_NOTE
       mapped_to: li_other_benefits_to_manager
@@ -24778,13 +24943,13 @@ profiles:
     OtherCashPaymentsToAcquireEquityOrDebtInstrumentsOfOtherEntitiesClassifiedAsInvestingActivities:
       context_kinds:
       - duration_12m
-      filings: 8
+      filings: 9
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: investments_purchased
       numeric: true
       parent_subtotal: cfi
-      seen_negative: false
+      seen_negative: true
     OtherCashPaymentsToAcquireInterestsInJointVenturesClassifiedAsInvestingActivities:
       context_kinds:
       - duration_12m
@@ -24818,7 +24983,7 @@ profiles:
     OtherCessTaxes:
       context_kinds:
       - duration_12m
-      filings: 9
+      filings: 10
       first_batch: B9
       line_item_category: TAX_NOTE
       mapped_to: li_other_cess_taxes
@@ -24828,7 +24993,7 @@ profiles:
     OtherChangesInEquity:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: EQUITY_NOTE
       mapped_to: li_other_changes_in_equity
@@ -24838,7 +25003,7 @@ profiles:
     OtherChangesInEquityOthers:
       context_kinds:
       - duration_12m
-      filings: 10
+      filings: 11
       first_batch: B9
       line_item_category: EQUITY_NOTE
       mapped_to: li_other_changes_in_equity_others
@@ -24878,7 +25043,7 @@ profiles:
     OtherComprehensiveIncome:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: OCI
       mapped_to: li_other_comprehensive_income
@@ -24888,7 +25053,7 @@ profiles:
     OtherComprehensiveIncomeAttributableToNoncontrollingInterests:
       context_kinds:
       - duration_12m
-      filings: 4
+      filings: 5
       first_batch: B9
       line_item_category: OCI
       mapped_to: li_other_comprehensive_income_attributable_to_noncontrolling_interests
@@ -24908,7 +25073,7 @@ profiles:
     OtherComprehensiveIncomeBeforeTax:
       context_kinds:
       - duration_12m
-      filings: 11
+      filings: 12
       first_batch: B9
       line_item_category: OCI
       mapped_to: li_other_comprehensive_income_before_tax
@@ -24968,7 +25133,7 @@ profiles:
     OtherComprehensiveIncomeBeforeTaxExchangeDifferencesOnTranslation:
       context_kinds:
       - duration_12m
-      filings: 9
+      filings: 10
       first_batch: B9
       line_item_category: OCI
       mapped_to: li_other_comprehensive_income_before_tax_exchange_differences_on_translation
@@ -24998,7 +25163,7 @@ profiles:
     OtherComprehensiveIncomeBeforeTaxGainsLossesOnRemeasurementsOfDefinedBenefitPlans:
       context_kinds:
       - duration_12m
-      filings: 10
+      filings: 11
       first_batch: B9
       line_item_category: OCI
       mapped_to: li_other_comprehensive_income_before_tax_gains_losses_on_remeasurements_of_defined_benefit_plans
@@ -25068,7 +25233,7 @@ profiles:
     OtherComprehensiveIncomeThatWillBeReclassifiedToProfitOrLossBeforeTax:
       context_kinds:
       - duration_12m
-      filings: 10
+      filings: 11
       first_batch: B9
       line_item_category: OCI
       mapped_to: li_other_comprehensive_income_that_will_be_reclassified_to_profit_or_loss_before_tax
@@ -25108,7 +25273,7 @@ profiles:
     OtherComprehensiveIncomeThatWillNotBeReclassifiedToProfitOrLossBeforeTax:
       context_kinds:
       - duration_12m
-      filings: 11
+      filings: 12
       first_batch: B9
       line_item_category: OCI
       mapped_to: li_other_comprehensive_income_that_will_not_be_reclassified_to_profit_or_loss_before_tax
@@ -25148,7 +25313,7 @@ profiles:
     OtherCurrentAssets:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_current_assets
@@ -25158,7 +25323,7 @@ profiles:
     OtherCurrentAssetsOthers:
       context_kinds:
       - instant
-      filings: 8
+      filings: 9
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_current_assets_others
@@ -25168,7 +25333,7 @@ profiles:
     OtherCurrentFinancialAssets:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_current_financial_assets
@@ -25178,7 +25343,7 @@ profiles:
     OtherCurrentFinancialAssetsOthers:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_current_financial_assets_others
@@ -25188,7 +25353,7 @@ profiles:
     OtherCurrentFinancialLiabilities:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_current_financial_liabilities
@@ -25198,7 +25363,7 @@ profiles:
     OtherCurrentFinancialLiabilitiesOthers:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_current_financial_liabilities_others
@@ -25208,7 +25373,7 @@ profiles:
     OtherCurrentLiabilities:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_current_liabilities
@@ -25218,7 +25383,7 @@ profiles:
     OtherCurrentLiabilitiesOthers:
       context_kinds:
       - instant
-      filings: 12
+      filings: 13
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_current_liabilities_others
@@ -25228,7 +25393,7 @@ profiles:
     OtherDecreaseInAmountOfShares:
       context_kinds:
       - duration_12m
-      filings: 7
+      filings: 8
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_other_decrease_in_amount_of_shares
@@ -25238,7 +25403,7 @@ profiles:
     OtherDecreaseInNumberOfShares:
       context_kinds:
       - duration_12m
-      filings: 7
+      filings: 8
       first_batch: B9
       line_item_category: COUNT
       mapped_to: li_other_decrease_in_number_of_shares
@@ -25288,27 +25453,37 @@ profiles:
     OtherEquity:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: other_equity
       numeric: true
       parent_subtotal: total_equity
-      seen_negative: false
+      seen_negative: true
     OtherEquityBalances:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: EQUITY_NOTE
       mapped_to: li_other_equity_balances
       numeric: true
       parent_subtotal: other_equity
+      seen_negative: true
+    OtherExpenditurePertainingToExplorationAndProductionActivities:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: live-x77
+      line_item_category: PNL_EXPENSE
+      mapped_to: li_other_expenditure_pertaining_to_exploration_and_production_activities
+      numeric: true
+      parent_subtotal: other_expenses
       seen_negative: false
     OtherExpenses:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: other_expenses
@@ -25318,7 +25493,7 @@ profiles:
     OtherIncome:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: other_income
@@ -25338,7 +25513,7 @@ profiles:
     OtherInflowsOutflowsOfCashClassifiedAsInvestingActivities:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: li_other_inflows_outflows_of_cash_classified_as_investing_activities
@@ -25358,7 +25533,7 @@ profiles:
     OtherIntangibleAssets:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: other_intangibles
@@ -25368,7 +25543,7 @@ profiles:
     OtherInterestCharges:
       context_kinds:
       - duration_12m
-      filings: 7
+      filings: 8
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_other_interest_charges
@@ -25388,17 +25563,27 @@ profiles:
     OtherMoneyForWhichCompanyIsContingentlyLiable:
       context_kinds:
       - instant
-      filings: 8
+      filings: 9
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_other_money_for_which_company_is_contingently_liable
       numeric: true
       parent_subtotal: null
       seen_negative: false
+    OtherNetGainLossOnForeignCurrencyFluctuationsTreatedAsOtherIncome:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: live-x77
+      line_item_category: PNL_INCOME
+      mapped_to: li_other_net_gain_loss_on_foreign_currency_fluctuations_treated_as_other_income
+      numeric: true
+      parent_subtotal: other_income
+      seen_negative: false
     OtherNoncurrentAssets:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_noncurrent_assets
@@ -25408,7 +25593,7 @@ profiles:
     OtherNoncurrentAssetsOthers:
       context_kinds:
       - instant
-      filings: 11
+      filings: 12
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_noncurrent_assets_others
@@ -25418,7 +25603,7 @@ profiles:
     OtherNoncurrentFinancialAssets:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_noncurrent_financial_assets
@@ -25428,7 +25613,7 @@ profiles:
     OtherNoncurrentFinancialAssetsOthers:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_noncurrent_financial_assets_others
@@ -25438,7 +25623,7 @@ profiles:
     OtherNoncurrentFinancialLiabilities:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_noncurrent_financial_liabilities
@@ -25448,7 +25633,7 @@ profiles:
     OtherNoncurrentFinancialLiabilitiesOthers:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_noncurrent_financial_liabilities_others
@@ -25458,7 +25643,7 @@ profiles:
     OtherNoncurrentLiabilities:
       context_kinds:
       - instant
-      filings: 10
+      filings: 11
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_noncurrent_liabilities
@@ -25468,7 +25653,7 @@ profiles:
     OtherNoncurrentLiabilitiesOthers:
       context_kinds:
       - instant
-      filings: 12
+      filings: 13
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_noncurrent_liabilities_others
@@ -25478,7 +25663,7 @@ profiles:
     OtherNonoperatingIncome:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_other_nonoperating_income
@@ -25488,17 +25673,27 @@ profiles:
     OtherOperatingRevenues:
       context_kinds:
       - duration_12m
-      filings: 10
+      filings: 11
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_other_operating_revenues
       numeric: true
       parent_subtotal: revenue_from_operations
       seen_negative: false
+    OtherOverheadsApportionedContracts:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: live-x77
+      line_item_category: PNL_EXPENSE
+      mapped_to: li_other_overheads_apportioned_contracts
+      numeric: true
+      parent_subtotal: other_expenses
+      seen_negative: false
     OtherPayablesCurrent:
       context_kinds:
       - instant
-      filings: 12
+      filings: 13
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_payables_current
@@ -25518,7 +25713,7 @@ profiles:
     OtherProvisionsCreated:
       context_kinds:
       - duration_12m
-      filings: 3
+      filings: 4
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_other_provisions_created
@@ -25558,7 +25753,7 @@ profiles:
     OtherTaxEffectsForReconciliationBetweenAccountingProfitAndTaxExpenseIncome:
       context_kinds:
       - duration_12m
-      filings: 11
+      filings: 12
       first_batch: B9
       line_item_category: TAX_NOTE
       mapped_to: li_other_tax_effects_for_reconciliation_between_accounting_profit_and_tax_expense_income
@@ -25568,7 +25763,7 @@ profiles:
     OtherTaxRateEffectsForReconciliationBetweenAccountingProfitAndTaxExpenseIncome:
       context_kinds:
       - duration_12m
-      filings: 3
+      filings: 4
       first_batch: B9
       line_item_category: TAX_NOTE
       mapped_to: li_other_tax_rate_effects_for_reconciliation_between_accounting_profit_and_tax_expense_income
@@ -25578,7 +25773,7 @@ profiles:
     OtherUnamortisedExpenses:
       context_kinds:
       - instant
-      filings: 1
+      filings: 2
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_other_unamortised_expenses
@@ -25626,7 +25821,7 @@ profiles:
     OverheadCostsApportionedContracts:
       context_kinds:
       - duration_12m
-      filings: 4
+      filings: 5
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_overhead_costs_apportioned_contracts
@@ -25652,7 +25847,7 @@ profiles:
     PaymentForAuditServices:
       context_kinds:
       - duration_12m
-      filings: 9
+      filings: 10
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_payment_for_audit_services
@@ -25682,7 +25877,7 @@ profiles:
     PaymentForOtherServices:
       context_kinds:
       - duration_12m
-      filings: 5
+      filings: 6
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_payment_for_other_services
@@ -25692,7 +25887,7 @@ profiles:
     PaymentForReimbursementOfExpenses:
       context_kinds:
       - duration_12m
-      filings: 5
+      filings: 6
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_payment_for_reimbursement_of_expenses
@@ -25722,7 +25917,7 @@ profiles:
     PaymentsOfLeaseLiabilitiesClassifiedAsFinancingActivities:
       context_kinds:
       - duration_12m
-      filings: 9
+      filings: 10
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: lease_payments
@@ -25752,7 +25947,7 @@ profiles:
     PaymentsToAuditor:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: audit_fees
@@ -25802,7 +25997,7 @@ profiles:
     PercentageOfPaidUpCapitalHeldByForeignHoldingCompanyAndOrWithItsSubsidiaries:
       context_kinds:
       - instant
-      filings: 5
+      filings: 6
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_percentage_of_paid_up_capital_held_by_foreign_holding_company_and_or_with_its_subsidiaries
@@ -25812,7 +26007,7 @@ profiles:
     PercentageOfProposedDividend:
       context_kinds:
       - duration_12m
-      filings: 7
+      filings: 8
       first_batch: B9
       line_item_category: EQUITY_NOTE
       mapped_to: li_percentage_of_proposed_dividend
@@ -25822,7 +26017,7 @@ profiles:
     PercentageOfShareCapitalHeldByForeignCompany:
       context_kinds:
       - instant
-      filings: 5
+      filings: 6
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_percentage_of_share_capital_held_by_foreign_company
@@ -25832,7 +26027,7 @@ profiles:
     PeriodCoveredByFinancialStatements:
       context_kinds:
       - duration_12m
-      filings: 5
+      filings: 6
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -25856,7 +26051,7 @@ profiles:
     PermanentAccountNumberOfEntity:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -25880,7 +26075,7 @@ profiles:
     PowerAndFuel:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: power_and_fuel
@@ -25900,7 +26095,7 @@ profiles:
     PrintingStationery:
       context_kinds:
       - duration_12m
-      filings: 3
+      filings: 4
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_printing_stationery
@@ -25910,7 +26105,7 @@ profiles:
     ProceedsFromBorrowingsClassifiedAsFinancingActivities:
       context_kinds:
       - duration_12m
-      filings: 9
+      filings: 10
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: borrowings_proceeds
@@ -25950,7 +26145,7 @@ profiles:
     ProceedsFromIssuingSharesClassifiedAsFinancingActivities:
       context_kinds:
       - duration_12m
-      filings: 7
+      filings: 8
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: share_issue_proceeds
@@ -25990,7 +26185,7 @@ profiles:
     ProceedsFromSalesOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: ppe_disposals
@@ -26000,43 +26195,43 @@ profiles:
     ProfitBeforeExceptionalItemsAndTax:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL
       mapped_to: profit_before_exceptional_and_tax
       numeric: true
       parent_subtotal: pat
-      seen_negative: false
+      seen_negative: true
     ProfitBeforeTax:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL
       mapped_to: pbt
       numeric: true
       parent_subtotal: pat
-      seen_negative: false
+      seen_negative: true
     ProfitLossAttributableToOrdinaryEquityHoldersOfParentEntity:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PER_SHARE
       mapped_to: li_profit_loss_attributable_to_ordinary_equity_holders_of_parent_entity
       numeric: true
       parent_subtotal: pat
-      seen_negative: false
+      seen_negative: true
     ProfitLossAttributableToOrdinaryEquityHoldersOfParentEntityIncludingDilutiveEffects:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PER_SHARE
       mapped_to: li_profit_loss_attributable_to_ordinary_equity_holders_of_parent_entity_including_dilutive_effects
       numeric: true
       parent_subtotal: pat
-      seen_negative: false
+      seen_negative: true
     ProfitLossBeforeTaxDiscontinuedOperations:
       context_kinds:
       - duration_12m
@@ -26050,23 +26245,23 @@ profiles:
     ProfitLossForPeriod:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL
       mapped_to: pat
       numeric: true
       parent_subtotal: null
-      seen_negative: false
+      seen_negative: true
     ProfitLossForPeriodFromContinuingOperations:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL
       mapped_to: pat_continuing
       numeric: true
       parent_subtotal: pat
-      seen_negative: false
+      seen_negative: true
     ProfitLossForThePeriodAsPerIndAs:
       context_kinds:
       - duration_12m
@@ -26180,7 +26375,7 @@ profiles:
     PropertyPlantAndEquipment:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: ppe_net
@@ -26300,7 +26495,7 @@ profiles:
     ProvisionsCurrent:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_provisions_current
@@ -26320,7 +26515,7 @@ profiles:
     ProvisionsNoncurrent:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_provisions_noncurrent
@@ -26330,7 +26525,7 @@ profiles:
     PublicDepositPayableCurrent:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_public_deposit_payable_current
@@ -26370,7 +26565,7 @@ profiles:
     PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: capex_ppe
@@ -26390,7 +26585,7 @@ profiles:
     RatesAndTaxesExcludingTaxesOnIncome:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_rates_and_taxes_excluding_taxes_on_income
@@ -26476,7 +26671,7 @@ profiles:
     RemunerationToDirectors:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: REMUNERATION_NOTE
       mapped_to: li_remuneration_to_directors
@@ -26486,7 +26681,7 @@ profiles:
     RemunerationToManager:
       context_kinds:
       - duration_12m
-      filings: 5
+      filings: 6
       first_batch: B9
       line_item_category: REMUNERATION_NOTE
       mapped_to: li_remuneration_to_manager
@@ -26496,7 +26691,7 @@ profiles:
     Rent:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_rent
@@ -26526,7 +26721,7 @@ profiles:
     RentalIncomeOnInvestmentProperty:
       context_kinds:
       - duration_12m
-      filings: 7
+      filings: 8
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_rental_income_on_investment_property
@@ -26543,10 +26738,20 @@ profiles:
       numeric: true
       parent_subtotal: other_income
       seen_negative: false
+    RentalIncomeOnInvestmentPropertyNoncurrent:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: live-x77
+      line_item_category: PNL_INCOME
+      mapped_to: li_rental_income_on_investment_property_noncurrent
+      numeric: true
+      parent_subtotal: other_income
+      seen_negative: false
     RepairsToBuilding:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_repairs_to_building
@@ -26556,7 +26761,7 @@ profiles:
     RepairsToMachinery:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_repairs_to_machinery
@@ -26566,7 +26771,7 @@ profiles:
     RepaymentsOfBorrowingsClassifiedAsFinancingActivities:
       context_kinds:
       - duration_12m
-      filings: 8
+      filings: 9
       first_batch: B9
       line_item_category: CASH_FLOW
       mapped_to: borrowings_repayments
@@ -26684,7 +26889,7 @@ profiles:
     RevenueFromOperations:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: revenue_from_operations
@@ -26704,7 +26909,7 @@ profiles:
     RevenueFromOperationsOtherThanFinanceCompany:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_revenue_from_operations_other_than_finance_company
@@ -26724,7 +26929,7 @@ profiles:
     RevenueFromSaleOfProducts:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_revenue_from_sale_of_products
@@ -26734,7 +26939,7 @@ profiles:
     RevenueFromSaleOfServices:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_revenue_from_sale_of_services
@@ -26764,7 +26969,7 @@ profiles:
     RevenueSubsidiesOrGrantsReceivedFromGovernmentAuthorities:
       context_kinds:
       - duration_12m
-      filings: 7
+      filings: 8
       first_batch: B9
       line_item_category: PNL_INCOME
       mapped_to: li_revenue_subsidies_or_grants_received_from_government_authorities
@@ -26824,12 +27029,32 @@ profiles:
     ReversalOfImpairmentLossRecognisedInProfitOrLossPropertyPlantAndEquipment:
       context_kinds:
       - duration_12m
-      filings: 4
+      filings: 5
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_reversal_of_impairment_loss_recognised_in_profit_or_loss_property_plant_and_equipment
       numeric: true
       parent_subtotal: ppe_net
+      seen_negative: false
+    ReversalOfImpairmentLossRecognisedInProfitOrLossTradeReceivables:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: live-x77
+      line_item_category: ASSET_MOVEMENT
+      mapped_to: li_reversal_of_impairment_loss_recognised_in_profit_or_loss_trade_receivables
+      numeric: true
+      parent_subtotal: ppe_net
+      seen_negative: false
+    ReversalOfInventoryWritedown:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: live-x77
+      line_item_category: PNL_EXPENSE
+      mapped_to: li_reversal_of_inventory_writedown
+      numeric: true
+      parent_subtotal: other_expenses
       seen_negative: false
     RightsPreferencesAndRestrictionsAttachingToClassOfEquityShareCapital:
       context_kinds:
@@ -26852,7 +27077,7 @@ profiles:
     SalariesAndWages:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_salaries_and_wages
@@ -26910,7 +27135,7 @@ profiles:
     ShareApplicationMoneyPaidDuringYear:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_share_application_money_paid_during_year
@@ -26920,7 +27145,7 @@ profiles:
     ShareApplicationMoneyReceivedAndDueForRefund:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_share_application_money_received_and_due_for_refund
@@ -26930,7 +27155,7 @@ profiles:
     ShareApplicationMoneyReceivedDuringYear:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_share_application_money_received_during_year
@@ -27000,7 +27225,7 @@ profiles:
     ShareOfProfitLossOfAssociatesAndJointVenturesAccountedForUsingEquityMethod:
       context_kinds:
       - duration_12m
-      filings: 4
+      filings: 5
       first_batch: B9
       line_item_category: PNL
       mapped_to: share_of_associates_jv
@@ -27020,7 +27245,7 @@ profiles:
     ShareOfProfitLossOfJointVenturesAccountedForUsingEquityMethod:
       context_kinds:
       - duration_12m
-      filings: 2
+      filings: 3
       first_batch: B9
       line_item_category: SUBTOTAL
       mapped_to: li_share_of_profit_loss_of_joint_ventures_accounted_for_using_equity_method
@@ -27030,7 +27255,7 @@ profiles:
     SharePremiumForSharesToBeAllotted:
       context_kinds:
       - instant
-      filings: 2
+      filings: 3
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_share_premium_for_shares_to_be_allotted
@@ -27060,7 +27285,7 @@ profiles:
     SharesInCompanyHeldByHoldingCompany:
       context_kinds:
       - instant
-      filings: 7
+      filings: 8
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_shares_in_company_held_by_holding_company
@@ -27070,7 +27295,7 @@ profiles:
     SharesInCompanyHeldByHoldingCompanyOrUltimateHoldingCompanyOrByItsSubsidiariesOrAssociates:
       context_kinds:
       - instant
-      filings: 9
+      filings: 10
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_shares_in_company_held_by_holding_company_or_ultimate_holding_company_or_by_its_subsidiaries_or_associates
@@ -27117,10 +27342,20 @@ profiles:
       numeric: true
       parent_subtotal: equity_share_capital
       seen_negative: false
+    SiteLabourSupervisionCostContracts:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: live-x77
+      line_item_category: PNL_EXPENSE
+      mapped_to: li_site_labour_supervision_cost_contracts
+      numeric: true
+      parent_subtotal: other_expenses
+      seen_negative: false
     StaffWelfareExpense:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_staff_welfare_expense
@@ -27130,7 +27365,7 @@ profiles:
     StatementOfIndAsComplianceExplanatory:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27167,6 +27402,16 @@ profiles:
       mapped_to: null
       numeric: false
       seen_negative: false
+    SubscriptionsMembershipFees:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: live-x77
+      line_item_category: PNL_EXPENSE
+      mapped_to: li_subscriptions_membership_fees
+      numeric: true
+      parent_subtotal: other_expenses
+      seen_negative: false
     SurplusOnDisposalDiscardDemolishmentAndDestructionOfDepreciablePropertyPlantAndEquipment:
       context_kinds:
       - duration_12m
@@ -27190,7 +27435,7 @@ profiles:
     TaxEffectOfExceptionalItems:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: B9
       line_item_category: TAX_NOTE
       mapped_to: li_tax_effect_of_exceptional_items
@@ -27230,13 +27475,13 @@ profiles:
     TaxExpense:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PNL
       mapped_to: tax_expense
       numeric: true
       parent_subtotal: pat
-      seen_negative: false
+      seen_negative: true
     TaxExpenseIncomeAtApplicableTaxRate:
       context_kinds:
       - duration_12m
@@ -27290,7 +27535,7 @@ profiles:
     TelephonePostage:
       context_kinds:
       - duration_12m
-      filings: 6
+      filings: 7
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_telephone_postage
@@ -27316,7 +27561,7 @@ profiles:
     TradePayablesCurrent:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: trade_payables_current
@@ -27336,7 +27581,7 @@ profiles:
     TradeReceivablesCurrent:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: trade_receivables_current
@@ -27356,7 +27601,7 @@ profiles:
     TradeReceivablesNoncurrent:
       context_kinds:
       - instant
-      filings: 5
+      filings: 6
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: trade_receivables_noncurrent
@@ -27396,7 +27641,7 @@ profiles:
     TravellingConveyance:
       context_kinds:
       - duration_12m
-      filings: 11
+      filings: 12
       first_batch: B9
       line_item_category: PNL_EXPENSE
       mapped_to: li_travelling_conveyance
@@ -27406,7 +27651,7 @@ profiles:
     TypeOfCashFlowStatement:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27414,7 +27659,7 @@ profiles:
     TypeOfIndustry:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27422,7 +27667,7 @@ profiles:
     UnbilledRevenue:
       context_kinds:
       - instant
-      filings: 2
+      filings: 3
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_unbilled_revenue
@@ -27442,7 +27687,7 @@ profiles:
     UnclaimedMaturedDebentures:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_unclaimed_matured_debentures
@@ -27452,7 +27697,7 @@ profiles:
     UnclaimedMaturedDeposits:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_unclaimed_matured_deposits
@@ -27462,7 +27707,7 @@ profiles:
     UnclaimedShareApplicationRefundMoney:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_unclaimed_share_application_refund_money
@@ -27482,7 +27727,7 @@ profiles:
     UnpaidDividends:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_unpaid_dividends
@@ -27492,7 +27737,7 @@ profiles:
     UnpaidMaturedDebenturesAndInterestAccruedThereon:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_unpaid_matured_debentures_and_interest_accrued_thereon
@@ -27502,7 +27747,7 @@ profiles:
     UnpaidMaturedDepositsAndInterestAccruedThereon:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: MEMO
       mapped_to: li_unpaid_matured_deposits_and_interest_accrued_thereon
@@ -27532,7 +27777,7 @@ profiles:
     UnusedTaxLossesForWhichNoDeferredTaxAssetsRecognised:
       context_kinds:
       - instant
-      filings: 1
+      filings: 2
       first_batch: B9
       line_item_category: BALANCE_SHEET
       mapped_to: li_unused_tax_losses_for_which_no_deferred_tax_assets_recognised
@@ -27542,7 +27787,7 @@ profiles:
     UsefulLivesOrAmortisationRatesOtherIntangibleAssets:
       context_kinds:
       - duration_12m
-      filings: 4
+      filings: 5
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27550,7 +27795,7 @@ profiles:
     UsefulLivesOrDepreciationRatesBiologicalAssetsOtherThanBearerPlantsAtCost:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27558,7 +27803,7 @@ profiles:
     UsefulLivesOrDepreciationRatesInvestmentPropertyCostModel:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27566,7 +27811,7 @@ profiles:
     UsefulLivesOrDepreciationRatesPropertyPlantAndEquipment:
       context_kinds:
       - duration_12m
-      filings: 11
+      filings: 12
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27584,7 +27829,7 @@ profiles:
     ValueOfPaidUpCapitalHeldByForeignHoldingCompanyAndOrWithItsSubsidiaries:
       context_kinds:
       - instant
-      filings: 5
+      filings: 6
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_value_of_paid_up_capital_held_by_foreign_holding_company_and_or_with_its_subsidiaries
@@ -27594,7 +27839,7 @@ profiles:
     ValueOfShareCapitalHeldByForeignCompany:
       context_kinds:
       - instant
-      filings: 5
+      filings: 6
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_value_of_share_capital_held_by_foreign_company
@@ -27604,7 +27849,7 @@ profiles:
     ValueOfSharesAuthorised:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_value_of_shares_authorised
@@ -27614,7 +27859,7 @@ profiles:
     ValueOfSharesCalled:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_value_of_shares_called
@@ -27624,7 +27869,7 @@ profiles:
     ValueOfSharesIssued:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_value_of_shares_issued
@@ -27634,7 +27879,7 @@ profiles:
     ValueOfSharesPaidUp:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_value_of_shares_paid_up
@@ -27644,7 +27889,7 @@ profiles:
     ValueOfSharesSubscribed:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_value_of_shares_subscribed
@@ -27654,7 +27899,7 @@ profiles:
     ValueOfSharesSubscribedAndFullyPaid:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_value_of_shares_subscribed_and_fully_paid
@@ -27664,7 +27909,7 @@ profiles:
     ValueOfSharesSubscribedButNotFullyPaid:
       context_kinds:
       - instant
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: SHARE_CAPITAL_NOTE
       mapped_to: li_value_of_shares_subscribed_but_not_fully_paid
@@ -27784,7 +28029,7 @@ profiles:
     WeightedAverageShares:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       line_item_category: PER_SHARE
       mapped_to: li_weighted_average_shares
@@ -27794,7 +28039,7 @@ profiles:
     WhetherAnyBorrowingCostsHasBeenCapitalisedDuringTheYear:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27802,7 +28047,7 @@ profiles:
     WhetherAnyOperatingLeaseHasBeenConvertedToFinancialLeaseOrViceVersa:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27810,7 +28055,7 @@ profiles:
     WhetherAssetsHaveBeenMeasuredAtFairValue:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27818,7 +28063,7 @@ profiles:
     WhetherAuditOfCostRecordsOfCompanyHasBeenMandatedUnderRulesSpecifiedInSN1:
       context_kinds:
       - duration_12m
-      filings: 9
+      filings: 10
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27826,7 +28071,7 @@ profiles:
     WhetherAuditorsReportHasBeenQualifiedOrHasAnyReservationsOrContainsAdverseRemarks:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27842,7 +28087,7 @@ profiles:
     WhetherCashFlowStatementIsApplicableOnCompany:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27850,7 +28095,7 @@ profiles:
     WhetherCompaniesAuditorsReportOrderIsApplicableOnCompany:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27858,7 +28103,7 @@ profiles:
     WhetherCompanyHasAdoptedIndAsFirstTime:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27866,7 +28111,7 @@ profiles:
     WhetherCompanyHasAssociatesLiquidatedOrSoldDuringYear:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27874,7 +28119,7 @@ profiles:
     WhetherCompanyHasAssociatesWhichAreYetToCommenceOperations:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27882,7 +28127,7 @@ profiles:
     WhetherCompanyHasComprehensiveIncomeOCIComponentsPresentedBeforeTax:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27890,7 +28135,7 @@ profiles:
     WhetherCompanyHasEnteredIntoAnyLeaseAgreement:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27898,7 +28143,7 @@ profiles:
     WhetherCompanyHasInvestedInAssociates:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27906,7 +28151,7 @@ profiles:
     WhetherCompanyHasInvestedInJointVentures:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27914,7 +28159,7 @@ profiles:
     WhetherCompanyHasJointVenturesLiquidatedOrSoldDuringYear:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27922,7 +28167,7 @@ profiles:
     WhetherCompanyHasJointVenturesWhichAreYetToCommenceOperations:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27930,7 +28175,7 @@ profiles:
     WhetherCompanyHasOtherComprehensiveIncomeOCIComponentsPresentedNetOfTax:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27938,7 +28183,7 @@ profiles:
     WhetherCompanyHasReceivedAnyGovernmentGrantOrGovernmentAssistance:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27946,7 +28191,7 @@ profiles:
     WhetherCompanyHasSubsidiaryCompanies:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27954,7 +28199,7 @@ profiles:
     WhetherCompanyHasSubsidiaryCompaniesLiquidatedOrSoldDuringYear:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27962,7 +28207,7 @@ profiles:
     WhetherCompanyHasSubsidiaryCompaniesWhichAreYetToCommenceOperations:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -27994,7 +28239,7 @@ profiles:
     WhetherCompanyIsSubsidiaryCompany:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28002,7 +28247,7 @@ profiles:
     WhetherConsolidatedFinancialStatementsIsApplicableOnCompany:
       context_kinds:
       - duration_12m
-      filings: 9
+      filings: 10
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28010,7 +28255,7 @@ profiles:
     WhetherEntityAppliesExemptionInIndAS2425:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28018,7 +28263,7 @@ profiles:
     WhetherEquityHaveBeenMeasuredAtFairValue:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28026,7 +28271,7 @@ profiles:
     WhetherImpairmentLossRecognisedOrReversedForIndividualAssetsOrCashGeneratingUnit:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28034,7 +28279,7 @@ profiles:
     WhetherInitialApplicationOfAnIndAsHasAnEffectOnTheCurrentPeriodOrAnyPriorPeriod:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28042,7 +28287,7 @@ profiles:
     WhetherLiabilitiesHaveBeenMeasuredAtFairValue:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28050,7 +28295,7 @@ profiles:
     WhetherMaintenanceOfCostRecordsByCompanyHasBeenMandatedUnderCompaniesCostRecordsAndAuditRules2014:
       context_kinds:
       - duration_12m
-      filings: 11
+      filings: 12
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28058,7 +28303,7 @@ profiles:
     WhetherMoneyRaisedFromPublicOfferingDuringYear:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28066,7 +28311,7 @@ profiles:
     WhetherOtherIntangibleAssetsAreStatedAtRevaluedAmount:
       context_kinds:
       - duration_12m
-      filings: 4
+      filings: 5
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28074,7 +28319,7 @@ profiles:
     WhetherPropertyPlantAndEquipmentAreStatedAtRevaluedAmount:
       context_kinds:
       - duration_12m
-      filings: 4
+      filings: 5
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28090,7 +28335,7 @@ profiles:
     WhetherReductionInCapitalDoneDuringYear:
       context_kinds:
       - duration_12m
-      filings: 2
+      filings: 3
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28114,7 +28359,7 @@ profiles:
     WhetherThereAreAnyAcquiredReceivablesFromBusinessCombination:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28122,7 +28367,7 @@ profiles:
     WhetherThereAreAnyArrangementsInvolvingLegalFormOfLease:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28130,7 +28375,7 @@ profiles:
     WhetherThereAreAnyConstructionContracts:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28138,7 +28383,7 @@ profiles:
     WhetherThereAreAnyContingentLiabilities:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28146,7 +28391,7 @@ profiles:
     WhetherThereAreAnyContingentLiabilitiesInBusinessCombination:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28154,7 +28399,7 @@ profiles:
     WhetherThereAreAnyDefinedBenefitPlans:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28162,7 +28407,7 @@ profiles:
     WhetherThereAreAnyExplorationAndEvaluationActivities:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28170,7 +28415,7 @@ profiles:
     WhetherThereAreAnyInsuranceContractsAsPerIndAs104:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28178,7 +28423,7 @@ profiles:
     WhetherThereAreAnyMajorCustomers:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28186,7 +28431,7 @@ profiles:
     WhetherThereAreAnyRelatedPartyTransactionsDuringYear:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28194,7 +28439,7 @@ profiles:
     WhetherThereAreAnyReportableSegments:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28202,7 +28447,7 @@ profiles:
     WhetherThereAreAnyServiceConcessionArrangments:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28210,7 +28455,7 @@ profiles:
     WhetherThereAreAnyShareBasedPaymentArrangement:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28218,7 +28463,7 @@ profiles:
     WhetherThereAreAnyShareholdersHoldingMoreThanFivePerCentSharesInCompany:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28226,7 +28471,7 @@ profiles:
     WhetherThereAreChangesInAcountingEstimatesDuringTheYear:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28242,7 +28487,7 @@ profiles:
     WhetherThereAreIntangibleAssetsWithIndefiniteUsefulLife:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28258,7 +28503,7 @@ profiles:
     WhetherThereAreNonAdjustingEventsAfterReportingPeriod:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28266,7 +28511,7 @@ profiles:
     WhetherThereAreReclassificationsToComparativeAmounts:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28274,7 +28519,7 @@ profiles:
     WhetherThereAreUnconsolidatedStructuredEntities:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28282,7 +28527,7 @@ profiles:
     WhetherThereAreUnconsolidatedStructuredEntitiesControlledByInvestmentEntity:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28290,7 +28535,7 @@ profiles:
     WhetherThereAreUnconsolidatedSubsidiaries:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28298,7 +28543,7 @@ profiles:
     WhetherThereIsAnyBusinessCombination:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28306,7 +28551,7 @@ profiles:
     WhetherThereIsAnyChangeInFunctionalCurrencyDuringTheYear:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28314,7 +28559,7 @@ profiles:
     WhetherThereIsAnyDepartureFromIndAS:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28322,7 +28567,7 @@ profiles:
     WhetherThereIsAnyGoodwillArisingOutOfBusinessCombination:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28330,7 +28575,7 @@ profiles:
     WhetherThereIsAnyImpairmentLossOrReversalOfImpairmentLossDuringTheYear:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28338,7 +28583,7 @@ profiles:
     WhetherThereIsAnyVoluntaryChangeInAccountingPolicy:
       context_kinds:
       - duration_12m
-      filings: 13
+      filings: 14
       first_batch: B9
       mapped_to: null
       numeric: false
@@ -28356,7 +28601,7 @@ profiles:
     WritedownsReversalsOfInventories:
       context_kinds:
       - duration_12m
-      filings: 5
+      filings: 6
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_writedowns_reversals_of_inventories
@@ -28366,7 +28611,7 @@ profiles:
     WritedownsReversalsOfPropertyPlantAndEquipment:
       context_kinds:
       - duration_12m
-      filings: 4
+      filings: 5
       first_batch: B9
       line_item_category: ASSET_MOVEMENT
       mapped_to: li_writedowns_reversals_of_property_plant_and_equipment

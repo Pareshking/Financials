@@ -184,12 +184,14 @@ RULES: tuple[tuple[str, str, frozenset | None], ...] = (
         r"|ExpenseArisingFromExploration|ChangesInInventoriesOf|^ChangesInOtherInventories$|MaterialCostContract"
         r"|OverheadCosts|^ContractCost$|^NetProvisionsCharged$|DiscountIssueShares|OtherUnamortisedExpenses"
         r"|^EmployeeShareBased|ImpairmentLossOnNonFinancialAssets|^ImpairmentLossRecognisedInProfitOrLoss$"
-        r"|TreatedAsFinanceCosts)",
+        r"|TreatedAsFinanceCosts|DiscountIssueDebentures|ExpenditurePertainingToExploration|^LossesOn(Change|Litigation)"
+        r"|OverheadsApportioned|SiteLabour|SubscriptionsMembership)",
         "ANNUAL_EXPENSE_DETAIL",
         ANNUAL,
     ),
     (
         r"(^InterestIncome|^Interest(On|From)|^DividendIncome|^IncomeOnBrokerage|^Gains|^GainLoss|^GainOn|^LossOn"
+        r"|^OtherNetGainLossOnForeignCurrency"
         r"|^NetGainLoss|^Rental|^RevenueFrom(SaleOf|Construction|OtherFinancial|Operations(Finance|Other))"
         r"|^Domestic|^Export|^MiscellaneousOther|^OtherNonoperatingIncome|^OtherOperatingRevenues|ExcessProvisions"
         r"|^LiabilitiesWrittenOff|^Income(From|Insurance|Arising)|RevenueArisingFromExchanges"

@@ -5,10 +5,10 @@ import re
 from financials.sources import MD_PATH, ROOT, load, render
 
 
-def test_registry_has_all_26_feeds_with_unique_ids():
+def test_registry_has_all_29_feeds_with_unique_ids():
     feeds = load()
     ids = [f["feed_id"] for f in feeds]
-    assert ids == [f"F{n:02d}" for n in range(1, 27)]
+    assert ids == [f"F{n:02d}" for n in range(1, 30)]
 
 
 def test_markdown_is_generated_from_yaml():
@@ -34,5 +34,5 @@ def test_unverified_feeds_do_not_claim_concrete_endpoints():
 
 def test_verified_feeds_have_a_parser_phase():
     assert {f["feed_id"] for f in load() if f["verification_status"] == "VERIFIED"} == {
-        "F01", "F02", "F03", "F04", "F05", "F06", "F07", "F08", "F10", "F21",
+        "F01", "F02", "F03", "F04", "F05", "F06", "F07", "F08", "F10", "F21", "F27", "F28",
     }  # fmt: skip

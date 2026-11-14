@@ -12,6 +12,7 @@ import json
 from datetime import date, datetime
 from decimal import Decimal
 
+from financials.db import version_key
 from financials.parsers.segments import SEGMENT_ELEMENTS
 
 
@@ -20,7 +21,9 @@ def segment_facts(con, entity_id: str, as_of: datetime, *, scope: str | None = N
     rows = con.execute(
         """WITH f AS (
              SELECT filing_id, scope, period_end, row_number() OVER (
-                      PARTITION BY scope, period_end ORDER BY visible_from_ts DESC, parser_version DESC) AS rn
+                      PARTITION BY scope, period_end ORDER BY visible_from_ts DESC, """
+        + version_key()
+        + """ DESC) AS rn
              FROM filing_meta
              WHERE entity_id = ? AND visible_from_ts <= ? AND accounting_profile <> 'REG34_ANNUAL'
                AND (? IS NULL OR scope = ?))

@@ -16,7 +16,7 @@ from pathlib import Path
 
 from financials.fetch.http import FetchError, PoliteFetcher
 from financials.parsers import ParseError
-from financials.parsers.discovery import parse_integrated_filing_listing, symbols_with_results_today
+from financials.parsers.discovery import listing_progress, parse_integrated_filing_listing, symbols_with_results_today
 from financials.parsers.reg30_events import parse_announcements_rss
 from financials.parsers.reg34_annual import parse_annual_listing
 from financials.parsers.shareholding import parse_shp_master
@@ -24,11 +24,14 @@ from financials.scope import MIN_PERIOD_END_DATE
 from financials.staging import (
     read_manifest,
     stage_corp_actions,
+    stage_equity_master,
     stage_holidays,
+    stage_index_closes,
     stage_index_snapshot,
     stage_market_day,
     stage_raw_only,
     stage_reg30_event,
+    stage_results_listing,
     stage_results_xbrl,
     stage_shareholding,
 )
@@ -41,7 +44,8 @@ JSON = "application/json"
 WARMUP = {"www.nseindia.com": "https://www.nseindia.com/"}  # session cookies for the API host [A1]
 CORP_ACTION_CHUNK_DAYS = 30  # the API answer was verified on a one-month window [P12]
 IMMUTABLE_PREFIXES = (f"{ARCHIVE}/content/cm/BhavCopy_", f"{ARCHIVE}/products/content/sec_bhavdata_full_",
-                      f"{ARCHIVE}/corporate/xbrl/")  # fmt: skip
+                      f"{ARCHIVE}/corporate/xbrl/", f"{ARCHIVE}/content/indices/ind_close_all_")  # fmt: skip
+EQUITY_MASTER_URL = f"{ARCHIVE}/content/equities/EQUITY_L.csv"  # [IDX10]
 NOT_FOUND_SETTLE_DAYS = 2  # a 404 counts as final only when observed this long after the requested date [P11]
 
 
@@ -51,6 +55,10 @@ def bhavcopy_url(d: date) -> str:
 
 def delivery_url(d: date) -> str:
     return f"{ARCHIVE}/products/content/sec_bhavdata_full_{d:%d%m%Y}.csv"
+
+
+def index_close_url(d: date) -> str:
+    return f"{ARCHIVE}/content/indices/ind_close_all_{d:%d%m%Y}.csv"  # [IDX9]
 
 
 def corp_actions_url(start: date, end: date) -> str:
@@ -65,8 +73,10 @@ def index_list_url(file_stub: str = "nifty500") -> str:
     return f"{ARCHIVE}/content/indices/ind_{file_stub}list.csv"
 
 
-def results_listing_url(symbol: str) -> str:
-    return f"{API}/integrated-filing-results?index=equities&symbol={symbol}"
+def results_listing_url(symbol: str, page: int = 1) -> str:
+    """Newest 20 rows; `page=N` gives rows 20(N-1)+1.. (A7: TCS page 2 = rows 21-22 of totalCount 22)."""
+    base = f"{API}/integrated-filing-results?index=equities&symbol={symbol}"
+    return base if page == 1 else f"{base}&page={page}"
 
 
 ANNOUNCEMENTS_RSS = "https://nsearchives.nseindia.com/content/RSS/Online_announcements.xml"
@@ -96,6 +106,8 @@ class Jobs:
         self.f, self.vault, self.stage_root = fetcher, vault, Path(stage_root)
         self.warnings: list[str] = []
         self.errors: list[str] = []  # per-file failures inside a listing (the rest of the listing goes on)
+        self.shp_min_as_of: date | None = None  # discovery: shareholding quarters from this date (None = latest)
+        self.workers = 1  # fetch-days threads (useful only with a host limit above one connection)
 
     def _file(self, url: str) -> bytes | None:
         try:
@@ -114,7 +126,7 @@ class Jobs:
         """Bytes, or None for an allowed 404. Archive files already vaulted are not downloaded again."""
         immutable = url.startswith(IMMUTABLE_PREFIXES)
         last = self.vault.last_fetch(url) if immutable else None
-        if last and last["status"] == 200:
+        if last and last["status"] == 200 and self.vault.exists(last["storage_path"]):
             return self.vault.read_path(last["storage_path"], last["sha256"])
         if last and last["status"] == 404 and allow_404 and asked_for is not None:
             seen = datetime.fromisoformat(last["fetched_at"]).date()
@@ -122,12 +134,24 @@ class Jobs:
                 return None
         data = self.f.get(url, accept=accept, allow_404=allow_404)
         if immutable:
+            if data is not None:  # the blob is in the vault before the ledger says so (a killed run leaves no lie)
+                self.vault.put(data, ext=self._ext(url), media_type="application/octet-stream", fetched_at=utc_now())
             self.vault.record_fetch(url, 404 if data is None else 200, utc_now(), data, self._ext(url))
         return data
 
+    def is_done(self, url: str, job: str) -> bool:
+        """Vaulted and staged. A file vaulted whose staging failed (e.g. a parser fixed since) is staged again from the
+        vault, never downloaded again."""
+        last = self.vault.last_fetch(url)
+        if not (last and last["status"] == 200 and self.vault.exists(last["storage_path"])):
+            return False
+        from financials.ids import stable_id
+
+        return (self.stage_root / job / stable_id("fil", "NSE", url, last["sha256"])).exists()
+
     def is_vaulted(self, url: str) -> bool:
         last = self.vault.last_fetch(url)
-        return bool(last and last["status"] == 200)
+        return bool(last and last["status"] == 200 and self.vault.exists(last["storage_path"]))
 
     # ── market data ──
 
@@ -135,11 +159,14 @@ class Jobs:
         """None when no bhavcopy exists (holiday/weekend): nothing is staged. A bhavcopy staged without delivery
         is staged again once the delivery file appears [P0-2]; a fully fetched day is not fetched again."""
         b_url, d_url = bhavcopy_url(d), delivery_url(d)
+        closes = self._index_closes(d) if self.is_vaulted(b_url) else []
         if self.is_vaulted(b_url) and self.is_vaulted(d_url):
-            return []
+            return closes
         bhav = self._get(b_url, allow_404=True, asked_for=d)
         if bhav is None:
             return None
+        if not closes:
+            closes = self._index_closes(d)
         deliv = self._get(d_url, allow_404=True, asked_for=d)
         stage = stage_market_day(
             self.vault, self.stage_root, bhavcopy=bhav, bhavcopy_url=b_url, delivery=deliv,
@@ -149,19 +176,43 @@ class Jobs:
         if traded != d.isoformat():
             # NSE can answer a non-trading date with another day's file; the batch is filed under its own TradDt.
             self.warnings.append(f"{d}: file holds TradDt {traded}; staged under {traded}")
-        return [stage]
+        return [stage, *closes]
+
+    def _index_closes(self, d: date) -> list[Path]:
+        """The day's ind_close_all [IDX9], fetched only for a date with a bhavcopy; vaulted files are not refetched."""
+        url = index_close_url(d)
+        if self.is_vaulted(url):
+            return []
+        data = self._get(url, allow_404=True, asked_for=d)
+        if data is None:
+            return []
+        return [stage_index_closes(self.vault, self.stage_root, data=data, source_url=url, fetched_at=utc_now())]
+
+    def equity_master(self) -> list[Path]:
+        data = self._get(EQUITY_MASTER_URL)
+        return [stage_equity_master(self.vault, self.stage_root, data=data, source_url=EQUITY_MASTER_URL,
+                                    fetched_at=utc_now())]  # fmt: skip
 
     def market_days(self, start: date, end: date) -> tuple[list[Path], list[str]]:
         """Every date in [start, end] (weekends included: special sessions exist, e.g. Saturday 1 Feb 2025 [CAL2]).
         A failure on one day is reported and the range continues; re-running resumes where it failed."""
-        staged, errors, d = [], [], start
-        while d <= end:
+        days = [start + timedelta(days=i) for i in range((end - start).days + 1)]
+
+        def one(d: date) -> tuple[list[Path], list[str]]:
             try:
-                staged += self.market_day(d) or []
+                return self.market_day(d) or [], []
             except (FetchError, ParseError) as exc:
-                errors.append(f"{d}: {exc}")
-            d += timedelta(days=1)
-        return staged, errors
+                return [], [f"{d}: {exc}"]
+
+        if self.workers > 1:
+            from concurrent.futures import ThreadPoolExecutor
+
+            with ThreadPoolExecutor(max_workers=self.workers) as pool:
+                results = list(pool.map(one, days))
+        else:
+            results = [one(d) for d in days]
+        staged = [p for got, _ in results for p in got]
+        return staged, [e for _, errs in results for e in errs]
 
     def corp_actions(self, start: date, end: date) -> list[Path]:
         """One request per 30-day window [P12]; each answer is its own vaulted, staged batch."""
@@ -186,17 +237,20 @@ class Jobs:
 
     # ── filings ──
 
-    def shareholding(self, symbol: str, *, latest_only: bool = True) -> list[Path]:
-        """Master JSON gives each filing's XBRL URL and broadcast time [SHP6]."""
+    def shareholding(self, symbol: str, *, latest_only: bool = True, min_as_of: date | None = None) -> list[Path]:
+        """Master JSON gives each filing's XBRL URL and broadcast time [SHP6]. `min_as_of` keeps the quarters from
+        that date on (2024-12-31 gives the first in-scope quarter, 2025-03-31, its QoQ comparison)."""
         url = shp_master_url(symbol)
         master = self._get(url, accept=JSON)
         out = [stage_raw_only(self.vault, self.stage_root, data=master, ext="json", media_type=JSON,
                               category="SHP_MASTER", source_url=url, fetched_at=utc_now())]  # fmt: skip
         entries = parse_shp_master(master)
-        if latest_only:
+        if min_as_of is not None:
+            entries = [e for e in entries if e.as_of_date >= min_as_of]
+        elif latest_only:
             entries = entries[:1]
         for e in entries:
-            if self.is_vaulted(e.xbrl_url) or (xbrl := self._file(e.xbrl_url)) is None:
+            if self.is_done(e.xbrl_url, "shareholding") or (xbrl := self._file(e.xbrl_url)) is None:
                 continue
             out.append(
                 stage_shareholding(
@@ -215,7 +269,9 @@ class Jobs:
         out = [stage_raw_only(self.vault, self.stage_root, data=listing, ext="json", media_type=JSON,
                               category="ANNUAL_LISTING", source_url=url, fetched_at=utc_now())]  # fmt: skip
         for e in parse_annual_listing(listing):
-            if e.to_year < min_to_year or self.is_vaulted(e.xbrl_url) or (xbrl := self._file(e.xbrl_url)) is None:
+            if e.to_year < min_to_year or self.is_done(e.xbrl_url, "results_xbrl"):
+                continue
+            if (xbrl := self._file(e.xbrl_url)) is None:
                 continue
             out.append(
                 stage_results_xbrl(
@@ -229,16 +285,26 @@ class Jobs:
     def results(self, symbol: str) -> list[Path]:
         """Integrated Filing results [A7]: listing JSON (vaulted), then every Financials row with a period end in
         scope (C9) whose XBRL is not vaulted yet; broadcast time from the listing (IST)."""
-        url = results_listing_url(symbol)
-        listing = self._get(url, accept=JSON)
-        out = [stage_raw_only(self.vault, self.stage_root, data=listing, ext="json", media_type=JSON,
-                              category="RESULTS_LISTING", source_url=url, fetched_at=utc_now())]  # fmt: skip
-        for e in parse_integrated_filing_listing(listing):
-            if e.period_end < MIN_PERIOD_END_DATE or self.is_vaulted(e.xbrl_url):
+        out, entries, page = [], [], 1
+        while True:  # every page until totalCount rows are listed [A7]
+            url = results_listing_url(symbol, page)
+            listing = self._get(url, accept=JSON)
+            out.append(stage_results_listing(self.vault, self.stage_root, data=listing, source_url=url,
+                                             fetched_at=utc_now()))  # fmt: skip
+            entries += parse_integrated_filing_listing(listing)
+            seen, total = listing_progress(listing)
+            if not seen or page * 20 >= total or page >= 10:
+                break
+            page += 1
+        for e in entries:
+            if e.period_end < MIN_PERIOD_END_DATE or self.is_done(e.xbrl_url, "results_xbrl"):
                 continue
             if (xbrl := self._file(e.xbrl_url)) is None:
                 continue
-            ts = ist_to_utc(e.broadcast_ts_ist.date(), e.broadcast_ts_ist.time())
+            # Visibility = later of broadcast_Date and creation_Date (a revised row has no broadcast) [X83].
+            v = e.visible_ts_ist
+            ts = None if v is None else ist_to_utc(v.date(), v.time())
+            src = "UNKNOWN" if ts is None else "API_FIELD" if v == e.broadcast_ts_ist else "API_CREATION"
             out.append(
                 stage_results_xbrl(
                     self.vault,
@@ -247,7 +313,7 @@ class Jobs:
                     source_url=e.xbrl_url,
                     fetched_at=utc_now(),
                     broadcast_ts=ts,
-                    broadcast_ts_source="API_FIELD",
+                    broadcast_ts_source=src,
                 )
             )
         return out  # fmt: skip
@@ -299,7 +365,8 @@ class Jobs:
                 staged += self.reg30_events()
             except (FetchError, ParseError) as exc:
                 errors.append(f"events: {exc}")
-        jobs = {"results": self.results, "annual": self.annual_reports, "shareholding": self.shareholding}
+        jobs = {"results": self.results, "annual": self.annual_reports,
+                "shareholding": lambda s: self.shareholding(s, min_as_of=self.shp_min_as_of)}  # fmt: skip
         kinds = list(kinds)
 
         def one(sym: str) -> tuple[list[Path], list[str]]:

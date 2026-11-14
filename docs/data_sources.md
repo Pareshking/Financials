@@ -2,7 +2,7 @@
 
 <!-- GENERATED from config/data_sources.yaml by `python -m financials.sources --write`. Do not edit. -->
 
-26 feeds: 10 VERIFIED, 9 OBSERVED, 5 UNVERIFIED, 2 PLANNED. Status meanings and runtime labels are defined in `config/data_sources.yaml`; evidence IDs point to `docs/references.md`.
+29 feeds: 12 VERIFIED, 9 OBSERVED, 6 UNVERIFIED, 2 PLANNED. Status meanings and runtime labels are defined in `config/data_sources.yaml`; evidence IDs point to `docs/references.md`.
 
 | ID | Feed | Phase | Status | Runtime | Evidence |
 |---|---|---|---|---|---|
@@ -32,6 +32,9 @@
 | F24 | Reg. 34(2)(f) BRSR XBRL | 3 | UNVERIFIED | UNKNOWN | — |
 | F25 | Macro, yield and commodity feeds | 3 | PLANNED | UNKNOWN | — |
 | F26 | Per-AMC monthly portfolios and new-gen supplemental KPIs | 3 | PLANNED | UNKNOWN | — |
+| F27 | Daily index closes (all NSE price indices) | 1 | VERIFIED | CONTAINER_DIRECT | IDX9 |
+| F28 | NSE equity master (EQUITY_L.csv) | 1 | VERIFIED | CONTAINER_DIRECT | IDX10 |
+| F29 | Nifty 500 total-return index (TRI) | 1 | UNVERIFIED | UNKNOWN | — |
 
 ## F01 — UDiFF cash-market bhavcopy
 
@@ -474,3 +477,54 @@
 | verification_status | PLANNED |
 | evidence | — |
 | notes | AMFI consolidated file not believed to exist (R8, UNVERIFIED). |
+
+## F27 — Daily index closes (all NSE price indices)
+
+| Field | Value |
+|---|---|
+| exchange_or_agency | NSE Indices via NSE archives |
+| url_or_endpoint_pattern | https://nsearchives.nseindia.com/content/indices/ind_close_all_DDMMYYYY.csv |
+| format | CSV |
+| cadence | Daily (trading days) |
+| fetch_runtime | CONTAINER_DIRECT |
+| join_keys | Index Name, Index Date |
+| target_tables | index_ohlcv |
+| unlocked_metrics | Nifty 500 / sector index levels, index P/E, P/B, dividend yield, relative strength |
+| phase | 1 |
+| verification_status | VERIFIED |
+| evidence | IDX9 |
+| notes | Fetched by fetch-days with each trading day's bhavcopy. Price indices only; no total-return rows (F29). |
+
+## F28 — NSE equity master (EQUITY_L.csv)
+
+| Field | Value |
+|---|---|
+| exchange_or_agency | NSE |
+| url_or_endpoint_pattern | https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv |
+| format | CSV |
+| cadence | Snapshot (current list) |
+| fetch_runtime | CONTAINER_DIRECT |
+| join_keys | SYMBOL, SERIES, ISIN NUMBER |
+| target_tables | raw_equity_master |
+| unlocked_metrics | listing date, face value, market lot, company legal name |
+| phase | 1 |
+| verification_status | VERIFIED |
+| evidence | IDX10 |
+| notes | fetch-equity-master. Current listings only; header fields carry a leading space after each comma. |
+
+## F29 — Nifty 500 total-return index (TRI)
+
+| Field | Value |
+|---|---|
+| exchange_or_agency | NSE Indices |
+| url_or_endpoint_pattern | endpoint TBD (not in ind_close_all; niftyindices.com historical TRI not probed) |
+| format | UNKNOWN |
+| cadence | Daily |
+| fetch_runtime | UNKNOWN |
+| join_keys | index name, date |
+| target_tables | (planned) index_ohlcv |
+| unlocked_metrics | benchmark total return for backtests |
+| phase | 1 |
+| verification_status | UNVERIFIED |
+| evidence | — |
+| notes | Per-stock total return is computed from prices and accepted dividends (financials.returns); the index TRI needs a verified source. |

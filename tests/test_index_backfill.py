@@ -219,11 +219,12 @@ def test_backfill_aborts_atomically_on_unresolvable_symbol(toy_db):
 
 
 def test_backfill_on_fixture_market_needs_price_history(full_market):
-    """The fixture snapshot resolved only 497 of 500 constituents (3 ISINs unknown to the DB), so the
-    backfill refuses to start; with full price history the next failure would be unresolved old symbols."""
+    """[IDX8] The snapshot resolves 497 equity constituents; the other 3 are REITs (series RR: BAGMANE, BIRET,
+    EMBASSY), counted as members outside the equity universe, so the walk starts at 500. On the six fixture days it
+    then stops at the first symbol with no price history in the database (the live backfill resolves them all)."""
     from financials.admin import backfill_index
 
-    with pytest.raises(IndexInvariantError, match="497 members at as_of, expected 500"):
+    with pytest.raises(IndexInvariantError, match="2026-09-30: cannot resolve BHARATCOAL"):
         backfill_index(full_market.con, "NIFTY 500", read_manifest(MANIFEST.read_text(encoding="utf-8")))
     n = full_market.con.execute("SELECT count(*) FROM index_constituents_history WHERE source = 'MANUAL_BACKFILL'")
     assert n.fetchone()[0] == 0

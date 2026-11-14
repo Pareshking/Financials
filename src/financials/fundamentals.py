@@ -11,10 +11,27 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
+from financials.db import version_key
+from financials.money import ROUNDING_UNITS
 from financials.parsers.indas_corp import period_months
 from financials.scope import financials_in_scope
 
 Period = tuple[date, date]
+# YTD identity (blueprint §3.2, [X80]): a filed YTD must equal the sum of its directly filed quarters within the
+# rounding of the filings (half a LevelOfRounding unit per term), but never tighter than this share of the YTD.
+# Design parameter (2026-11-14): on the live backfill 94% of 8,081 comparisons agree to the rupee, 4% within 0.5%.
+YTD_IDENTITY_REL_TOLERANCE = Decimal("0.005")
+YTD_GUARDED_TAGS = frozenset({"revenue_from_operations", "total_income", "pat", "pbt", "pat_owners"})
+ATTRIBUTION_WITHHELD_TAG = "attribution_withheld"  # X86 marker (parsers.indas_corp)
+ATTRIBUTION_TAGS = frozenset({"pat_owners", "pat_nci"})
+# X94: tax lines copied from the comparative (prior-year) column. PBT is current, tax is last year's, so PAT and TCI
+# (= PBT - tax) are wrong while PBT - tax = PAT still holds (Muthoot standalone Q2 / H1 FY27). Withheld, not corrected:
+# the true tax is not in the file.
+TAX_COPY_COMPONENTS = ("current_tax", "deferred_tax")
+TAX_COPY_WITHHELD_TAGS = frozenset(
+    {"tax_expense", "current_tax", "deferred_tax", "pat", "pat_continuing", "pat_owners", "pat_nci",
+     "total_comprehensive_income"}
+)  # fmt: skip
 
 
 def _add_months(d: date, months: int) -> date:
@@ -34,6 +51,68 @@ class FactBook:
     scope: str
     durations: dict[str, dict[Period, Decimal]] = field(default_factory=dict)
     instants: dict[str, dict[date, Decimal]] = field(default_factory=dict)
+    rounding_unit: Decimal = Decimal(1)  # coarsest LevelOfRounding among this entity's visible filings (scope)
+    # X82: declared fiscal-year starts (filing_meta.fy_start). A >3-month duration is a YTD only when it starts on
+    # one; "Half Yearly"/"Yearly" filings put the Q4 figure in an Oct-Mar context (NETWEB Q4 FY26). Empty = no check.
+    fy_starts: frozenset[date] = frozenset()
+
+    tax_copied: list[dict] = field(default_factory=list)  # X94 breaks found (and withheld) by load_factbook
+
+    def tax_copy_breaks(self) -> list[dict]:
+        """X94: periods whose current and deferred tax both equal, to the rupee and non-zero, those of the same-length
+        period one year earlier while PBT differs. Two independent non-zero components matching exactly is a copied
+        comparative column, not a coincidence (a lone zero deferred tax with a round 1 Cr current tax is, DALBHARAT)."""
+        cur, dfd, pbt = (self.durations.get(t, {}) for t in (*TAX_COPY_COMPONENTS, "pbt"))
+        out = []
+        for (s, e), c in cur.items():
+            prior = (_add_months(s, -12), _add_months(e, -12))
+            d, pc, pd = dfd.get((s, e)), cur.get(prior), dfd.get(prior)
+            if not c or not d or c != pc or d != pd:
+                continue
+            if pbt.get((s, e)) is None or pbt.get((s, e)) == pbt.get(prior):
+                continue
+            out.append({"period": [str(s), str(e)], "prior_period": [str(prior[0]), str(prior[1])],
+                        "current_tax": str(c), "deferred_tax": str(d), "pbt": str(pbt[(s, e)]),
+                        "prior_pbt": str(pbt.get(prior))})  # fmt: skip
+        return out
+
+    def withhold_tax_copies(self) -> None:
+        self.tax_copied = self.tax_copy_breaks()
+        for b in self.tax_copied:
+            p = (date.fromisoformat(b["period"][0]), date.fromisoformat(b["period"][1]))
+            for tag in TAX_COPY_WITHHELD_TAGS:
+                self.durations.get(tag, {}).pop(p, None)
+
+    def is_ytd_start(self, start: date) -> bool:
+        return not self.fy_starts or start in self.fy_starts
+
+    def ytd_breaks(self, tag: str) -> list[dict]:
+        """Every filed YTD (> 3 months, from a fiscal-year start) whose quarters were all filed directly, and whose
+        value differs from their sum by more than the tolerance. A break means a restated or mis-filed quarter
+        (or YTD); which one is wrong cannot be told from the numbers, so nothing is corrected [X80]."""
+        d = self.durations.get(tag, {})
+        out = []
+        for (s, e), ytd in d.items():
+            m = period_months(s, e)
+            if m is None or m <= 3 or m > 12 or m % 3 or not self.is_ytd_start(s):
+                continue
+            ends = [_add_months(e, -3 * i) for i in range(m // 3)]
+            qs = [d.get((_add_months(date(qe.year, qe.month, 1), -2), qe)) for qe in ends]
+            if None in qs:
+                continue
+            total = sum(qs, Decimal(0))
+            tol = max(self.rounding_unit * (len(qs) + 1) / 2, abs(ytd) * YTD_IDENTITY_REL_TOLERANCE)
+            if abs(ytd - total) > tol:
+                out.append({"tag": tag, "ytd_period": [str(s), str(e)], "ytd": str(ytd), "quarters_sum": str(total),
+                            "quarters": len(qs), "tolerance": str(tol)})  # fmt: skip
+        return out
+
+    def _ytd_consistent(self, tag: str, end: date) -> bool:
+        """False when any YTD ending inside the 4 quarters to `end` breaks the identity (guarded tags only)."""
+        if tag not in YTD_GUARDED_TAGS:
+            return True
+        window = {_add_months(end, -3 * i) for i in range(4)}
+        return not any(date.fromisoformat(b["ytd_period"][1]) in window for b in self.ytd_breaks(tag))
 
     # ── flows ──
     def quarter(self, tag: str, end: date) -> Decimal | None:
@@ -44,12 +123,14 @@ class FactBook:
             return d[(q_start, end)]
         prev_end = _add_months(end, -3)
         for (s, e), v in d.items():
-            if e == end and (s, prev_end) in d and s < q_start:
+            if e == end and (s, prev_end) in d and s < q_start and self.is_ytd_start(s):
                 return v - d[(s, prev_end)]
         return None
 
     def ttm(self, tag: str, end: date) -> Decimal | None:
         """Sum of the 4 quarters ending `end`; falls back to the YTD bridge for H1/FY-only flows."""
+        if not self._ytd_consistent(tag, end):
+            return None  # X80: a restated / mis-filed quarter inside the window; never sum inconsistent quarters
         qs = [self.quarter(tag, _add_months(end, -3 * i)) for i in range(4)]
         if None not in qs:
             return sum(qs, Decimal(0))
@@ -64,7 +145,7 @@ class FactBook:
             m = period_months(s, e)
             if m == 12:
                 return v
-            if m is None or m > 12:
+            if m is None or m > 12 or not self.is_ytd_start(s):
                 continue
             fy_prev = (_add_months(s, -12), _prev_day_month_end(s))
             ytd_prev = (_add_months(s, -12), _add_months(e, -12))
@@ -82,7 +163,9 @@ class FactBook:
         if key not in self.durations:
             primary = self.durations.get(tag, {})
             base = self.durations.get(fallback, {}) if fallback else self.durations.get("revenue_from_operations", {})
-            out = {p: primary.get(p, base[p] if fallback else Decimal(0)) for p in base}
+            # X86: where the owners / NCI split is withheld, neither the split nor a fallback to PAT is used.
+            blocked = self.durations.get(ATTRIBUTION_WITHHELD_TAG, {}) if tag in ATTRIBUTION_TAGS else {}
+            out = {p: primary.get(p, base[p] if fallback else Decimal(0)) for p in base if p not in blocked}
             out.update(primary)
             self.durations[key] = out
         return key
@@ -116,24 +199,110 @@ def _prev_day_month_end(d: date) -> date:
     return date(prev.year, prev.month, calendar.monthrange(prev.year, prev.month)[1])
 
 
+_ROUNDING_CASE = " ".join(f"WHEN '{k}' THEN {int(v)}" for k, v in ROUNDING_UNITS.items())
+# X83: only each filing's latest parser version is read. A re-parse can move a filing's visibility later (listing
+# creation time instead of the board-meeting rule); the older version's rows must not stay visible earlier.
+CURRENT_VERSION = (
+    "parser_version = coalesce((SELECT arg_max(cv.parser_version, " + version_key("cv.parser_version") + ") "
+    "FROM filing_meta cv WHERE cv.filing_id = fact_observations.filing_id), parser_version)"
+)
+
+
+# Accounting basis of a profile (invariant 6: never combine profiles). Go Digit and Star Health moved from IRDAI
+# Indian-GAAP insurer filings to Ind AS in FY27; their Q1 IRDAI PBT and the Ind AS H1 cannot be combined [X90].
+_BASIS = (
+    "CASE accounting_profile WHEN 'IRDAI_GENERAL' THEN 'IRDAI' WHEN 'IRDAI_LIFE' THEN 'IRDAI' "
+    "WHEN 'IGAAP_BANK' THEN 'IGAAP_BANK' ELSE 'INDAS' END"
+)
+SAME_BASIS = (
+    "(NOT EXISTS (SELECT 1 FROM filing_meta b WHERE b.filing_id = fact_observations.filing_id) OR "
+    "(SELECT any_value(" + _BASIS + ") FROM filing_meta b WHERE b.filing_id = fact_observations.filing_id) = "
+    "coalesce((SELECT arg_max(" + _BASIS + ", visible_from_ts) FROM filing_meta l WHERE l.entity_id = ? "
+    "AND l.scope = ? AND l.visible_from_ts <= ? AND l.accounting_profile <> 'REG34_ANNUAL'), 'INDAS'))"
+)
+
+
 def load_factbook(con, entity_id: str, scope: str, as_of: datetime) -> FactBook:
+    """Latest visible value per (tag, period), from filings on the accounting basis of the entity's latest
+    quarterly filing (X90): after a change of basis the older basis drops out, so quarters and TTM rebuild."""
     rows = con.execute(
         """SELECT canonical_tag, period_type, period_start, period_end, coalesce(value_inr, value_other)
            FROM (SELECT *, row_number() OVER (
                     PARTITION BY canonical_tag, period_start, period_end
-                    ORDER BY visible_from_ts DESC, parser_version DESC) AS rn
+                    ORDER BY visible_from_ts DESC, """
+        + version_key()
+        + """ DESC) AS rn
                  FROM fact_observations
-                 WHERE entity_id = ? AND scope = ? AND visible_from_ts <= ?)
+                 WHERE entity_id = ? AND scope = ? AND visible_from_ts <= ? AND """
+        + CURRENT_VERSION
+        + " AND "
+        + SAME_BASIS
+        + """)
            WHERE rn = 1""",
-        [entity_id, scope, as_of],
+        [entity_id, scope, as_of, entity_id, scope, as_of],
     ).fetchall()
-    book = FactBook(entity_id, scope)
+    unit, fy_starts = con.execute(
+        "SELECT max(CASE level_of_rounding "
+        + _ROUNDING_CASE
+        + " ELSE 1 END), list(DISTINCT fy_start) FROM filing_meta WHERE entity_id = ? AND scope = ? "
+        "AND visible_from_ts <= ?",
+        [entity_id, scope, as_of],
+    ).fetchone()
+    book = FactBook(entity_id, scope, fy_starts=frozenset(fy_starts or ()))
+    if rows and unit is not None:
+        book.rounding_unit = Decimal(unit)
     for tag, ptype, start, end, value in rows:
         if ptype == "INSTANT":
             book.instants.setdefault(tag, {})[end] = Decimal(value)
         else:
             book.durations.setdefault(tag, {})[(start, end)] = Decimal(value)
+    book.withhold_tax_copies()
     return book
+
+
+SEGMENT_CURRENT_VERSION = CURRENT_VERSION.replace("fact_observations.", "segment_observations.")
+
+
+@dataclass(frozen=True)
+class SegmentRow:
+    axis_kind: str
+    axis: str
+    member: str
+    member_role: str
+    label: str | None
+    element: str
+    canonical_metric: str
+    period_type: str
+    period_start: date
+    period_end: date
+    period_months: int | None
+    value_inr: Decimal
+    filing_id: str
+    visible_from_ts: datetime
+
+
+def load_segments(
+    con, entity_id: str, scope: str, as_of: datetime, *, axis_kind: str | None = None
+) -> list[SegmentRow]:
+    """Segment / geography rows as known at `as_of` [X97]: each filing's current parser version only, visible_from_ts
+    <= as_of. Per (axis, element, period) every member of the latest visible filing that reports it, so a revision or
+    a restated comparative replaces the whole breakdown: members are per-filing ids (`ReportableSegments1Member` can
+    be a different business in another filing), so members of two filings are never mixed. Labels as filed.
+    A separate read: these rows never enter the factbook, a P&L line or a ratio (architecture §14b-1)."""
+    rows = con.execute(
+        """SELECT axis_kind, axis, member, member_role, label, element, canonical_metric, period_type, period_start,
+                  period_end, period_months, value_inr, filing_id, visible_from_ts
+           FROM segment_observations
+           WHERE entity_id = ? AND scope = ? AND visible_from_ts <= ? AND (? IS NULL OR axis_kind = ?) AND """
+        + SEGMENT_CURRENT_VERSION
+        + """
+           QUALIFY dense_rank() OVER (
+               PARTITION BY axis_kind, axis, element, period_start, period_end
+               ORDER BY visible_from_ts DESC, filing_id DESC) = 1
+           ORDER BY axis_kind, period_end, period_start, axis, member, element""",
+        [entity_id, scope, as_of, axis_kind, axis_kind],
+    ).fetchall()
+    return [SegmentRow(*r) for r in rows]
 
 
 SCOPES = ("CONSOLIDATED", "STANDALONE")
@@ -825,7 +994,8 @@ def _year(book: FactBook, p: tuple[date, date]) -> dict[str, Decimal | None]:
         "ltd": _at(book, "borrowings_noncurrent", end), "rec": _at(book, "trade_receivables_current", end),
         "share_capital": _at(book, "equity_share_capital", end),
         "equity_owners": _at(book, "equity_attributable_to_owners", end) or _at(book, "total_equity", end),
-        "pat_owners": _fy(book, "pat_owners", p) or _fy(book, "pat", p),
+        "pat_owners": None if _fy(book, ATTRIBUTION_WITHHELD_TAG, p)
+        else (_fy(book, "pat_owners", p) or _fy(book, "pat", p)),
         "goodwill": _at(book, "goodwill", end), "intangibles": _at(book, "other_intangibles", end),
         "cwip": _at(book, "cwip", end), "gross_block": _at(book, "ppe_gross_block", end),
         "contingent": _at(book, "contingent_liabilities", end),
@@ -911,6 +1081,9 @@ SCREENER_CONVENTION_COLUMNS = (
 )  # fmt: skip
 
 
+COGS_MIN_SHARE = Decimal("0.01")  # S23 CHOICE: below 1% of sales, inventory / payable days are not meaningful
+
+
 class _BookAsResult:
     """Lets the parity-tested statement builders (statements/*) read a FactBook: same rows, same definitions.
 
@@ -944,11 +1117,9 @@ def screener_convention_ratios(book: FactBook, on_or_before: date) -> dict:
     Working Capital = Other Assets - Other Liabilities (rupees). Kept beside our own ratios, not instead of them:
     `roce` excludes other income and uses closing capital.
 
-    Days ratios on the same Sales denominator as the export's Debtor Days [S23, our definitions; the website's
-    are UNVERIFIED]: Inventory Days = closing Inventory / (Sales / 365); Days Payable = closing trade payables /
-    (Sales / 365); Cash Conversion Cycle = Debtor + Inventory - Payable days (differs from the website for TCS:
-    72 vs 93, the website leaves inventory and payable days blank); Working Capital Days = (current assets - cash &
-    bank - current investments - current liabilities) / (Sales / 365), observed to match the website on TCS.
+    Days ratios as on the website [S23]: Inventory / Payable Days = closing inventory / trade payables over COGS / 365
+    (NULL when COGS < 1% of sales); Cash Conversion Cycle = Debtor + Inventory - Payable days (blanks as 0); Working
+    Capital Days = (current assets - cash & bank - current investments - current liabilities) / (Sales / 365).
     Schedule III omits nil lines, so a filed balance sheet without an inventory or payables line means 0 days
     [C23]."""
     from financials.statements.balance_sheet import balance_sheet
@@ -972,11 +1143,18 @@ def screener_convention_ratios(book: FactBook, on_or_before: date) -> dict:
         out["inventory_turnover"] = sales / stock if stock else None
         per_day = sales / 365
         payables = bs.rows["Other Liabilities"].parts.get("Trade payables")
-        out["inventory_days"] = stock / per_day if stock is not None else None
-        out["days_payable"] = payables / per_day if payables is not None else None
-        parts = (out["debtor_days"], out["inventory_days"], out["days_payable"])
-        if None not in parts:
-            out["cash_conversion_cycle"] = parts[0] + parts[1] - parts[2]
+        # S23: inventory and payable days are on COGS = materials consumed + purchases of stock-in-trade + change in
+        # inventories (ITC FY26 consolidated: 208.8 / 63.2 = the website's 209 / 63). With COGS under 1% of sales
+        # (services: TCS 41 Cr on 267,021 Cr) they are NULL, as the website leaves them blank (CHOICE threshold).
+        cogs = sum((_fy(book, t, fy) or Decimal(0) for t in _COGS), Decimal(0))
+        if cogs > 0 and cogs >= COGS_MIN_SHARE * sales:
+            cogs_day = cogs / 365
+            out["inventory_days"] = stock / cogs_day if stock is not None else None
+            out["days_payable"] = payables / cogs_day if payables is not None else None
+        if out["debtor_days"] is not None:  # blank inventory / payable days count as 0, as on the website
+            out["cash_conversion_cycle"] = (
+                out["debtor_days"] + (out["inventory_days"] or 0) - (out["days_payable"] or 0)
+            )
         ca, cl = (
             book.instants.get("current_assets", {}).get(fy[1]),
             book.instants.get("current_liabilities", {}).get(fy[1]),

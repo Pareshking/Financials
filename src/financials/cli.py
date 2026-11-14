@@ -20,7 +20,7 @@ from financials.dsl import run_screen
 from financials.features import materialize
 from financials.fetch.http import PoliteFetcher, Transport
 from financials.fetch.jobs import WARMUP, Jobs
-from financials.promoter import promote
+from financials.promoter import close_wrong_template_duplicates, promote
 from financials.scope import MIN_TRADE_DATE
 from financials.staging import read_manifest
 from financials.timeutil import utc_now
@@ -28,8 +28,8 @@ from financials.vault import Vault
 
 UNIVERSES = ("nifty500", "active")
 
-JOB_ORDER = {"holidays": 0, "market_day": 1, "index_snapshot": 2, "corp_actions": 3, "results_xbrl": 4,
-             "shareholding": 5, "raw_only": 6, "kpis": 7}  # fmt: skip
+JOB_ORDER = {"holidays": 0, "market_day": 1, "index_close": 2, "index_snapshot": 2, "corp_actions": 3,
+             "results_xbrl": 4, "shareholding": 5, "raw_only": 6, "kpis": 7, "equity_master": 8}  # fmt: skip
 
 
 def _paths(data_dir: Path) -> tuple[Path, Path, Path]:
@@ -56,7 +56,7 @@ def promote_pending(con, stage_root: Path, out=sys.stdout) -> int:
     Market days are promoted strictly in date order. When one aborts (e.g. G1 on a half-published file), every
     later market day waits instead of promoting: promoting it would put the failed day permanently behind the
     ORDER gate. Batches for the same date are still tried (a complete re-fetch can replace a trimmed one)."""
-    pending = 0
+    pending, results_seen = 0, False
     blocked_after: str | None = None
     for d in pending_stages(con, stage_root):
         rel = d.relative_to(stage_root).as_posix()
@@ -76,6 +76,9 @@ def promote_pending(con, stage_root: Path, out=sys.stdout) -> int:
             blocked_after = None  # a complete batch for the blocked date went through
         con.execute("INSERT OR REPLACE INTO promotion_log VALUES (?, ?, ?, ?, ?)",
                     [rel, r.job, r.status, r.message, utc_now()])  # fmt: skip
+        results_seen = results_seen or r.job == "results_xbrl"
+    if results_seen and (n := close_wrong_template_duplicates(con)):
+        print(f"{'FIXED_BY_RULE':16s} {'results_xbrl':14s} {n} wrong-template duplicate(s) closed [X89]", file=out)
     return pending
 
 
@@ -86,15 +89,20 @@ def _date(s: str) -> date:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="financials", description=__doc__.splitlines()[0])
     p.add_argument("--data-dir", type=Path, default=Path("data"))
+    archive_help = "archive host requests/s and connections (owner decision); the API host stays at 1/s"
+    p.add_argument("--archive-rps", type=float, default=1.0, help=archive_help)
+
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("init-db")
     fd = sub.add_parser("fetch-days", help="bhavcopy + delivery for a date range (holidays are skipped)")
     fd.add_argument("start", type=_date)
     fd.add_argument("end", type=_date, nargs="?")
+    fd.add_argument("--workers", type=int, default=1, help="threads (with --archive-rps above 1)")
     fc = sub.add_parser("fetch-corp-actions")
     fc.add_argument("start", type=_date)
     fc.add_argument("end", type=_date)
     sub.add_parser("fetch-holidays")
+    sub.add_parser("fetch-equity-master", help="NSE equity master EQUITY_L.csv (listing date, face value, ISIN)")
     fi = sub.add_parser("fetch-index")
     fi.add_argument("--as-of", type=_date, default=date.today())
     fs = sub.add_parser("fetch-shareholding")
@@ -118,7 +126,8 @@ def build_parser() -> argparse.ArgumentParser:
     df.add_argument("--kinds", nargs="+", default=["results", "annual", "shareholding"],
                     choices=["results", "annual", "shareholding"])  # fmt: skip
     df.add_argument("--no-events", action="store_true")
-    df.add_argument("--workers", type=int, default=1, help="threads; still 1 request/s per host")
+    df.add_argument("--workers", type=int, default=1, help="threads (per-host limits still apply)")
+    df.add_argument("--shp-from", type=_date, help="shareholding quarters from this date (default: latest only)")
     rd = sub.add_parser("run-day", help="holidays, days, corporate actions, discovery, promote, materialize")
     rd.add_argument("--date", type=_date, required=True)
     rd.add_argument("--lookback-days", type=int, default=7)
@@ -134,6 +143,20 @@ def build_parser() -> argparse.ArgumentParser:
     ib = sub.add_parser("import-bundle", help="load a bundle into a new database and verify checksums")
     ib.add_argument("src", type=Path)
     ib.add_argument("--db", type=Path, required=True)
+    rs = sub.add_parser("restage", help="re-parse vaulted inputs with the current parser (no download)")
+    restage_help = "RESULTS_XBRL re-parses only filings with open parse / identity / period findings"
+    rs.add_argument(
+        "--category", choices=["CORP_ACTIONS", "SHP_XBRL", "RESULTS_XBRL"], required=True, help=restage_help
+    )
+    rs.add_argument("--visibility", action="store_true",
+                    help="RESULTS_XBRL: instead re-parse promoted filings whose visibility rule now gives a later "
+                         "time (listing creation / file name) [X83]")  # fmt: skip
+    rs.add_argument("--all", action="store_true",
+                    help="RESULTS_XBRL: re-parse every results / annual filing (after a parser change that adds "
+                         "output to clean filings, e.g. segment rows in 0.10.0)")  # fmt: skip
+    evidence_help = "stage raw_results_listing rows from vaulted RESULTS_LISTING blobs (then promote) [X83]"
+    sub.add_parser("backfill-listing-evidence", help=evidence_help)
+    sub.add_parser("audit-ytd", help="raise YTD_QUARTER_MISMATCH findings for every entity and scope [X80]")
     sub.add_parser("promote", help="apply all pending staged batches (single writer)")
     rb = sub.add_parser("rebuild-market", help="roll market-derived state back to a date and replay it (audited)")
     rb.add_argument("--from", dest="from_date", type=_date, required=True)
@@ -185,11 +208,40 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def restage_rows(con, category: str, mode: str = "OPEN_FINDINGS") -> list[tuple]:
+    """Vaulted filings to re-parse: (source_url, fetched_at, storage_path, sha256, broadcast_ts, broadcast_ts_source,
+    exchange). RESULTS_XBRL: OPEN_FINDINGS (default) = filings with open parse / identity / period findings;
+    VISIBILITY = promoted filings whose visibility rule now gives a later time [X83]; ALL = every results and annual
+    filing that has filing_meta (parsed, not OUT_OF_SCOPE) or an open finding. Other categories: every filing."""
+    from financials.promoter import FILING_FINDING_STAGES
+
+    where, params = "", [category]
+    open_findings = (
+        "f.filing_id IN (SELECT filing_id FROM quarantine_queue WHERE resolved_at IS NULL "
+        f"AND stage IN {FILING_FINDING_STAGES}) "
+    )
+    if category == "RESULTS_XBRL" and mode == "VISIBILITY":
+        from financials.promoter import filings_with_later_visibility
+
+        where, params = "AND f.filing_id IN (SELECT unnest(?)) ", [category, filings_with_later_visibility(con)]
+    elif category == "RESULTS_XBRL" and mode == "ALL":
+        where = "AND (f.filing_id IN (SELECT filing_id FROM filing_meta) OR " + open_findings + ") "
+    elif category == "RESULTS_XBRL":
+        where = "AND " + open_findings
+    return con.execute(
+        "SELECT f.source_url, f.fetched_at, b.storage_path, b.sha256, f.broadcast_ts, f.broadcast_ts_source, "
+        "f.exchange FROM filings f JOIN blobs b USING (sha256) WHERE f.category = ? " + where
+        + "ORDER BY f.source_url", params).fetchall()  # fmt: skip
+
+
 def main(argv: Sequence[str] | None = None, *, transport: Transport | None = None, out=sys.stdout) -> int:
     args = build_parser().parse_args(argv)
     vault_dir, stage_root, db_path = _paths(args.data_dir)
     if args.cmd.startswith(("fetch", "discover")):
-        jobs = Jobs(PoliteFetcher(transport, warmup=WARMUP), Vault(vault_dir), stage_root)
+        jobs = Jobs(
+            PoliteFetcher(transport, warmup=WARMUP, host_limits=archive_limits(args)), Vault(vault_dir), stage_root
+        )
+        jobs.workers = getattr(args, "workers", 1)
         staged, errors = run_fetch(args, jobs, db_path, out)
         for s in staged:
             print(f"staged {s.relative_to(stage_root).as_posix()}", file=out)
@@ -220,6 +272,70 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
         for t, v in m["tables"].items():
             print(f"{t:36s} rows={v['rows']:>10} files={v['files']:>3} {v['bytes'] / 2**20:8.2f} MB", file=out)
         print(f"total {m['total_bytes'] / 2**20:.2f} MB", file=out)
+        return 0
+    if args.cmd == "restage":
+        from financials.staging import stage_corp_actions
+
+        if not db_path.exists():
+            print(f"error: no market database at {db_path}", file=out)
+            return 2
+        from financials import PARSER_VERSION
+        from financials.staging import stage_results_xbrl, stage_shareholding
+
+        con = connect(db_path, read_only=True)
+        try:
+            mode = "VISIBILITY" if args.visibility else "ALL" if args.all else "OPEN_FINDINGS"
+            rows = restage_rows(con, args.category, mode)
+        finally:
+            con.close()
+        vault = Vault(vault_dir)
+        for url, fetched, path, sha, bts, bsrc, exch in rows:
+            data = vault.read_path(path, sha)
+            if args.category == "CORP_ACTIONS":
+                s = stage_corp_actions(vault, stage_root, data=data, source_url=url, fetched_at=fetched)
+            elif args.category == "RESULTS_XBRL":
+                s = stage_results_xbrl(vault, stage_root, data=data, source_url=url, fetched_at=fetched,
+                                       broadcast_ts=bts, broadcast_ts_source=bsrc, exchange=exch,
+                                       run_suffix=PARSER_VERSION)  # fmt: skip
+            else:  # same filing (blob, URL, broadcast time); a new parser_version batch
+                s = stage_shareholding(vault, stage_root, data=data, source_url=url, fetched_at=fetched,
+                                       broadcast_ts=bts, broadcast_ts_source=bsrc, exchange=exch,
+                                       run_suffix=PARSER_VERSION)  # fmt: skip
+            print(f"staged {s.relative_to(stage_root).as_posix()}", file=out)
+        return 0
+    if args.cmd == "backfill-listing-evidence":
+        from financials.staging import stage_results_listing
+
+        if not db_path.exists():
+            print(f"error: no market database at {db_path}", file=out)
+            return 2
+        con = connect(db_path, read_only=True)
+        try:
+            rows = con.execute(
+                "SELECT f.source_url, f.fetched_at, f.exchange, b.storage_path, b.sha256 FROM filings f "
+                "JOIN blobs b USING (sha256) WHERE f.category = 'RESULTS_LISTING' AND NOT EXISTS "
+                "(SELECT 1 FROM raw_results_listing r WHERE r.filing_id = f.filing_id) ORDER BY f.fetched_at"
+            ).fetchall()
+        finally:
+            con.close()
+        vault = Vault(vault_dir)
+        for url, fetched, exch, path, sha in rows:
+            stage_results_listing(vault, stage_root, data=vault.read_path(path, sha), source_url=url,
+                                  fetched_at=fetched, exchange=exch, run_suffix="evidence")  # fmt: skip
+        print(f"staged {len(rows)} results listings (run promote)", file=out)
+        return 0
+    if args.cmd == "audit-ytd":
+        from financials.promoter import audit_ytd_identity
+
+        con = connect(db_path)
+        try:
+            pairs = con.execute("SELECT DISTINCT entity_id, scope FROM filing_meta ORDER BY 1, 2").fetchall()
+            con.execute("BEGIN")
+            ids = audit_ytd_identity(con, pairs)
+            con.execute("COMMIT")
+        finally:
+            con.close()
+        print(f"{len(ids)} YTD_QUARTER_MISMATCH findings over {len(pairs)} entity-scopes", file=out)
         return 0
     if args.cmd == "load-kpis":
         from financials.staging import stage_kpis
@@ -324,6 +440,12 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
     return 2
 
 
+def archive_limits(args) -> dict[str, tuple[float, int]] | None:
+    if args.archive_rps <= 1:
+        return None
+    return {"nsearchives.nseindia.com": (args.archive_rps, max(1, int(args.archive_rps)))}
+
+
 def universe_symbols(db_path: Path, name: str, as_of: date) -> list[str]:
     """Symbols of a universe from the market database (read-only): `nifty500` = index members on `as_of`,
     `active` = every security with an open identifier interval."""
@@ -365,6 +487,8 @@ def run_fetch(args, jobs: Jobs, db_path: Path, out) -> tuple[list[Path], list[st
         staged += jobs.corp_actions(max(args.start, MIN_TRADE_DATE), args.end)
     elif args.cmd == "fetch-holidays":
         staged += jobs.holidays()
+    elif args.cmd == "fetch-equity-master":
+        staged += jobs.equity_master()
     elif args.cmd == "fetch-index":
         staged += jobs.index_snapshot(args.as_of)
     elif args.cmd == "fetch-shareholding":
@@ -388,6 +512,7 @@ def run_fetch(args, jobs: Jobs, db_path: Path, out) -> tuple[list[Path], list[st
         syms = _symbols(args, db_path, args.symbols)
         if args.from_rss:
             syms += [s for s in jobs.symbols_from_rss() if s not in syms]
+        jobs.shp_min_as_of = args.shp_from
         staged, errors = jobs.discover(syms, args.kinds, events=not args.no_events, workers=args.workers)
     return staged, errors
 

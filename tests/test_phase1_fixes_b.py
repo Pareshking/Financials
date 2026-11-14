@@ -32,6 +32,7 @@ from financials.staging import stage_results_xbrl
 from financials.vault import Vault
 
 A7 = FIXTURES / "discovery" / "nse_integrated-filing-results_equities_TCS_20261113.json"
+A7_PAGE2 = FIXTURES / "discovery" / "nse_integrated-filing-results_equities_TCS_page2_20261114.json"
 RSS = FIXTURES / "events" / "nse_Online_announcements_20261113.xml"
 XBRL = "https://nsearchives.nseindia.com/corporate/xbrl/"
 
@@ -69,12 +70,16 @@ def test_discover_fetches_only_new_in_scope_results(tmp_path):
     q2 = XBRL + "INTEGRATED_FILING_INDAS_1734607_08102026100810_WEB.xml"
     q4 = XBRL + "INTEGRATED_FILING_INDAS_1648408_09042026114218_WEB.xml"
     routes = {results_listing_url("TCS"): Response(200, A7.read_bytes()),
+              results_listing_url("TCS", 2): Response(200, A7_PAGE2.read_bytes()),
               q2: Response(200, (FIXTURES / "xbrl" / q2.rsplit("/", 1)[-1]).read_bytes()),
               q4: Response(200, (FIXTURES / "xbrl" / q4.rsplit("/", 1)[-1]).read_bytes())}  # fmt: skip
     jobs, t = jobs_for(tmp_path, routes)
     staged, errors = jobs.discover(["TCS"], ["results"], events=False)
-    assert len(staged) == 3  # listing + two files; the other 11 rows are not served (404): reported, not fatal
-    assert len(errors) == 11 and all(e.startswith("INTEGRATED_FILING_") for e in errors)
+    # two listing pages + two files; the other 12 in-scope Financials rows (11 on page 1, the Mar 2025 standalone on
+    # page 2) are not served (404): reported, not fatal
+    assert len(staged) == 4
+    assert len(errors) == 12 and all(e.startswith("INTEGRATED_FILING_") for e in errors)
+    assert results_listing_url("TCS", 2) in [u for u, _ in t.calls]
     before = len(t.calls)
     jobs.discover(["TCS"], ["results"], events=False)
     fetched_again = [u for u, _ in t.calls[before:] if u in (q2, q4)]
@@ -335,3 +340,43 @@ def test_parallel_workers_keep_one_request_per_host_interval(tmp_path):
     assert set(per_host) == {"www.nseindia.com"}
     ts = sorted(per_host["www.nseindia.com"])
     assert len(ts) == 8 and all(b - a >= 0.049 for a, b in pairwise(ts))
+
+
+def test_a_ledger_entry_without_its_blob_is_fetched_again(tmp_path):
+    """A run killed between download and vault write leaves a 200 in the URL index but no file: fetch it again."""
+    d = date(2025, 10, 17)
+    jobs, t = jobs_for(tmp_path, {bhavcopy_url(d): Response(200, bhav("20251017"))})
+    jobs.vault.record_fetch(bhavcopy_url(d), 200, datetime(2026, 11, 14), bhav("20251017"), "csv.zip")
+    assert not jobs.is_vaulted(bhavcopy_url(d))  # ledger says 200, but no blob on disk
+    assert jobs.market_day(d) and bhavcopy_url(d) in [u for u, _ in t.calls]
+    assert jobs.is_vaulted(bhavcopy_url(d))
+
+
+def test_listing_rows_without_broadcast_time_parse_and_fall_back_to_the_board_meeting_rule():
+    """A7: ADANIGREEN's listing has 10 of 20 rows with broadcast_Date null; they parse with no broadcast time."""
+    p = FIXTURES / "discovery" / "nse_integrated-filing-results_equities_ADANIGREEN_20261114.json"
+    rows = parse_integrated_filing_listing(p.read_bytes(), results_only=False)
+    assert len(rows) == 20 and sum(r.broadcast_ts_ist is None for r in rows) == 10
+    assert all(r.xbrl_url.startswith("https://nsearchives.nseindia.com/corporate/xbrl/") for r in rows)
+
+
+def test_vault_stores_text_blobs_compressed_and_reads_either_form(tmp_path):
+    """Text blobs (XBRL, JSON, CSV) are stored as <path>.gz; the logical storage path and sha256 stay those of the
+    original bytes, and a blob stored uncompressed earlier still reads."""
+    import gzip
+
+    v = Vault(tmp_path / "vault")
+    data = (FIXTURES / "xbrl" / "SHP_1739151_15102026054406_WEB.xml").read_bytes()
+    b = v.put(data, ext="xml", media_type="application/xml", fetched_at=datetime(2026, 11, 14))
+    gz = tmp_path / "vault" / (b.storage_path + ".gz")
+    assert gz.exists() and not (tmp_path / "vault" / b.storage_path).exists()
+    assert gz.stat().st_size < len(data) / 4 and v.read(b) == data and v.exists(b.storage_path)
+    z = v.put(bhav("20251017"), ext="csv.zip", media_type="application/zip", fetched_at=datetime(2026, 11, 14))
+    assert (tmp_path / "vault" / z.storage_path).exists()  # zips are stored as sent
+    plain = tmp_path / "vault" / "ab" / ("ab" + "0" * 62 + ".csv")
+    plain.parent.mkdir(parents=True)
+    plain.write_bytes(b"x")
+    import hashlib
+
+    assert v.read_path("ab/" + plain.name, hashlib.sha256(b"x").hexdigest()) == b"x"  # legacy uncompressed form
+    assert gzip.decompress(gz.read_bytes()) == data

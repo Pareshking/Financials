@@ -8,6 +8,7 @@ G4 (null spike) and G5 (atomic universe) run in feature materialisation (financi
 from __future__ import annotations
 
 import json
+import re
 import statistics
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -20,7 +21,8 @@ import duckdb
 
 from financials import PARSER_VERSION
 from financials.corp_actions import ACCEPTED_STATUSES, CorpAction, adjust_closes, audit_day, verify_group
-from financials.db import fetch_dicts, insert_rows
+from financials.db import fetch_dicts, insert_rows, version_key
+from financials.fundamentals import CURRENT_VERSION
 from financials.identity import UNIVERSE_SERIES, Interval, SecurityRegistry
 from financials.ids import stable_id
 from financials.parsers.udiff import BhavRow
@@ -61,6 +63,8 @@ def promote(con: duckdb.DuckDBPyConnection, stage_dir: Path) -> PromotionResult:
         "reg30_event": _promote_reg30_event,
         "raw_only": _promote_raw_only,
         "kpis": _promote_kpis,
+        "index_close": _promote_vault_and_raw,
+        "equity_master": _promote_vault_and_raw,
     }.get(job)
     if handler is None:
         raise ValueError(f"unknown job {job!r}")
@@ -286,6 +290,8 @@ def _promote_market_day(con, stage_dir: Path, manifest: dict[str, Any]) -> Promo
     quarantined += _infer_non_sessions(con, exchange, trade_date, filing_id)
     verify_pending_actions(con, exchange)
     quarantined += _audit_gaps(con, exchange, trade_date, obs)
+    resolve_market_moves(con)
+    resolve_isin_changes(con, exchange)
     closed = close_inactive_securities(con, exchange, trade_date)
     message = str(trade_date) + (f", {closed} inactive securities closed" if closed else "")
     return PromotionResult("PROMOTED", "market_day", message=message, quarantined=quarantined)
@@ -340,6 +346,91 @@ def _infer_non_sessions(con, exchange: str, trade_date: date, filing_id: str) ->
             },
         )
     ]
+
+
+# CA12 (live backfill 2024-10 .. 2026-11): of 2,227 open-gap findings, 2,153 were equity shares and 1,997 of them
+# moved <= 20% with no corporate-action record of any kind within 7 days in a feed that covers the date. A missing
+# share-count event is what the auditor exists to catch, and it would sit in that feed; so such a gap is a market move.
+MARKET_MOVE_MAX_GAP = Decimal("0.20")
+MARKET_MOVE_WINDOW_DAYS = 7
+
+
+def resolve_market_moves(con) -> int:
+    """Named rule CA12: close UNEXPLAINED_GAP findings of equity shares (INE ISIN) with |gap| <= 20% when the
+    corporate-action feed covers the date (+/- 7 days) and holds no record for the security in that window.
+    ETF units (INF), larger gaps and gaps near any action stay for a human. One batched statement."""
+    rows = con.execute(
+        f"""WITH cov AS (
+              SELECT CAST(strptime(regexp_extract(source_url, 'from_date=([0-9-]+)', 1), '%d-%m-%Y') AS DATE) f,
+                     CAST(strptime(regexp_extract(source_url, 'to_date=([0-9-]+)', 1), '%d-%m-%Y') AS DATE) t
+              FROM filings WHERE category = 'CORP_ACTIONS' AND source_url LIKE '%from_date=%'),
+            g AS (
+              SELECT q.quarantine_id, q.security_id, CAST(json_extract_string(q.details, '$.trade_date') AS DATE) d,
+                     abs(CAST(json_extract_string(q.details, '$.gap') AS DOUBLE)) a
+              FROM quarantine_queue q
+              WHERE q.stage = 'GAP' AND q.reason_code = 'UNEXPLAINED_GAP' AND q.resolved_at IS NULL)
+           UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE',
+                  resolution_note = 'market move: equity, <= 20%, no action within 7 days in a covering feed [CA12]'
+           WHERE quarantine_id IN (
+             SELECT g.quarantine_id FROM g
+             JOIN security_identifier_history h ON h.security_id = g.security_id AND h.valid_from <= g.d
+                  AND (h.valid_to IS NULL OR h.valid_to > g.d) AND h.isin LIKE 'INE%'
+             WHERE g.a <= {float(MARKET_MOVE_MAX_GAP)}
+               AND EXISTS (SELECT 1 FROM cov WHERE g.d - INTERVAL {MARKET_MOVE_WINDOW_DAYS} DAY BETWEEN cov.f AND cov.t)
+               AND EXISTS (SELECT 1 FROM cov WHERE g.d + INTERVAL {MARKET_MOVE_WINDOW_DAYS} DAY BETWEEN cov.f AND cov.t)
+               AND NOT EXISTS (SELECT 1 FROM corp_actions ca WHERE ca.security_id = g.security_id
+                               AND ca.ex_date BETWEEN g.d - INTERVAL {MARKET_MOVE_WINDOW_DAYS} DAY
+                                                  AND g.d + INTERVAL {MARKET_MOVE_WINDOW_DAYS} DAY))
+           RETURNING 1""",
+        [utc_now()],
+    ).fetchall()
+    return len(rows)
+
+
+# CA13 (live backfill): 15 ETF units (INF ISINs) changed ISIN with an opening price at ~1/10 or ~1/100 of the previous
+# close (GROWWGOLD 2026-02-06: -0.903; LICMFGOLD 2026-03-06: -0.99): unit splits, absent from the equities
+# corporate-action feed. And a re-ISIN without price effect (HDFCLIQUID 2025-02-28: gap 0.0) has nothing to adjust.
+ETF_SPLIT_DIVISORS = (2, 5, 10, 20, 50, 100)
+ETF_SPLIT_TOLERANCE = Decimal("0.10")  # = VERIFY_TOLERANCE: units move on the split day too (NV20 0.106)
+
+
+def resolve_isin_changes(con, exchange: str = "NSE") -> int:
+    """Named rule CA13 for open ISIN_CHANGE_WITHOUT_ACTION findings: (1) an ETF unit (INF ISIN) whose open / previous
+    close is within 10% of 1/k for k in ETF_SPLIT_DIVISORS gets a SPLIT 1:k recorded (verified like any action, which
+    also closes its gap findings); (2) a change with |gap| below the no-effect band closes (nothing to adjust)."""
+    from financials.corp_actions import UNOBSERVABLE_BAND
+
+    rows = con.execute(
+        """SELECT q.quarantine_id, q.security_id, CAST(json_extract_string(q.details, '$.trade_date') AS DATE) d,
+                  CAST(json_extract_string(q.details, '$.gap') AS DOUBLE) gap, h.isin, o.price_filing_id
+           FROM quarantine_queue q
+           JOIN security_identifier_history h ON h.security_id = q.security_id
+                AND h.valid_from <= CAST(json_extract_string(q.details, '$.trade_date') AS DATE)
+                AND (h.valid_to IS NULL OR h.valid_to > CAST(json_extract_string(q.details, '$.trade_date') AS DATE))
+           JOIN ohlcv o ON o.security_id = q.security_id
+                AND o.trade_date = CAST(json_extract_string(q.details, '$.trade_date') AS DATE)
+           WHERE q.reason_code = 'ISIN_CHANGE_WITHOUT_ACTION' AND q.resolved_at IS NULL"""
+    ).fetchall()
+    done = 0
+    for qid, sec, d, gap, isin, filing in rows:
+        if gap is None:
+            continue
+        ratio = Decimal(str(1 + gap))
+        k = next((k for k in ETF_SPLIT_DIVISORS if abs(ratio * k - 1) <= ETF_SPLIT_TOLERANCE), None)
+        if isin.startswith("INF") and k is not None:
+            record_corp_action(con, CorpAction(stable_id("ca", "RULE_CA13", sec, d, k), sec, "SPLIT", d, Decimal(1),
+                                               Decimal(k)), source_filing_id=filing)  # fmt: skip
+            done += 1
+        elif abs(Decimal(str(gap))) < UNOBSERVABLE_BAND:
+            con.execute(
+                "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = "
+                "'ISIN change without price effect [CA13]' WHERE quarantine_id = ?",
+                [utc_now(), qid],
+            )
+            done += 1
+    if done:
+        verify_pending_actions(con, exchange)
+    return done
 
 
 INACTIVITY_TRADING_DAYS = 20  # CHOICE: an open interval with no bar in the last 20 promoted sessions is closed
@@ -555,6 +646,14 @@ def verify_pending_actions(con, exchange: str) -> int:
                 "AND resolved_at IS NULL AND CAST(json_extract_string(details, '$.trade_date') AS DATE) = ?",
                 [utc_now(), "explained by recorded split/consolidation", sec, ex],
             )
+    con.execute(
+        "UPDATE quarantine_queue q SET resolved_at = ?, resolution = 'FIXED_BY_RULE', "
+        "resolution_note = 'action verified on re-check' WHERE q.reason_code = 'VERIFY_FAILED' "
+        "AND q.resolved_at IS NULL AND EXISTS (SELECT 1 FROM corp_actions a WHERE a.action_id = "
+        "json_extract_string(q.details, '$.action_id') "
+        "AND a.status IN ('VERIFIED', 'UNOBSERVABLE', 'VERIFIED_MANUAL'))",
+        [utc_now()],
+    )
     return decided
 
 
@@ -571,6 +670,109 @@ def resolve_security_by_isin(con, exchange: str, isin: str, on_date: date) -> li
             [exchange, isin],
         ).fetchall()
     return [r[0] for r in rows]
+
+
+ISIN_TYPO_RULE = "ISIN_TYPO_SYMBOL_MATCH"
+
+
+def is_isin_typo(stated: str, actual: str) -> bool:
+    """X81: the stated ISIN is the actual one with the letter O typed for the digit 0, or with one pair of adjacent
+    characters swapped. Nothing looser (no other substitutions, insertions or deletions)."""
+    if not stated or len(stated) != len(actual) or stated == actual:
+        return False
+    if all(a == b or (a == "O" and b == "0") for a, b in zip(stated, actual, strict=True)):
+        return True
+    diff = [i for i, (a, b) in enumerate(zip(stated, actual, strict=True)) if a != b]
+    return (
+        len(diff) == 2
+        and diff[1] == diff[0] + 1
+        and stated[diff[0]] == actual[diff[1]]
+        and stated[diff[1]] == actual[diff[0]]
+    )
+
+
+def resolve_isin_typo(con, exchange: str, isin: str, symbol: str | None, on_date: date, filing_id: str) -> list[str]:
+    """Rule ISIN_TYPO_SYMBOL_MATCH [X81]: an unknown stated ISIN is accepted only when the stated symbol names exactly
+    one security on `on_date` (else in any interval, as resolve_security_by_isin) and that security's ISIN is the
+    stated one up to an O/0 typo or one adjacent swap. Logged in admin_log; raw keeps the ISIN as sent (invariant 3)."""
+    if not symbol or not isin:
+        return []
+    rows = con.execute(
+        "SELECT DISTINCT security_id, isin FROM security_identifier_history WHERE exchange = ? AND symbol = ? "
+        "AND valid_from <= ? AND (valid_to IS NULL OR valid_to > ?)",
+        [exchange, symbol, on_date, on_date],
+    ).fetchall()
+    if not rows:  # same fallback as resolve_security_by_isin: any interval, still exactly one security
+        rows = con.execute(
+            "SELECT DISTINCT security_id, isin FROM security_identifier_history WHERE exchange = ? AND symbol = ?",
+            [exchange, symbol],
+        ).fetchall()
+    if len({sec for sec, _ in rows}) != 1 or not all(is_isin_typo(isin, actual) for _, actual in rows):
+        return []
+    sec, actual = rows[0]
+    params = json.dumps({"filing_id": filing_id, "stated_isin": isin, "symbol": symbol, "isin": actual,
+                         "security_id": sec}, sort_keys=True)  # fmt: skip
+    row = [stable_id("adm", ISIN_TYPO_RULE, params), "RULE:" + ISIN_TYPO_RULE, params, "X81", utc_now()]
+    con.execute("INSERT OR IGNORE INTO admin_log VALUES (?, ?, ?, NULL, ?, ?)", row)
+    return [sec]
+
+
+UNREGISTERED_ISIN_RULE = "UNREGISTERED_ISIN_SYMBOL_MATCH"
+_NAME_SUFFIXES = {"LTD", "LIMITED", "L"}
+
+
+def _name_tokens(name: str) -> list[str]:
+    tokens = re.sub(r"[^A-Z0-9 ]", " ", name.upper().replace(".", "")).split()
+    while tokens and tokens[-1] in _NAME_SUFFIXES:
+        tokens.pop()
+    return tokens
+
+
+def names_agree(stated: str | None, legal: str | None) -> bool:
+    """Exchange names are abbreviated ("KRISHNA INST OF MED SCI L"): every legal-name word must be a prefix of the
+    stated word in the same position, after dropping punctuation and a trailing LTD / LIMITED / L."""
+    if not stated or not legal:
+        return False
+    a, b = _name_tokens(stated), _name_tokens(legal)
+    return bool(b) and len(a) == len(b) and all(x.startswith(y) for x, y in zip(a, b, strict=True))
+
+
+def resolve_unregistered_isin(
+    con, exchange: str, isin: str, symbol: str | None, company_name: str | None, on_date: date, filing_id: str
+) -> list[str]:
+    """Rule UNREGISTERED_ISIN_SYMBOL_MATCH [X88]: the stated ISIN belongs to no security we know (any exchange, any
+    time), so it cannot name another listed issuer; the stated symbol names exactly one security (on `on_date`, else
+    any interval) and that security has the same ISIN issuer code or the same company name (names_agree). Covers
+    garbled ISINs, a bond ISIN (HDB Financial INE756I08058) and a pre-split ISIN (Persistent INE262H01016).
+    Logged in admin_log; raw keeps the ISIN as sent (invariant 3)."""
+    if not symbol or not isin:
+        return []
+    if con.execute("SELECT count(*) FROM security_identifier_history WHERE isin = ?", [isin]).fetchone()[0]:
+        return []
+    rows = (
+        con.execute(
+            "SELECT DISTINCT h.security_id, h.isin, e.legal_name FROM security_identifier_history h "
+            "JOIN securities s USING (security_id) JOIN entity_master e USING (entity_id) WHERE h.exchange = ? "
+            "AND h.symbol = ? AND h.valid_from <= ? AND (h.valid_to IS NULL OR h.valid_to > ?)",
+            [exchange, symbol, on_date, on_date],
+        ).fetchall()
+        or con.execute(
+            "SELECT DISTINCT h.security_id, h.isin, e.legal_name FROM security_identifier_history h "
+            "JOIN securities s USING (security_id) JOIN entity_master e USING (entity_id) WHERE h.exchange = ? "
+            "AND h.symbol = ?",
+            [exchange, symbol],
+        ).fetchall()
+    )
+    if len({sec for sec, _, _ in rows}) != 1:
+        return []
+    sec, actual, legal = rows[0]
+    if isin_issuer_code(actual) != isin_issuer_code(isin) and not names_agree(company_name, legal):
+        return []
+    params = json.dumps({"filing_id": filing_id, "stated_isin": isin, "symbol": symbol, "isin": actual,
+                         "security_id": sec, "company_name": company_name}, sort_keys=True)  # fmt: skip
+    row = [stable_id("adm", UNREGISTERED_ISIN_RULE, params), "RULE:" + UNREGISTERED_ISIN_RULE, params, "X88", utc_now()]
+    con.execute("INSERT OR IGNORE INTO admin_log VALUES (?, ?, ?, NULL, ?, ?)", row)
+    return [sec]
 
 
 def isin_issuer_code(isin: str) -> str:
@@ -612,6 +814,7 @@ def _promote_corp_actions(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     skipped = 0
     for r in read_table(con, stage_dir, "stg_corp_actions"):
         if r["parse_status"] == "IGNORED":
+            _retire_ignored(con, stable_id("ca", exchange, r["isin"], r["ex_date"], r["subject"], r["component"]))
             continue
         if not market_in_scope(r["ex_date"]):
             skipped += 1
@@ -648,6 +851,8 @@ def _promote_corp_actions(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
             cash_per_share=r["cash_per_share"],
         )
         unparsed = r["parse_status"] == "UNPARSED"
+        if not unparsed:
+            _upgrade_unparsed(con, action)
         record_corp_action(
             con,
             action,
@@ -673,9 +878,77 @@ def _promote_corp_actions(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
                 )
             )
         recorded += 1
+    _requeue_orphaned(con)
     verify_pending_actions(con, exchange)
+    resolve_market_moves(con)
     message = f"{recorded} actions" + (f", {skipped} before {MIN_TRADE_DATE} skipped" if skipped else "")
     return PromotionResult("PROMOTED", "corp_actions", message=message, quarantined=quarantined)
+
+
+def _upgrade_unparsed(con, action: CorpAction) -> None:
+    """A record stored as UNKNOWN (unparsed purpose) that a later parser version reads: same action id (same ISIN,
+    ex-date, subject, component), so the ledger row takes the parsed type and ratios, goes back to PENDING for
+    verification, and its UNPARSED_PURPOSE finding closes [CA11]. Manual decisions (SUPERSEDED, REJECTED) stand."""
+    hit = con.execute(
+        "UPDATE corp_actions SET action_type = ?, ratio_num = ?, ratio_den = ?, issue_price = ?, cash_per_share = ?, "
+        "status = 'PENDING', price_factor = NULL, eps_factor = NULL, observed_gap = NULL, decided_at = NULL "
+        "WHERE action_id = ? AND action_type = 'UNKNOWN' AND status = 'QUARANTINED' RETURNING 1",
+        [action.action_type, action.ratio_num, action.ratio_den, action.issue_price, action.cash_per_share,
+         action.action_id],
+    ).fetchall()  # fmt: skip
+    if hit:
+        con.execute(
+            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ? "
+            "WHERE reason_code = 'UNPARSED_PURPOSE' AND resolved_at IS NULL "
+            "AND json_extract_string(details, '$.action_id') = ?",
+            [utc_now(), f"parsed by {action.action_type} rule [CA11]", action.action_id],
+        )
+    if hit:
+        _requeue_siblings(con, action.action_id)
+
+
+def _retire_ignored(con, action_id: str) -> None:
+    """A record once stored as UNKNOWN that the current rules read as no action (an AGM / EGM notice [CA11]):
+    the ledger row is retired (REJECTED, kept for audit) and its UNPARSED_PURPOSE finding closes."""
+    hit = con.execute(
+        "UPDATE corp_actions SET status = 'REJECTED', decided_at = ? WHERE action_id = ? AND action_type = 'UNKNOWN' "
+        "AND status = 'QUARANTINED' RETURNING 1",
+        [utc_now(), action_id],
+    ).fetchall()
+    if hit:
+        con.execute(
+            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = "
+            "'meeting notice, no corporate action [CA11]' WHERE reason_code = 'UNPARSED_PURPOSE' "
+            "AND resolved_at IS NULL AND json_extract_string(details, '$.action_id') = ?",
+            [utc_now(), action_id],
+        )
+    if hit:
+        _requeue_siblings(con, action_id)
+
+
+def _requeue_orphaned(con) -> None:
+    """Quarantined actions whose group was blocked only by an unfactorable (UNKNOWN) record that is no longer
+    quarantined (upgraded or retired [CA11]) go back to PENDING; one batched statement."""
+    con.execute(
+        """UPDATE corp_actions a SET status = 'PENDING', decided_at = NULL
+           WHERE a.status = 'QUARANTINED' AND a.action_type <> 'UNKNOWN'
+             AND EXISTS (SELECT 1 FROM quarantine_queue q WHERE q.reason_code = 'VERIFY_FAILED'
+                         AND q.resolved_at IS NULL AND json_extract_string(q.details, '$.action_id') = a.action_id
+                         AND json_extract_string(q.details, '$.reason') LIKE '%unparsed corporate action%')
+             AND NOT EXISTS (SELECT 1 FROM corp_actions u WHERE u.security_id = a.security_id
+                             AND u.ex_date = a.ex_date AND u.action_type = 'UNKNOWN' AND u.status = 'QUARANTINED')"""
+    )
+
+
+def _requeue_siblings(con, action_id: str) -> None:
+    """Actions of the same security and ex-date that were quarantined only because this record could not be
+    factored go back to PENDING, so the next verification judges the group again (JNKINDIA 2024-10-21)."""
+    con.execute(
+        "UPDATE corp_actions SET status = 'PENDING', decided_at = NULL WHERE status = 'QUARANTINED' "
+        "AND action_type <> 'UNKNOWN' AND (security_id, ex_date) IN "
+        "(SELECT security_id, ex_date FROM corp_actions WHERE action_id = ?)",
+        [action_id],
+    )
 
 
 def _f(x: Decimal | None) -> float | None:
@@ -712,17 +985,45 @@ def _visible_from(
     broadcast_ts: datetime | None,
     board_end: datetime | None,
     board_end_ist_date: date | None,
+    source_url: str | None = None,
 ) -> tuple[datetime | None, str | None]:
-    if broadcast_ts is not None:
-        return broadcast_ts, "BROADCAST"
-    if board_end is None or board_end_ist_date is None:
-        return None, None
-    from financials.calendar import next_trading_day
+    """Earliest time the filing can have been public (UTC) [X83, architecture §6.3].
 
-    nxt = next_trading_day(con, exchange, board_end_ist_date)
-    if nxt is None:
-        return None, None
-    return ist_to_utc(nxt, time(0, 0)), "BOARD_MEETING_RULE"
+    1. The later of the filing's broadcast time and the listing's broadcast/creation time (raw_results_listing):
+       a revised listing row has no broadcast_Date, and a re-uploaded file is created after the broadcast it replaces.
+    2. Without either: the board-meeting rule (board end + next trading day) [R9, UNVERIFIED], lifted to the XBRL file
+       name's upload time read as PM (12-hour clock) when that is later (re-filings uploaded weeks after the meeting).
+    Never earlier than the file name's upload time read as AM: a file cannot be public before it was made.
+    """
+    from financials.calendar import next_trading_day
+    from financials.parsers.discovery import filename_ts_bounds
+
+    listed = (
+        con.execute(
+            "SELECT max(broadcast_ts), max(creation_ts) FROM raw_results_listing WHERE xbrl_url = ?", [source_url]
+        ).fetchone()
+        if source_url
+        else (None, None)
+    )
+    bounds = filename_ts_bounds(source_url) if source_url else None
+    lo, hi = (ist_to_utc(b.date(), b.time()) for b in bounds) if bounds else (None, None)
+    board = None
+    if board_end is not None and board_end_ist_date is not None:
+        nxt = next_trading_day(con, exchange, board_end_ist_date)
+        board = None if nxt is None else ist_to_utc(nxt, time(0, 0))
+    known = [t for t in (broadcast_ts, *listed) if t is not None]
+    if known:
+        visible = max(known)
+        source = "BROADCAST" if visible == broadcast_ts else "LISTING_CREATION"
+    elif board is None:
+        return None, None  # no broadcast, listing or board-meeting evidence: NO_VISIBILITY
+    elif hi is not None and hi > board:
+        visible, source = hi, "FILENAME_TS"
+    else:
+        visible, source = board, "BOARD_MEETING_RULE"
+    if lo is not None and lo > visible:
+        visible, source = lo, "FILENAME_TS"
+    return visible, source
 
 
 def _declared_period_end(con, stage_dir: Path) -> date | None:
@@ -735,6 +1036,47 @@ def _declared_period_end(con, stage_dir: Path) -> date | None:
         return max(date.fromisoformat(e) for e in ends) if ends else None
     except ValueError:
         return None
+
+
+def audit_ytd_identity(con, pairs: Iterable[tuple[str, str]]) -> list[str]:
+    """X80 / blueprint §3.2: for each (entity, scope), every filed YTD whose quarters were all filed directly must
+    equal their sum. Each break is a CONSISTENCY/YTD_QUARTER_MISMATCH finding (deterministic id, so a re-run raises
+    nothing new); TTM over that year is withheld by FactBook whatever the finding's status. A corrected or revised
+    filing that restores the identity is the only fix."""
+    from financials.fundamentals import YTD_GUARDED_TAGS, load_factbook
+
+    rows, pairs = [], list(pairs)
+    for entity_id, scope in pairs:
+        book = load_factbook(con, entity_id, scope, datetime(9999, 12, 31))
+        for tag in sorted(YTD_GUARDED_TAGS):
+            for b in book.ytd_breaks(tag):
+                rows.append(_quarantine_row(stage="CONSISTENCY", reason_code="YTD_QUARTER_MISMATCH",
+                                            entity_id=entity_id, details={"scope": scope, **b}))  # fmt: skip
+        for b in book.tax_copied:  # X94: already withheld by load_factbook; the finding makes it visible
+            rows.append(_quarantine_row(stage="CONSISTENCY", reason_code="TAX_COPIED_FROM_PRIOR_YEAR",
+                                        entity_id=entity_id, details={"scope": scope, **b}))  # fmt: skip
+    _close_stale_ytd_findings(con, pairs, {r["quarantine_id"] for r in rows})
+    return _quarantine_many(con, rows) if rows else []
+
+
+def _close_stale_ytd_findings(con, pairs: list[tuple[str, str]], current: set[str]) -> None:
+    """An open YTD_QUARTER_MISMATCH of an audited (entity, scope) that the audit no longer raises is closed: a
+    corrected filing or a later rule (X82: a non-FY-start duration is not a YTD) removed the break."""
+    if not pairs:
+        return
+    open_rows = con.execute(
+        "SELECT quarantine_id, entity_id, json_extract_string(details, '$.scope') FROM quarantine_queue "
+        "WHERE stage = 'CONSISTENCY' AND reason_code IN ('YTD_QUARTER_MISMATCH', 'TAX_COPIED_FROM_PRIOR_YEAR') "
+        "AND resolved_at IS NULL"
+    ).fetchall()
+    audited = set(pairs)
+    stale = [q for q, e, s in open_rows if (e, s) in audited and q not in current]
+    if stale:
+        con.execute(
+            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', "
+            "resolution_note = 'consistency holds on re-audit' WHERE quarantine_id IN (SELECT unnest(?))",
+            [utc_now(), stale],
+        )
 
 
 def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
@@ -785,6 +1127,14 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
             "JOIN securities s USING (security_id) WHERE h.exchange = ? AND h.isin = ?",
             [filing["exchange"], meta["stated_isin"]],
         ).fetchall()
+        if not ent:
+            typo = resolve_isin_typo(con, filing["exchange"], meta["stated_isin"], meta["stated_symbol"],
+                                     meta["period_end"], fid)  # fmt: skip
+            typo = typo or resolve_unregistered_isin(con, filing["exchange"], meta["stated_isin"],
+                                                     meta["stated_symbol"], meta.get("company_name"),
+                                                     meta["period_end"], fid)  # fmt: skip
+            ent = con.execute("SELECT entity_id FROM securities WHERE security_id IN (SELECT unnest(?))",
+                              [typo]).fetchall()  # fmt: skip
         reason = "UNKNOWN_ISIN" if not ent else "AMBIGUOUS_ISIN"
     ovr = filing_overrides(con, fid)
     if "security_id" in ovr:  # `quarantine resolve --action OVERRIDE` [P2-13]
@@ -802,7 +1152,8 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
 
     board_end = meta["board_meeting_end_ts"]
     board_ist_date = utc_to_ist_date(board_end) if board_end is not None else None
-    visible, source = _visible_from(con, filing["exchange"], filing["broadcast_ts"], board_end, board_ist_date)
+    visible, source = _visible_from(con, filing["exchange"], filing["broadcast_ts"], board_end, board_ist_date,
+                                    filing["source_url"])  # fmt: skip
     if visible is None and "broadcast_ts" in ovr:
         visible, source = datetime.fromisoformat(ovr["broadcast_ts"]), "MANUAL_OVERRIDE"
     if visible is None:
@@ -846,8 +1197,23 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     _link_revision(con, fid, entity_id, meta, visible)
     facts = read_table(con, stage_dir, "stg_xbrl_facts")
     insert_rows(con, "fact_observations", [{**f, "entity_id": entity_id, "visible_from_ts": visible} for f in facts])
+    # Segment / geography rows [X97]: same entity, scope, visibility and parser version as the filing; a separate
+    # table that never feeds fact_observations or a ratio.
+    segs = read_table(con, stage_dir, "stg_segments")
+    insert_rows(con, "segment_observations", [{**r, "entity_id": entity_id, "visible_from_ts": visible} for r in segs])
+    # Non-blocking parse findings (X86 ATTRIBUTION_WITHHELD): the filing is promoted, the finding stays open.
+    finding_rows = [
+        _quarantine_row(stage=i["stage"], reason_code=i["reason_code"], filing_id=fid, entity_id=entity_id,
+                        details=json.loads(i["details"]))
+        for i in read_table(con, stage_dir, "stg_findings")
+    ]  # fmt: skip
+    _close_filing_findings(con, fid, f"parser {meta['parser_version']}: promoted",
+                           keep=[r["quarantine_id"] for r in finding_rows])  # fmt: skip
+    qs = (_quarantine_many(con, finding_rows) if finding_rows else []) + audit_ytd_identity(
+        con, [(entity_id, meta["scope"])]
+    )
     q = cross_check_shares(con, entity_id, meta["period_end"])
-    return PromotionResult("PROMOTED", "results_xbrl", message=fid, quarantined=[q] if q else [])
+    return PromotionResult("PROMOTED", "results_xbrl", message=fid, quarantined=qs + ([q] if q else []))
 
 
 def filing_overrides(con, filing_id: str) -> dict[str, str]:
@@ -858,24 +1224,56 @@ def filing_overrides(con, filing_id: str) -> dict[str, str]:
     return dict(rows)
 
 
+def filings_with_later_visibility(con) -> list[str]:
+    """Promoted results filings whose current visibility rule [X83] gives a later time than their latest
+    filing_meta row (backdated re-filings). `restage --category RESULTS_XBRL --visibility` re-parses these."""
+    rows = con.execute(
+        "SELECT m.filing_id, f.exchange, f.broadcast_ts, f.source_url, m.board_meeting_end_ts, m.visible_from_ts "
+        "FROM filing_meta m JOIN filings f USING (filing_id) WHERE f.category = 'RESULTS_XBRL' AND m.parser_version = "
+        "(SELECT arg_max(x.parser_version, " + version_key("x.parser_version") + ") FROM filing_meta x "
+        "WHERE x.filing_id = m.filing_id) ORDER BY m.filing_id"
+    ).fetchall()
+    out = []
+    for fid, exch, bts, url, board_end, current in rows:
+        board_date = utc_to_ist_date(board_end) if board_end is not None else None
+        visible, _ = _visible_from(con, exch, bts, board_end, board_date, url)
+        if visible is not None and visible > current:
+            out.append(fid)
+    return out
+
+
 def _link_revision(con, fid: str, entity_id: str, meta: dict, visible: datetime) -> None:
-    """Revision chain [E9]: this filing supersedes the latest filing of the same entity, profile, scope and period end
-    that became visible before it. Byte-identical blobs are RESENDs. Append-only link rows; facts need nothing else,
-    because every PIT read already takes the latest version visible at the as-of."""
+    """Revision chain [E9]: a filing supersedes the filings of the same entity, profile, scope and period end that
+    became visible before it. Byte-identical blobs are RESENDs. Linking is order-independent: this filing is linked
+    to the latest earlier-visible one, and the earliest later-visible one already promoted is linked to it, so the
+    chain does not depend on which of the two was promoted first. Append-only link rows (a pair may also be linked
+    across a gap when the middle filing arrives last; "supersedes" is transitive). Facts need nothing else, because
+    every PIT read already takes the latest version visible at the as-of."""
+    key = [entity_id, meta["accounting_profile"], meta["scope"], meta["period_end"], fid]
+    base = ("SELECT m.filing_id, f.sha256 FROM filing_meta m JOIN filings f USING (filing_id) WHERE m.entity_id = ? "
+            "AND m.accounting_profile = ? AND m.scope = ? AND m.period_end = ? AND m.filing_id <> ? ")  # fmt: skip
     prior = con.execute(
-        "SELECT m.filing_id, f.sha256 FROM filing_meta m JOIN filings f USING (filing_id) WHERE m.entity_id = ? "
-        "AND m.accounting_profile = ? AND m.scope = ? AND m.period_end = ? AND m.filing_id <> ? "
-        "AND m.visible_from_ts < ? ORDER BY m.visible_from_ts DESC, m.filing_id DESC LIMIT 1",
-        [entity_id, meta["accounting_profile"], meta["scope"], meta["period_end"], fid, visible],
+        base
+        + "AND (m.visible_from_ts, m.filing_id) < (?, ?) ORDER BY m.visible_from_ts DESC, m.filing_id DESC LIMIT 1",
+        [*key, visible, fid],
     ).fetchone()
-    if prior is None:
-        return
+    later = con.execute(
+        base + "AND (m.visible_from_ts, m.filing_id) > (?, ?) ORDER BY m.visible_from_ts, m.filing_id LIMIT 1",
+        [*key, visible, fid],
+    ).fetchone()
     sha = con.execute("SELECT sha256 FROM filings WHERE filing_id = ?", [fid]).fetchone()[0]
+    rows = []
+    if prior is not None:
+        rows.append((fid, prior[0], sha == prior[1]))
+    if later is not None:
+        rows.append((later[0], fid, sha == later[1]))
+    if not rows:
+        return
     insert_rows(
         con,
         "filing_revisions",
-        [{"filing_id": fid, "supersedes_filing_id": prior[0], "entity_id": entity_id, "period_end": meta["period_end"],
-          "scope": meta["scope"], "relation": "RESEND" if sha == prior[1] else "REVISION"}],
+        [{"filing_id": new, "supersedes_filing_id": old, "entity_id": entity_id, "period_end": meta["period_end"],
+          "scope": meta["scope"], "relation": "RESEND" if same else "REVISION"} for new, old, same in rows],
         or_ignore=True,
     )  # fmt: skip
 
@@ -887,8 +1285,11 @@ def pit_fact(
     row = con.execute(
         """SELECT coalesce(value_inr, value_other) FROM fact_observations
            WHERE entity_id = ? AND scope = ? AND canonical_tag = ? AND period_start = ? AND period_end = ?
-             AND visible_from_ts <= ?
-           ORDER BY visible_from_ts DESC, parser_version DESC LIMIT 1""",
+             AND visible_from_ts <= ? AND """
+        + CURRENT_VERSION
+        + " ORDER BY visible_from_ts DESC, "
+        + version_key()
+        + " DESC LIMIT 1",
         [entity_id, scope, canonical_tag, period_start, period_end, as_of],
     ).fetchone()
     return None if row is None else row[0]
@@ -1024,18 +1425,22 @@ def cross_check_shares(con, entity_id: str, as_of: date) -> str | None:
         "SELECT o.shares, m.has_partly_paid, o.filing_id FROM shareholding_observations o "
         "JOIN shareholding_meta m USING (filing_id, parser_version) "
         "WHERE o.entity_id = ? AND o.as_of_date = ? AND o.category = 'TOTAL' "
-        "ORDER BY o.visible_from_ts DESC, o.parser_version DESC LIMIT 1",
+        "ORDER BY o.visible_from_ts DESC, " + version_key("o.parser_version") + " DESC LIMIT 1",
         [entity_id, as_of],
     ).fetchone()
-    res = con.execute(
+    # Every results filing of the latest visibility (standalone and consolidated can both state paid-up capital);
+    # the worst disagreement is reported, so the outcome does not depend on row order.
+    rows = con.execute(
         "SELECT value_other, filing_id FROM fact_observations WHERE entity_id = ? AND canonical_tag = "
-        "'shares_from_paid_up' AND period_end = ? ORDER BY visible_from_ts DESC, parser_version DESC LIMIT 1",
+        "'shares_from_paid_up' AND period_end = ? AND "
+        + CURRENT_VERSION
+        + " QUALIFY visible_from_ts = max(visible_from_ts) OVER () ORDER BY filing_id",
         [entity_id, as_of],
-    ).fetchone()
-    if shp is None or res is None or shp[1]:
+    ).fetchall()
+    if shp is None or not rows or shp[1]:
         return None
-    shp_total, derived = Decimal(shp[0]), Decimal(res[0])
-    diff = abs(shp_total - derived) / shp_total
+    shp_total = Decimal(shp[0])
+    diff, derived, res_filing = max((abs(shp_total - Decimal(v)) / shp_total, Decimal(v), f) for v, f in rows)
     if diff <= SHARE_CROSS_CHECK_TOLERANCE:
         return None
     return _quarantine(
@@ -1049,17 +1454,84 @@ def cross_check_shares(con, entity_id: str, as_of: date) -> str | None:
             "paid_up_over_face_value": derived,
             "relative_diff": diff,
             "shp_filing": shp[2],
-            "results_filing": res[1],
+            "results_filing": res_filing,
         },
+    )
+
+
+SHP_PARSE_FINDINGS = ("PARSE_ERROR", "CONTEXT_CONFLICT", "MISSING_CRITICAL", "PCT_SCALE_UNKNOWN")
+FILING_FINDING_STAGES = ("PARSE", "IDENTITY", "PERIOD")
+
+
+def _close_shp_parse_findings(con, filing_id: str, note: str) -> None:
+    """A re-parse (new parser_version) of the same filing that now parses closes its open parse findings."""
+    con.execute(
+        "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ? "
+        f"WHERE filing_id = ? AND resolved_at IS NULL AND reason_code IN {SHP_PARSE_FINDINGS}",
+        [utc_now(), note, filing_id],
+    )
+
+
+WRONG_TEMPLATE_RULE = "WRONG_TEMPLATE_DUPLICATE"
+WRONG_TEMPLATE_NS = "IntegratedFinance_OtherThanBank"
+
+
+def close_wrong_template_duplicates(con) -> int:
+    """Rule WRONG_TEMPLATE_DUPLICATE [X89]: an Ind AS company that first files its results on the non-Ind AS
+    template (SEBI `IntegratedFinance_OtherThanBank` taxonomy: ExtraordinaryItems, ...BeforeMinorityInterest) and
+    then on the Ind AS template for the same entity, scope and period end. The UNKNOWN_TAXONOMY finding of the
+    wrong-template filing is closed once such a promoted filing exists, whichever arrived first (Aarti, Kansai,
+    KIMS, MRPL, Rajesh Exports). Without one (L&T Q4 FY25) it stays open. Run once per promote batch."""
+    rows = con.execute(
+        f"""WITH wt AS (
+              SELECT q.quarantine_id,
+                     max(CASE WHEN r.element_name = 'ISIN' THEN r.value_text END) AS isin,
+                     max(CASE WHEN r.element_name = 'NatureOfReportStandaloneConsolidated'
+                              THEN upper(r.value_text) END) AS scope,
+                     max(CASE WHEN r.element_name = 'DateOfEndOfReportingPeriod' THEN r.value_text END) AS pe
+              FROM quarantine_queue q JOIN raw_xbrl_facts r USING (filing_id)
+              WHERE q.stage = 'PARSE' AND q.reason_code = 'UNKNOWN_TAXONOMY' AND q.resolved_at IS NULL
+                AND json_extract_string(q.details, '$.entity_namespace') LIKE '%{WRONG_TEMPLATE_NS}%'
+                AND r.element_name IN ('ISIN', 'NatureOfReportStandaloneConsolidated', 'DateOfEndOfReportingPeriod')
+              GROUP BY q.quarantine_id)
+            SELECT wt.quarantine_id, min(m.filing_id)
+            FROM wt JOIN security_identifier_history h ON h.isin = wt.isin
+            JOIN securities s ON s.security_id = h.security_id
+            JOIN filing_meta m ON m.entity_id = s.entity_id AND m.scope = wt.scope
+                               AND m.period_end = try_cast(wt.pe AS DATE) AND m.accounting_profile <> 'REG34_ANNUAL'
+            GROUP BY wt.quarantine_id"""
+    ).fetchall()
+    for qid, correct in rows:
+        con.execute(
+            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ? "
+            "WHERE quarantine_id = ?",
+            [utc_now(), f"X89 {WRONG_TEMPLATE_RULE}: Ind AS filing {correct} for the same entity, scope, period", qid],
+        )
+    return len(rows)
+
+
+def _close_filing_findings(con, filing_id: str, note: str, keep: list[str] | None = None) -> None:
+    """A results filing that now promotes (or is now known to be out of scope) closes the open parse, identity and
+    period findings an earlier parser_version raised for it, except the non-blocking findings this promotion raises
+    again (`keep`). Share cross-checks (stage SHARES) are untouched."""
+    keep = keep or [""]
+    con.execute(
+        "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ? "
+        f"WHERE filing_id = ? AND resolved_at IS NULL AND stage IN {FILING_FINDING_STAGES} "
+        f"AND quarantine_id NOT IN ({', '.join('?' * len(keep))})",
+        [utc_now(), note, filing_id, *keep],
     )
 
 
 def _promote_shareholding(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
     staged_meta = read_table(con, stage_dir, "stg_shp_meta")
     if staged_meta and not financials_in_scope(staged_meta[0]["as_of_date"]):
-        return _out_of_scope(
+        res = _out_of_scope(
             con, stage_dir, "shareholding", f"as of {staged_meta[0]['as_of_date']} < {MIN_PERIOD_END_DATE}"
         )
+        _close_shp_parse_findings(con, staged_meta[0]["filing_id"],
+                                  f"parser {staged_meta[0]['parser_version']}: parses, out of scope [C9]")  # fmt: skip
+        return res
     _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_xbrl_facts"))
     filing = read_table(con, stage_dir, "filings")[0]
     fid = filing["filing_id"]
@@ -1079,6 +1551,11 @@ def _promote_shareholding(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     ).fetchone()[0]:
         return PromotionResult("ALREADY_PROMOTED", "shareholding", message=fid)
     secs = resolve_security_by_isin(con, filing["exchange"], meta["stated_isin"], meta["as_of_date"])
+    if not secs:
+        secs = resolve_isin_typo(con, filing["exchange"], meta["stated_isin"], meta["stated_symbol"],
+                                 meta["as_of_date"], fid)  # fmt: skip
+        secs = secs or resolve_unregistered_isin(con, filing["exchange"], meta["stated_isin"], meta["stated_symbol"],
+                                                 meta.get("company_name"), meta["as_of_date"], fid)  # fmt: skip
     entities = sorted(
         {con.execute("SELECT entity_id FROM securities WHERE security_id = ?", [s_]).fetchone()[0] for s_ in secs}
     )
@@ -1162,8 +1639,16 @@ def _promote_shareholding(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
             for c in read_table(con, stage_dir, "stg_shp_categories")
         ],
     )
+    _close_shp_parse_findings(con, fid, f"parser {meta['parser_version']}: {meta.get('rules_applied') or 'parses'}")
     q = cross_check_shares(con, entity_id, meta["as_of_date"])
     return PromotionResult("PROMOTED", "shareholding", message=fid, quarantined=[q] if q else [])
+
+
+def _promote_vault_and_raw(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
+    """Raw-only feeds (index closes [IDX9], equity master [IDX10]): vault rows + the raw table, append-only."""
+    tables = {"index_close": "index_ohlcv", "equity_master": "raw_equity_master"}
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings", tables[manifest["job"]]))
+    return PromotionResult("PROMOTED", manifest["job"], message=manifest.get("trade_date") or manifest["snapshot_date"])
 
 
 def _promote_kpis(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
@@ -1217,7 +1702,7 @@ def _promote_kpis(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionRe
 
 
 def _promote_raw_only(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
-    _insert_vault_rows(con, stage_dir, ("blobs", "filings"))
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_results_listing"))
     return PromotionResult("PROMOTED", "raw_only", message=read_table(con, stage_dir, "filings")[0]["category"])
 
 

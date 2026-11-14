@@ -107,3 +107,28 @@ def test_g5_aborts_when_universe_is_empty(published):
     result = materialize(published.con, date(2030, 1, 1))
     assert (result.status, result.gate) == ("ABORTED", "G5")
     assert compute_rows(published.con, date(2030, 1, 1)) == []
+
+
+def test_g4_forgives_only_ttm_nulls_caused_by_the_c9_window():
+    """Live backfill 2025-07-28: companies filing Q1 FY26 lose TTM because the window to Jun 2025 needs the Sep and
+    Dec 2024 quarters, before the cutoff (C9). That is expected (rule G4_C9_WINDOW); any other new NULL still counts."""
+    from datetime import date as d
+
+    from financials.db import apply_schema, connect, insert_rows
+    from financials.features import _c9_expected_nulls, _null_rates
+
+    con = connect()
+    apply_schema(con)
+    base = {"as_of_date": d(2025, 7, 25), "entity_id": "e", "symbol": "S", "series": "EQ", "sales_ttm": 1, "pat_ttm": 1,
+            "fundamentals_end": d(2025, 3, 31)}  # fmt: skip
+    insert_rows(con, "screener_features_history", [{**base, "security_id": s} for s in ("A", "B", "C", "D")])
+    now = [
+        {"security_id": "A", "fundamentals_end": d(2025, 6, 30), "sales_ttm": None, "pat_ttm": None},  # C9 window
+        {"security_id": "B", "fundamentals_end": d(2025, 3, 31), "sales_ttm": None, "pat_ttm": 1},  # same end: defect
+        {"security_id": "C", "fundamentals_end": d(2025, 12, 31), "sales_ttm": None, "pat_ttm": 1},  # window in scope
+        {"security_id": "D", "fundamentals_end": d(2025, 6, 30), "sales_ttm": 1, "pat_ttm": 1},
+    ]
+    forgiven = _c9_expected_nulls(con, d(2025, 7, 25), now)
+    assert forgiven == {("A", "sales_ttm"), ("A", "pat_ttm")}
+    rates = _null_rates([{**r, "close": 1, "market_cap": 1, "total_equity": 1} for r in now], forgiven)
+    assert rates["sales_ttm"] == 0.5 and rates["pat_ttm"] == 0.0

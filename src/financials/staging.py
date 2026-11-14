@@ -24,7 +24,8 @@ from financials.money import to_inr
 from financials.parsers import ParseError
 from financials.parsers.delivery import parse_sec_bhavdata_full
 from financials.parsers.integrated import parse_integrated_results
-from financials.parsers.nse_corp_actions import parse_nse_corp_actions_json
+from financials.parsers.nse_corp_actions import PURPOSE_RULES_VERSION, parse_nse_corp_actions_json
+from financials.parsers.segments import Windows, parse_segments
 from financials.parsers.udiff import parse_udiff_cm
 from financials.parsers.xbrl import parse_instance
 from financials.timeutil import ist_to_utc
@@ -44,6 +45,13 @@ CREATE TABLE stg_xbrl_facts (
     canonical_tag VARCHAR NOT NULL, period_type VARCHAR NOT NULL, period_start DATE NOT NULL,
     period_end DATE NOT NULL, period_months INTEGER, unit VARCHAR NOT NULL, value_inr DECIMAL(20,2),
     value_other DECIMAL(28,8), source_element VARCHAR NOT NULL, line_item_category VARCHAR, parent_subtotal VARCHAR
+);
+CREATE TABLE stg_segments (
+    filing_id VARCHAR NOT NULL, parser_version VARCHAR NOT NULL, scope VARCHAR NOT NULL, axis_kind VARCHAR NOT NULL,
+    axis VARCHAR NOT NULL, member VARCHAR NOT NULL, member_role VARCHAR NOT NULL, label VARCHAR,
+    element VARCHAR NOT NULL, canonical_metric VARCHAR NOT NULL, period_type VARCHAR NOT NULL,
+    period_start DATE NOT NULL, period_end DATE NOT NULL, period_months INTEGER, value_inr DECIMAL(20,2) NOT NULL,
+    PRIMARY KEY (filing_id, axis, member, element, period_start, period_end)
 );
 CREATE TABLE stg_corp_actions (
     filing_id VARCHAR NOT NULL, seq INTEGER NOT NULL, component INTEGER NOT NULL, exchange VARCHAR NOT NULL,
@@ -90,6 +98,9 @@ CREATE TABLE stg_kpis (
 CREATE TABLE stg_issues (
     filing_id VARCHAR, stage VARCHAR NOT NULL, reason_code VARCHAR NOT NULL, details JSON NOT NULL
 );
+CREATE TABLE stg_findings (
+    filing_id VARCHAR, stage VARCHAR NOT NULL, reason_code VARCHAR NOT NULL, details JSON NOT NULL
+);
 """
 
 # Insertion order respects foreign keys.
@@ -100,6 +111,9 @@ TABLE_ORDER = (
     "raw_delivery",
     "raw_xbrl_facts",
     "raw_index_snapshot",
+    "index_ohlcv",
+    "raw_equity_master",
+    "raw_results_listing",
     "stg_holidays",
     "stg_shp_meta",
     "stg_shp_categories",
@@ -107,10 +121,12 @@ TABLE_ORDER = (
     "stg_shp_line_items",
     "stg_xbrl_filing",
     "stg_xbrl_facts",
+    "stg_segments",
     "stg_corp_actions",
     "stg_events",
     "stg_kpis",
     "stg_issues",
+    "stg_findings",
 )
 
 
@@ -259,8 +275,10 @@ def stage_results_xbrl(
     broadcast_ts: datetime | None = None,
     broadcast_ts_source: str = "UNKNOWN",
     exchange: str = "NSE",
+    run_suffix: str | None = None,
 ) -> Path:
-    """Vault + parse one quarterly results XBRL. Parse problems are staged as issues, not raised."""
+    """Vault + parse one quarterly results XBRL. Parse problems are staged as issues, not raised.
+    `run_suffix` (restage) gives a re-parse its own batch, promoted as a new parser_version."""
     blob = vault.put(data, ext="xml", media_type="application/xml", fetched_at=fetched_at)
     filing = make_filing(
         blob,
@@ -273,6 +291,7 @@ def stage_results_xbrl(
     )
     tables: dict[str, list[dict[str, Any]]] = {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)]}
     fid = filing.filing_id
+    run_id = fid if run_suffix is None else f"{fid}-{run_suffix}"
 
     try:
         inst = parse_instance(data)
@@ -285,7 +304,7 @@ def stage_results_xbrl(
                 "details": json.dumps({"error": str(exc)}),
             }
         ]
-        return write_stage(stage_root, "results_xbrl", fid, tables)
+        return write_stage(stage_root, "results_xbrl", run_id, tables)
 
     tables["raw_xbrl_facts"] = _raw_fact_rows(fid, inst)
 
@@ -300,7 +319,7 @@ def stage_results_xbrl(
                 "details": json.dumps({"error": str(exc)}),
             }
         ]
-        return write_stage(stage_root, "results_xbrl", fid, tables)
+        return write_stage(stage_root, "results_xbrl", run_id, tables)
 
     if parsed.issues:
         tables["stg_issues"] = [
@@ -312,8 +331,18 @@ def stage_results_xbrl(
             }
             for i in parsed.issues
         ]
-        return write_stage(stage_root, "results_xbrl", fid, tables)
+        return write_stage(stage_root, "results_xbrl", run_id, tables)
 
+    if getattr(parsed, "findings", None):  # non-blocking: promoted, each opens a quarantine row [X86]
+        tables["stg_findings"] = [
+            {
+                "filing_id": fid,
+                "stage": i.stage,
+                "reason_code": i.reason_code,
+                "details": json.dumps(i.details, default=str, sort_keys=True),
+            }
+            for i in parsed.findings
+        ]
     m = parsed.meta
     tables["stg_xbrl_filing"] = [
         {
@@ -359,7 +388,44 @@ def stage_results_xbrl(
         for f in parsed.facts
     ]
     _assert_exact(tables["stg_xbrl_facts"], parsed)
-    return write_stage(stage_root, "results_xbrl", fid, tables)
+    _stage_segments(tables, fid, inst, parsed)
+    return write_stage(stage_root, "results_xbrl", run_id, tables)
+
+
+def _stage_segments(tables: dict[str, list[dict[str, Any]]], fid: str, inst, parsed) -> None:
+    """Segment / geography rows of a filing that parsed [X49, X97-X99], in the periods its parser validated. A sum
+    check that fails is a non-blocking finding (promoted, opens a quarantine row); it never blocks the filing and
+    never changes a P&L fact."""
+    m = parsed.meta
+    windows = Windows.from_meta(m)
+    if windows is None:
+        return
+    report = parse_segments(inst, windows, level_of_rounding=m.get("level_of_rounding"))
+    tables["stg_segments"] = [
+        {
+            "filing_id": fid,
+            "parser_version": PARSER_VERSION,
+            "scope": m["scope"],
+            "axis_kind": f.axis_kind,
+            "axis": f.axis,
+            "member": f.member,
+            "member_role": f.member_role,
+            "label": f.label,
+            "element": f.element,
+            "canonical_metric": f.canonical_metric,
+            "period_type": f.period_type,
+            "period_start": f.period_start or f.period_end,
+            "period_end": f.period_end,
+            "period_months": f.period_months,
+            "value_inr": f.value,
+        }
+        for f in report.facts
+    ]
+    tables.setdefault("stg_findings", []).extend(
+        {"filing_id": fid, "stage": "SEGMENT", "reason_code": code,
+         "details": json.dumps(details, default=str, sort_keys=True)}
+        for code, details in report.issues
+    )  # fmt: skip
 
 
 def _assert_exact(rows: list[dict[str, Any]], parsed) -> None:
@@ -422,7 +488,7 @@ def stage_corp_actions(
     return write_stage(
         stage_root,
         "corp_actions",
-        filing.filing_id,
+        f"{filing.filing_id}-{PURPOSE_RULES_VERSION}",
         {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)], "stg_corp_actions": rows},
         extra={"exchange": exchange},
     )
@@ -526,9 +592,12 @@ def stage_shareholding(
     broadcast_ts: datetime | None = None,
     broadcast_ts_source: str = "UNKNOWN",
     exchange: str = "NSE",
+    run_suffix: str | None = None,
 ) -> Path:
-    """Vault + parse one Reg. 31 shareholding XBRL. Broadcast time comes from the NSE master JSON."""
-    from financials.parsers.shareholding import parse_shareholding
+    """Vault + parse one Reg. 31 shareholding XBRL. Broadcast time comes from the NSE master JSON.
+    `run_suffix` (restage) gives a re-parse its own batch next to the first one, so it promotes as a new
+    parser_version instead of being taken for the batch already promoted."""
+    from financials.parsers.shareholding import parse_shareholding, shp_instance
 
     blob = vault.put(data, ext="xml", media_type="application/xml", fetched_at=fetched_at)
     filing = make_filing(
@@ -541,9 +610,10 @@ def stage_shareholding(
         broadcast_ts_source=broadcast_ts_source,
     )
     fid = filing.filing_id
+    run_id = fid if run_suffix is None else f"{fid}-{run_suffix}"
     tables: dict[str, list[dict[str, Any]]] = {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)]}
     try:
-        tables["raw_xbrl_facts"] = _raw_fact_rows(fid, parse_instance(data))
+        tables["raw_xbrl_facts"] = _raw_fact_rows(fid, shp_instance(data)[0])
         parsed = parse_shareholding(data)
     except ParseError as exc:
         tables["stg_issues"] = [
@@ -554,7 +624,7 @@ def stage_shareholding(
                 "details": json.dumps({"error": str(exc)}),
             }
         ]
-        return write_stage(stage_root, "shareholding", fid, tables)
+        return write_stage(stage_root, "shareholding", run_id, tables)
     if parsed.issues:
         tables["stg_issues"] = [
             {
@@ -565,7 +635,7 @@ def stage_shareholding(
             }
             for i in parsed.issues
         ]
-        return write_stage(stage_root, "shareholding", fid, tables)
+        return write_stage(stage_root, "shareholding", run_id, tables)
     m = parsed.meta
     tables["stg_shp_meta"] = [
         {
@@ -608,7 +678,7 @@ def stage_shareholding(
         }
         for cat, vals in sorted(parsed.categories.items())
     ]
-    return write_stage(stage_root, "shareholding", fid, tables)
+    return write_stage(stage_root, "shareholding", run_id, tables)
 
 
 def stage_reg30_event(
@@ -704,6 +774,41 @@ def stage_kpis(vault: Vault, stage_root: Path, *, data: bytes, source_url: str, 
     )  # fmt: skip
 
 
+def stage_index_closes(vault: Vault, stage_root: Path, *, data: bytes, source_url: str, fetched_at: datetime) -> Path:
+    """Vault + parse one ind_close_all_DDMMYYYY.csv [IDX9]."""
+    from financials.parsers.indices import parse_index_closes
+
+    rows = parse_index_closes(data)
+    blob = vault.put(data, ext="csv", media_type="text/csv", fetched_at=fetched_at)
+    eod = ist_to_utc(rows[0].trade_date, time(23, 59, 59))
+    filing = make_filing(blob, exchange="NSE", category="INDEX_CLOSE", source_url=source_url, fetched_at=fetched_at,
+                         broadcast_ts=eod, broadcast_ts_source="EOD_RULE")  # fmt: skip
+    day = rows[0].trade_date
+    return write_stage(
+        stage_root, "index_close", f"{day:%Y%m%d}-{blob.sha256[:12]}",
+        {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)],
+         "index_ohlcv": [{**asdict(r), "filing_id": filing.filing_id} for r in rows]},
+        extra={"trade_date": day.isoformat()},
+    )  # fmt: skip
+
+
+def stage_equity_master(vault: Vault, stage_root: Path, *, data: bytes, source_url: str, fetched_at: datetime) -> Path:
+    """Vault + parse EQUITY_L.csv [IDX10]; the snapshot date is the IST date of the fetch."""
+    from financials.parsers.indices import parse_equity_master
+    from financials.timeutil import utc_to_ist_date
+
+    rows = parse_equity_master(data)
+    blob = vault.put(data, ext="csv", media_type="text/csv", fetched_at=fetched_at)
+    filing = make_filing(blob, exchange="NSE", category="EQUITY_MASTER", source_url=source_url, fetched_at=fetched_at)
+    snap = utc_to_ist_date(fetched_at)
+    return write_stage(
+        stage_root, "equity_master", f"{snap:%Y%m%d}-{blob.sha256[:12]}",
+        {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)],
+         "raw_equity_master": [{**asdict(r), "filing_id": filing.filing_id, "snapshot_date": snap} for r in rows]},
+        extra={"snapshot_date": snap.isoformat()},
+    )  # fmt: skip
+
+
 def stage_raw_only(
     vault: Vault,
     stage_root: Path,
@@ -722,3 +827,46 @@ def stage_raw_only(
     return write_stage(
         stage_root, "raw_only", filing.filing_id, {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)]}
     )
+
+
+def _utc(ts: datetime | None) -> datetime | None:
+    return None if ts is None else ist_to_utc(ts.date(), ts.time())
+
+
+def results_listing_rows(listing_filing_id: str, data: bytes) -> list[dict[str, Any]]:
+    """Every row of an integrated-filing-results listing as visibility evidence [A7, X83]; unparsable -> none."""
+    from financials.parsers.discovery import parse_integrated_filing_listing
+
+    try:
+        entries = parse_integrated_filing_listing(data, results_only=False)
+    except ParseError:
+        return []
+    rows = {}
+    for e in entries:
+        rows[e.xbrl_url] = {
+            "filing_id": listing_filing_id, "xbrl_url": e.xbrl_url, "symbol": e.symbol, "period_end": e.period_end,
+            "scope": e.scope, "filing_type": e.filing_type, "broadcast_ts": _utc(e.broadcast_ts_ist),
+            "creation_ts": _utc(e.creation_ts_ist), "revised_ts": _utc(e.revised_ts_ist),
+            "revision_remark": e.revision_remark,
+        }  # fmt: skip
+    return list(rows.values())
+
+
+def stage_results_listing(
+    vault: Vault,
+    stage_root: Path,
+    *,
+    data: bytes,
+    source_url: str,
+    fetched_at: datetime,
+    exchange: str = "NSE",
+    run_suffix: str | None = None,
+) -> Path:
+    """Vault an integrated-filing-results listing (RESULTS_LISTING) and stage its rows as raw_results_listing."""
+    blob = vault.put(data, ext="json", media_type="application/json", fetched_at=fetched_at)
+    filing = make_filing(blob, exchange=exchange, category="RESULTS_LISTING", source_url=source_url,
+                         fetched_at=fetched_at)  # fmt: skip
+    run_id = filing.filing_id if run_suffix is None else f"{filing.filing_id}-{run_suffix}"
+    return write_stage(stage_root, "raw_only", run_id,
+                       {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)],
+                        "raw_results_listing": results_listing_rows(filing.filing_id, data)})  # fmt: skip

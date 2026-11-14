@@ -92,7 +92,7 @@ This section only records the decisions; it does not duplicate the DDL.
 | L1 | `raw_cm_bhavcopy`, `raw_delivery`, `raw_xbrl_facts`. Keyed by source identifiers plus `filing_id`. No surrogate IDs. |
 | L2 identity | `entity_master`, `securities`, `security_identifier_history` (date-bounded; `valid_to` exclusive), `trading_calendar` |
 | L2 market | `ohlcv` (resolved, unadjusted; delivery joined) |
-| L2 fundamentals | `filing_meta` (per filing × parser_version), `fact_observations` (long format) |
+| L2 fundamentals | `filing_meta` (per filing × parser_version), `fact_observations` (long format), `segment_observations` (Ind AS 108 segment and geography rows, §14b-1) |
 | Control | `corp_actions`, `quarantine_queue`, `company_overrides` |
 | L2 calendar/index | `trading_calendar`, `calendar_coverage`, `raw_index_snapshot`, `index_constituents_history` |
 | L2 shareholding | `shareholding_meta`, `shareholding_observations` |
@@ -124,14 +124,16 @@ Other outcomes:
 
 ### 6.2 Deriving quarterly flows
 - Quarter value = `OneD` fact when present.
-- Otherwise quarter = YTD_k − YTD_{k−1}, both in the same FY, scope and profile. The derived row records `source_element = 'DERIVED:YTD_DIFF'`.
+- Otherwise quarter = YTD_k − YTD_{k−1}, both in the same FY, scope and profile, and both starting on a declared fiscal-year start (`filing_meta.fy_start`): an Oct-Mar six-month context in a "Yearly" filing is not a YTD [X82]. The derived row records `source_element = 'DERIVED:YTD_DIFF'`.
 - Q4 is frequently reported as FY − 9M, so the identity `FourD(Qk) = Σ OneD` is **not** a restatement detector.
 
 ### 6.3 Point-in-time visibility
-- `visible_from_ts` = `filings.broadcast_ts` when known.
-- Otherwise `board_meeting_end_ts + 1 trading day`, flagged `BOARD_MEETING_RULE` [R9]. This is conservative: it may hide data a day too long but never shows it early.
-- If neither is known, the filing is quarantined (`PERIOD/NO_VISIBILITY`).
-- Every PIT query filters `visible_from_ts <= :as_of`. The "current view" picks, for each (entity, scope, tag, period), the row with the latest `visible_from_ts`, then the latest `parser_version`.
+- `visible_from_ts` = the latest of `filings.broadcast_ts` and the listing's `broadcast_Date` / `creation_Date` (`raw_results_listing`, filled from every vaulted `RESULTS_LISTING`) [X83]. A revised listing row has no `broadcast_Date`, and a re-uploaded file is created after the broadcast of the row it replaces. Source `BROADCAST` or `LISTING_CREATION`.
+- Otherwise (last resort) `board_meeting_end_ts + 1 trading day`, flagged `BOARD_MEETING_RULE` [R9, UNVERIFIED], lifted to the XBRL file-name upload time read as PM (`FILENAME_TS`) when that is later. The board-meeting rule alone is **not** conservative for re-filings: 408 of 684 such filings were uploaded more than a day after the date it gave (X83).
+- Never earlier than the file-name upload time read as AM (the name is a 12-hour clock without AM/PM).
+- If no broadcast, listing or board-meeting time is known, the filing is quarantined (`PERIOD/NO_VISIBILITY`).
+- Every PIT query filters `visible_from_ts <= :as_of` and reads only each filing's latest `parser_version` (`fundamentals.CURRENT_VERSION`), so a re-parse that moves a filing's visibility later leaves no early row. The "current view" then picks, for each (entity, scope, tag, period), the row with the latest `visible_from_ts`.
+- `restage --category RESULTS_XBRL --visibility` re-parses promoted filings whose rule now gives a later time; `backfill-listing-evidence` stages `raw_results_listing` from vaulted listings first.
 - Precedence for 12-month periods: a Reg. 34 annual fact supersedes the Reg. 33 FY fact **only from its own `visible_from_ts`**.
 
 ### 6.4 Scope continuity
@@ -380,6 +382,11 @@ Ratios still read only curated tags; line items are for statements, sub-rows and
 
 Revisions (E9, E10): `filing_revisions` links a filing to the one it supersedes (REVISION or byte-identical RESEND);
 PIT reads already take the latest version visible at the as-of, so the link is provenance, not a read path.
+Linking is order-independent: a promoted filing is linked to the latest earlier-visible filing of the same key, and
+the earliest later-visible filing already promoted is linked to it (a reverse-order replay gives the same pairs;
+when a middle filing arrives last a non-adjacent pair can also be linked, which "supersedes" allows as transitive).
+A later filing for the same key is **not** always the better one: some companies file a "Fourth quarter" and then a
+"Yearly" XBRL whose quarter column is mis-dated (X82), so the read path never drops a superseded filing wholesale.
 
 ### 10.7 `screener_features` columns in Phase 1
 
@@ -477,7 +484,7 @@ Price inputs are read in one of two knowledge modes (`features._price_inputs`):
 | G1 Completeness | EQ/BE/BZ rows ≥ 92% of the trailing 5-trading-day median | Abort batch; keep previous state; retry later |
 | G2 Identifier resolution | Every raw price row resolves to a `security_id` via `(exchange, fin_instrm_id \| symbol+series, isin, date)`; unresolved rows ≤ 1% | Every unresolved row carries an identity issue (missing `FinInstrmId`, ISIN collision, out of order, duplicate) and is quarantined `IDENTIFIER/…`; above 1% → abort. `quarantine reprocess` loads a missing-`FinInstrmId` bar by ISIN |
 | G3 Accounting identities | Per filing, in the parsers (staged issues): P&L chain (X9 / bank equivalents), `Assets = EquityAndLiabilities` when BS present, expense components sum to `Expenses`; tolerance §7.3 | Quarantine that filing only |
-| G4 Null-spike (features) | Null rate of `close`, `market_cap`, `sales_ttm`, `pat_ttm`, `total_equity` rises ≤ 1.5 percentage points vs the previous materialised date | Abort; previous features stay live |
+| G4 Null-spike (features) | Null rate of `close`, `market_cap`, `sales_ttm`, `pat_ttm`, `total_equity` rises ≤ 1.5 percentage points vs the previous materialised date. Rule G4_C9_WINDOW: a TTM that turns NULL because the company's latest quarter moved forward and the new 4-quarter window reaches before the financials cutoff (C9) is not counted; on the live backfill this is every company filing Q1–Q3 FY26 (Jul 2025–Jan 2026), until four in-scope quarters exist | Abort; previous features stay live |
 | G5 Atomic features | Row count = universe (securities with a bar in the last 15 days and a valid identifier); history rows for the date and the live table replaced in one transaction | No partial state is ever visible |
 | ORDER | Market days and index snapshots must arrive in date order | Abort. `promote` holds later market days behind an aborted one, so a day that fails G1 is never overtaken; an older day found later needs `rebuild-market --from D` |
 | CAL3 No-session inference | After a market day, its `PrvsClsgPric` vs the previous promoted close: ≥ 99% of ≥ 100 common securities equal → the dates in between had no session (`trading_calendar.source = INFERRED_PREV_CLOSE`) | Otherwise `CALENDAR/MISSING_SESSION` (a session is missing from the database) |
@@ -542,12 +549,42 @@ Banks, NBFCs, life and general insurers use the raw-element formulas in S4–S7 
 (fixed-asset schedule, notes) are NULL on quarterly statements. The Screener export carries only the
 Data Sheet rows, so golden parity covers top-level rows only. Sub-rows are checked by summation, not by golden values.
 
-### 14b-1. Expense sub-rows and segments (X49, X50)
+### 14b-1. Expense sub-rows and segments (X49, X50, X97-X99)
 
 Expenses sub-rows add **Power and fuel** and **Freight** when the filer labels them (named label rules). They stay NULL
-when it doesn't, and the rest of other expenses absorbs them, so the sub-rows still sum to Expenses. Segments
-(`parsers/segments.py`) are parsed and checked against filed totals and the balance sheet, but are not persisted
-until a segment table is agreed. They are never used to fill P&L rows.
+when it doesn't, and the rest of other expenses absorbs them, so the sub-rows still sum to Expenses.
+
+**Segments are persisted** (owner decision 2026-11-14) in `segment_observations`, one row per member fact:
+`axis_kind` (BUSINESS | GEOGRAPHY), `axis`, `member`, `label` and `element` exactly as filed, `member_role` derived from
+the member name only (SEGMENT, UNALLOCATED, ELIMINATION, RECONCILING; DOMICILE, FOREIGN_TOTAL, FOREIGN, AREA),
+`canonical_metric` derived from the element only (`segments.SEGMENT_METRICS`), periods as in `fact_observations`
+(instants store `period_start = period_end`), `value_inr DECIMAL(20,2)`, and the filing's `entity_id`, `scope`,
+`parser_version` and `visible_from_ts`. Primary key (filing_id, parser_version, axis, member, element, period_start,
+period_end): no nullable key column.
+- **Sources.** Quarterly results (every profile that files the four `ReportableSegment*Axis` elements: corporate,
+  NBFC, bank, life insurer) and Reg. 34 annual (`EntitySReportableSegmentsAxis`, `GeographicalAreasAxis`). The
+  Integrated Filing has no geography axis. Elements no committed fixture shows (e.g. segment tax, capex additions,
+  equity-method investments) are not mapped; they stay in `raw_xbrl_facts`.
+- **How.** `parsers/segments.py` is pure (bytes -> rows + findings) and keeps only facts in the periods the filing's
+  own parser validated (`Windows.from_meta`: declared quarter / YTD and period end, or the Reg. 34 in-scope years);
+  a declared pre-cutoff year is skipped (C9), any other context outside the declared periods is a finding.
+  `stage_results_xbrl` stages `stg_segments` with the filing and the promoter inserts them in the same transaction
+  as `fact_observations`. A quarantined or out-of-scope filing promotes none. PARSER_VERSION 0.10.0 restages.
+- **Checks (non-blocking findings, stage `SEGMENT`).** SEGMENT_SUM (members vs the filed non-dimensional total,
+  within the LevelOfRounding tolerance; with unallocated / elimination members also accepted), SEGMENT_RECONCILING
+  (reconciling = unallocated + eliminations), GEOGRAPHY_FOREIGN_SUM (ForeignCountriesMember = its ForeignCountryN
+  children), SEGMENT_ASSETS (segment + unallocable = net segment assets). A finding is promoted with the filing and
+  opens a quarantine row; it never blocks the filing or corrects a value. Net segment assets vs total assets is a
+  warning only.
+- **Reader.** `fundamentals.load_segments(con, entity_id, scope, as_of)`: each filing's current parser version,
+  `visible_from_ts <= as_of`, and per (axis, element, period) every member of the latest visible filing. Members are
+  per-filing ids (`ReportableSegments1Member` may be another business in another filing), so two filings' members are
+  never mixed.
+- **What is never done with them.** Segment rows never feed `fact_observations`, the factbook, a P&L row, a ratio or a
+  screen, and no cross-company segment taxonomy is built: labels are free text. Segment totals are not P&L
+  substitutes (Cummins: segment revenue is before inter-segment elimination; segment PBT includes associates).
+  Unchanged from C24: labelled quarterly members also appear in `fact_observations` as `oth_segment_*` line items, and
+  Reg. 34 domicile / foreign revenue as `revenue_domestic` / `revenue_foreign` [X75].
 
 ### 14c. Annual statements and conventions (S10-S15)
 
@@ -612,6 +649,25 @@ Status (2026-11-13): **built and tested end to end** on real fixtures, all liste
 - Full Reg. 31 shareholding.
 - RPT ratios, forensic scores and the remaining §10 ratios.
 - Feature snapshots.
+
+**Gaps against the owner's master blueprint (reviewed 2026-11-14), still open:**
+- Restatement detector (blueprint §3.2): the YTD-vs-quarters identity is **built** [X80] (TTM withheld over a broken
+  year, `CONSISTENCY/YTD_QUARTER_MISMATCH` findings, `audit-ytd`). Still open: the extra triggers on
+  `ProfitLossFromDiscontinuedOperations` ≠ 0 and on a demerger/merger in `corp_actions` when the identity happens to
+  hold, and any recovery of restated quarters (NSE XBRL has no prior-period columns; PDFs are out of scope).
+- AOC-1 subsidiary tree from Reg. 34 (only AOC-1-like elements seen so far [X75]; needs a fixture with the schedule).
+- Merger lineage (`merged_into`, swap ratio, position conversion) and demerger cost-of-acquisition split; today
+  `MERGED` exists only for duplicate-security repair.
+- Reg. 76 exact share count (F09 UNVERIFIED); Reg. 31 cross-checked with paid-up capital stands in.
+- The blueprint files AMFI holdings, PIT/SAST/SDD and bulk/block deals under Phase 2; they stay in Phase 3 here
+  because their sources are UNVERIFIED (F11, F13, R8) or only OBSERVED (F14).
+- Deliberate divergences: special dividends never adjust prices (invariant 8; the blueprint's §4.2 factor is not
+  used), and context ids (`OneD`, `FourD`, `OneI`) are never trusted as period labels (invariant 6; [SHP16]).
+
+**Owner requirements (2026-11-14):** every item from the owner's requirements chat, with status and the phased to-do of what is still missing, is in `docs/owner_requirements.md`.
+
+**Pre-work before Phase 3:** a verified Nifty 500 TRI source (F29) for backtest benchmarks; real fixtures for PIT
+(F11), SDD (F13), credit-rating and debt XBRL (F22) and BRSR (F24); a per-AMC adapter plan for monthly portfolios (R8).
 
 **Phase 3: catalysts, flows and backtesting**
 - Reg. 30 event XBRL via RSS; insider/SAST/SDD.

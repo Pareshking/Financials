@@ -67,6 +67,7 @@ class PoliteFetcher:
         clock: Callable[[], float] = time.monotonic,
         rng: random.Random | None = None,
         warmup: dict[str, str] | None = None,
+        host_limits: dict[str, tuple[float, int]] | None = None,
     ) -> None:
         self.transport = transport or UrllibTransport()
         self.user_agent, self.min_interval, self.max_attempts = user_agent, min_interval, max_attempts
@@ -80,6 +81,11 @@ class PoliteFetcher:
         # any number of worker threads; different hosts proceed in parallel (the only gain parallel workers give).
         self._host_locks: dict[str, threading.Lock] = {}
         self._locks_guard = threading.Lock()
+        # Owner decision 2026-11-14: a host may be given (requests per second, concurrent connections), e.g. the static
+        # archive host at (8, 8). Requests then start >= 1/rps apart with at most `connections` in flight; a 429/503
+        # still backs off. Hosts without an entry keep min_interval and one request in flight.
+        self.host_limits = host_limits or {}
+        self._sems: dict[str, threading.Semaphore] = {}
 
     def _host_lock(self, host: str) -> threading.Lock:
         with self._locks_guard:
@@ -96,6 +102,18 @@ class PoliteFetcher:
     def _raw(self, url: str, accept: str) -> Response:
         host = urlsplit(url).netloc
         headers = {"User-Agent": self.user_agent, "Accept": accept, "Accept-Language": "en-US,en;q=0.9"}
+        if host in self.host_limits:
+            rps, conns = self.host_limits[host]
+            with self._locks_guard:
+                sem = self._sems.setdefault(host, threading.Semaphore(conns))
+            with sem:
+                with self._host_lock(host):  # start-to-start spacing of 1/rps
+                    last = self._last.get(host)
+                    if last is not None and (wait := 1.0 / rps - (self.clock() - last)) > 0:
+                        self.sleep(wait)
+                    self._last[host] = self.clock()
+                    self.requests.append(url)
+                return self.transport.get(url, headers, self.timeout)
         with self._host_lock(host):  # spacing + request under the host lock: never two in flight per host
             self._space(host)
             self.requests.append(url)

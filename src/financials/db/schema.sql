@@ -123,6 +123,54 @@ CREATE TABLE IF NOT EXISTS calendar_coverage (   -- years for which a holiday li
     PRIMARY KEY (exchange, cal_year)
 );
 
+-- Daily index levels from content/indices/ind_close_all_DDMMYYYY.csv [IDX9] (price indices; no TRI rows). L1, append-only.
+CREATE TABLE IF NOT EXISTS index_ohlcv (
+    index_name    VARCHAR NOT NULL,
+    trade_date    DATE    NOT NULL,
+    open          DECIMAL(18,4),
+    high          DECIMAL(18,4),
+    low           DECIMAL(18,4),
+    close         DECIMAL(18,4) NOT NULL,
+    volume        BIGINT,
+    turnover_inr  DECIMAL(24,2),                 -- filed in Rs crore
+    pe            DOUBLE,
+    pb            DOUBLE,
+    div_yield     DOUBLE,
+    filing_id     VARCHAR NOT NULL REFERENCES filings(filing_id),
+    PRIMARY KEY (index_name, trade_date, filing_id)
+);
+
+-- NSE equity master content/equities/EQUITY_L.csv [IDX10]: listing date, face value, ISIN per symbol. L1, append-only.
+CREATE TABLE IF NOT EXISTS raw_equity_master (
+    filing_id      VARCHAR NOT NULL REFERENCES filings(filing_id),
+    snapshot_date  DATE    NOT NULL,
+    symbol         VARCHAR NOT NULL,
+    name           VARCHAR NOT NULL,
+    series         VARCHAR NOT NULL,
+    listing_date   DATE,
+    paid_up_value  DECIMAL(18,4),
+    market_lot     INTEGER,
+    isin           VARCHAR NOT NULL,
+    face_value     DECIMAL(18,4),
+    PRIMARY KEY (filing_id, symbol, series)
+);
+
+-- One row per Integrated Filing listing row (api/integrated-filing-results, vaulted as RESULTS_LISTING) [A7, X83].
+-- `creation_Date` is on every row; `broadcast_Date` is null on revised rows. Times are UTC (listing is IST).
+CREATE TABLE IF NOT EXISTS raw_results_listing (
+    filing_id        VARCHAR NOT NULL REFERENCES filings(filing_id),   -- the vaulted listing JSON
+    xbrl_url         VARCHAR NOT NULL,
+    symbol           VARCHAR NOT NULL,
+    period_end       DATE    NOT NULL,
+    scope            VARCHAR,
+    filing_type      VARCHAR NOT NULL,
+    broadcast_ts     TIMESTAMP,
+    creation_ts      TIMESTAMP,
+    revised_ts       TIMESTAMP,
+    revision_remark  VARCHAR,
+    PRIMARY KEY (filing_id, xbrl_url)
+);
+
 CREATE TABLE IF NOT EXISTS raw_index_snapshot (
     filing_id      VARCHAR NOT NULL REFERENCES filings(filing_id),
     index_name     VARCHAR NOT NULL,
@@ -243,6 +291,35 @@ CREATE TABLE IF NOT EXISTS fact_observations (
     CHECK ((unit = 'INR') = (value_other IS NULL)),
     CHECK (period_type IN ('DURATION', 'INSTANT')),
     CHECK ((period_type = 'INSTANT') = (period_months IS NULL)),
+    CHECK (period_months IS NULL OR period_months BETWEEN 1 AND 18)
+);
+
+-- Ind AS 108 segment and geography disclosures (parsers/segments.py) [X49, X97-X99]: one row per member fact, axis,
+-- member, label and element exactly as filed; no cross-company segment taxonomy. Promoted with its filing (same
+-- entity, scope, visibility and parser version). Never feeds fact_observations, the factbook or any ratio (§14b-1).
+CREATE TABLE IF NOT EXISTS segment_observations (
+    filing_id        VARCHAR NOT NULL REFERENCES filings(filing_id),
+    parser_version   VARCHAR NOT NULL,
+    entity_id        VARCHAR NOT NULL REFERENCES entity_master(entity_id),
+    scope            VARCHAR NOT NULL,
+    axis_kind        VARCHAR NOT NULL,          -- BUSINESS | GEOGRAPHY
+    axis             VARCHAR NOT NULL,          -- dimension QName as filed (in-capmkt:ReportableSegmentsAxis, ...)
+    member           VARCHAR NOT NULL,          -- member QName as filed
+    member_role      VARCHAR NOT NULL,          -- from the member name: SEGMENT | UNALLOCATED | ELIMINATION | RECONCILING | DOMICILE | FOREIGN_TOTAL | FOREIGN | AREA
+    label            VARCHAR,                   -- DescriptionOfReportableSegment / NatureOfReportableSegment / country, as filed
+    element          VARCHAR NOT NULL,          -- as filed
+    canonical_metric VARCHAR NOT NULL,          -- segments.SEGMENT_METRICS: REVENUE | RESULT | ASSETS | ...
+    period_type      VARCHAR NOT NULL,          -- DURATION | INSTANT
+    period_start     DATE NOT NULL,             -- = period_end for INSTANT
+    period_end       DATE NOT NULL,
+    period_months    INTEGER,                   -- NULL for INSTANT; 1..18
+    value_inr        DECIMAL(20,2) NOT NULL,
+    visible_from_ts  TIMESTAMP NOT NULL,
+    PRIMARY KEY (filing_id, parser_version, axis, member, element, period_start, period_end),
+    CHECK (axis_kind IN ('BUSINESS', 'GEOGRAPHY')),
+    CHECK (period_type IN ('DURATION', 'INSTANT')),
+    CHECK ((period_type = 'INSTANT') = (period_months IS NULL)),
+    CHECK ((period_type = 'INSTANT') = (period_start = period_end)),
     CHECK (period_months IS NULL OR period_months BETWEEN 1 AND 18)
 );
 
@@ -494,8 +571,8 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     debtor_days         DOUBLE,              -- Screener export: closing debtors / (sales / 365) [S22]
     inventory_turnover  DOUBLE,              -- Screener export: sales / closing inventory [S22]
     working_capital     DECIMAL(24,2),       -- Screener export: Other Assets - Other Liabilities (rupees) [S22]
-    inventory_days      DOUBLE,              -- closing inventory / (sales / 365) [S23]
-    days_payable        DOUBLE,              -- closing trade payables / (sales / 365) [S23]
+    inventory_days      DOUBLE,              -- closing inventory / (COGS / 365); NULL if COGS < 1% of sales [S23]
+    days_payable        DOUBLE,              -- closing trade payables / (COGS / 365) [S23]
     cash_conversion_cycle DOUBLE,            -- debtor + inventory - payable days [S23]
     working_capital_days DOUBLE,             -- (CA - cash & bank - current investments - CL) / (sales / 365) [S23]
     vnb_margin          DOUBLE,              -- supplemental_kpis (life insurers), latest period visible at as-of
@@ -650,8 +727,8 @@ CREATE TABLE IF NOT EXISTS screener_features (
     debtor_days         DOUBLE,              -- Screener export: closing debtors / (sales / 365) [S22]
     inventory_turnover  DOUBLE,              -- Screener export: sales / closing inventory [S22]
     working_capital     DECIMAL(24,2),       -- Screener export: Other Assets - Other Liabilities (rupees) [S22]
-    inventory_days      DOUBLE,              -- closing inventory / (sales / 365) [S23]
-    days_payable        DOUBLE,              -- closing trade payables / (sales / 365) [S23]
+    inventory_days      DOUBLE,              -- closing inventory / (COGS / 365); NULL if COGS < 1% of sales [S23]
+    days_payable        DOUBLE,              -- closing trade payables / (COGS / 365) [S23]
     cash_conversion_cycle DOUBLE,            -- debtor + inventory - payable days [S23]
     working_capital_days DOUBLE,             -- (CA - cash & bank - current investments - CL) / (sales / 365) [S23]
     vnb_margin          DOUBLE,              -- supplemental_kpis (life insurers), latest period visible at as-of

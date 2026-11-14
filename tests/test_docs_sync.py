@@ -38,7 +38,24 @@ def test_every_registry_quirk_cites_existing_evidence():
             assert ref.strip() in KNOWN, (name, ref)
 
 
-INTEGRATED = sorted([*XBRL_DIR.glob("INTEGRATED_FILING_*.xml"), *XBRL_DIR.glob("IF_INS_COM_IND_AS_*.xml")])
+# X89: results filed on the non-Ind AS template (IntegratedFinance_OtherThanBank). Committed as evidence that such
+# filings stay unparsed (X79) until their Ind AS re-filing closes the finding; every other committed filing parses.
+WRONG_TEMPLATE = {
+    "INTEGRATED_FILING_INDAS_1487244_18072025075933_WEB.xml",
+    "INTEGRATED_FILING_INDAS_1487257_18072025080410_WEB.xml",
+}
+INTEGRATED = sorted(
+    p
+    for p in [*XBRL_DIR.glob("INTEGRATED_FILING_*.xml"), *XBRL_DIR.glob("IF_INS_COM_IND_AS_*.xml")]
+    if p.name not in WRONG_TEMPLATE
+)
+
+
+def test_wrong_template_fixtures_are_the_only_unparsed_ones():
+    for name in WRONG_TEMPLATE:
+        inst = parse_instance((XBRL_DIR / name).read_bytes())
+        assert "IntegratedFinance_OtherThanBank" in inst.entity_namespace
+        assert detect_profile(inst.entity_namespace) is None
 
 
 @pytest.mark.parametrize("path", INTEGRATED, ids=lambda p: p.name[:40])
@@ -58,7 +75,9 @@ SHP_FILES = sorted(XBRL_DIR.glob("SHP_*.xml"))
 @pytest.mark.parametrize("path", SHP_FILES, ids=lambda p: p.stem)
 def test_registry_covers_every_reg31_element_axis_and_category(path):
     """Reg. 31 is dimensional: every element (any context), axis and CategoryOfShareholders member is registered."""
-    inst = parse_instance(path.read_bytes())
+    from financials.parsers.shareholding import shp_instance
+
+    inst = shp_instance(path.read_bytes())[0]  # SHP16: the 2022-09-30 taxonomy's undeclared entity contexts
     elements = {f.name for f in inst.facts}
     axes = {a.split(":")[-1] for c in inst.contexts.values() for a, _ in c.dimensions}
     members = {

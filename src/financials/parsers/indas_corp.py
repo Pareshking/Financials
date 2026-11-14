@@ -262,6 +262,8 @@ class ParsedResults:
     meta: dict[str, Any] = field(default_factory=dict)
     facts: list[CanonicalFact] = field(default_factory=list)
     issues: list[Issue] = field(default_factory=list)
+    # Non-blocking findings: the filing is promoted and each finding opens a quarantine row [X86].
+    findings: list[Issue] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -312,6 +314,31 @@ def _family(context_id: str) -> str | None:
         if context_id in (family + "D", family + "I"):
             return family
     return None
+
+
+def _stale_context_dates(inst: Instance, declared: dict, period_end: date) -> tuple[dict, date | None]:
+    """Named rule STALE_CONTEXT_DATES [X87]: every period context of the filing still carries an earlier filing's
+    dates (Siemens Q3 FY26: OneD Apr-Jun 2025 and FourD Oct 2024-Jun 2025, declared Oct-Dec 2025 and the 15-month
+    Oct 2024-Dec 2025; the results PDF shows the XBRL values, 33,985 / 179,167 Mn revenue, for the declared periods).
+    Applies only when each period family has one context period, none equals its declared period, all share one end
+    date before the declared period end, and every declared period ends on it. Returns (family -> stale period,
+    stale end) or ({}, None)."""
+    periods: dict[str, set] = {}
+    for fact in inst.facts:
+        ctx = inst.contexts[fact.context_id]
+        if fact.is_numeric and not ctx.dimensions and not ctx.is_instant and (family := _family(ctx.id)):
+            periods.setdefault(family, set()).add((ctx.start, ctx.end))
+    if not periods or any(len(v) != 1 for v in periods.values()):
+        return {}, None
+    stale = {f: next(iter(v)) for f, v in periods.items()}
+    ends = {p[1] for p in stale.values()}
+    if (
+        len(ends) != 1
+        or any(declared.get(f) is None or declared[f] == p or declared[f][1] != period_end for f, p in stale.items())
+        or not next(iter(ends)) < period_end
+    ):
+        return {}, None
+    return stale, next(iter(ends))
 
 
 def parse_indas_corp_results(data: bytes) -> ParsedResults:
@@ -435,6 +462,11 @@ def _map_facts(inst: Instance, result: ParsedResults, spec: ProfileSpec | None =
     declared = {"One": result.meta["quarter_period"], "Four": result.meta["ytd_period"]}
     period_end: date = result.meta["period_end"]
     seen: dict[tuple[str, date, date], CanonicalFact] = {}
+    stale, stale_end = _stale_context_dates(inst, declared, period_end)
+    if stale:
+        result.meta.setdefault("rules_applied", []).append(
+            {"rule": "STALE_CONTEXT_DATES", "periods": {f: [str(d) for d in p] for f, p in sorted(stale.items())}}
+        )
 
     for fact in inst.facts:
         if not fact.is_numeric:
@@ -444,9 +476,10 @@ def _map_facts(inst: Instance, result: ParsedResults, spec: ProfileSpec | None =
             continue  # raw-only (RPT detail, segment, OCI breakdowns)
         if ctx.is_instant:
             mapping = spec.instant_tags.get(fact.name)
-            if mapping is None or ctx.instant != period_end:
+            instant = period_end if stale and ctx.instant == stale_end else ctx.instant  # X87
+            if mapping is None or instant != period_end:
                 continue  # e.g. PY_I opening cash: raw-only [X2]
-            start = end = ctx.instant
+            start = end = instant
             months = None
             ptype = "INSTANT"
         else:
@@ -456,6 +489,8 @@ def _map_facts(inst: Instance, result: ParsedResults, spec: ProfileSpec | None =
             family = _family(ctx.id)
             expected = declared.get(family) if family else None
             actual = (ctx.start, ctx.end)
+            if family in stale and actual == stale[family]:
+                actual = expected  # X87: re-dated to the declared period
             if expected is None or actual != expected:
                 result.issues.append(
                     Issue(
@@ -518,6 +553,11 @@ def _map_facts(inst: Instance, result: ParsedResults, spec: ProfileSpec | None =
         )
     _apply_zero_attribution_rule(result)
     _apply_owners_tci_rule(result)
+    if spec is None or spec.identities is None:
+        # Only where owners + NCI = PAT is the profile's identity (corporate, NBFC, annual). Not banks: their
+        # PAT precedes the share of associates (PNB Q2 FY27: owners 5,898 Cr = PAT 5,561 - NCI + associates).
+        _apply_attribution_recovery_rules(result)
+        _apply_attribution_swap_rule(result)
     preserve_withheld(inst, result, durations=set(declared.values()), instants={period_end})
     result.meta["interest_paid_cfo_class"] = _classify(
         result, "interest_paid_operating", "interest_paid_financing", "FINANCING"
@@ -555,6 +595,7 @@ def map_line_items(inst: Instance, result: ParsedResults, curated: dict, *, dura
     result.facts[:] = enriched
     seen = {(f.canonical_tag, f.period_start, f.period_end) for f in result.facts}
     conflicts: dict[tuple, set] = {}
+    subpaise: list[str] = []
     pending: dict[tuple, CanonicalFact] = {}
 
     def period_of(ctx):
@@ -615,6 +656,11 @@ def map_line_items(inst: Instance, result: ParsedResults, curated: dict, *, dura
             value = f.decimal()
         except ParseError:
             continue
+        if unit == "INR" and value != value.quantize(Decimal("0.01")):
+            # X77: XBRL rupees are absolute, so a value with sub-paise digits under an INR unit is a mis-tagged count
+            # or quantity (BBTC NumberOfMeetingsOfBoard, ELECON product quantity): kept exactly, never as money.
+            unit = "INR_SUBPAISE"
+            subpaise.append(f.name)
         cf = CanonicalFact(key, ptype, start, end, months, unit, value, f.name, cat, parent)
         if k in pending and pending[k].value != value:
             conflicts.setdefault(k, set()).update({str(pending[k].value), str(value)})
@@ -627,6 +673,8 @@ def map_line_items(inst: Instance, result: ParsedResults, curated: dict, *, dura
         result.meta.setdefault("warnings", []).append(
             {"code": "LINE_ITEM_CONFLICT", "keys": sorted(f"{k[0]}@{k[2]}" for k in conflicts)}
         )
+    if subpaise:
+        result.meta.setdefault("warnings", []).append({"code": "INR_UNIT_SUBPAISE", "elements": sorted(set(subpaise))})
 
 
 def enrich_line_items(result: ParsedResults) -> None:
@@ -717,6 +765,100 @@ def _apply_owners_tci_rule(result: ParsedResults) -> None:
     )
 
 
+# X93: owners + NCI = PAT holds to 3 rounding units, not the 1.5 of a three-term sum: companies round each line from
+# unrounded books and file a 2-3 unit gap that their own PDF shows too (SPARC Q1 FY27 -20.76 vs PAT -20.78 Lakhs ->
+# 2 lakh; RPower Q4 FY25 125.60 vs 125.57 Cr in Lakhs -> 3 lakh).
+ATTRIBUTION_TERMS = 6
+TCI_OWNERS_KEY = "li_comprehensive_income_for_the_period_attributable_to_owners_of_parent"
+TCI_NCI_KEY = "li_comprehensive_income_for_the_period_attributable_to_owners_of_parent_non_controlling_interests"
+ATTRIBUTION_WITHHELD_TAG = "attribution_withheld"  # marker (PURE 1): owners/NCI for the period are not usable [X86]
+
+
+def _replace_attribution(result: ParsedResults, p: tuple, owners: Decimal, nci: Decimal, rule: str) -> None:
+    at = {f.canonical_tag: f for f in result.facts if f.canonical_tag in ("pat_owners", "pat_nci")
+          and (f.period_start, f.period_end) == p}  # fmt: skip
+    for tag, value in (("pat_owners", owners), ("pat_nci", nci)):
+        old = at.get(tag) or dataclasses.replace(at["pat_owners"], canonical_tag=tag)  # NCI element not filed
+        if tag in at:
+            result.facts.remove(old)
+        result.facts.append(dataclasses.replace(old, value=value, source_element=f"RULE:{rule}"))
+
+
+def _apply_attribution_recovery_rules(result: ParsedResults) -> None:
+    """Exact recovery of a mis-tagged profit attribution, then withholding of what cannot be recovered.
+
+    Run after X48 / X56. For each period whose owners + NCI differs from PAT:
+    - ATTRIBUTION_TAGGED_AS_OCI [X84]: the owners/NCI profit elements carry the OCI attribution (owners + NCI =
+      OCI). Profit attribution = TCI attribution - OCI attribution, accepted only when that sums to PAT
+      (Adani Ports Q4 FY26: 4,567.63 - 1,238.67 = 3,328.96 cr owners; 158.48 - 179.14 = -20.66 cr NCI, as in the PDF).
+    - ATTRIBUTION_SIGN_FLIP [X85]: flipping the sign of exactly one of owners / NCI makes owners + NCI = PAT
+      (Godrej Agrovet H1 FY27: 249.71 - 18.65 = 231.06 cr). Ambiguous or zero flips are not applied.
+    - ATTRIBUTION_WITHHELD [X86]: otherwise drop owners and NCI for the period and add the marker fact, so readers
+      neither use the split nor fall back to PAT; the rest of the filing is promoted and the finding stays open
+      (owner decision 2026-11-14, superseding 2026-11-13 for the non-zero NCI case). Raw facts stay as filed.
+    """
+    tol = identity_tolerance(result.meta["level_of_rounding"], ATTRIBUTION_TERMS)
+    periods = sorted({(f.period_start, f.period_end) for f in result.facts if f.canonical_tag == "pat_owners"})
+    applied: dict[str, list] = {}
+    withheld = []
+    for p in periods:
+        pat, owners, nci = (result.value(t, *p) for t in ("pat", "pat_owners", "pat_nci"))
+        if nci is None:  # no NCI element filed: owners alone must equal PAT (THELEELA Q4 FY26 owners = OCI) [X96]
+            nci = Decimal(0)
+        if None in (pat, owners) or abs(owners + nci - pat) <= tol:
+            continue
+        oci, t_own, t_nci = (result.value(t, *p) for t in ("oci_net", TCI_OWNERS_KEY, TCI_NCI_KEY))
+        if (
+            None not in (oci, t_own, t_nci)
+            and abs(owners + nci - oci) <= tol
+            and abs((t_own - owners) + (t_nci - nci) - pat) <= tol
+        ):
+            _replace_attribution(result, p, t_own - owners, t_nci - nci, "ATTRIBUTION_TAGGED_AS_OCI")
+            applied.setdefault("ATTRIBUTION_TAGGED_AS_OCI", []).append([str(p[0]), str(p[1])])
+            continue
+        flips = [
+            (o, n)
+            for o, n, flipped in ((owners, -nci, nci), (-owners, nci, owners))
+            if abs(flipped) > tol and abs(o + n - pat) <= tol
+        ]
+        if len(flips) == 1:
+            _replace_attribution(result, p, *flips[0], "ATTRIBUTION_SIGN_FLIP")
+            applied.setdefault("ATTRIBUTION_SIGN_FLIP", []).append([str(p[0]), str(p[1])])
+            continue
+        if abs(nci - pat) <= tol and abs(owners - pat) > tol:  # X91: NCI filed = PAT
+            _replace_attribution(result, p, owners, pat - owners, "NCI_TAGGED_AS_PAT")
+            applied.setdefault("NCI_TAGGED_AS_PAT", []).append([str(p[0]), str(p[1])])
+            continue
+        tci = result.value("total_comprehensive_income", *p)
+        if nci != 0 and tci is not None and abs(owners + nci - tci) <= tol and abs(tci - pat) > tol:
+            # X92: owners + NCI = TCI with NCI != 0. Owners := PAT - NCI as filed; exact when the NCI's share of OCI
+            # is 0 (ATUL, ACC, L&T Finance), off by that share otherwise (Brigade Q2 FY27: 193.62 vs PDF 193.60 Cr).
+            _replace_attribution(result, p, pat - nci, nci, "OWNERS_AND_NCI_TAGGED_AS_TCI")
+            applied.setdefault("OWNERS_AND_NCI_TAGGED_AS_TCI", []).append([str(p[0]), str(p[1])])
+            continue
+        withheld.append((p, owners, nci, pat))
+    for p, owners, nci, pat in withheld:
+        kept = [
+            f
+            for f in result.facts
+            if f.canonical_tag in ("pat_owners", "pat_nci") and (f.period_start, f.period_end) == p
+        ]
+        for f in kept:
+            result.facts.remove(f)
+        f = kept[0]
+        marker = CanonicalFact(ATTRIBUTION_WITHHELD_TAG, f.period_type, f.period_start, f.period_end,
+                               f.period_months, "PURE", Decimal(1), "RULE:ATTRIBUTION_WITHHELD")  # fmt: skip
+        result.facts.append(marker)
+        result.findings.append(
+            Issue("IDENTITY", "ATTRIBUTION_WITHHELD",
+                  {"period": [str(p[0]), str(p[1])], "owners": str(owners), "nci": str(nci), "pat": str(pat),
+                   "tolerance": str(tol)})
+        )  # fmt: skip
+        applied.setdefault("ATTRIBUTION_WITHHELD", []).append([str(p[0]), str(p[1])])
+    for rule, ps in applied.items():
+        result.meta.setdefault("rules_applied", []).append({"rule": rule, "periods": ps})
+
+
 def _classify(result: ParsedResults, op_tag: str, other_tag: str, other_label: str) -> str | None:
     ytd = result.meta["ytd_period"]
     op = result.value(op_tag, *ytd)
@@ -780,7 +922,7 @@ def _check_identities(result: ParsedResults, spec: ProfileSpec | None = None) ->
             _check(result, "PAT_CHAIN", pat_c + rest, pat, 4, p)
         owners, nci = v("pat_owners"), v("pat_nci")
         if None not in (owners, nci, pat):
-            _check(result, "OWNERS_PLUS_NCI", owners + nci, pat, 3, p)
+            _check(result, "OWNERS_PLUS_NCI", owners + nci, pat, ATTRIBUTION_TERMS, p)
         adj, cgo = v("cf_adjustments_total"), v("cash_generated_from_operations")
         if None not in (pbt, adj, cgo):
             # Indirect method starts from PBT (before associates) [X45]
@@ -880,6 +1022,37 @@ CORP_SPEC = ProfileSpec(
 )
 
 EPS_TOLERANCE = Decimal("0.05")
+
+
+SWAP_EPS_AGREE = Decimal("0.02")  # NCI / shares within 2% of the filed EPS (weighted vs period-end shares)
+SWAP_EPS_DISAGREE = Decimal("0.25")  # ... while owners / shares is more than 25% away
+
+
+def _apply_attribution_swap_rule(result: ParsedResults) -> None:
+    """OWNERS_NCI_SWAPPED [X95]: owners and NCI filed in each other's elements. owners + NCI = PAT still holds, so
+    X84-X86 never fire; the filing's own EPS tells them apart. Applied when NCI / period-end shares agrees with the
+    filed basic EPS and owners / shares does not (Glenmark Q4 FY26: owners -0.95 Cr, NCI 3,014.14 Cr; 3,014.14 Cr /
+    28.22 Cr shares = 10.68 = filed EPS). Both values are as filed, only exchanged: an exact recovery."""
+    q = result.meta["quarter_period"]
+    shares = result.value("shares_from_paid_up", q[1], q[1])
+    if not shares or shares <= 0:
+        return
+    tol = identity_tolerance(result.meta["level_of_rounding"], ATTRIBUTION_TERMS)
+    swapped = []
+    for p in sorted({(f.period_start, f.period_end) for f in result.facts if f.canonical_tag == "pat_owners"}):
+        pat, owners, nci, eps = (result.value(t, *p) for t in ("pat", "pat_owners", "pat_nci", "eps_basic"))
+        if None in (pat, owners, nci, eps) or not eps or not nci or p[1] != q[1]:
+            continue
+        if abs(owners + nci - pat) > tol:
+            continue
+        by_nci, by_owners = nci / shares, owners / shares
+        agree = abs(by_nci - eps) <= max(SWAP_EPS_AGREE * abs(eps), Decimal("0.02"))
+        disagree = abs(by_owners - eps) > max(SWAP_EPS_DISAGREE * abs(eps), Decimal("0.50"))
+        if agree and disagree:
+            _replace_attribution(result, p, nci, owners, "OWNERS_NCI_SWAPPED")
+            swapped.append([str(p[0]), str(p[1])])
+    if swapped:
+        result.meta.setdefault("rules_applied", []).append({"rule": "OWNERS_NCI_SWAPPED", "periods": swapped})
 
 
 def _check_eps(result: ParsedResults) -> None:

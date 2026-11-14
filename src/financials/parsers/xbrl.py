@@ -94,7 +94,10 @@ def _date(el: ET.Element | None) -> date | None:
     return date.fromisoformat(el.text.strip())
 
 
-def parse_instance(data: bytes) -> Instance:
+def parse_instance(data: bytes, *, undeclared_entity_contexts: frozenset[str] = frozenset()) -> Instance:
+    """Parse an XBRL instance. A fact whose context is not declared raises ParseError, except for ids in
+    `undeclared_entity_contexts` (named rule SHP16, granted only by the shareholding parser): those become
+    dimensionless contexts with no period, so they can never pass a period check."""
     try:
         namespaces: dict[str, str] = {}
         for _, (prefix, uri) in ET.iterparse(io.BytesIO(data), events=("start-ns",)):
@@ -138,17 +141,30 @@ def parse_instance(data: bytes) -> Instance:
 
     facts: list[Fact] = []
     by_key: dict[tuple[str, str], Fact] = {}
+    ambiguous: set[tuple[str, str]] = set()
     for seq, el in enumerate(root):
         ctx = el.get("contextRef")
         if not ctx:
             continue
         if ctx not in contexts:
-            raise ParseError(f"fact references unknown context {ctx}")
+            if ctx not in undeclared_entity_contexts:
+                raise ParseError(f"fact references unknown context {ctx}")
+            contexts[ctx] = Context(id=ctx, start=None, end=None, instant=None, dimensions=())
         ns, _, name = el.tag[1:].partition("}")
         fact = Fact(seq, ns, name, ctx, el.get("unitRef"), el.get("decimals"), el.text or "")
         key = (name, ctx)
+        if key in ambiguous:
+            facts.append(fact)
+            continue
         if key in by_key and by_key[key].value_text.strip() != fact.value_text.strip():
-            raise ParseError(f"duplicate fact {name}@{ctx} with different values")
+            if ctx not in undeclared_entity_contexts:
+                raise ParseError(f"duplicate fact {name}@{ctx} with different values")
+            # SHP16: table rows flattened into one undeclared context are positionally ambiguous. Every row stays
+            # in `facts` (raw keeps them in document order); no single value is reachable by key.
+            ambiguous.add(key)
+            del by_key[key]
+            facts.append(fact)
+            continue
         by_key.setdefault(key, fact)
         facts.append(fact)
     return Instance(namespaces, contexts, facts, by_key, units)

@@ -21,7 +21,12 @@ Period = tuple[date, date]
 # rounding of the filings (half a LevelOfRounding unit per term), but never tighter than this share of the YTD.
 # Design parameter (2026-11-14): on the live backfill 94% of 8,081 comparisons agree to the rupee, 4% within 0.5%.
 YTD_IDENTITY_REL_TOLERANCE = Decimal("0.005")
-YTD_GUARDED_TAGS = frozenset({"revenue_from_operations", "total_income", "pat", "pbt", "pat_owners"})
+YTD_GUARDED_TAGS = frozenset({"revenue_from_operations", "total_income", "pat", "pbt_incl_jv", "pat_owners"})
+# X102: PBT including the share of associates / JVs, per period = filed PBT + filed JV share. Integrated Filing XBRL
+# puts the JV share after PBT, but filers also book it inside PBT as an exceptional item with the JV element 0
+# (FINCABLES Q1 FY26 PBT 176.37 + JV 26.18 = 202.55; Q2 PBT 206.20 incl. 38.11 exceptional, JV 0). Filed PBT then
+# switches definition between quarters; PBT + JV does not. The YTD identity is checked on it, not on filed PBT.
+PBT_INCL_JV = "pbt_incl_jv"
 ATTRIBUTION_WITHHELD_TAG = "attribution_withheld"  # X86 marker (parsers.indas_corp)
 ATTRIBUTION_TAGS = frozenset({"pat_owners", "pat_nci"})
 # X94: tax lines copied from the comparative (prior-year) column. PBT is current, tax is last year's, so PAT and TCI
@@ -279,6 +284,9 @@ def load_factbook(con, entity_id: str, scope: str, as_of: datetime) -> FactBook:
             book.instants.setdefault(tag, {})[end] = Decimal(value)
         else:
             book.durations.setdefault(tag, {})[(start, end)] = Decimal(value)
+    jv = book.durations.get("share_of_associates_jv", {})
+    if "pbt" in book.durations:
+        book.durations[PBT_INCL_JV] = {p: v + jv.get(p, Decimal(0)) for p, v in book.durations["pbt"].items()}
     book.withhold_tax_copies()
     return book
 

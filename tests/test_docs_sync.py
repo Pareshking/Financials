@@ -58,7 +58,9 @@ SHP_FILES = sorted(XBRL_DIR.glob("SHP_*.xml"))
 @pytest.mark.parametrize("path", SHP_FILES, ids=lambda p: p.stem)
 def test_registry_covers_every_reg31_element_axis_and_category(path):
     """Reg. 31 is dimensional: every element (any context), axis and CategoryOfShareholders member is registered."""
-    inst = parse_instance(path.read_bytes())
+    from financials.parsers.shareholding import shp_instance
+
+    inst = shp_instance(path.read_bytes())[0]  # SHP16: the 2022-09-30 taxonomy's undeclared entity contexts
     elements = {f.name for f in inst.facts}
     axes = {a.split(":")[-1] for c in inst.contexts.values() for a, _ in c.dimensions}
     members = {

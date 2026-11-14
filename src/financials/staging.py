@@ -528,9 +528,12 @@ def stage_shareholding(
     broadcast_ts: datetime | None = None,
     broadcast_ts_source: str = "UNKNOWN",
     exchange: str = "NSE",
+    run_suffix: str | None = None,
 ) -> Path:
-    """Vault + parse one Reg. 31 shareholding XBRL. Broadcast time comes from the NSE master JSON."""
-    from financials.parsers.shareholding import parse_shareholding
+    """Vault + parse one Reg. 31 shareholding XBRL. Broadcast time comes from the NSE master JSON.
+    `run_suffix` (restage) gives a re-parse its own batch next to the first one, so it promotes as a new
+    parser_version instead of being taken for the batch already promoted."""
+    from financials.parsers.shareholding import parse_shareholding, shp_instance
 
     blob = vault.put(data, ext="xml", media_type="application/xml", fetched_at=fetched_at)
     filing = make_filing(
@@ -543,9 +546,10 @@ def stage_shareholding(
         broadcast_ts_source=broadcast_ts_source,
     )
     fid = filing.filing_id
+    run_id = fid if run_suffix is None else f"{fid}-{run_suffix}"
     tables: dict[str, list[dict[str, Any]]] = {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)]}
     try:
-        tables["raw_xbrl_facts"] = _raw_fact_rows(fid, parse_instance(data))
+        tables["raw_xbrl_facts"] = _raw_fact_rows(fid, shp_instance(data)[0])
         parsed = parse_shareholding(data)
     except ParseError as exc:
         tables["stg_issues"] = [
@@ -556,7 +560,7 @@ def stage_shareholding(
                 "details": json.dumps({"error": str(exc)}),
             }
         ]
-        return write_stage(stage_root, "shareholding", fid, tables)
+        return write_stage(stage_root, "shareholding", run_id, tables)
     if parsed.issues:
         tables["stg_issues"] = [
             {
@@ -567,7 +571,7 @@ def stage_shareholding(
             }
             for i in parsed.issues
         ]
-        return write_stage(stage_root, "shareholding", fid, tables)
+        return write_stage(stage_root, "shareholding", run_id, tables)
     m = parsed.meta
     tables["stg_shp_meta"] = [
         {
@@ -610,7 +614,7 @@ def stage_shareholding(
         }
         for cat, vals in sorted(parsed.categories.items())
     ]
-    return write_stage(stage_root, "shareholding", fid, tables)
+    return write_stage(stage_root, "shareholding", run_id, tables)
 
 
 def stage_reg30_event(

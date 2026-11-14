@@ -141,7 +141,7 @@ def build_parser() -> argparse.ArgumentParser:
     ib.add_argument("src", type=Path)
     ib.add_argument("--db", type=Path, required=True)
     rs = sub.add_parser("restage", help="re-parse vaulted inputs with the current parser (no download)")
-    rs.add_argument("--category", choices=["CORP_ACTIONS"], required=True)
+    rs.add_argument("--category", choices=["CORP_ACTIONS", "SHP_XBRL"], required=True)
     sub.add_parser("promote", help="apply all pending staged batches (single writer)")
     rb = sub.add_parser("rebuild-market", help="roll market-derived state back to a date and replay it (audited)")
     rb.add_argument("--from", dest="from_date", type=_date, required=True)
@@ -238,19 +238,26 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
         if not db_path.exists():
             print(f"error: no market database at {db_path}", file=out)
             return 2
+        from financials import PARSER_VERSION
+        from financials.staging import stage_shareholding
+
         con = connect(db_path, read_only=True)
         try:
             rows = con.execute(
-                "SELECT f.source_url, f.fetched_at, b.storage_path, b.sha256 FROM filings f "
-                "JOIN blobs b USING (sha256) WHERE f.category = ? ORDER BY f.source_url",
+                "SELECT f.source_url, f.fetched_at, b.storage_path, b.sha256, f.broadcast_ts, f.broadcast_ts_source, "
+                "f.exchange FROM filings f JOIN blobs b USING (sha256) WHERE f.category = ? ORDER BY f.source_url",
                 [args.category]).fetchall()  # fmt: skip
         finally:
             con.close()
         vault = Vault(vault_dir)
-        for url, fetched, path, sha in rows:
-            s = stage_corp_actions(
-                vault, stage_root, data=vault.read_path(path, sha), source_url=url, fetched_at=fetched
-            )
+        for url, fetched, path, sha, bts, bsrc, exch in rows:
+            data = vault.read_path(path, sha)
+            if args.category == "CORP_ACTIONS":
+                s = stage_corp_actions(vault, stage_root, data=data, source_url=url, fetched_at=fetched)
+            else:  # same filing (blob, URL, broadcast time); a new parser_version batch
+                s = stage_shareholding(vault, stage_root, data=data, source_url=url, fetched_at=fetched,
+                                       broadcast_ts=bts, broadcast_ts_source=bsrc, exchange=exch,
+                                       run_suffix=PARSER_VERSION)  # fmt: skip
             print(f"staged {s.relative_to(stage_root).as_posix()}", file=out)
         return 0
     if args.cmd == "load-kpis":

@@ -40,8 +40,8 @@ from financials.parsers.shareholding import (
     PUBLIC_HOLDER_AXES,
     SHP_NS_FRAGMENT,
     parse_shareholding,
+    shp_instance,
 )
-from financials.parsers.xbrl import parse_instance
 
 SHP_PROFILE = "REG31_SHP"
 # Reg. 31 is dimensional: every element is registered with the axes it was seen on (not only
@@ -100,13 +100,15 @@ MAPPED = MAPPED_BY_PROFILE["INDAS_CORP"]
 def ctx_kind(c) -> str:
     if c.instant is not None:
         return "instant"
+    if c.start is None or c.end is None:
+        return "undeclared"  # SHP16 entity contexts
     months = (c.end.year - c.start.year) * 12 + c.end.month - c.start.month + 1
     return f"duration_{months}m"
 
 
 def inspect(path: Path, dump_dir: Path | None) -> dict:
     data = path.read_bytes()
-    inst = parse_instance(data)
+    inst = shp_instance(data)[0]  # plain parse_instance, plus rule SHP16 for the 2022-09-30 SHP taxonomy
     is_shp = any(SHP_NS_FRAGMENT in u and u.endswith("/in-bse-shp") for u in inst.namespaces.values())
     ent_ns = next((u for u in inst.namespaces.values() if u.endswith("/in-capmkt-ent")), "")
     is_event = any(f"/{seg}/" in ent_ns for seg in EVENT_FAMILIES)

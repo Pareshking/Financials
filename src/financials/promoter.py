@@ -1222,12 +1222,27 @@ def cross_check_shares(con, entity_id: str, as_of: date) -> str | None:
     )
 
 
+SHP_PARSE_FINDINGS = ("PARSE_ERROR", "CONTEXT_CONFLICT", "MISSING_CRITICAL", "PCT_SCALE_UNKNOWN")
+
+
+def _close_shp_parse_findings(con, filing_id: str, note: str) -> None:
+    """A re-parse (new parser_version) of the same filing that now parses closes its open parse findings."""
+    con.execute(
+        "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ? "
+        f"WHERE filing_id = ? AND resolved_at IS NULL AND reason_code IN {SHP_PARSE_FINDINGS}",
+        [utc_now(), note, filing_id],
+    )
+
+
 def _promote_shareholding(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
     staged_meta = read_table(con, stage_dir, "stg_shp_meta")
     if staged_meta and not financials_in_scope(staged_meta[0]["as_of_date"]):
-        return _out_of_scope(
+        res = _out_of_scope(
             con, stage_dir, "shareholding", f"as of {staged_meta[0]['as_of_date']} < {MIN_PERIOD_END_DATE}"
         )
+        _close_shp_parse_findings(con, staged_meta[0]["filing_id"],
+                                  f"parser {staged_meta[0]['parser_version']}: parses, out of scope [C9]")  # fmt: skip
+        return res
     _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_xbrl_facts"))
     filing = read_table(con, stage_dir, "filings")[0]
     fid = filing["filing_id"]
@@ -1330,6 +1345,7 @@ def _promote_shareholding(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
             for c in read_table(con, stage_dir, "stg_shp_categories")
         ],
     )
+    _close_shp_parse_findings(con, fid, f"parser {meta['parser_version']}: {meta.get('rules_applied') or 'parses'}")
     q = cross_check_shares(con, entity_id, meta["as_of_date"])
     return PromotionResult("PROMOTED", "shareholding", message=fid, quarantined=[q] if q else [])
 

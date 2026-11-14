@@ -232,6 +232,7 @@ Inspected for Batch 10 but not committed: the other Reg. 30 files listed in docs
 | `bhavcopy/BhavCopy_NSE_CM_0_0_0_20251021_F_0000.csv.zip` | Diwali Laxmi Pujan 2025: Muhurat session bhavcopy, turnover ~20% of 20 Oct (CAL2) | `https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20251021_F_0000.csv.zip` | `729f028f4dfde2d7dca1abca7b0277a87c4ca950dd0fd5d180ba8fc48c0b6456` |
 | `bhavcopy/BhavCopy_NSE_CM_0_0_0_20251023_F_0000.csv.zip` | Session after the 22 Oct holiday: PrvsClsgPric = 21 Oct close for every security (CAL3) | `https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20251023_F_0000.csv.zip` | `f06c74027d8b576d1b3ce7419bdb86472c153f7ac2ce687ed5dc949f2e00a105` |
 | `discovery/nse_integrated-filing-results_equities_TCS_20261113.json` | Results discovery (A7): newest 20 Integrated Filing rows (Financials + Governance) | `https://www.nseindia.com/api/integrated-filing-results?index=equities&symbol=TCS` | `2389cbc7d508c09eea436404e293862c96beb92ff902033c2ec24218fd6d6219` |
+| `discovery/nse_integrated-filing-results_equities_TCS_page2_20261114.json` | A7 pagination (fetched 2026-11-14): `page=2` returns rows 21-22 of `totalCount` 22 (Mar 2025 standalone, Dec 2024 Governance); no overlap with page 1 | `https://www.nseindia.com/api/integrated-filing-results?index=equities&symbol=TCS&page=2` | `38bb3a80b3052f51e813ad73588c537f74dea5e4996054e52be7a90639b54a89` |
 
 ## Screener goldens (local only, not committed)
 

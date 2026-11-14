@@ -32,6 +32,7 @@ from financials.staging import stage_results_xbrl
 from financials.vault import Vault
 
 A7 = FIXTURES / "discovery" / "nse_integrated-filing-results_equities_TCS_20261113.json"
+A7_PAGE2 = FIXTURES / "discovery" / "nse_integrated-filing-results_equities_TCS_page2_20261114.json"
 RSS = FIXTURES / "events" / "nse_Online_announcements_20261113.xml"
 XBRL = "https://nsearchives.nseindia.com/corporate/xbrl/"
 
@@ -69,12 +70,16 @@ def test_discover_fetches_only_new_in_scope_results(tmp_path):
     q2 = XBRL + "INTEGRATED_FILING_INDAS_1734607_08102026100810_WEB.xml"
     q4 = XBRL + "INTEGRATED_FILING_INDAS_1648408_09042026114218_WEB.xml"
     routes = {results_listing_url("TCS"): Response(200, A7.read_bytes()),
+              results_listing_url("TCS", 2): Response(200, A7_PAGE2.read_bytes()),
               q2: Response(200, (FIXTURES / "xbrl" / q2.rsplit("/", 1)[-1]).read_bytes()),
               q4: Response(200, (FIXTURES / "xbrl" / q4.rsplit("/", 1)[-1]).read_bytes())}  # fmt: skip
     jobs, t = jobs_for(tmp_path, routes)
     staged, errors = jobs.discover(["TCS"], ["results"], events=False)
-    assert len(staged) == 3  # listing + two files; the other 11 rows are not served (404): reported, not fatal
-    assert len(errors) == 11 and all(e.startswith("INTEGRATED_FILING_") for e in errors)
+    # two listing pages + two files; the other 12 in-scope Financials rows (11 on page 1, the Mar 2025 standalone on
+    # page 2) are not served (404): reported, not fatal
+    assert len(staged) == 4
+    assert len(errors) == 12 and all(e.startswith("INTEGRATED_FILING_") for e in errors)
+    assert results_listing_url("TCS", 2) in [u for u, _ in t.calls]
     before = len(t.calls)
     jobs.discover(["TCS"], ["results"], events=False)
     fetched_again = [u for u, _ in t.calls[before:] if u in (q2, q4)]

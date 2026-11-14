@@ -16,7 +16,7 @@ from pathlib import Path
 
 from financials.fetch.http import FetchError, PoliteFetcher
 from financials.parsers import ParseError
-from financials.parsers.discovery import parse_integrated_filing_listing, symbols_with_results_today
+from financials.parsers.discovery import listing_progress, parse_integrated_filing_listing, symbols_with_results_today
 from financials.parsers.reg30_events import parse_announcements_rss
 from financials.parsers.reg34_annual import parse_annual_listing
 from financials.parsers.shareholding import parse_shp_master
@@ -65,8 +65,10 @@ def index_list_url(file_stub: str = "nifty500") -> str:
     return f"{ARCHIVE}/content/indices/ind_{file_stub}list.csv"
 
 
-def results_listing_url(symbol: str) -> str:
-    return f"{API}/integrated-filing-results?index=equities&symbol={symbol}"
+def results_listing_url(symbol: str, page: int = 1) -> str:
+    """Newest 20 rows; `page=N` gives rows 20(N-1)+1.. (A7: TCS page 2 = rows 21-22 of totalCount 22)."""
+    base = f"{API}/integrated-filing-results?index=equities&symbol={symbol}"
+    return base if page == 1 else f"{base}&page={page}"
 
 
 ANNOUNCEMENTS_RSS = "https://nsearchives.nseindia.com/content/RSS/Online_announcements.xml"
@@ -96,6 +98,7 @@ class Jobs:
         self.f, self.vault, self.stage_root = fetcher, vault, Path(stage_root)
         self.warnings: list[str] = []
         self.errors: list[str] = []  # per-file failures inside a listing (the rest of the listing goes on)
+        self.shp_min_as_of: date | None = None  # discovery: shareholding quarters from this date (None = latest)
 
     def _file(self, url: str) -> bytes | None:
         try:
@@ -186,14 +189,17 @@ class Jobs:
 
     # ── filings ──
 
-    def shareholding(self, symbol: str, *, latest_only: bool = True) -> list[Path]:
-        """Master JSON gives each filing's XBRL URL and broadcast time [SHP6]."""
+    def shareholding(self, symbol: str, *, latest_only: bool = True, min_as_of: date | None = None) -> list[Path]:
+        """Master JSON gives each filing's XBRL URL and broadcast time [SHP6]. `min_as_of` keeps the quarters from
+        that date on (2024-12-31 gives the first in-scope quarter, 2025-03-31, its QoQ comparison)."""
         url = shp_master_url(symbol)
         master = self._get(url, accept=JSON)
         out = [stage_raw_only(self.vault, self.stage_root, data=master, ext="json", media_type=JSON,
                               category="SHP_MASTER", source_url=url, fetched_at=utc_now())]  # fmt: skip
         entries = parse_shp_master(master)
-        if latest_only:
+        if min_as_of is not None:
+            entries = [e for e in entries if e.as_of_date >= min_as_of]
+        elif latest_only:
             entries = entries[:1]
         for e in entries:
             if self.is_vaulted(e.xbrl_url) or (xbrl := self._file(e.xbrl_url)) is None:
@@ -229,11 +235,18 @@ class Jobs:
     def results(self, symbol: str) -> list[Path]:
         """Integrated Filing results [A7]: listing JSON (vaulted), then every Financials row with a period end in
         scope (C9) whose XBRL is not vaulted yet; broadcast time from the listing (IST)."""
-        url = results_listing_url(symbol)
-        listing = self._get(url, accept=JSON)
-        out = [stage_raw_only(self.vault, self.stage_root, data=listing, ext="json", media_type=JSON,
-                              category="RESULTS_LISTING", source_url=url, fetched_at=utc_now())]  # fmt: skip
-        for e in parse_integrated_filing_listing(listing):
+        out, entries, page = [], [], 1
+        while True:  # every page until totalCount rows are listed [A7]
+            url = results_listing_url(symbol, page)
+            listing = self._get(url, accept=JSON)
+            out.append(stage_raw_only(self.vault, self.stage_root, data=listing, ext="json", media_type=JSON,
+                                      category="RESULTS_LISTING", source_url=url, fetched_at=utc_now()))  # fmt: skip
+            entries += parse_integrated_filing_listing(listing)
+            seen, total = listing_progress(listing)
+            if not seen or page * 20 >= total or page >= 10:
+                break
+            page += 1
+        for e in entries:
             if e.period_end < MIN_PERIOD_END_DATE or self.is_vaulted(e.xbrl_url):
                 continue
             if (xbrl := self._file(e.xbrl_url)) is None:
@@ -299,7 +312,8 @@ class Jobs:
                 staged += self.reg30_events()
             except (FetchError, ParseError) as exc:
                 errors.append(f"events: {exc}")
-        jobs = {"results": self.results, "annual": self.annual_reports, "shareholding": self.shareholding}
+        jobs = {"results": self.results, "annual": self.annual_reports,
+                "shareholding": lambda s: self.shareholding(s, min_as_of=self.shp_min_as_of)}  # fmt: skip
         kinds = list(kinds)
 
         def one(sym: str) -> tuple[list[Path], list[str]]:

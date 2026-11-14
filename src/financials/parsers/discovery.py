@@ -60,6 +60,12 @@ def parse_integrated_filing_listing(data: bytes, *, results_only: bool = True) -
     return out
 
 
+def listing_progress(data: bytes) -> tuple[int, int]:
+    """(rows on this page, totalCount) of an integrated-filing-results answer."""
+    doc = json.loads(data.decode("utf-8"))
+    return len(doc.get("data") or []), int(doc.get("totalCount") or 0)
+
+
 _ATTACHMENT = re.compile(r"^https://nsearchives\.nseindia\.com/corporate/([A-Z0-9&\-]+)_\d{14}_")
 
 

@@ -119,6 +119,7 @@ def build_parser() -> argparse.ArgumentParser:
                     choices=["results", "annual", "shareholding"])  # fmt: skip
     df.add_argument("--no-events", action="store_true")
     df.add_argument("--workers", type=int, default=1, help="threads; still 1 request/s per host")
+    df.add_argument("--shp-from", type=_date, help="shareholding quarters from this date (default: latest only)")
     rd = sub.add_parser("run-day", help="holidays, days, corporate actions, discovery, promote, materialize")
     rd.add_argument("--date", type=_date, required=True)
     rd.add_argument("--lookback-days", type=int, default=7)
@@ -388,6 +389,7 @@ def run_fetch(args, jobs: Jobs, db_path: Path, out) -> tuple[list[Path], list[st
         syms = _symbols(args, db_path, args.symbols)
         if args.from_rss:
             syms += [s for s in jobs.symbols_from_rss() if s not in syms]
+        jobs.shp_min_as_of = args.shp_from
         staged, errors = jobs.discover(syms, args.kinds, events=not args.no_events, workers=args.workers)
     return staged, errors
 

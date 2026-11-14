@@ -1,7 +1,9 @@
 """Materialised `screener_features` (latest) and `screener_features_history` (one row per as_of_date).
 
 Runs inside the single writer process. Gates (architecture §12):
-- G4 null-spike: a critical column's null rate may not rise > 1.5 percentage points vs the previous run.
+- G4 null-spike: a critical column's null rate may not rise > 1.5 percentage points vs the previous run. A TTM
+  value that turns NULL because the company filed a newer quarter whose 4-quarter window reaches before the
+  financials cutoff (C9: never a partial window) is expected, not a defect, and is not counted (rule G4_C9_WINDOW).
 - G5 atomic swap: history rows for the date and the live table are replaced in one transaction,
   only after the row count equals the universe size.
 
@@ -29,6 +31,7 @@ from financials.fundamentals import (
     REVERSE_DCF_TERMINAL_G,
     REVERSE_DCF_WACC,
     SCREENER_CONVENTION_COLUMNS,
+    _add_months,
     altman_z_double_prime,
     annual_ratios,
     bank_blocks,
@@ -46,10 +49,12 @@ from financials.fundamentals import (
     screener_convention_ratios,
     yoy_growth,
 )
+from financials.scope import MIN_PERIOD_END_DATE
 from financials.timeutil import ist_to_utc
 
 CRITICAL_COLUMNS = ("close", "market_cap", "sales_ttm", "pat_ttm", "total_equity")
 G4_MAX_NULL_RISE = 0.015
+TTM_COLUMNS = frozenset({"sales_ttm", "pat_ttm"})
 UNIVERSE_LOOKBACK_DAYS = 15
 
 
@@ -627,9 +632,35 @@ def _lender_overrides(book, end: date) -> dict:
     return out
 
 
-def _null_rates(rows: list[dict]) -> dict[str, float]:
+def _null_rates(rows: list[dict], forgiven: set[tuple[str, str]] = frozenset()) -> dict[str, float]:
     n = len(rows) or 1
-    return {c: sum(r.get(c) is None for r in rows) / n for c in CRITICAL_COLUMNS}
+    return {
+        c: sum(r.get(c) is None and (r["security_id"], c) not in forgiven for r in rows) / n for c in CRITICAL_COLUMNS
+    }
+
+
+def _window_reaches_before_cutoff(end: date | None) -> bool:
+    """The 4-quarter window ending `end` starts with a quarter ending before MIN_PERIOD_END_DATE (C9)."""
+    return end is not None and _add_months(end, -9) < MIN_PERIOD_END_DATE
+
+
+def _c9_expected_nulls(con, prev: date, rows: list[dict]) -> set[tuple[str, str]]:
+    """Rule G4_C9_WINDOW: (security, TTM column) pairs that were non-NULL on `prev` and are NULL now only because
+    `fundamentals_end` moved to a newer quarter whose window needs pre-cutoff quarters. One query for all rows."""
+    cols = ", ".join(f"{c} IS NULL" for c in sorted(TTM_COLUMNS))
+    before = {r[0]: r[1:] for r in con.execute(
+        f"SELECT security_id, fundamentals_end, {cols} FROM screener_features_history WHERE as_of_date = ?", [prev]
+    ).fetchall()}  # fmt: skip
+    out = set()
+    for r in rows:
+        b = before.get(r["security_id"])
+        end = r.get("fundamentals_end")
+        if b is None or b[0] is None or end is None or end <= b[0] or not _window_reaches_before_cutoff(end):
+            continue
+        for c, was_null in zip(sorted(TTM_COLUMNS), b[1:], strict=True):
+            if r.get(c) is None and not was_null:
+                out.add((r["security_id"], c))
+    return out
 
 
 def materialize(con, as_of: date, exchange: str = "NSE") -> MaterializeResult:
@@ -647,7 +678,7 @@ def materialize(con, as_of: date, exchange: str = "NSE") -> MaterializeResult:
         before = dict(zip(CRITICAL_COLUMNS, con.execute(
             f"SELECT {cols} FROM screener_features_history WHERE as_of_date = ?", [prev]
         ).fetchone(), strict=True))  # fmt: skip
-        now = _null_rates(rows)
+        now = _null_rates(rows, _c9_expected_nulls(con, prev, rows))
         spikes = {c: (before[c], now[c]) for c in CRITICAL_COLUMNS if now[c] - before[c] > G4_MAX_NULL_RISE}
         if spikes:
             return MaterializeResult("ABORTED", as_of, len(rows), "G4", f"null-rate spike vs {prev}: {spikes}")

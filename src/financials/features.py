@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
+from financials import features_pl
 from financials.corp_actions import ACCEPTED_STATUSES
 from financials.db import insert_rows, table_columns, version_key
 from financials.features_price import add_price_columns, refresh_breadth
@@ -65,10 +66,14 @@ from financials.timeutil import ist_to_utc, utc_now
 # Reader version of materialised rows. Bump it whenever features.py, fundamentals.py (or another file pinned by
 # tests/test_incremental_materialize.py) changes any output: `materialize --incremental` refuses days built by another
 # version, because only a full run then reproduces the history.
-FEATURES_VERSION = "2026.11.15-4B"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
+FEATURES_VERSION = "2026.11.15-5"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
 # -3: QoQ sales / profit growth, NPM, interest coverage, OPM same quarter last year, dividend yield / payout,
 #     promoter holding QoQ change (owner_requirements items 1, 3, 4)
+# -4A: period P&L family (features_pl: quarter / fiscal-year lines, quarter YoY growth, result dates, history-gated
+#     FY CAGR / median / averages), book value per share, trade-to-trade flag; opm_last_year_pct is now the last
+#     fiscal year's OPM, the same-quarter value moved to opm_preceding_year_quarter_pct (ratio catalogue Batches 0-1)
 # -4B: batch B price / volume / technicals (features_price.py) and the market_breadth table
+# -5: batches A and B merged
 
 CRITICAL_COLUMNS = ("close", "market_cap", "sales_ttm", "pat_ttm", "total_equity")
 G4_MAX_NULL_RISE = 0.015
@@ -520,11 +525,13 @@ def compute_rows(
     fundamentals_cache: dict[str, dict] = {}
     rows = []
     prefetch_fundamentals(con, as_of_ts, entities)  # one pass instead of a per-entity scan [benchmarks]
+    features_pl.prefetch(con, as_of_ts, entities)
     try:
         rows = _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all, paid_up, quarter_end,
                      events, kpis, history, curated, arch_override, fundamentals_cache, dividends)  # fmt: skip
     finally:
         clear_prefetch(con, as_of_ts)
+        features_pl.clear(con, as_of_ts)
     add_price_columns(con, rows, as_of, exchange, factors, frozen, secs)  # batch B (price/technicals)
     return rows
 
@@ -591,6 +598,8 @@ def _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all,
             row["interest_coverage"] = None  # finance costs are the lender's cost of goods, not a solvency charge
         row.update(_dividend_columns((dividends or {}).get(sec, []), factors.get(sec, []), as_of, b,
                                      frozen.get(sec), row["eps_ttm"]))  # fmt: skip
+        row.update(features_pl.row_columns(fund.get("_pl"), row, fund, factors.get(sec, []), as_of, shares, b,
+                                           frozen.get(sec)))  # fmt: skip
         row.update(_newgen_columns(fund.get("_newgen"), mcap, ev, fund))
         hist = history.get(sec, {"pe": [], "ev_ebitda": []})
         fcff = _f(fund["_fcff"]) if fund["_fcff"] is not None else None
@@ -621,7 +630,7 @@ _EMPTY_FUNDAMENTALS: dict = {
     "_net_debt": None, "_fcff": None, "_pat_owners": None, "_pe_earnings": None, "_equity_owners": None,
     "_minority": None, "roe_continuing": None, "core_profit_ttm": None, "_pat_owners_total": None,
     "sales_growth_qoq_pct": None, "profit_growth_qoq_pct": None, "npm_pct": None, "interest_coverage": None,
-    "opm_last_year_pct": None,
+    "opm_preceding_year_quarter_pct": None,
     **dict.fromkeys(NBFC_COLUMNS + BANK_COLUMNS + INSURER_COLUMNS + CASH_CONVERSION_COLUMNS + ANNUAL_COLUMNS
                   + SCREENER_CONVENTION_COLUMNS),
 }  # fmt: skip
@@ -629,7 +638,7 @@ _EMPTY_FUNDAMENTALS: dict = {
 # Industrial ratios that do not apply to lenders (architecture §10): NULL for INDAS_NBFC books.
 _NOT_FOR_LENDERS = (
     "ebitda_ttm", "opm", "roce", "roic", "croic", "debt_to_equity", "altman_z_dd", "fcf_ttm", *CASH_CONVERSION_COLUMNS,
-    "interest_coverage", "opm_last_year_pct",
+    "interest_coverage", "opm_preceding_year_quarter_pct",
 )  # fmt: skip
 
 
@@ -738,6 +747,7 @@ def _fundamentals(con, entity_id: str, as_of_ts: datetime, end: date) -> dict:
     } | _lender_overrides(book, end)  # fmt: skip
     # NPM on the row's own sales (interest earned for banks, premium for insurers) and owners' TTM profit [X42]
     out["npm_pct"] = _f(safe_div(b["pat_owners"], out["sales_ttm"]))
+    out["_pl"] = features_pl.period_values(con, book, end, as_of_ts)  # period P&L family (ratio catalogue Batch 1)
     return out
 
 
@@ -755,14 +765,14 @@ def _sales_quarter(book, end: date) -> Decimal | None:
 
 def _quarterly_columns(book, end: date) -> dict:
     """Latest quarter vs the one before, same scope book (§6.4): sales and owners' profit (COALESCE(owners, PAT) per
-    filing, as for PE [X42]); OPM of the same quarter a year earlier. NULL when a quarter is missing (never a
-    longer-gap change) or the base is <= 0."""
+    filing, as for PE [X42]); OPM of the same quarter a year earlier (opm_preceding_year_quarter_pct). NULL when a
+    quarter is missing (never a longer-gap change) or the base is <= 0."""
     prev = _add_months(end, -3)
     owners = book.coalesced("pat_owners", "pat")
     return {
         "sales_growth_qoq_pct": _f(qoq_growth(_sales_quarter(book, end), _sales_quarter(book, prev))),
         "profit_growth_qoq_pct": _f(qoq_growth(book.quarter(owners, end), book.quarter(owners, prev))),
-        "opm_last_year_pct": _f(quarter_opm(book, _add_months(end, -12))),
+        "opm_preceding_year_quarter_pct": _f(quarter_opm(book, _add_months(end, -12))),
     }
 
 

@@ -10,12 +10,12 @@ Every concrete item in the chat is mapped to the repository as of 2026-11-14. Th
 
 | Status | Meaning | Count |
 |---|---|---|
-| DONE | implemented and tested (file and test cited) | 177 |
+| DONE | implemented and tested (file and test cited) | 179 |
 | DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 72 |
 | IN_PROGRESS | being built now | 4 |
-| MISSING | not anywhere in docs or code | 40 |
+| MISSING | not anywhere in docs or code | 41 |
 | CONFLICTS_WITH_EVIDENCE | contradicted by our verified fixtures or tests | 17 |
-| OUT_OF_SCOPE_BY_DECISION | excluded by a recorded decision (C2, C7, C9, invariants, CLAUDE.md Don'ts) | 33 |
+| OUT_OF_SCOPE_BY_DECISION | excluded by a recorded decision (C2, C7, C9, invariants, CLAUDE.md Don'ts) | 30 |
 | NEEDS_OWNER_DECISION | the docs do not settle it | 0 |
 | **Total** | | **343** |
 
@@ -139,11 +139,11 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G169 | Dividend yield | DONE | dividend_yield_pct: trailing-365-day accepted dividends (the TR ledger, C2) restated to today's share basis / close; NULL before a full window (C9) or while a gap freezes prices; tests/test_owner_items_qoq_dividend_promoter.py |
 | G170 | FCF yield | DONE | fcff_yield (unlevered); tests/test_phase1_fixes_b.py. Equity FCF yield not built |
 | G171 | Sales growth and profit growth YoY | DONE | sales_growth_yoy, profit_growth_yoy; tests/test_features.py. 8 quarters |
-| G172 | Sales / profit growth 3Y and 5Y, EPS growth 3Y | OUT_OF_SCOPE_BY_DECISION | C9; fundamentals.cagr(min_periods_required); tests/test_scope.py. NULL until history exists |
+| G172 | Sales / profit growth 3Y and 5Y, EPS growth 3Y | DONE | history-gated (C9, owner rule: built, NULL until history): sales_growth_{3,5,7,10}y_pct, profit_growth_*, operating_profit_growth_*, eps_growth_* (features_pl; FY CAGR via fundamentals.cagr(min_periods_required = 4 x years + 1), EPS restated by later EPS factors); 3Y switches on with FY28 (~May 2028). tests/test_period_pl_family.py (NULL on fixtures, values on synthetic FY25-FY35) |
 | G173 | QoQ sales % and QoQ profit % | DONE | sales_growth_qoq_pct, profit_growth_qoq_pct (owners' profit, NULL on a base <= 0); same scope book; tests/test_owner_items_qoq_dividend_promoter.py, tests/test_phase1_phase2_e2e.py |
 | G174 | ROCE, ROE, ROIC, OPM, debt/equity, working-capital days, CFO/EBITDA | DONE | tests/test_features.py, tests/test_cash_conversion.py |
-| G175 | OPM last year, NPM, interest coverage | DONE | opm_last_year_pct (same quarter a year earlier), npm_pct (TTM owners' profit / sales_ttm), interest_coverage (TTM (PBT + finance costs) / finance costs; NULL for lenders, insurers); tests/test_owner_items_qoq_dividend_promoter.py. Filed DSCR / ISCR (X41) not exposed; OPM last year NULL on every committed company until a same-quarter pair exists |
-| G176 | OPM 5Y | OUT_OF_SCOPE_BY_DECISION | C9 |
+| G175 | OPM last year, NPM, interest coverage | DONE | opm_last_year_pct (= the last fiscal year's OPM since features 2026.11.15-4A, Screener's meaning; the same-quarter value built in -3 is now opm_preceding_year_quarter_pct), npm_pct (TTM owners' profit / sales_ttm), interest_coverage (TTM (PBT + finance costs) / finance costs; NULL for lenders, insurers); tests/test_owner_items_qoq_dividend_promoter.py. Filed DSCR / ISCR (X41) not exposed; OPM last year NULL on every committed company until a same-quarter pair exists |
+| G176 | OPM 5Y | DONE | history-gated: opm_5y_pct, opm_10y_pct (mean FY OPM; NULL until FY29 / FY34, C9); features_pl; tests/test_period_pl_family.py |
 | G177 | Promoter holding, pledge %, FII, DII holding | DONE | arch 10.7; tests/test_batch8_shareholding.py |
 | G178 | Change in promoter holding | DONE | promoter_holding_change_qoq_pp (adjacent Reg. 31 quarters, percentage points); RELIANCE 2025-03-31 -> 2025-06-30 = -0.04 pp; tests/test_owner_items_qoq_dividend_promoter.py |
 | G179 | MF holding change 1M (AMFI) | DOCUMENTED_PLANNED | F26 |
@@ -196,7 +196,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G244 | Guardrail: expose raw numerator and denominator columns | DOCUMENTED_PLANNED | arch 10 (stated rule). Not present in screener_features |
 | G245 | Guardrail: NULL industrial ratios for banks, NBFCs, insurers | DONE | arch 9, 10.5, 10.6; tests/test_batch4_nbfc.py, tests/test_batch6_insurers.py |
 | G246 | Financial cohort metrics: NIM, cost-to-income, provision coverage, P/B | DONE | arch 10.5; tests/test_batch5_bank.py, tests/test_batch4_nbfc.py. PCR NULL for NBFCs (X54) |
-| G247 | Smooth incremental ratios over 3Y / 5Y windows | OUT_OF_SCOPE_BY_DECISION | C9 |
+| G247 | Smooth incremental ratios over 3Y / 5Y windows | MISSING | mislabelled OUT_OF_SCOPE (master_backlog §2): under the owner's rule it is a history-gated build item (NULL until history, C9); capital-allocation family, ratio catalogue Batch 3 |
 | G248 | New-generation businesses need different ratios *(owner)* | DONE | arch 10.8; C21; tests/test_batch7_newgen.py |
 | G250 | EV / gross profit | DONE | ev_to_gross_profit; tests/test_batch7_newgen.py |
 | G251 | Ex-cash PE | DONE | ex_cash_pe; tests/test_batch7_newgen.py |
@@ -347,7 +347,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G166 | One wide nightly feature table, one row per security | DONE | screener_features(_history); materialize; tests/test_features.py. About 150 columns |
 | G185 | Alias dictionary mapping readable names to columns | DONE | dsl.ALIASES; tests/test_dsl.py |
 | G186 | Arithmetic, AND/OR/NOT and comparisons compiled to parameterised SQL; no injection | DONE | arch 14; tests/test_dsl.py |
-| G187 | Saved custom ratios expand inline in any screen | DONE | dsl.save_custom_ratio; user_custom_ratios; tests/test_dsl.py. No CLI command to save one |
+| G187 | Saved custom ratios expand inline in any screen | DONE | dsl.save_custom_ratio; user_custom_ratios; CLI `save-ratio NAME EXPR`, `ratios`; usable as output columns (`screen --columns`, `--order-by`, M1 / G07); tests/test_dsl.py, tests/test_period_pl_family.py |
 | G188 | Natural-language to DSL translator that shows the formula for checking | MISSING | not built |
 | G189 | Daily screen alerts when a stock enters or exits a saved screen | DOCUMENTED_PLANNED | arch 15 Phase 3 (daily diff digest) |
 | G211 | Portfolio overlap, sector weights, weighted PE/ROCE, correlation | OUT_OF_SCOPE_BY_DECISION | Decision H (2026-11-15, reversible): portfolio analytics out of scope for now (arch 1) |

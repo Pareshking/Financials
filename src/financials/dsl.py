@@ -34,7 +34,9 @@ ALIASES: dict[str, tuple[str, str]] = {
     "net profit": ("(pat_ttm / 10000000)", "INR crore, TTM"),
     "free cash flow": ("(fcf_ttm / 10000000)", "INR crore, TTM (H1/FY bridge)"),
     "net debt": ("(net_debt / 10000000)", "INR crore"),
-    "book value": ("(total_equity / 10000000)", "INR crore"),
+    "book value": ("book_value_per_share", "INR per share, owners' equity / shares (Screener's meaning)"),
+    "book value per share": ("book_value_per_share", "INR per share, owners' equity / shares"),
+    "net worth": ("(total_equity / 10000000)", "INR crore, total equity (latest H1/FY BS)"),
     "price to earning": ("pe", "x"),
     "pe": ("pe", "x"),
     "price to book value": ("pb", "x"),
@@ -171,7 +173,6 @@ ALIASES: dict[str, tuple[str, str]] = {
     "net profit margin": ("(npm_pct * 100)", "% TTM owners' profit / TTM sales"),
     "interest coverage": ("interest_coverage", "x TTM (PBT + finance costs) / finance costs (not for lenders)"),
     "interest coverage ratio": ("interest_coverage", "x TTM (PBT + finance costs) / finance costs (not for lenders)"),
-    "opm last year": ("(opm_last_year_pct * 100)", "% same quarter one year earlier"),
     "dividend yield": ("(dividend_yield_pct * 100)", "% trailing 365 days of ex-dates / close"),
     "dividend payout": ("(dividend_payout_pct * 100)", "% trailing dividends per share / EPS TTM"),
     "change in promoter holding": ("promoter_holding_change_qoq_pp", "percentage points, QoQ"),
@@ -221,6 +222,95 @@ ALIASES: dict[str, tuple[str, str]] = {
     "vwap": ("vwap", "INR, today"),
     "vwap 20d": ("vwap_20d", "INR, adjusted"),
 }
+
+
+def _yyyymmdd(column: str) -> str:
+    return f"CAST(strftime({column}, '%Y%m%d') AS INTEGER)"
+
+
+# Batch 0: aliases for built columns that had none (ratio catalogue C2).
+ALIASES.update(
+    {
+        "shares": ("shares", "count (Reg. 31 total, else paid-up / face value)"),
+        "number of equity shares": ("shares", "count (Reg. 31 total, else paid-up / face value)"),
+        "restatement suspected": ("CAST(restatement_suspected AS INTEGER)", "1/0 (X106 YTD identity break in the TTM)"),
+        "non promoter non public holding": ("(non_promoter_non_public_pct * 100)", "% (employee trusts, DRs)"),
+        "annual fy end": (_yyyymmdd("annual_fy_end"), "YYYYMMDD, fiscal year of the annual ratios"),
+        "fundamentals end": (_yyyymmdd("fundamentals_end"), "YYYYMMDD, latest quarter end of the TTM window"),
+        "balance sheet date": (_yyyymmdd("bs_as_of"), "YYYYMMDD"),
+        "cash flow date": (_yyyymmdd("cf_as_of"), "YYYYMMDD"),
+        "shareholding date": (_yyyymmdd("shp_as_of"), "YYYYMMDD, Reg. 31 as-of"),
+        "price date": (_yyyymmdd("price_date"), "YYYYMMDD, last bar on/before the as-of"),
+        "loans": ("(loans / 10000000)", "INR crore, lenders"),
+        "reverse dcf wacc": ("(reverse_dcf_wacc_used * 100)", "% used by reverse dcf growth"),
+        "reverse dcf terminal growth": ("(reverse_dcf_terminal_g * 100)", "% used by reverse dcf growth"),
+        "consolidated": ("CAST(scope_used = 'CONSOLIDATED' AS INTEGER)", "1/0, scope of this row's fundamentals"),
+        "trade to trade": ("CAST(is_trade_to_trade AS INTEGER)", "1/0, series BE or BZ (M6)"),
+        "is trade to trade": ("CAST(is_trade_to_trade AS INTEGER)", "1/0, series BE or BZ (M6)"),
+    }
+)
+
+
+def _period_aliases() -> dict[str, tuple[str, str]]:
+    """Batch 1 (period P&L family, features_pl): Screener's names, e.g. "Sales latest quarter", "Net profit preceding
+    year quarter", "OPM last year", "Sales growth 3Years". Money in INR crore, ratios in %."""
+    lines = {"sales": ["sales"], "operating_profit": ["operating profit"], "other_income": ["other income"],
+             "depreciation": ["depreciation"], "ebit": ["ebit"], "interest": ["interest"],
+             "pbt": ["profit before tax", "pbt"], "tax": ["tax"], "pat": ["profit after tax", "pat"],
+             "net_profit": ["net profit"],
+             "exceptional_items": ["extraordinary items", "exceptional items"]}  # fmt: skip
+    periods = {"latest_quarter": ["latest quarter"], "preceding_quarter": ["preceding quarter"],
+               "preceding_year_quarter": ["preceding year quarter"],
+               "2quarters_back": ["2quarters back", "2 quarters back"],
+               "3quarters_back": ["3quarters back", "3 quarters back"],
+               "last_year": ["last year"], "preceding_year": ["preceding year"]}  # fmt: skip
+    from financials.features_pl import EPS_COLUMNS, EQUITY_CAPITAL_COLUMNS, MARGIN_COLUMNS, MONEY_COLUMNS
+
+    out: dict[str, tuple[str, str]] = {}
+    for line, names in lines.items():
+        for period, pnames in periods.items():
+            if f"{line}_{period}" in MONEY_COLUMNS:
+                for n in names:
+                    for pn in pnames:
+                        out[f"{n} {pn}"] = (f"({line}_{period} / 10000000)", f"INR crore, {pn}")
+    for period, pnames in periods.items():
+        for pn in pnames:
+            if f"eps_{period}" in EPS_COLUMNS:
+                out[f"eps {pn}"] = (f"eps_{period}", f"INR per share, filed, today's share basis, {pn}")
+            if f"equity_capital_{period}" in EQUITY_CAPITAL_COLUMNS:
+                out[f"equity capital {pn}"] = (f"(equity_capital_{period} / 10000000)", f"INR crore, {pn}")
+            for m in ("opm", "npm", "gpm"):
+                if f"{m}_{period}_pct" in (*MARGIN_COLUMNS, "opm_last_year_pct", "opm_preceding_year_quarter_pct"):
+                    out[f"{m} {pn}"] = (f"({m}_{period}_pct * 100)", f"%, {pn}")
+    out["opm same quarter last year"] = ("(opm_preceding_year_quarter_pct * 100)", "%, the pre-4A 'opm last year'")
+    for name in ("yoy quarterly sales growth", "quarterly sales growth yoy"):
+        out[name] = ("(sales_growth_yoy_quarter_pct * 100)", "% latest quarter vs same quarter last year")
+    for name in ("yoy quarterly profit growth", "quarterly profit growth yoy"):
+        out[name] = ("(profit_growth_yoy_quarter_pct * 100)", "% owners' profit, latest quarter vs same quarter LY")
+    out["operating profit growth"] = ("(operating_profit_growth_yoy_quarter_pct * 100)",
+                                      "% EBITDA, latest quarter vs same quarter last year")  # fmt: skip
+    for name in ("sales ttm 1year back", "sales preceding 12months", "sales preceding 12 months"):
+        out[name] = ("(sales_ttm_1y_back / 10000000)", "INR crore, TTM ending a year before the latest quarter")
+    for n in (3, 5, 7, 10):
+        for key, names in (("sales", ["sales"]), ("profit", ["profit"]), ("eps", ["eps"]),
+                           ("operating_profit", ["operating profit", "ebitda"])):  # fmt: skip
+            for name in names:
+                for y in (f"{n}years", f"{n} years"):
+                    out[f"{name} growth {y}"] = (f"({key}_growth_{n}y_pct * 100)", f"% FY CAGR over {n} years")
+    for n in (5, 10):
+        for y in (f"{n}years", f"{n} years"):
+            out[f"sales growth {y} median"] = (f"(sales_growth_median_{n}y_pct * 100)", "% median yearly FY growth")
+        for y in (f"{n}year", f"{n}years", f"{n} years"):
+            out[f"average earnings {y}"] = (f"(avg_earnings_{n}y / 10000000)", "INR crore, mean FY owners' profit")
+            out[f"average ebit {y}"] = (f"(avg_ebit_{n}y / 10000000)", "INR crore, mean FY EBIT")
+            out[f"opm {y}"] = (f"(opm_{n}y_pct * 100)", f"% mean FY OPM over {n} years")
+    out["last result date"] = (_yyyymmdd("last_result_date"), "YYYYMMDD (IST), latest quarter's results")
+    out["last annual result date"] = (_yyyymmdd("last_annual_result_date"), "YYYYMMDD (IST), latest FY results")
+    out["days since last result"] = ("date_diff('day', last_result_date, as_of_date)", "days")
+    return out
+
+
+ALIASES.update(_period_aliases())
 
 KEYWORDS = {"and", "or", "not"}
 COMPARATORS = {"<", "<=", ">", ">=", "=", "!="}
@@ -518,20 +608,60 @@ def compile_screen(query: str, custom: dict[str, str] | None = None) -> Compiled
     return CompiledScreen(where, c.params, sorted(c.refs))
 
 
-def run_screen(con, query: str, as_of: date | None = None, limit: int = 500) -> list[dict]:
-    """Run against the live table, or point-in-time against history when `as_of` is given."""
-    cs = compile_screen(query, load_custom_ratios(con))
-    extra = ", ".join(f'{ALIASES[m][0]} AS "{m}"' for m in cs.metrics)
+def compile_columns(columns: list[str], custom: dict[str, str] | None = None) -> list[tuple[str, str, list[Decimal]]]:
+    """Output columns (M1): each a DSL arithmetic expression (an alias, a saved custom ratio, or arithmetic over them),
+    compiled like a filter operand. Returns (label, SQL, params); the label is the normalised expression text."""
+    out = []
+    for text in columns:
+        if not text.strip():
+            continue
+        c = Compiler(custom)
+        out.append((normalise(text), c.compile(parse_arith(text)), c.params))
+    return out
+
+
+def split_columns(text: str | None) -> list[str]:
+    """`--columns "Sales latest quarter, OPM last year, Sales / Market cap"`: the grammar has no commas."""
+    return [c.strip() for c in (text or "").split(",") if c.strip()]
+
+
+def run_screen(
+    con,
+    query: str,
+    as_of: date | None = None,
+    limit: int = 500,
+    *,
+    columns: list[str] | None = None,
+    order_by: str | None = None,
+    descending: bool = False,
+) -> list[dict]:
+    """Run against the live table, or point-in-time against history when `as_of` is given. Each match carries the
+    metrics the query references plus `columns` (DSL expressions, custom ratios allowed); `order_by` (an expression)
+    sorts the matches, NULLs last, then by symbol."""
+    custom = load_custom_ratios(con)
+    cs = compile_screen(query, custom)
+    extra_cols = [(m, ALIASES[m][0], []) for m in cs.metrics]
+    seen = set(cs.metrics)
+    for label, sql, params in compile_columns(columns or [], custom):
+        if label not in seen:
+            seen.add(label)
+            extra_cols.append((label, sql, params))
+    select_params = [p for _, _, ps in extra_cols for p in ps]
+    extra = ", ".join(f'{sql} AS "{label}"' for label, sql, _ in extra_cols)
     select = "as_of_date, symbol, series, close" + (f", {extra}" if extra else "")
+    order, order_params = "symbol", []
+    if order_by:
+        ((_, order_sql, order_params),) = compile_columns([order_by], custom)
+        order = f"{order_sql} {'DESC' if descending else 'ASC'} NULLS LAST, symbol"
     if as_of is None:
-        sql = f"SELECT {select} FROM screener_features WHERE {cs.where_sql} ORDER BY symbol LIMIT {int(limit)}"
-        params = cs.params
+        sql = f"SELECT {select} FROM screener_features WHERE {cs.where_sql} ORDER BY {order} LIMIT {int(limit)}"
+        params = [*select_params, *cs.params, *order_params]
     else:
         sql = (
             f"SELECT {select} FROM screener_features_history WHERE as_of_date = ? AND {cs.where_sql} "
-            f"ORDER BY symbol LIMIT {int(limit)}"
+            f"ORDER BY {order} LIMIT {int(limit)}"
         )
-        params = [as_of, *cs.params]
+        params = [*select_params, as_of, *cs.params, *order_params]
     cur = con.execute(sql, params)
     names = [d[0] for d in cur.description]
     return [dict(zip(names, r, strict=True)) for r in cur.fetchall()]

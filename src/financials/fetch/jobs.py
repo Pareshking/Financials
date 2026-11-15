@@ -13,6 +13,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from urllib.parse import quote
 
 from financials.fetch.http import FetchError, PoliteFetcher
 from financials.parsers import ParseError
@@ -73,9 +74,15 @@ def index_list_url(file_stub: str = "nifty500") -> str:
     return f"{ARCHIVE}/content/indices/ind_{file_stub}list.csv"
 
 
+def _sym(symbol: str) -> str:
+    """URL-encode an NSE symbol: "M&M", "J&KBANK", "ARE&M" otherwise split the query string at "&" and the API
+    answers for symbol "M" (M&M, M&M Financial, Amara Raja, GE Vernova T&D and J&K Bank had no results, 2026-11-15)."""
+    return quote(symbol, safe="")
+
+
 def results_listing_url(symbol: str, page: int = 1) -> str:
     """Newest 20 rows; `page=N` gives rows 20(N-1)+1.. (A7: TCS page 2 = rows 21-22 of totalCount 22)."""
-    base = f"{API}/integrated-filing-results?index=equities&symbol={symbol}"
+    base = f"{API}/integrated-filing-results?index=equities&symbol={_sym(symbol)}"
     return base if page == 1 else f"{base}&page={page}"
 
 
@@ -85,11 +92,11 @@ EVENT_PREFIXES = ("REG30_PARA_B_", "CIM_", "ALTERATION_OF_CAPITAL_AND_FUND_RAISI
 
 
 def annual_listing_url(symbol: str) -> str:
-    return f"{API}/annual-reports-xbrl?index=equities&symbol={symbol}"
+    return f"{API}/annual-reports-xbrl?index=equities&symbol={_sym(symbol)}"
 
 
 def shp_master_url(symbol: str) -> str:
-    return f"{API}/corporate-share-holdings-master?index=equities&symbol={symbol}"
+    return f"{API}/corporate-share-holdings-master?index=equities&symbol={_sym(symbol)}"
 
 
 def chunks(start: date, end: date, days: int = CORP_ACTION_CHUNK_DAYS) -> list[tuple[date, date]]:

@@ -199,3 +199,14 @@ def test_e2e_vault_holds_every_raw_file(e2e):
     data, _, _ = e2e
     blobs = [p for p in (data / "vault").rglob("*.*") if p.name != "url_index.jsonl"]
     assert len(blobs) == len(fixture_routes())  # each distinct response stored once
+
+
+def test_symbols_with_ampersand_are_url_encoded():
+    """'M&M' must reach the API as one symbol, not split the query string (5 Nifty 500 issuers had no results)."""
+    from financials.fetch.jobs import annual_listing_url, results_listing_url, shp_master_url
+
+    assert results_listing_url("M&M").endswith("symbol=M%26M")
+    assert results_listing_url("J&KBANK", page=2).endswith("symbol=J%26KBANK&page=2")
+    assert annual_listing_url("ARE&M").endswith("symbol=ARE%26M")
+    assert shp_master_url("GVT&D").endswith("symbol=GVT%26D")
+    assert results_listing_url("TCS").endswith("symbol=TCS")

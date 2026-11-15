@@ -96,18 +96,20 @@ def test_qoq_growth_is_null_on_a_missing_or_non_positive_base():
     assert qoq_growth(Decimal(-3), Decimal(2)) == Decimal("-2.5")
 
 
-def test_opm_last_year_is_the_same_quarter_one_year_earlier(fincables):
+def test_opm_preceding_year_quarter_is_the_same_quarter_one_year_earlier(fincables):
+    """Built as `opm_last_year_pct` in features 2026.11.15-3; renamed in -4A (Screener's "OPM last year" is the
+    fiscal year's OPM, now `opm_last_year_pct`, see tests/test_period_pl_family.py). Same definition."""
     q4 = date(2025, 3, 31)
     adds = ("ProfitBeforeExceptionalItemsAndTax", "FinanceCosts", "DepreciationDepletionAndAmortisationExpense")
     ebitda = sum(_filed(q4, e) for e in adds) - _filed(q4, "OtherIncome")
     assert ebitda == Decimal("1708400000")  # 2,126.8 + 5.0 + 124.2 - 547.6 crore
     assert quarter_opm(fincables, q4) == ebitda / Decimal("15945800000")
-    # Were Q4 FY26 the latest quarter, OPM last year would be Q4 FY25's quarterly OPM...
-    assert _quarterly_columns(fincables, date(2026, 3, 31))["opm_last_year_pct"] == pytest.approx(
+    # Were Q4 FY26 the latest quarter, OPM of the preceding year quarter would be Q4 FY25's quarterly OPM...
+    assert _quarterly_columns(fincables, date(2026, 3, 31))["opm_preceding_year_quarter_pct"] == pytest.approx(
         float(ebitda / Decimal("15945800000"))
     )
     # ... while for Q2 FY26 the same quarter of FY25 is before the financials cutoff, so it stays NULL.
-    assert _quarterly_columns(fincables, date(2025, 9, 30))["opm_last_year_pct"] is None
+    assert _quarterly_columns(fincables, date(2025, 9, 30))["opm_preceding_year_quarter_pct"] is None
 
 
 def test_npm_and_interest_coverage_use_the_ttm_window(fincables):
@@ -282,9 +284,10 @@ def test_dsl_aliases_reach_the_new_columns():
     from financials.dsl import compile_screen
 
     sql = compile_screen(
-        "QoQ Sales > 5 AND QoQ Profits > 5 AND NPM > 10 AND Interest coverage > 3 AND OPM last year > 10 "
+        "QoQ Sales > 5 AND QoQ Profits > 5 AND NPM > 10 AND Interest coverage > 3 AND OPM same quarter last year > 10 "
         "AND Dividend yield > 1 AND Dividend payout < 60 AND Change in promoter holding > 0"
     ).where_sql
-    for col in ("sales_growth_qoq_pct", "profit_growth_qoq_pct", "npm_pct", "interest_coverage", "opm_last_year_pct",
+    for col in ("sales_growth_qoq_pct", "profit_growth_qoq_pct", "npm_pct", "interest_coverage",
+                "opm_preceding_year_quarter_pct",
                 "dividend_yield_pct", "dividend_payout_pct", "promoter_holding_change_qoq_pp"):  # fmt: skip
         assert col in sql

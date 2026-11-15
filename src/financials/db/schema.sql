@@ -613,10 +613,124 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     profit_growth_qoq_pct DOUBLE,            -- same for COALESCE(owners, PAT) per filing; NULL if the base <= 0
     npm_pct             DOUBLE,              -- TTM owners' profit / sales_ttm (fraction)
     interest_coverage   DOUBLE,              -- TTM (PBT + finance costs) / finance costs; NULL for lenders, insurers
-    opm_last_year_pct   DOUBLE,              -- EBITDA / revenue of the same quarter one year earlier (fraction)
+    opm_last_year_pct   DOUBLE,              -- last fiscal year's EBITDA / sales (fraction; was same quarter until 4A)
     dividend_yield_pct  DOUBLE,              -- trailing-365-day accepted cash dividends (today's share basis) / close
     dividend_payout_pct DOUBLE,              -- the same dividends per share / eps_ttm; NULL if EPS <= 0
     promoter_holding_change_qoq_pp DOUBLE,   -- Reg. 31 promoter % now minus the previous quarter end, in pp
+    -- batch A (P&L family)
+    sales_latest_quarter                     DECIMAL(24,2),   -- quarter lines, rupees (features_pl)
+    sales_preceding_quarter                  DECIMAL(24,2),
+    sales_preceding_year_quarter             DECIMAL(24,2),
+    operating_profit_latest_quarter          DECIMAL(24,2),
+    operating_profit_preceding_quarter       DECIMAL(24,2),
+    operating_profit_preceding_year_quarter  DECIMAL(24,2),
+    other_income_latest_quarter              DECIMAL(24,2),
+    other_income_preceding_quarter           DECIMAL(24,2),
+    other_income_preceding_year_quarter      DECIMAL(24,2),
+    depreciation_latest_quarter              DECIMAL(24,2),
+    depreciation_preceding_quarter           DECIMAL(24,2),
+    depreciation_preceding_year_quarter      DECIMAL(24,2),
+    ebit_latest_quarter                      DECIMAL(24,2),
+    ebit_preceding_quarter                   DECIMAL(24,2),
+    ebit_preceding_year_quarter              DECIMAL(24,2),
+    interest_latest_quarter                  DECIMAL(24,2),
+    interest_preceding_quarter               DECIMAL(24,2),
+    interest_preceding_year_quarter          DECIMAL(24,2),
+    pbt_latest_quarter                       DECIMAL(24,2),
+    pbt_preceding_quarter                    DECIMAL(24,2),
+    pbt_preceding_year_quarter               DECIMAL(24,2),
+    tax_latest_quarter                       DECIMAL(24,2),
+    tax_preceding_quarter                    DECIMAL(24,2),
+    tax_preceding_year_quarter               DECIMAL(24,2),
+    pat_latest_quarter                       DECIMAL(24,2),
+    pat_preceding_quarter                    DECIMAL(24,2),
+    pat_preceding_year_quarter               DECIMAL(24,2),
+    net_profit_latest_quarter                DECIMAL(24,2),
+    net_profit_preceding_quarter             DECIMAL(24,2),
+    net_profit_preceding_year_quarter        DECIMAL(24,2),
+    exceptional_items_latest_quarter         DECIMAL(24,2),
+    exceptional_items_preceding_quarter      DECIMAL(24,2),
+    exceptional_items_preceding_year_quarter DECIMAL(24,2),
+    sales_2quarters_back                     DECIMAL(24,2),
+    sales_3quarters_back                     DECIMAL(24,2),
+    operating_profit_2quarters_back          DECIMAL(24,2),
+    operating_profit_3quarters_back          DECIMAL(24,2),
+    net_profit_2quarters_back                DECIMAL(24,2),
+    net_profit_3quarters_back                DECIMAL(24,2),
+    sales_last_year                          DECIMAL(24,2),   -- latest FY <= fundamentals_end: filed 12M, else 4 Qs
+    sales_preceding_year                     DECIMAL(24,2),
+    operating_profit_last_year               DECIMAL(24,2),
+    operating_profit_preceding_year          DECIMAL(24,2),
+    other_income_last_year                   DECIMAL(24,2),
+    other_income_preceding_year              DECIMAL(24,2),
+    depreciation_last_year                   DECIMAL(24,2),
+    depreciation_preceding_year              DECIMAL(24,2),
+    ebit_last_year                           DECIMAL(24,2),
+    ebit_preceding_year                      DECIMAL(24,2),
+    interest_last_year                       DECIMAL(24,2),
+    interest_preceding_year                  DECIMAL(24,2),
+    pbt_last_year                            DECIMAL(24,2),
+    pbt_preceding_year                       DECIMAL(24,2),
+    tax_last_year                            DECIMAL(24,2),
+    tax_preceding_year                       DECIMAL(24,2),
+    pat_last_year                            DECIMAL(24,2),
+    pat_preceding_year                       DECIMAL(24,2),
+    net_profit_last_year                     DECIMAL(24,2),
+    net_profit_preceding_year                DECIMAL(24,2),
+    exceptional_items_last_year              DECIMAL(24,2),
+    exceptional_items_preceding_year         DECIMAL(24,2),
+    sales_ttm_1y_back                        DECIMAL(24,2),   -- TTM ending fundamentals_end - 12 months
+    avg_earnings_5y                          DECIMAL(24,2),   -- mean of N FYs (history-gated, C9)
+    avg_earnings_10y                         DECIMAL(24,2),
+    avg_ebit_5y                              DECIMAL(24,2),
+    avg_ebit_10y                             DECIMAL(24,2),
+    eps_latest_quarter                       DECIMAL(18,4),   -- filed EPS x later EPS factors
+    eps_preceding_quarter                    DECIMAL(18,4),
+    eps_preceding_year_quarter               DECIMAL(18,4),
+    eps_last_year                            DECIMAL(18,4),
+    eps_preceding_year                       DECIMAL(18,4),
+    equity_capital_latest_quarter            DECIMAL(24,2),   -- paid-up, results filing
+    equity_capital_preceding_quarter         DECIMAL(24,2),
+    equity_capital_preceding_year_quarter    DECIMAL(24,2),
+    opm_latest_quarter_pct                   DOUBLE,          -- fractions; GPM only per C6
+    opm_preceding_quarter_pct                DOUBLE,
+    opm_preceding_year_pct                   DOUBLE,
+    npm_latest_quarter_pct                   DOUBLE,
+    npm_preceding_quarter_pct                DOUBLE,
+    npm_preceding_year_quarter_pct           DOUBLE,
+    npm_last_year_pct                        DOUBLE,
+    npm_preceding_year_pct                   DOUBLE,
+    gpm_latest_quarter_pct                   DOUBLE,
+    gpm_last_year_pct                        DOUBLE,
+    gpm_preceding_year_pct                   DOUBLE,
+    sales_growth_yoy_quarter_pct             DOUBLE,          -- Q / same Q last year - 1; base > 0
+    profit_growth_yoy_quarter_pct            DOUBLE,
+    operating_profit_growth_yoy_quarter_pct  DOUBLE,
+    sales_growth_3y_pct                      DOUBLE,          -- FY CAGR; NULL until base FY in scope
+    sales_growth_5y_pct                      DOUBLE,
+    sales_growth_7y_pct                      DOUBLE,
+    sales_growth_10y_pct                     DOUBLE,
+    profit_growth_3y_pct                     DOUBLE,
+    profit_growth_5y_pct                     DOUBLE,
+    profit_growth_7y_pct                     DOUBLE,
+    profit_growth_10y_pct                    DOUBLE,
+    operating_profit_growth_3y_pct           DOUBLE,
+    operating_profit_growth_5y_pct           DOUBLE,
+    operating_profit_growth_7y_pct           DOUBLE,
+    operating_profit_growth_10y_pct          DOUBLE,
+    eps_growth_3y_pct                        DOUBLE,
+    eps_growth_5y_pct                        DOUBLE,
+    eps_growth_7y_pct                        DOUBLE,
+    eps_growth_10y_pct                       DOUBLE,
+    sales_growth_median_5y_pct               DOUBLE,          -- median yearly FY growth (gated)
+    sales_growth_median_10y_pct              DOUBLE,
+    opm_5y_pct                               DOUBLE,          -- mean FY OPM over 5 / 10 FYs (gated)
+    opm_10y_pct                              DOUBLE,
+    last_result_date                         DATE,            -- IST, latest quarter first visible
+    last_annual_result_date                  DATE,            -- IST, latest FY first visible
+    book_value_per_share                     DECIMAL(18,4),   -- owners' equity / shares
+    is_trade_to_trade                        BOOLEAN,         -- series BE or BZ
+    opm_preceding_year_quarter_pct           DOUBLE,          -- same quarter last year (fraction)
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -778,10 +892,124 @@ CREATE TABLE IF NOT EXISTS screener_features (
     profit_growth_qoq_pct DOUBLE,            -- same for COALESCE(owners, PAT) per filing; NULL if the base <= 0
     npm_pct             DOUBLE,              -- TTM owners' profit / sales_ttm (fraction)
     interest_coverage   DOUBLE,              -- TTM (PBT + finance costs) / finance costs; NULL for lenders, insurers
-    opm_last_year_pct   DOUBLE,              -- EBITDA / revenue of the same quarter one year earlier (fraction)
+    opm_last_year_pct   DOUBLE,              -- last fiscal year's EBITDA / sales (fraction; was same quarter until 4A)
     dividend_yield_pct  DOUBLE,              -- trailing-365-day accepted cash dividends (today's share basis) / close
     dividend_payout_pct DOUBLE,              -- the same dividends per share / eps_ttm; NULL if EPS <= 0
     promoter_holding_change_qoq_pp DOUBLE,   -- Reg. 31 promoter % now minus the previous quarter end, in pp
+    -- batch A (P&L family)
+    sales_latest_quarter                     DECIMAL(24,2),   -- quarter lines, rupees (features_pl)
+    sales_preceding_quarter                  DECIMAL(24,2),
+    sales_preceding_year_quarter             DECIMAL(24,2),
+    operating_profit_latest_quarter          DECIMAL(24,2),
+    operating_profit_preceding_quarter       DECIMAL(24,2),
+    operating_profit_preceding_year_quarter  DECIMAL(24,2),
+    other_income_latest_quarter              DECIMAL(24,2),
+    other_income_preceding_quarter           DECIMAL(24,2),
+    other_income_preceding_year_quarter      DECIMAL(24,2),
+    depreciation_latest_quarter              DECIMAL(24,2),
+    depreciation_preceding_quarter           DECIMAL(24,2),
+    depreciation_preceding_year_quarter      DECIMAL(24,2),
+    ebit_latest_quarter                      DECIMAL(24,2),
+    ebit_preceding_quarter                   DECIMAL(24,2),
+    ebit_preceding_year_quarter              DECIMAL(24,2),
+    interest_latest_quarter                  DECIMAL(24,2),
+    interest_preceding_quarter               DECIMAL(24,2),
+    interest_preceding_year_quarter          DECIMAL(24,2),
+    pbt_latest_quarter                       DECIMAL(24,2),
+    pbt_preceding_quarter                    DECIMAL(24,2),
+    pbt_preceding_year_quarter               DECIMAL(24,2),
+    tax_latest_quarter                       DECIMAL(24,2),
+    tax_preceding_quarter                    DECIMAL(24,2),
+    tax_preceding_year_quarter               DECIMAL(24,2),
+    pat_latest_quarter                       DECIMAL(24,2),
+    pat_preceding_quarter                    DECIMAL(24,2),
+    pat_preceding_year_quarter               DECIMAL(24,2),
+    net_profit_latest_quarter                DECIMAL(24,2),
+    net_profit_preceding_quarter             DECIMAL(24,2),
+    net_profit_preceding_year_quarter        DECIMAL(24,2),
+    exceptional_items_latest_quarter         DECIMAL(24,2),
+    exceptional_items_preceding_quarter      DECIMAL(24,2),
+    exceptional_items_preceding_year_quarter DECIMAL(24,2),
+    sales_2quarters_back                     DECIMAL(24,2),
+    sales_3quarters_back                     DECIMAL(24,2),
+    operating_profit_2quarters_back          DECIMAL(24,2),
+    operating_profit_3quarters_back          DECIMAL(24,2),
+    net_profit_2quarters_back                DECIMAL(24,2),
+    net_profit_3quarters_back                DECIMAL(24,2),
+    sales_last_year                          DECIMAL(24,2),   -- latest FY <= fundamentals_end: filed 12M, else 4 Qs
+    sales_preceding_year                     DECIMAL(24,2),
+    operating_profit_last_year               DECIMAL(24,2),
+    operating_profit_preceding_year          DECIMAL(24,2),
+    other_income_last_year                   DECIMAL(24,2),
+    other_income_preceding_year              DECIMAL(24,2),
+    depreciation_last_year                   DECIMAL(24,2),
+    depreciation_preceding_year              DECIMAL(24,2),
+    ebit_last_year                           DECIMAL(24,2),
+    ebit_preceding_year                      DECIMAL(24,2),
+    interest_last_year                       DECIMAL(24,2),
+    interest_preceding_year                  DECIMAL(24,2),
+    pbt_last_year                            DECIMAL(24,2),
+    pbt_preceding_year                       DECIMAL(24,2),
+    tax_last_year                            DECIMAL(24,2),
+    tax_preceding_year                       DECIMAL(24,2),
+    pat_last_year                            DECIMAL(24,2),
+    pat_preceding_year                       DECIMAL(24,2),
+    net_profit_last_year                     DECIMAL(24,2),
+    net_profit_preceding_year                DECIMAL(24,2),
+    exceptional_items_last_year              DECIMAL(24,2),
+    exceptional_items_preceding_year         DECIMAL(24,2),
+    sales_ttm_1y_back                        DECIMAL(24,2),   -- TTM ending fundamentals_end - 12 months
+    avg_earnings_5y                          DECIMAL(24,2),   -- mean of N FYs (history-gated, C9)
+    avg_earnings_10y                         DECIMAL(24,2),
+    avg_ebit_5y                              DECIMAL(24,2),
+    avg_ebit_10y                             DECIMAL(24,2),
+    eps_latest_quarter                       DECIMAL(18,4),   -- filed EPS x later EPS factors
+    eps_preceding_quarter                    DECIMAL(18,4),
+    eps_preceding_year_quarter               DECIMAL(18,4),
+    eps_last_year                            DECIMAL(18,4),
+    eps_preceding_year                       DECIMAL(18,4),
+    equity_capital_latest_quarter            DECIMAL(24,2),   -- paid-up, results filing
+    equity_capital_preceding_quarter         DECIMAL(24,2),
+    equity_capital_preceding_year_quarter    DECIMAL(24,2),
+    opm_latest_quarter_pct                   DOUBLE,          -- fractions; GPM only per C6
+    opm_preceding_quarter_pct                DOUBLE,
+    opm_preceding_year_pct                   DOUBLE,
+    npm_latest_quarter_pct                   DOUBLE,
+    npm_preceding_quarter_pct                DOUBLE,
+    npm_preceding_year_quarter_pct           DOUBLE,
+    npm_last_year_pct                        DOUBLE,
+    npm_preceding_year_pct                   DOUBLE,
+    gpm_latest_quarter_pct                   DOUBLE,
+    gpm_last_year_pct                        DOUBLE,
+    gpm_preceding_year_pct                   DOUBLE,
+    sales_growth_yoy_quarter_pct             DOUBLE,          -- Q / same Q last year - 1; base > 0
+    profit_growth_yoy_quarter_pct            DOUBLE,
+    operating_profit_growth_yoy_quarter_pct  DOUBLE,
+    sales_growth_3y_pct                      DOUBLE,          -- FY CAGR; NULL until base FY in scope
+    sales_growth_5y_pct                      DOUBLE,
+    sales_growth_7y_pct                      DOUBLE,
+    sales_growth_10y_pct                     DOUBLE,
+    profit_growth_3y_pct                     DOUBLE,
+    profit_growth_5y_pct                     DOUBLE,
+    profit_growth_7y_pct                     DOUBLE,
+    profit_growth_10y_pct                    DOUBLE,
+    operating_profit_growth_3y_pct           DOUBLE,
+    operating_profit_growth_5y_pct           DOUBLE,
+    operating_profit_growth_7y_pct           DOUBLE,
+    operating_profit_growth_10y_pct          DOUBLE,
+    eps_growth_3y_pct                        DOUBLE,
+    eps_growth_5y_pct                        DOUBLE,
+    eps_growth_7y_pct                        DOUBLE,
+    eps_growth_10y_pct                       DOUBLE,
+    sales_growth_median_5y_pct               DOUBLE,          -- median yearly FY growth (gated)
+    sales_growth_median_10y_pct              DOUBLE,
+    opm_5y_pct                               DOUBLE,          -- mean FY OPM over 5 / 10 FYs (gated)
+    opm_10y_pct                              DOUBLE,
+    last_result_date                         DATE,            -- IST, latest quarter first visible
+    last_annual_result_date                  DATE,            -- IST, latest FY first visible
+    book_value_per_share                     DECIMAL(18,4),   -- owners' equity / shares
+    is_trade_to_trade                        BOOLEAN,         -- series BE or BZ
+    opm_preceding_year_quarter_pct           DOUBLE,          -- same quarter last year (fraction)
     PRIMARY KEY (as_of_date, security_id)
 );
 

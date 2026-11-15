@@ -292,7 +292,8 @@ def test_owner_items_qoq_npm_coverage_dividends_promoter_change(unified):
     con = unified.con
     cur = con.execute(
         "SELECT symbol, valuation_archetype, sales_growth_qoq_pct, profit_growth_qoq_pct, npm_pct, interest_coverage,"
-        " opm_last_year_pct, dividend_yield_pct, dividend_payout_pct, promoter_holding_change_qoq_pp, close "
+        " opm_preceding_year_quarter_pct, dividend_yield_pct, dividend_payout_pct, promoter_holding_change_qoq_pp,"
+        " close "
         "FROM screener_features"
     )
     names = [d[0] for d in cur.description]
@@ -314,8 +315,9 @@ def test_owner_items_qoq_npm_coverage_dividends_promoter_change(unified):
     # Lenders and insurers: no interest coverage (finance costs are their cost of funds), whatever their data.
     assert all(r["interest_coverage"] is None for r in rows.values()
                if r["valuation_archetype"] in ("FINANCIAL_LENDING", "INSURANCE"))  # fmt: skip
-    # No committed company has the same quarter a year apart in a non-lender book yet: OPM last year is NULL [C9].
-    assert all(r["opm_last_year_pct"] is None for r in rows.values())
+    # No committed company has the same quarter a year apart in a non-lender book yet: the OPM of the preceding year
+    # quarter (named opm_last_year_pct before features 2026.11.15-4A) is NULL [C9].
+    assert all(r["opm_preceding_year_quarter_pct"] is None for r in rows.values())
     # Reliance Reg. 31: 50.11% (2025-03-31) -> 50.07% (2025-06-30), the two latest visible, adjacent quarters.
     assert rows["RELIANCE"]["promoter_holding_change_qoq_pp"] == pytest.approx(-0.04)
     assert rows["HDFCBANK"]["promoter_holding_change_qoq_pp"] == 0.0  # no promoter in either quarter [SHP14]

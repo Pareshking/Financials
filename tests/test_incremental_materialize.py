@@ -313,12 +313,13 @@ def test_full_range_run_consumes_markers_it_covers(db):
 # (so `materialize --incremental` refuses days built by the old rules) and update both values here together.
 PINNED_SOURCES = (
     "src/financials/features.py",
+    "src/financials/features_pl.py",
     "src/financials/fundamentals.py",
     "src/financials/scope.py",
     "src/financials/money.py",
     "reference/valuation_archetypes.csv",
 )
-PINNED = ("2026.11.15-3", "1fe2b6b6853b77c405a3701cb2b6ce44737f3b3411a62856594cc2382003be35")
+PINNED = ("2026.11.15-4A", "1be12db4c44b7af656d84266d54375ca87c4ad358950648dd41cda3d9b0cd304")
 
 
 def sources_sha256() -> str:

@@ -14,7 +14,7 @@ Read-only survey; nothing was run against the DB. Tag names below were grepped, 
 | Status | Meaning |
 |---|---|
 | BUILT | a `screener_features` column exists (named) |
-| IN PROGRESS | being added now by the other agent: `sales_growth_qoq_pct`, `profit_growth_qoq_pct`, `npm_pct`, `interest_coverage`, `opm_last_year_pct`, `dividend_yield_pct`, `dividend_payout_pct`, `promoter_holding_change_qoq_pp` |
+| IN PROGRESS | being added now by another agent (the e085eb5 columns are BUILT since; none open at 2026-11-15 batch A) |
 | BUILDABLE NOW | every input is already promoted (`fact_observations` curated or `li_` tags, `ohlcv`, `index_ohlcv`, `shareholding_*`, `corp_actions`, `corporate_events`, `filing_meta`, `raw_index_snapshot`) and the window fits after the cutoff today |
 | WHEN HISTORY | the formula is buildable but its window reaches before C9; NULL via `min_periods_required` until the date given |
 | NEEDS PARSER | *(extra status, used sparingly)* the source is already vaulted (raw XBRL in `raw_xbrl_facts`) but the axis/element is not mapped to a canonical fact; needs a fixture-pinned rule, no new source |
@@ -73,12 +73,12 @@ context) and Reg. 34 FY25/FY26 comparatives. Due dates assumed: Q1-Q3 results wi
 | A1.7 | ★ Price to Sales | valuation | mcap / TTM rev_ops | BUILDABLE NOW | `market_cap`, `sales_ttm` (both already columns) |
 | A1.8 | ★ Price to Free Cash Flow | valuation | mcap / TTM fcf (CFO − capex, H1/FY bridge) | BUILDABLE NOW | `fcf_ttm`; NULL when FCF ≤ 0 |
 | A1.9 | ★ Earnings yield | valuation | TTM ebit / EV (Greenblatt form; Screener's exact formula UNVERIFIED) | BUILDABLE NOW | `building_blocks.ebit`, `enterprise_value` |
-| A1.10 | ★ Dividend yield (G169) | valuation | TTM cash dividends per share (ex-date in last 365 days) / close | IN PROGRESS | `dividend_yield_pct`; `corp_actions` DIVIDEND `cash_per_share` |
+| A1.10 | ★ Dividend yield (G169) | valuation | TTM cash dividends per share (ex-date in last 365 days) / close | BUILT | `dividend_yield_pct`; `corp_actions` DIVIDEND `cash_per_share` |
 | A1.11 | ★ PEG Ratio (G168) | valuation | PE / (3Y EPS CAGR × 100) | WHEN HISTORY | FY28 vs FY25 EPS → ~May 2028. Interim "PEG on FY YoY" is computable now but is not Screener's ratio |
 | A1.12 | Price to Quarterly Earning | valuation | mcap / (4 × latest quarter continuing owners' profit) (definition UNVERIFIED) | BUILDABLE NOW | `FactBook.quarter(continuing_owners)` |
-| A1.13 | Book value (per share) | per-share | owners' equity / shares | BUILDABLE NOW | `equity_attributable_to_owners` (fallback `total_equity`), `shares`. NB: DSL alias `book value` today = total equity in Rs Cr, not per share (Screener's meaning) |
+| A1.13 | Book value (per share) | per-share | owners' equity / shares | BUILT | `book_value_per_share` (owners' equity, fallback total equity / `shares`); DSL `book value` now per share, `net worth` = total equity in Rs Cr (batch A) |
 | A1.14 | ★ EPS | per-share | TTM owners' profit / current shares | BUILT | `eps_ttm` (+ `eps_continuing_ttm`) |
-| A1.15 | Number of equity shares | per-share | Reg. 31 total (else paid-up / FV) | BUILT | `shares` (no DSL alias yet) |
+| A1.15 | Number of equity shares | per-share | Reg. 31 total (else paid-up / FV) | BUILT | `shares` (DSL `shares`, `number of equity shares`) |
 | A1.16 | Number of equity shares preceding year | per-share | shares at as-of − 1 year, split/bonus-adjusted by `eps_factor` | BUILDABLE NOW | Reg. 31 since Mar-2025 |
 | A1.17 | Number of equity shares 10years back | per-share | same, 10 years | WHEN HISTORY | ~Apr 2035 |
 | A1.18 | Face value | per-share | filed FV | BUILDABLE NOW | `face_value_per_share` (quarterly); `raw_equity_master.face_value` (F28) |
@@ -117,7 +117,7 @@ context) and Reg. 34 FY25/FY26 comparatives. Due dates assumed: Q1-Q3 results wi
 | A2.21 | Current ratio | liquidity | current_assets / current_liabilities | BUILDABLE NOW | H1/FY BS |
 | A2.22 | Quick ratio | liquidity | (current_assets − inventories) / current_liabilities | BUILDABLE NOW | |
 | A2.23 | ★ Debt to equity | leverage | total_debt / total_equity | BUILT | `debt_to_equity` |
-| A2.24 | ★ Interest Coverage Ratio (G175) | leverage | TTM ebit (or PBT + finance costs) / TTM finance costs | IN PROGRESS | `interest_coverage`. Filed `li_interest_service_coverage_ratio` exists in 38 INDAS_CORP filings (listed-debt issuers only) |
+| A2.24 | ★ Interest Coverage Ratio (G175) | leverage | TTM ebit (or PBT + finance costs) / TTM finance costs | BUILT | `interest_coverage`. Filed `li_interest_service_coverage_ratio` exists in 38 INDAS_CORP filings (listed-debt issuers only) |
 | A2.25 | Debtor days; Days Receivable Outstanding | working capital | closing trade receivables / (FY sales / 365) | BUILT | `debtor_days` |
 | A2.26 | Days Inventory Outstanding | working capital | closing inventory / (COGS / 365) | BUILT | `inventory_days` |
 | A2.27 | Days Payable Outstanding | working capital | closing trade payables / (COGS / 365) | BUILT | `days_payable` |
@@ -127,7 +127,7 @@ context) and Reg. 34 FY25/FY26 comparatives. Due dates assumed: Q1-Q3 results wi
 | A2.31 | Debtor days 3/5years back | working capital history | FY value N years back | WHEN HISTORY | ~May 2028 / 2030 |
 | A2.32 | Exports percentage | mix | FY foreign revenue / revenue (Reg. 34 `GeographicalAreasAxis`, `revenue_foreign`; alternative `li_export_turnover_goods_gross` + `li_export_revenue_services`, 12 and 7 filings) | BUILDABLE NOW | Reg. 34 annual only (FY25, FY26). Geography = customer location, which is close to but not identical to "exports" |
 | A2.33 | Exports percentage 3/5Years back | mix history | | WHEN HISTORY | Reg. 34 FY28 ~Sep 2028; FY30 ~Sep 2030 |
-| A2.34 | OPM 5Year / 10Year | margin history | mean FY OPM | WHEN HISTORY | ~May 2029 / ~May 2034 |
+| A2.34 | OPM 5Year / 10Year | margin history | mean FY OPM | BUILT | `opm_5y_pct`, `opm_10y_pct` (history-gated: NULL until FY29 ~May 2029 / FY34 ~May 2034) |
 | A2.35 | Average 5years dividend | payout history | mean FY dividend (rupees) over 5 FYs | WHEN HISTORY | ~May 2029 (FY basis) / ~Oct 2029 (ex-date basis) |
 | A2.36 | Average dividend payout 3years | payout history | mean FY (dividends / owners' PAT) | WHEN HISTORY | ~May 2027 |
 
@@ -136,7 +136,7 @@ context) and Reg. 34 FY25/FY26 comparatives. Due dates assumed: Q1-Q3 results wi
 | ID | Name (Screener variants) | Family | Definition (our tags) | Status | Data / notes |
 |---|---|---|---|---|---|
 | A3.1 | ★ Promoter holding | ownership | Reg. 31 PROMOTER pct | BUILT | `promoter_holding_pct` |
-| A3.2 | ★ Change in promoter holding (G178) | ownership | QoQ percentage points | IN PROGRESS | `promoter_holding_change_qoq_pp` |
+| A3.2 | ★ Change in promoter holding (G178) | ownership | QoQ percentage points | BUILT | `promoter_holding_change_qoq_pp` |
 | A3.3 | Change in promoter holding 3Years | ownership history | pp change vs SHP 12 quarters earlier | WHEN HISTORY | ~Apr 2028 |
 | A3.4 | ★ Pledged percentage | ownership | pledged / promoter shares | BUILT | `promoter_pledge_pct` (+ `promoter_encumbered_pct`) |
 | A3.5 | Unpledged promoter holding | ownership | promoter pct × (1 − pledge pct) | BUILDABLE NOW | `shareholding_observations` + `shareholding_meta.promoter_pledged_shares` |
@@ -157,37 +157,37 @@ Screener's annual rows come from annual reports and can differ from the sum of q
 | A4.1 | ★ Sales (TTM) | P&L TTM | TTM rev_ops | BUILT | `sales_ttm` |
 | A4.2 | ★ Profit after tax (TTM); Net profit | P&L TTM | TTM pat (total, incl. NCI); owners' share via `pat_owners` | BUILT | `pat_ttm` (DSL `net profit` = total PAT; owners' TTM not a column) |
 | A4.3 | ★ OPM (TTM) | margin | TTM ebitda / rev_ops | BUILT | `opm` |
-| A4.4 | Sales last/preceding year | P&L FY | FY rev_ops | BUILDABLE NOW | `revenue_from_operations` − `excise_duty` |
-| A4.5 | Operating profit last/preceding year | P&L FY | FY ebitda | BUILDABLE NOW | PBEIT + finance_costs + D&A − other_income |
-| A4.6 | Other income last/preceding year | P&L FY | FY `other_income` (Screener adds exceptional items to OI, S2; we keep them separate) | BUILDABLE NOW | |
+| A4.4 | Sales last/preceding year | P&L FY | FY rev_ops | BUILT | `sales_last_year`, `sales_preceding_year` (features_pl) |
+| A4.5 | Operating profit last/preceding year | P&L FY | FY ebitda | BUILT | `operating_profit_last_year`, `operating_profit_preceding_year` |
+| A4.6 | Other income last/preceding year | P&L FY | FY `other_income` (Screener adds exceptional items to OI, S2; we keep them separate) | BUILT | `other_income_last_year`, `other_income_preceding_year` (exceptional items kept separate) |
 | A4.7 | EBIDT last/preceding year | P&L FY | FY ebitda + other_income (= PBEIT + finance costs + D&A) | BUILDABLE NOW | |
-| A4.8 | Depreciation last/preceding year | P&L FY | `depreciation_amortisation` | BUILDABLE NOW | |
-| A4.9 | EBIT last/preceding year | P&L FY | FY ebit | BUILDABLE NOW | |
-| A4.10 | Interest last/preceding year | P&L FY | `finance_costs` | BUILDABLE NOW | |
-| A4.11 | Profit before tax last/preceding year | P&L FY | `pbt` (or `pbt_incl_jv`, X102) | BUILDABLE NOW | |
-| A4.12 | Tax last/preceding year; Current Tax | P&L FY | `tax_expense`; `current_tax` | BUILDABLE NOW | X94 tax-copy withholding applies |
-| A4.13 | Profit after tax last/preceding year | P&L FY | `pat` | BUILDABLE NOW | |
-| A4.14 | Extraordinary items last/preceding year | P&L FY | `exceptional_items` | BUILDABLE NOW | |
-| A4.15 | Net Profit last/preceding year | P&L FY | owners' profit `COALESCE(pat_owners, pat)` | BUILDABLE NOW | |
+| A4.8 | Depreciation last/preceding year | P&L FY | `depreciation_amortisation` | BUILT | `depreciation_last_year`, `depreciation_preceding_year` |
+| A4.9 | EBIT last/preceding year | P&L FY | FY ebit | BUILT | `ebit_last_year`, `ebit_preceding_year` |
+| A4.10 | Interest last/preceding year | P&L FY | `finance_costs` | BUILT | `interest_last_year`, `interest_preceding_year` |
+| A4.11 | Profit before tax last/preceding year | P&L FY | `pbt` (or `pbt_incl_jv`, X102) | BUILT | `pbt_last_year`, `pbt_preceding_year` (filed PBT) |
+| A4.12 | Tax last/preceding year; Current Tax | P&L FY | `tax_expense`; `current_tax` | BUILT | `tax_last_year`, `tax_preceding_year` (`tax_expense`; current tax alone not built); X94 withholding applies |
+| A4.13 | Profit after tax last/preceding year | P&L FY | `pat` | BUILT | `pat_last_year`, `pat_preceding_year` |
+| A4.14 | Extraordinary items last/preceding year | P&L FY | `exceptional_items` | BUILT | `exceptional_items_last_year`, `exceptional_items_preceding_year` |
+| A4.15 | Net Profit last/preceding year | P&L FY | owners' profit `COALESCE(pat_owners, pat)` | BUILT | `net_profit_last_year`, `net_profit_preceding_year` |
 | A4.16 | Minority share last/preceding year | P&L FY | `pat_nci` | BUILDABLE NOW | consolidated only; X86 withheld splits → NULL |
 | A4.17 | Dividend last/preceding year | P&L FY | dividends paid in FY (`dividends_paid`, CF) or proposed (`li_amount_of_dividends_proposed_to_be_distributed_to_equity_shareholders`, Reg. 34) | BUILDABLE NOW | pick one and name it; corp_actions DPS × shares is a third option |
 | A4.18 | Material cost last/preceding year | P&L FY | cogs = materials + purchases + Δinventories | BUILDABLE NOW | |
 | A4.19 | Employee cost last/preceding year | P&L FY | `employee_benefit_expense` | BUILDABLE NOW | |
-| A4.20 | OPM last year | margin FY | FY ebitda / FY rev_ops | IN PROGRESS | `opm_last_year_pct` |
-| A4.21 | OPM preceding year | margin FY | FY(−1) | BUILDABLE NOW | |
-| A4.22 | NPM (TTM) | margin | TTM pat / TTM rev_ops | IN PROGRESS | `npm_pct` |
-| A4.23 | NPM last/preceding year | margin FY | FY net profit / FY sales | BUILDABLE NOW | |
-| A4.24 | EPS last/preceding year | per-share FY | filed FY `eps_basic` (or FY owners' PAT / adjusted shares) | BUILDABLE NOW | per-share series adjusted by `eps_factor` only |
-| A4.25 | TTM Result Date; Last annual result date | dates | `visible_from_ts` of the filing that completes the TTM window / of the latest FY | BUILDABLE NOW | `filing_meta.visible_from_ts`, `period_end` |
+| A4.20 | OPM last year | margin FY | FY ebitda / FY rev_ops | BUILT | `opm_last_year_pct` (FY since features 2026.11.15-4A; the same-quarter form is `opm_preceding_year_quarter_pct`) |
+| A4.21 | OPM preceding year | margin FY | FY(−1) | BUILT | `opm_preceding_year_pct` |
+| A4.22 | NPM (TTM) | margin | TTM pat / TTM rev_ops | BUILT | `npm_pct` |
+| A4.23 | NPM last/preceding year | margin FY | FY net profit / FY sales | BUILT | `npm_last_year_pct`, `npm_preceding_year_pct` (owners' profit / sales) |
+| A4.24 | EPS last/preceding year | per-share FY | filed FY `eps_basic` (or FY owners' PAT / adjusted shares) | BUILT | `eps_last_year`, `eps_preceding_year`: filed FY basic EPS × EPS factors of share-count actions ex after it was visible |
+| A4.25 | TTM Result Date; Last annual result date | dates | `visible_from_ts` of the filing that completes the TTM window / of the latest FY | BUILT | `last_annual_result_date` (first visibility of the latest FY's 12-month figures, IST); the latest quarter's in `last_result_date` (A5.21). A separate "TTM result date" is not built: it equals `last_result_date` whenever the TTM window ends at the latest quarter |
 | A4.26 | ★ Sales growth; ★ Profit growth | growth | TTM vs TTM a year earlier | BUILT | `sales_growth_yoy`, `profit_growth_yoy`: **NULL for everyone until TTM Dec-2026 (~mid-Feb 2027)**. FY26/FY25 growth (A4.28) fills the gap |
-| A4.27 | Sales preceding 12months; Sales TTM 1year back; Net profit preceding 12months | P&L TTM history | TTM ending 12 months before the latest TTM | WHEN HISTORY | ~mid-Feb 2027 |
+| A4.27 | Sales preceding 12months; Sales TTM 1year back; Net profit preceding 12months | P&L TTM history | TTM ending 12 months before the latest TTM | BUILT | `sales_ttm_1y_back` (history-gated: NULL until TTM Dec-2025 is complete, ~mid-Feb 2027, except where an FY-end bridge exists); net profit form not built |
 | A4.28 | Sales / profit growth last year (FY YoY) | growth | FY26 / FY25 − 1 | BUILDABLE NOW | not a Screener name but the 1Y annual growth Screener's 3Y/5Y family starts from |
-| A4.29 | ★ Sales growth 3/5Years; Sales growth 7/10Years | growth | FY CAGR | WHEN HISTORY | 3Y ~May 2028; 5Y ~May 2030; 7Y ~May 2032; 10Y ~May 2035 |
-| A4.30 | ★ Profit growth 3/5Years; 7/10Years | growth | FY owners' PAT CAGR (NULL if either end ≤ 0) | WHEN HISTORY | same dates |
-| A4.31 | EBIDT growth 3/5/7/10Years | growth | FY EBIDT CAGR | WHEN HISTORY | same dates |
-| A4.32 | EPS growth 3/5/7/10Years (G172) | growth | FY EPS CAGR, EPS adjusted for share-count actions | WHEN HISTORY | same dates |
-| A4.33 | Sales growth 5years median / 10years median | growth | median of yearly FY growth rates | WHEN HISTORY | ~May 2030 / ~May 2035 |
-| A4.34 | Average Earnings 5/10Year; Average EBIT 5/10Year | P&L history | mean FY owners' PAT / ebit | WHEN HISTORY | ~May 2029 / ~May 2034 |
+| A4.29 | ★ Sales growth 3/5Years; Sales growth 7/10Years | growth | FY CAGR | BUILT | `sales_growth_{3,5,7,10}y_pct` (history-gated: `fundamentals.cagr(min_periods_required = 4 × years + 1)` at the FY end; 3Y ~May 2028, 5Y ~May 2030, 7Y ~May 2032, 10Y ~May 2035) |
+| A4.30 | ★ Profit growth 3/5Years; 7/10Years | growth | FY owners' PAT CAGR (NULL if either end ≤ 0) | BUILT | `profit_growth_{3,5,7,10}y_pct` (owners' profit; history-gated, same dates) |
+| A4.31 | EBIDT growth 3/5/7/10Years | growth | FY EBIDT CAGR | WHEN HISTORY | same dates. The EBITDA (operating profit) form is built, history-gated, as `operating_profit_growth_{3,5,7,10}y_pct` (DSL `ebitda growth 3years`); the EBIDT form (+ other income) is not |
+| A4.32 | EPS growth 3/5/7/10Years (G172) | growth | FY EPS CAGR, EPS adjusted for share-count actions | BUILT | `eps_growth_{3,5,7,10}y_pct` (restated filed FY EPS; history-gated, same dates) |
+| A4.33 | Sales growth 5years median / 10years median | growth | median of yearly FY growth rates | BUILT | `sales_growth_median_{5,10}y_pct` (history-gated: ~May 2030 / ~May 2035) |
+| A4.34 | Average Earnings 5/10Year; Average EBIT 5/10Year | P&L history | mean FY owners' PAT / ebit | BUILT | `avg_earnings_{5,10}y`, `avg_ebit_{5,10}y` (history-gated: ~May 2029 / ~May 2034) |
 
 ## A5. Quarter P&L family (latest quarter, preceding quarter, preceding year quarter, 2 / 3 quarters back)
 
@@ -197,27 +197,27 @@ The period parameter maps to `end` = latest quarter end, −3, −12, −6, −9
 
 | ID | Name (Screener variants) | Family | Definition (our tags) | Status | Data / notes |
 |---|---|---|---|---|---|
-| A5.1 | ★ Sales latest quarter; Sales preceding quarter / preceding year quarter / 2quarters back / 3quarters back | P&L Q | quarter rev_ops | BUILDABLE NOW | |
-| A5.2 | Operating profit (same 5 offsets) | P&L Q | quarter ebitda | BUILDABLE NOW | |
-| A5.3 | Other income (latest / preceding / preceding year quarter) | P&L Q | `other_income` | BUILDABLE NOW | |
+| A5.1 | ★ Sales latest quarter; Sales preceding quarter / preceding year quarter / 2quarters back / 3quarters back | P&L Q | quarter rev_ops | BUILT | `sales_{latest_quarter,preceding_quarter,preceding_year_quarter,2quarters_back,3quarters_back}` |
+| A5.2 | Operating profit (same 5 offsets) | P&L Q | quarter ebitda | BUILT | `operating_profit_*` (same 5 offsets) |
+| A5.3 | Other income (latest / preceding / preceding year quarter) | P&L Q | `other_income` | BUILT | `other_income_*` (3 offsets) |
 | A5.4 | EBIDT (3 offsets) | P&L Q | ebitda + other_income | BUILDABLE NOW | |
-| A5.5 | Depreciation (3 offsets) | P&L Q | `depreciation_amortisation` | BUILDABLE NOW | |
-| A5.6 | EBIT (3 offsets) | P&L Q | ebit | BUILDABLE NOW | |
-| A5.7 | Interest (3 offsets) | P&L Q | `finance_costs` | BUILDABLE NOW | |
-| A5.8 | Profit before tax (3 offsets) | P&L Q | `pbt` | BUILDABLE NOW | |
-| A5.9 | Tax (3 offsets) | P&L Q | `tax_expense` | BUILDABLE NOW | |
-| A5.10 | ★ Profit after tax latest quarter (+2 offsets) | P&L Q | `pat` | BUILDABLE NOW | |
-| A5.11 | Extraordinary items (3 offsets) | P&L Q | `exceptional_items` | BUILDABLE NOW | |
-| A5.12 | Net Profit (5 offsets incl. 2/3 quarters back) | P&L Q | owners' profit | BUILDABLE NOW | |
-| A5.13 | OPM latest / preceding / preceding year quarter | margin Q | quarter ebitda / rev_ops | BUILDABLE NOW | |
-| A5.14 | NPM latest / preceding / preceding year quarter | margin Q | quarter net profit / rev_ops | BUILDABLE NOW | the TTM `npm_pct` is IN PROGRESS |
-| A5.15 | GPM latest quarter | margin Q | quarter gross_profit / rev_ops, only when materials + purchases ≥ 10% of revenue (C6) | BUILDABLE NOW | |
-| A5.16 | Equity Capital latest / preceding / preceding year quarter | capital Q | `paid_up_equity_capital` (quarterly P&L footer) | BUILDABLE NOW | |
-| A5.17 | EPS latest / preceding / preceding year quarter | per-share Q | filed quarter `eps_basic` | BUILDABLE NOW | |
-| A5.18 | ★ YOY Quarterly sales growth; ★ YOY Quarterly profit growth | growth Q | latest quarter / same quarter last year − 1 | BUILDABLE NOW | not among the other agent's columns (those are QoQ) |
-| A5.19 | QoQ sales %, QoQ profit % (owner PDF G173) | growth Q | latest / preceding quarter − 1 | IN PROGRESS | `sales_growth_qoq_pct`, `profit_growth_qoq_pct` |
-| A5.20 | Operating profit growth | growth Q | quarter ebitda YoY (Screener definition UNVERIFIED: could be TTM) | BUILDABLE NOW | |
-| A5.21 | Last result date | dates | `visible_from_ts` of the latest results filing | BUILDABLE NOW | |
+| A5.5 | Depreciation (3 offsets) | P&L Q | `depreciation_amortisation` | BUILT | `depreciation_*` |
+| A5.6 | EBIT (3 offsets) | P&L Q | ebit | BUILT | `ebit_*` |
+| A5.7 | Interest (3 offsets) | P&L Q | `finance_costs` | BUILT | `interest_*` |
+| A5.8 | Profit before tax (3 offsets) | P&L Q | `pbt` | BUILT | `pbt_*` |
+| A5.9 | Tax (3 offsets) | P&L Q | `tax_expense` | BUILT | `tax_*` |
+| A5.10 | ★ Profit after tax latest quarter (+2 offsets) | P&L Q | `pat` | BUILT | `pat_*` (3 offsets) |
+| A5.11 | Extraordinary items (3 offsets) | P&L Q | `exceptional_items` | BUILT | `exceptional_items_*` |
+| A5.12 | Net Profit (5 offsets incl. 2/3 quarters back) | P&L Q | owners' profit | BUILT | `net_profit_*` (5 offsets) |
+| A5.13 | OPM latest / preceding / preceding year quarter | margin Q | quarter ebitda / rev_ops | BUILT | `opm_latest_quarter_pct`, `opm_preceding_quarter_pct`, `opm_preceding_year_quarter_pct` |
+| A5.14 | NPM latest / preceding / preceding year quarter | margin Q | quarter net profit / rev_ops | BUILT | `npm_latest_quarter_pct`, `npm_preceding_quarter_pct`, `npm_preceding_year_quarter_pct` |
+| A5.15 | GPM latest quarter | margin Q | quarter gross_profit / rev_ops, only when materials + purchases ≥ 10% of revenue (C6) | BUILT | `gpm_latest_quarter_pct` (+ `gpm_last_year_pct`, `gpm_preceding_year_pct`) |
+| A5.16 | Equity Capital latest / preceding / preceding year quarter | capital Q | `paid_up_equity_capital` (quarterly P&L footer) | BUILT | `equity_capital_*` (3 offsets; paid-up capital stated in the results) |
+| A5.17 | EPS latest / preceding / preceding year quarter | per-share Q | filed quarter `eps_basic` | BUILT | `eps_*` (3 offsets; filed 3-month basic EPS, restated by later EPS factors) |
+| A5.18 | ★ YOY Quarterly sales growth; ★ YOY Quarterly profit growth | growth Q | latest quarter / same quarter last year − 1 | BUILT | `sales_growth_yoy_quarter_pct`, `profit_growth_yoy_quarter_pct` (owners; NULL on a base ≤ 0) |
+| A5.19 | QoQ sales %, QoQ profit % (owner PDF G173) | growth Q | latest / preceding quarter − 1 | BUILT | `sales_growth_qoq_pct`, `profit_growth_qoq_pct` |
+| A5.20 | Operating profit growth | growth Q | quarter ebitda YoY (Screener definition UNVERIFIED: could be TTM) | BUILT | `operating_profit_growth_yoy_quarter_pct` (quarter EBITDA YoY; Screener's definition UNVERIFIED) |
+| A5.21 | Last result date | dates | `visible_from_ts` of the latest results filing | BUILT | `last_result_date` (IST date the latest quarter-end results were first visible, row's scope) |
 | A5.22 | Expected quarterly sales / operating profit / net profit / EPS / sales growth | forecast | Screener's own projection | NOT POSSIBLE | a forecast with an undisclosed method; no free consensus-estimate source |
 
 ## A6. Balance-sheet family
@@ -323,7 +323,7 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 
 | ID | Name | Family | Definition (our tags) | Status | Data / notes |
 |---|---|---|---|---|---|
-| B2.1 | Dividend payout % (G202) | payout | dividends / owners' PAT | IN PROGRESS | `dividend_payout_pct` |
+| B2.1 | Dividend payout % (G202) | payout | dividends / owners' PAT | BUILT | `dividend_payout_pct` |
 | B2.2 | Shareholder yield (G218, corrected G316) | payout | TTM (`dividends_paid` + `li_payments_to_acquire_or_redeem_entitys_shares` − `share_issue_proceeds`) / mcap | BUILDABLE NOW | H1/FY CF bridge; buyback element seen in 74 INDAS_CORP registry filings (mostly 0) |
 | B2.3 | Buyback yield | payout | TTM buyback cash / mcap | BUILDABLE NOW | as B2.2 |
 | B2.4 | Net dilution 1Y | dilution | shares_adj(t) / shares_adj(t−1y) − 1 (Reg. 31, adjusted by `eps_factor`) | BUILDABLE NOW | |
@@ -466,10 +466,10 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 
 | Status | Part A (Screener gallery) | Part B (beyond Screener) | Total |
 |---|---|---|---|
-| BUILT | 29 | 21 | 50 |
-| IN PROGRESS | 6 | 1 | 7 |
-| BUILDABLE NOW | 100 | 70 | 170 |
-| WHEN HISTORY | 33 | 6 | 39 |
+| BUILT | 77 | 22 | 99 |
+| IN PROGRESS | 0 | 0 | 0 |
+| BUILDABLE NOW | 65 | 70 | 135 |
+| WHEN HISTORY | 26 | 6 | 32 |
 | NEEDS PARSER | 2 | 2 | 4 |
 | NEW FREE SOURCE | 1 | 15 | 16 |
 | NOT POSSIBLE | 2 | 4 | 6 |
@@ -496,6 +496,13 @@ tests. Batch 0 is trivial: DSL aliases for built columns that have none (`shares
 | 4. Price, volume and technicals | 1D/1W returns, volume and averages, 52W high/low levels, DMA levels and previous day, RSI, MACD (A8.1, A8.5-A8.7, A8.9-A8.12), ATR, RS vs Nifty 500 and RS rank, beta / volatility / drawdown, 52W-low distance, VWAP, delivery %, median traded value, volume spike, 52W-high-on-delivery flag (B6.1-B6.7, B6.9-B6.11), Is SME (A1.24); then market breadth and PEAD as separate market-level tables (B6.13, B6.14) | ~25 | `features._momentum` / `_delivery` (one pass over adjusted bars), `index_ohlcv` preload; new market-level table for breadth |
 | 5. Ownership and event flags | FII and DII QoQ separately, unpledged promoter, shareholder counts and changes (A3.5, A3.8, A3.10, A3.11), MF / insurance / retail holdings, pledge change, absorption, >1% holder count (B7.1-B7.6), audit-qualified flag (B1.16), allotment / litigation / fund-raising counts, index inclusion, ex-date and result-date flags (B8.2-B8.7) | ~15 | `shareholding_columns`, `_event_counts`, `_preload` (filing_meta, corp_actions, index history) |
 | 6. Valuation, cross-section and composites | P/S, earnings yield, EV/Sales (A1.7, A1.9, B5.6), PB / P/S percentiles (B5.2, B5.3), coarse industry PE / PBV, discount to industry median, peer rank, sector breadth (A1.19, B5.7, B5.8, B4.9), EV/GOV and P/EV (B5.10), Beneish and Piotroski components, original Altman Z (B1.2, B1.3, B1.5), standalone-vs-consolidated leakage (B1.18), RPT intensity (B1.19), segment mix (B9.1, B9.2) | ~20 | features `_rows` (needs mcap / EV), a cross-sectional pass after rows are built (industry medians, ranks), `raw_index_snapshot` industry PIT lookup, second-scope FactBook prefetch |
+
+Progress (2026-11-15, batch A, features `2026.11.15-4A`): Batch 0 done (aliases, `book value` per share, `screen
+--columns` / `--order-by`, `save-ratio`, trade-to-trade flag). Batch 1 done for the P&L lines × 5 quarter offsets and
+2 fiscal years, quarter YoY growth, result dates and the history-gated P&L windows (wide columns, `features_pl.py`).
+Still open from Batch 1: EBIDT lines (A4.7, A5.4), minority share, dividend, material and employee cost lines
+(A4.16-A4.19), FY YoY (A4.28), accelerations and margin deltas (B4.1, B4.3-B4.6, B4.8), cost shares (B3.4-B3.7),
+exceptional share (B1.14), price to quarterly earnings (A1.12).
 
 Order rationale: 1-3 are pure FactBook work on already-tested blocks and unlock most of Screener's gallery; 4 is
 independent of fundamentals (can run in parallel); 5 is small; 6 last because cross-sectional steps (industry medians,

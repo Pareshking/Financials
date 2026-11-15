@@ -214,6 +214,15 @@ def build_parser() -> argparse.ArgumentParser:
     sc = sub.add_parser("screen")
     sc.add_argument("query")
     sc.add_argument("--as-of", type=_date)
+    sc.add_argument("--columns", help='extra result columns, comma-separated DSL expressions or custom ratios, e.g. '
+                    '"Sales latest quarter, OPM last year, Sales / Market cap"')  # fmt: skip
+    sc.add_argument("--order-by", help="sort the matches by this DSL expression (NULLs last)")
+    sc.add_argument("--desc", action="store_true", help="with --order-by: descending")
+    sc.add_argument("--limit", type=int, default=500)
+    sr = sub.add_parser("save-ratio", help="save (or replace) a custom ratio usable in screens and --columns")
+    sr.add_argument("name")
+    sr.add_argument("expression")
+    sub.add_parser("ratios", help="list saved custom ratios")
     return p
 
 
@@ -368,7 +377,7 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
         print(f"{len(events)} events from {len(sorted(args.text_dir.glob('*.txt')))} notices -> {args.out}", file=out)
         return 0
 
-    if args.cmd == "screen" or (args.cmd == "quarantine" and args.qcmd in ("list", "inspect")):
+    if args.cmd in ("screen", "ratios") or (args.cmd == "quarantine" and args.qcmd in ("list", "inspect")):
         return read_command(args, db_path, out)
 
     args.data_dir.mkdir(parents=True, exist_ok=True)
@@ -420,6 +429,16 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
                 print(f"error: {exc}", file=out)
                 return 1
             print(json.dumps(result, default=str, indent=1), file=out)
+            return 0
+        if args.cmd == "save-ratio":
+            from financials.dsl import DslError, save_custom_ratio
+
+            try:
+                save_custom_ratio(con, args.name, args.expression)
+            except DslError as exc:
+                print(f"error: {exc}", file=out)
+                return 2
+            print(f"saved custom ratio {args.name!r} = {args.expression}", file=out)
             return 0
         if args.cmd == "scope-override":
             from financials.admin import AdminError, set_scope_override
@@ -622,7 +641,27 @@ def read_command(args, db_path: Path, out) -> int:
         return 3
     try:
         if args.cmd == "screen":
-            print(json.dumps(run_screen(con, args.query, as_of=args.as_of), default=str, indent=1), file=out)
+            from financials.dsl import DslError, split_columns
+
+            try:
+                rows = run_screen(
+                    con,
+                    args.query,
+                    as_of=args.as_of,
+                    limit=args.limit,
+                    columns=split_columns(args.columns),
+                    order_by=args.order_by,
+                    descending=args.desc,
+                )
+            except DslError as exc:
+                print(f"error: {exc}", file=out)
+                return 2
+            print(json.dumps(rows, default=str, indent=1), file=out)
+            return 0
+        if args.cmd == "ratios":
+            from financials.dsl import load_custom_ratios
+
+            print(json.dumps(load_custom_ratios(con), indent=1, sort_keys=True), file=out)
             return 0
         from financials.admin import AdminError, inspect_quarantine, list_quarantine
 

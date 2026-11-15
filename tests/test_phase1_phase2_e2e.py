@@ -324,3 +324,25 @@ def test_owner_items_qoq_npm_coverage_dividends_promoter_change(unified):
     # The committed corporate actions go ex in Sep-Oct 2025, outside the 365 days to 13 Nov 2026: yields are 0.
     assert {r["dividend_yield_pct"] for r in rows.values()} <= {0.0, None}
     assert sum(r["dividend_yield_pct"] == 0.0 for r in rows.values()) > 1000
+
+
+def test_batch_c_lenders_and_insurers_keep_only_capital_and_cash_flow_lines(unified):
+    """features_bs on every real profile: lenders and insurers get NULL industrial balance-sheet / cash-flow ratios
+    (NOT_FOR_LENDERS), industrial companies with a balance sheet get their liquidity ratios."""
+    from financials.features_bs import NOT_FOR_LENDERS
+
+    cur = unified.con.execute("SELECT * FROM screener_features WHERE scope_used IS NOT NULL")
+    names = [d[0] for d in cur.description]
+    rows = [dict(zip(names, r, strict=True)) for r in cur.fetchall()]
+    fin = [r for r in rows if r["valuation_archetype"] in ("FINANCIAL_LENDING", "INSURANCE")]
+    assert len({r["valuation_archetype"] for r in fin}) == 2
+    assert all(r[c] is None for r in fin for c in NOT_FOR_LENDERS)
+    assert any(r["equity_capital"] is not None for r in fin)
+    industrial = [r for r in rows if r["valuation_archetype"] == "INDUSTRIAL_SERVICES" and r["bs_as_of"]
+                  and r["is_lending_nbfc"] is None]  # fmt: skip
+    assert industrial and all(r["current_ratio"] is not None for r in industrial)
+    # A non-lending NBFC (J. Poly Investments, Division III book) is valued as industrial but its book is a
+    # lender's (interest earned, no current / non-current split): the industrial lines stay NULL, as `opm` does.
+    (jpoly,) = [r for r in rows if r["symbol"] == "JPOLYINVST"]
+    assert jpoly["is_lending_nbfc"] is not None and jpoly["opm"] is None
+    assert all(jpoly[c] is None for c in NOT_FOR_LENDERS)

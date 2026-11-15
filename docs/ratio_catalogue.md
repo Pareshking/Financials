@@ -71,7 +71,7 @@ context) and Reg. 34 FY25/FY26 comparatives. Due dates assumed: Q1-Q3 results wi
 | A1.5 | ★ Price to book value | valuation | mcap / owners' equity (latest H1/FY BS) | BUILT | `pb` |
 | A1.6 | ★ EVEBITDA | valuation | EV / TTM ebitda | BUILT | `ev_ebitda` |
 | A1.7 | ★ Price to Sales | valuation | mcap / TTM rev_ops | BUILDABLE NOW | `market_cap`, `sales_ttm` (both already columns) |
-| A1.8 | ★ Price to Free Cash Flow | valuation | mcap / TTM fcf (CFO − capex, H1/FY bridge) | BUILDABLE NOW | `fcf_ttm`; NULL when FCF ≤ 0 |
+| A1.8 | ★ Price to Free Cash Flow | valuation | mcap / TTM fcf (CFO − capex, H1/FY bridge) | BUILT | `price_to_fcf` (mcap / `fcf_ttm`; NULL when FCF ≤ 0); batch C |
 | A1.9 | ★ Earnings yield | valuation | TTM ebit / EV (Greenblatt form; Screener's exact formula UNVERIFIED) | BUILDABLE NOW | `building_blocks.ebit`, `enterprise_value` |
 | A1.10 | ★ Dividend yield (G169) | valuation | TTM cash dividends per share (ex-date in last 365 days) / close | BUILT | `dividend_yield_pct`; `corp_actions` DIVIDEND `cash_per_share` |
 | A1.11 | ★ PEG Ratio (G168) | valuation | PE / (3Y EPS CAGR × 100) | WHEN HISTORY | FY28 vs FY25 EPS → ~May 2028. Interim "PEG on FY YoY" is computable now but is not Screener's ratio |
@@ -79,43 +79,43 @@ context) and Reg. 34 FY25/FY26 comparatives. Due dates assumed: Q1-Q3 results wi
 | A1.13 | Book value (per share) | per-share | owners' equity / shares | BUILT | `book_value_per_share` (owners' equity, fallback total equity / `shares`); DSL `book value` now per share, `net worth` = total equity in Rs Cr (batch A) |
 | A1.14 | ★ EPS | per-share | TTM owners' profit / current shares | BUILT | `eps_ttm` (+ `eps_continuing_ttm`) |
 | A1.15 | Number of equity shares | per-share | Reg. 31 total (else paid-up / FV) | BUILT | `shares` (DSL `shares`, `number of equity shares`) |
-| A1.16 | Number of equity shares preceding year | per-share | shares at as-of − 1 year, split/bonus-adjusted by `eps_factor` | BUILDABLE NOW | Reg. 31 since Mar-2025 |
-| A1.17 | Number of equity shares 10years back | per-share | same, 10 years | WHEN HISTORY | ~Apr 2035 |
-| A1.18 | Face value | per-share | filed FV | BUILDABLE NOW | `face_value_per_share` (quarterly); `raw_equity_master.face_value` (F28) |
+| A1.16 | Number of equity shares preceding year | per-share | shares at as-of − 1 year, split/bonus-adjusted by `eps_factor` | BUILT | `shares_preceding_year` (Reg. 31 pattern exactly 12 months before the latest, today's share basis; Reg. 31 only); batch C |
+| A1.17 | Number of equity shares 10years back | per-share | same, 10 years | BUILT | `shares_10y_back` (history-gated, NULL until ~Apr 2035); batch C |
+| A1.18 | Face value | per-share | filed FV | BUILT | `face_value` (latest results filing's `face_value_per_share`); batch C |
 | A1.19 | ★ Industry PE / Industry PBV | relative | median PE (PB) of peers in the same industry at as-of | BUILDABLE NOW | coarse only: `raw_index_snapshot.industry` from `ind_nifty500list.csv` (IDX1 VERIFIED): one tier, Nifty 500 members only, PIT only from the first stored snapshot (A6: no history). NSE 4-tier basic industry = NEW FREE SOURCE (G96, no verified source) |
 | A1.20 | Historical PE 3/5/7/10Years | valuation history | average of PE at each FY results date over N FYs (Screener definition UNVERIFIED) | WHEN HISTORY | FY basis: 3Y ~May 2027, 5Y ~May 2029, 7Y ~2031, 10Y ~2034. Daily-median basis: 3Y ~Feb 2029 |
 | A1.21 | Historical PBV 3/5/7/10Years | valuation history | same with PB | WHEN HISTORY | as A1.20 (PB exists from ~May 2025) |
 | A1.22 | Market Capitalization 3/5/7/10years back | valuation history | mcap at as-of − N years | WHEN HISTORY | ~Apr 2028 / 2030 / 2032 / 2035 |
 | A1.23 | Credit rating | credit | latest long-term rating and action | NEW FREE SOURCE | F22 UNVERIFIED (rating announcements are PDF; no XBRL seen). G98 |
 | A1.24 | Is SME / Is not SME | universe | series in SM/ST vs EQ/BE/BZ | BUILDABLE NOW | trivial: SME is excluded by C7, so "Is SME" is always 0 in our universe |
-| A1.25 | ★ Debt | balance sheet | total_debt = borrowings (non-current + current) + labelled lease liabilities | BUILDABLE NOW | block exists in `building_blocks`; only `net_debt` is a column |
+| A1.25 | ★ Debt | balance sheet | total_debt = borrowings (non-current + current) + labelled lease liabilities | BUILT | `debt` (latest BS, Screener statement Borrowings incl. leases; a line a filed BS omits = nil, C23); batch C |
 
 ## A2. Returns, efficiency, leverage (Most used + Ratios)
 
 | ID | Name (Screener variants) | Family | Definition (our tags) | Status | Data / notes |
 |---|---|---|---|---|---|
 | A2.1 | ★ Return on equity | returns | TTM owners' profit / closing owners' equity (C16) | BUILT | `roe` (+ `roe_continuing`) |
-| A2.2 | ROE preceding year | returns | FY(−1) owners' PAT / closing owners' equity at that FY end | BUILDABLE NOW | FY25 PAT + Mar-2025 BS |
+| A2.2 | ROE preceding year | returns | FY(−1) owners' PAT / closing owners' equity at that FY end | BUILT | `roe_preceding_year` (closing owners' equity, as `roe`); batch C |
 | A2.3 | ★ Average return on equity 3/5Years; Average ROE 3/5/7/10Years | returns | mean of FY ROE over N FYs | WHEN HISTORY | ~May 2027 / 2029 / 2031 / 2034 |
 | A2.4 | ROE 5years growth | returns | ROE(FY) − ROE(FY−5) (definition UNVERIFIED) | WHEN HISTORY | ~May 2030 |
 | A2.5 | ★ Return on capital employed | returns | TTM ebit / closing (equity + debt) | BUILT | `roce`; Screener form (PBT + interest) / avg capital = `roce_screener` |
-| A2.6 | ROCE preceding year | returns | FY(−1) ROCE | BUILDABLE NOW | closing-capital form now; Screener average-capital form needs Mar-2024 BS → ~May 2027 |
+| A2.6 | ROCE preceding year | returns | FY(−1) ROCE | BUILT | `roce_preceding_year` (FY EBIT / closing debt + total equity, as `roce`); Screener average-capital form not built; batch C |
 | A2.7 | Average ROCE 3/5/7/10Years; Median ROCE 3/5/7/10Years | returns | mean / median of FY ROCE | WHEN HISTORY | closing form ~May 2027/2029/2031/2034; `roce_screener` form ~May 2028/2030/2032/2035 |
-| A2.8 | ★ Return on assets | returns | TTM owners' PAT / avg total assets (opening = BS 12 months earlier) | BUILDABLE NOW | `roa` exists for lenders only; extend to industrials (Sep-2025 H1 BS is the opening) |
-| A2.9 | ROA preceding year | returns | FY(−1) PAT / total assets | BUILDABLE NOW | closing-assets form now; average form ~May 2027 |
+| A2.8 | ★ Return on assets | returns | TTM owners' PAT / avg total assets (opening = BS 12 months earlier) | BUILT | `roa` now also for industrial books: TTM owners' profit / avg total assets over the 12 months to `bs_as_of` (NULL until the BS 12 months earlier is visible); batch C |
+| A2.9 | ROA preceding year | returns | FY(−1) PAT / total assets | BUILT | `roa_preceding_year` (average assets; history-gated, NULL until FY27 ~May 2027); batch C |
 | A2.10 | Return on assets 3/5years | returns | mean FY ROA | WHEN HISTORY | ~May 2027 / 2029 |
 | A2.11 | Return on invested capital | returns | TTM nopat / avg invested capital | BUILT | `roic` |
 | A2.12 | Average ROIC 3/5Years | returns | mean FY ROIC | WHEN HISTORY | average IC → FY26 first → ~May 2028 / 2030 |
-| A2.13 | Earning Power | returns | TTM ebit / total assets (Screener definition UNVERIFIED) | BUILDABLE NOW | ebit, `total_assets` |
-| A2.14 | Graham Number | valuation | √(22.5 × EPS × book value per share), NULL if either ≤ 0 | BUILDABLE NOW | `eps_ttm`, A1.13 |
+| A2.13 | Earning Power | returns | TTM ebit / total assets (Screener definition UNVERIFIED) | BUILT | `earning_power` (TTM EBIT / closing total assets; Screener definition still UNVERIFIED); batch C |
+| A2.14 | Graham Number | valuation | √(22.5 × EPS × book value per share), NULL if either ≤ 0 | BUILT | `graham_number`; batch C |
 | A2.15 | Piotroski score (G160) | composite | 0..9, FY vs FY | BUILT | `piotroski_f` (FY26 vs FY25 works) |
 | A2.16 | G Factor | composite | Screener's formula is undisclosed; the likely basis is Mohanram's G-score (8 binary tests vs industry medians incl. 16-quarter earnings and sales variability) — UNVERIFIED | WHEN HISTORY | variability needs 16 quarters (~Feb 2029) and industry medians (coarse A1.19 only). Do not build until the definition is confirmed |
-| A2.17 | Financial leverage | leverage | avg total assets / avg owners' equity (closing form until two BS) | BUILDABLE NOW | `total_assets`, owners' equity |
-| A2.18 | Asset Turnover Ratio | efficiency | TTM rev_ops / avg total assets | BUILDABLE NOW | |
+| A2.17 | Financial leverage | leverage | avg total assets / avg owners' equity (closing form until two BS) | BUILT | `financial_leverage` (average form only; NULL until two balance sheets 12 months apart); batch C |
+| A2.18 | Asset Turnover Ratio | efficiency | TTM rev_ops / avg total assets | BUILT | `asset_turnover` (TTM sales to `bs_as_of` / avg total assets); batch C |
 | A2.19 | Inventory turnover ratio | efficiency | sales / closing inventory (Screener S22) | BUILT | `inventory_turnover` |
-| A2.20 | Inventory turnover 3/5/7/10Years back | efficiency history | FY value N years back | WHEN HISTORY | ~May 2028 / 2030 / 2032 / 2035 |
-| A2.21 | Current ratio | liquidity | current_assets / current_liabilities | BUILDABLE NOW | H1/FY BS |
-| A2.22 | Quick ratio | liquidity | (current_assets − inventories) / current_liabilities | BUILDABLE NOW | |
+| A2.20 | Inventory turnover 3/5/7/10Years back | efficiency history | FY value N years back | BUILT | `inventory_turnover_{3,5,7,10}y_back` (history-gated, NULL until ~May 2028 / 2030 / 2032 / 2035); batch C |
+| A2.21 | Current ratio | liquidity | current_assets / current_liabilities | BUILT | `current_ratio`; batch C |
+| A2.22 | Quick ratio | liquidity | (current_assets − inventories) / current_liabilities | BUILT | `quick_ratio`; batch C |
 | A2.23 | ★ Debt to equity | leverage | total_debt / total_equity | BUILT | `debt_to_equity` |
 | A2.24 | ★ Interest Coverage Ratio (G175) | leverage | TTM ebit (or PBT + finance costs) / TTM finance costs | BUILT | `interest_coverage`. Filed `li_interest_service_coverage_ratio` exists in 38 INDAS_CORP filings (listed-debt issuers only) |
 | A2.25 | Debtor days; Days Receivable Outstanding | working capital | closing trade receivables / (FY sales / 365) | BUILT | `debtor_days` |
@@ -123,10 +123,10 @@ context) and Reg. 34 FY25/FY26 comparatives. Due dates assumed: Q1-Q3 results wi
 | A2.27 | Days Payable Outstanding | working capital | closing trade payables / (COGS / 365) | BUILT | `days_payable` |
 | A2.28 | Cash Conversion Cycle | working capital | DSO + DIO − DPO | BUILT | `cash_conversion_cycle` |
 | A2.29 | Working Capital Days (G111) | working capital | (CA − cash & bank − current investments − CL) / (sales / 365) | BUILT | `working_capital_days` |
-| A2.30 | Average debtor days 3years; Average Working Capital Days 3years | working capital history | mean over FY25-FY27 | WHEN HISTORY | ~May 2027 |
-| A2.31 | Debtor days 3/5years back | working capital history | FY value N years back | WHEN HISTORY | ~May 2028 / 2030 |
-| A2.32 | Exports percentage | mix | FY foreign revenue / revenue (Reg. 34 `GeographicalAreasAxis`, `revenue_foreign`; alternative `li_export_turnover_goods_gross` + `li_export_revenue_services`, 12 and 7 filings) | BUILDABLE NOW | Reg. 34 annual only (FY25, FY26). Geography = customer location, which is close to but not identical to "exports" |
-| A2.33 | Exports percentage 3/5Years back | mix history | | WHEN HISTORY | Reg. 34 FY28 ~Sep 2028; FY30 ~Sep 2030 |
+| A2.30 | Average debtor days 3years; Average Working Capital Days 3years | working capital history | mean over FY25-FY27 | BUILT | `avg_debtor_days_3y`, `avg_working_capital_days_3y` (history-gated, NULL until FY27 ~May 2027); batch C |
+| A2.31 | Debtor days 3/5years back | working capital history | FY value N years back | BUILT | `debtor_days_{3,5}y_back` (history-gated, NULL until ~May 2028 / 2030); batch C |
+| A2.32 | Exports percentage | mix | FY foreign revenue / revenue (Reg. 34 `GeographicalAreasAxis`, `revenue_foreign`; alternative `li_export_turnover_goods_gross` + `li_export_revenue_services`, 12 and 7 filings) | BUILT | `exports_pct` (foreign / (domestic + foreign) by geography, Reg. 34); the `li_export_*` alternative not used; batch C |
+| A2.33 | Exports percentage 3/5Years back | mix history |  | BUILT | `exports_pct_{3,5}y_back` (history-gated, NULL until ~Sep 2028 / 2030); batch C |
 | A2.34 | OPM 5Year / 10Year | margin history | mean FY OPM | BUILT | `opm_5y_pct`, `opm_10y_pct` (history-gated: NULL until FY29 ~May 2029 / FY34 ~May 2034) |
 | A2.35 | Average 5years dividend | payout history | mean FY dividend (rupees) over 5 FYs | WHEN HISTORY | ~May 2029 (FY basis) / ~Oct 2029 (ex-date basis) |
 | A2.36 | Average dividend payout 3years | payout history | mean FY (dividends / owners' PAT) | WHEN HISTORY | ~May 2027 |
@@ -224,44 +224,44 @@ The period parameter maps to `end` = latest quarter end, −3, −12, −6, −9
 
 | ID | Name (Screener variants) | Family | Definition (our tags) | Status | Data / notes |
 |---|---|---|---|---|---|
-| A6.1 | Equity capital | BS | `equity_share_capital` | BUILDABLE NOW | H1/FY |
+| A6.1 | Equity capital | BS | `equity_share_capital` | BUILT | `equity_capital` (latest BS); batch C |
 | A6.2 | Preference capital | BS | — | NEEDS PARSER | no curated element; under Ind AS redeemable preference shares sit in borrowings. Class split only on Reg. 34 `ClassesOfEquityShareCapitalAxis` (vaulted, unmapped) |
-| A6.3 | Reserves | BS | `other_equity` | BUILDABLE NOW | |
+| A6.3 | Reserves | BS | `other_equity` | BUILT | `reserves` (other equity; banks / insurers reserves and surplus); batch C |
 | A6.4 | Secured loan; Unsecured loan | BS | borrowings by security | NEEDS PARSER | Reg. 34 `ClassificationOfBorrowingsAxis` / `ClassificationOfAssetsBasedOnSecurityAxis` are in the registry (axes) but not mapped; no flat element |
-| A6.5 | Balance sheet total; Total Assets | BS | `total_assets` | BUILDABLE NOW | |
-| A6.6 | Gross block | BS (annual) | `ppe_gross_block` | BUILDABLE NOW | Reg. 34 PPE schedule only (X71) |
-| A6.7 | Accumulated depreciation | BS (annual) | `ppe_accumulated_depreciation` | BUILDABLE NOW | Reg. 34 only |
-| A6.8 | Net block | BS | `ppe_net` (+ `other_intangibles` if Screener includes them; S10 decides) | BUILDABLE NOW | |
-| A6.9 | Capital work in progress | BS | `cwip` | BUILDABLE NOW | |
-| A6.10 | Investments | BS | non-current + current + equity-method | BUILDABLE NOW | `investments` block |
-| A6.11 | Current assets; Current liabilities | BS | `current_assets`, `current_liabilities` | BUILDABLE NOW | |
+| A6.5 | Balance sheet total; Total Assets | BS | `total_assets` | BUILT | `balance_sheet_total` (Screener statement total, DTA netted against DTL, S10); batch C |
+| A6.6 | Gross block | BS (annual) | `ppe_gross_block` | BUILT | `gross_block` (Reg. 34 at the last FY end); batch C |
+| A6.7 | Accumulated depreciation | BS (annual) | `ppe_accumulated_depreciation` | BUILT | `accumulated_depreciation`; batch C |
+| A6.8 | Net block | BS | `ppe_net` (+ `other_intangibles` if Screener includes them; S10 decides) | BUILT | `net_block` (Screener statement Net Block: PPE + investment property + goodwill + intangibles + ROU); batch C |
+| A6.9 | Capital work in progress | BS | `cwip` | BUILT | `cwip` (incl. intangibles under development); batch C |
+| A6.10 | Investments | BS | non-current + current + equity-method | BUILT | `investments`; batch C |
+| A6.11 | Current assets; Current liabilities | BS | `current_assets`, `current_liabilities` | BUILT | `current_assets`, `current_liabilities`; batch C |
 | A6.12 | Book value of unquoted investments | BS (annual) | `li_aggregate_amount_of_unquoted_noncurrent_investments` + `…_current_investments` | BUILDABLE NOW | Reg. 34, 15 filings |
 | A6.13 | Market value of quoted investments | BS (annual) | `li_market_value_of_quoted_noncurrent_investments` + `…_current_investments` | BUILDABLE NOW | Reg. 34, 15 / 14 filings |
 | A6.14 | Revaluation reserve | BS (annual) | `li_property_plant_and_equipment_revaluation_surplus` | BUILDABLE NOW | 1 Reg. 34 filing so far; usually NULL (Ind AS rarely revalues) |
-| A6.15 | Contingent liabilities | BS (annual) | `contingent_liabilities` (else `contingent_liabilities_and_commitments`) | BUILDABLE NOW | ratio form BUILT: `contingent_liabilities_to_net_worth` |
+| A6.15 | Contingent liabilities | BS (annual) | `contingent_liabilities` (else `contingent_liabilities_and_commitments`) | BUILT | `contingent_liabilities` (excl. commitments, at the last FY end); batch C |
 | A6.16 | Working capital | BS | Screener: Other Assets − Other Liabilities | BUILT | `working_capital` |
-| A6.17 | Lease liabilities | BS | `lease_liabilities_current` + `_noncurrent` (label rules, X39/X72) | BUILDABLE NOW | |
-| A6.18 | Inventory; Trade receivables; Trade Payables; Cash Equivalents | BS | `inventories`; `trade_receivables_current` (+ noncurrent); `trade_payables_current` (+ noncurrent); `cash_and_equivalents` | BUILDABLE NOW | |
-| A6.19 | Advance from Customers | BS (annual) | `advance_from_customers` | BUILDABLE NOW | Reg. 34 (12 filings); quarterly proxy: contract-liability label rules |
-| A6.20 | Debt / Working capital / Net block / Gross block / CWIP preceding year | BS history | value at the previous FY end | BUILDABLE NOW | FY25 balance sheet (Mar-2025) exists; gross block FY25 from Reg. 34 opening instants |
-| A6.21 | Working capital / Debt / Net block 3/5/7/10Years back | BS history | FY value N years back | WHEN HISTORY | ~May 2028 / 2030 / 2032 / 2035 |
-| A6.22 | Book value 3/5/10years back | BS history | owners' equity per share N years back | WHEN HISTORY | ~May 2028 / 2030 / 2035 |
-| A6.23 | Book value preceding year | BS history | FY(−1) owners' equity per share | BUILDABLE NOW | |
+| A6.17 | Lease liabilities | BS | `lease_liabilities_current` + `_noncurrent` (label rules, X39/X72) | BUILT | `lease_liabilities`; batch C |
+| A6.18 | Inventory; Trade receivables; Trade Payables; Cash Equivalents | BS | `inventories`; `trade_receivables_current` (+ noncurrent); `trade_payables_current` (+ noncurrent); `cash_and_equivalents` | BUILT | `inventory`, `trade_receivables`, `trade_payables` (current + non-current), `cash_equivalents`; batch C |
+| A6.19 | Advance from Customers | BS (annual) | `advance_from_customers` | BUILT | `advance_from_customers` (Reg. 34 at the last FY end); batch C |
+| A6.20 | Debt / Working capital / Net block / Gross block / CWIP preceding year | BS history | value at the previous FY end | BUILT | `debt_`, `working_capital_`, `net_block_`, `gross_block_`, `cwip_preceding_year`, `debt_to_equity_preceding_year` (end of the FY before the last FY); batch C |
+| A6.21 | Working capital / Debt / Net block 3/5/7/10Years back | BS history | FY value N years back | BUILT | `debt_`, `working_capital_`, `net_block_{3,5,7,10}y_back` (history-gated, NULL until ~May 2028 / 2030 / 2032 / 2035); batch C |
+| A6.22 | Book value 3/5/10years back | BS history | owners' equity per share N years back | BUILT | `book_value_{3,5,10}y_back` (owners' equity / Reg. 31 shares at that FY end; history-gated, NULL until ~May 2028 / 2030 / 2035); batch C |
+| A6.23 | Book value preceding year | BS history | FY(−1) owners' equity per share | BUILT | `book_value_preceding_year` (owners' equity / Reg. 31 shares at that FY end, today's share basis); batch C |
 
 ## A7. Cash-flow family (last year / preceding year; multi-year sums)
 
 | ID | Name (Screener variants) | Family | Definition (our tags) | Status | Data / notes |
 |---|---|---|---|---|---|
-| A7.1 | Cash from operations last/preceding year | CF FY | FY `cfo` | BUILDABLE NOW | FY25 CF from the Q4 FY25 filing (CF is H1/FY) |
-| A7.2 | Cash from investing last/preceding year | CF FY | FY `cfi` | BUILDABLE NOW | |
-| A7.3 | Cash from financing last/preceding year | CF FY | FY `cff` | BUILDABLE NOW | |
-| A7.4 | Net cash flow last/preceding year | CF FY | `net_cash_flow` (before FX) or `net_cash_flow_after_fx` | BUILDABLE NOW | |
-| A7.5 | Cash end of last/preceding year | CF FY | `cash_cf_statement` at FY end | BUILDABLE NOW | |
-| A7.6 | Cash beginning of last/preceding year | CF FY | prior FY-end `cash_cf_statement`; for FY25 derive as cash end − `net_cash_flow_after_fx` (the Mar-2024 instant is pre-cutoff) | BUILDABLE NOW | identity, not a backfill |
-| A7.7 | Free cash flow last/preceding year | CF FY | FY cfo − (capex_ppe + capex_intangibles) | BUILDABLE NOW | TTM version BUILT: `fcf_ttm` |
-| A7.8 | CFO to EBITDA last/preceding year | CF FY | FY cfo / FY ebitda | BUILDABLE NOW | TTM version BUILT: `cfo_to_ebitda` |
-| A7.9 | Free cash flow / Operating cash flow / Investing cash flow 3/5/7/10years | CF history | sum over N FYs | WHEN HISTORY | ~May 2027 / 2029 / 2031 / 2034 |
-| A7.10 | Cash 3/5/7Years back | CF history | FY-end cash N years back | WHEN HISTORY | ~May 2028 / 2030 / 2032 |
+| A7.1 | Cash from operations last/preceding year | CF FY | FY `cfo` | BUILT | `cfo_last_year`, `cfo_preceding_year`; batch C |
+| A7.2 | Cash from investing last/preceding year | CF FY | FY `cfi` | BUILT | `cfi_last_year`, `cfi_preceding_year`; batch C |
+| A7.3 | Cash from financing last/preceding year | CF FY | FY `cff` | BUILT | `cff_last_year`, `cff_preceding_year`; batch C |
+| A7.4 | Net cash flow last/preceding year | CF FY | `net_cash_flow` (before FX) or `net_cash_flow_after_fx` | BUILT | `net_cash_flow_last_year`, `_preceding_year` (after FX, S12); batch C |
+| A7.5 | Cash end of last/preceding year | CF FY | `cash_cf_statement` at FY end | BUILT | `cash_end_last_year`, `_preceding_year`; batch C |
+| A7.6 | Cash beginning of last/preceding year | CF FY | prior FY-end `cash_cf_statement`; for FY25 derive as cash end − `net_cash_flow_after_fx` (the Mar-2024 instant is pre-cutoff) | BUILT | `cash_beginning_last_year`, `_preceding_year` (identity for FY25: equals TCS's filed, out-of-scope Mar-2024 cash); batch C |
+| A7.7 | Free cash flow last/preceding year | CF FY | FY cfo − (capex_ppe + capex_intangibles) | BUILT | `fcf_last_year`, `fcf_preceding_year`; batch C |
+| A7.8 | CFO to EBITDA last/preceding year | CF FY | FY cfo / FY ebitda | BUILT | `cfo_to_ebitda_last_year`, `_preceding_year` (post-tax CFO / EBITDA; the TTM `cfo_to_ebitda` is pre-tax); batch C |
+| A7.9 | Free cash flow / Operating cash flow / Investing cash flow 3/5/7/10years | CF history | sum over N FYs | BUILT | `fcf_`, `cfo_`, `cfi_{3,5,7,10}y` (history-gated, NULL until ~May 2027 / 2029 / 2031 / 2034); batch C |
+| A7.10 | Cash 3/5/7Years back | CF history | FY-end cash N years back | BUILT | `cash_{3,5,7}y_back` (history-gated, NULL until ~May 2028 / 2030 / 2032); batch C |
 
 ## A8. Price and technicals family
 
@@ -301,7 +301,7 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 | B1.6 | Sloan accrual (G222) | forensic | (TTM PAT − CFO − CFI) / avg TA | BUILT | `sloan_accrual` |
 | B1.7 | Balance-sheet accruals (ΔNOA / avg TA) | forensic | Δ(operating assets − operating liabilities) FY26 vs FY25 / avg TA | BUILDABLE NOW | |
 | B1.8 | CFO / PAT | earnings quality | TTM cfo / TTM pat | BUILDABLE NOW | `fcf_to_pat` is BUILT (FCF form) |
-| B1.9 | CFO / EBITDA 3Y; FCF / PAT 3Y (G223, G224) | earnings quality | 3-FY sums | WHEN HISTORY | ~May 2027 (TTM forms BUILT) |
+| B1.9 | CFO / EBITDA 3Y; FCF / PAT 3Y (G223, G224) | earnings quality | 3-FY sums | BUILT | `cfo_to_ebitda_3y` (G223), `fcf_conversion_3y` (G224) (history-gated, NULL until FY27 ~May 2027); batch C |
 | B1.10 | Receivables vs sales divergence (G225) | forensic | YoY receivables − YoY revenue | BUILT | `receivables_sales_divergence` |
 | B1.11 | Cash tax rate | earnings quality | TTM `income_taxes_paid` / TTM `tax_expense` (also vs ETR) | BUILDABLE NOW | H1/FY CF |
 | B1.12 | Effective tax rate | earnings quality | TTM tax / PBT (clamped, C5) | BUILDABLE NOW | `etr` block |
@@ -324,20 +324,20 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 | ID | Name | Family | Definition (our tags) | Status | Data / notes |
 |---|---|---|---|---|---|
 | B2.1 | Dividend payout % (G202) | payout | dividends / owners' PAT | BUILT | `dividend_payout_pct` |
-| B2.2 | Shareholder yield (G218, corrected G316) | payout | TTM (`dividends_paid` + `li_payments_to_acquire_or_redeem_entitys_shares` − `share_issue_proceeds`) / mcap | BUILDABLE NOW | H1/FY CF bridge; buyback element seen in 74 INDAS_CORP registry filings (mostly 0) |
-| B2.3 | Buyback yield | payout | TTM buyback cash / mcap | BUILDABLE NOW | as B2.2 |
-| B2.4 | Net dilution 1Y | dilution | shares_adj(t) / shares_adj(t−1y) − 1 (Reg. 31, adjusted by `eps_factor`) | BUILDABLE NOW | |
-| B2.5 | Net dilution 5Y (G219) | dilution | | WHEN HISTORY | ~Apr 2030 |
-| B2.6 | Reinvestment rate (G216) | reinvestment | FY (capex − D&A + Δ non-cash working capital) / nopat | BUILDABLE NOW | FY26 with FY25 opening working capital |
-| B2.7 | Incremental ROIC 1Y | reinvestment | Δnopat / Δinvested capital, FY26 vs FY25 | BUILDABLE NOW | noisy; NULL if ΔIC ≤ 0 |
-| B2.8 | Incremental ROIC 3Y / 5Y (G215) | reinvestment | | WHEN HISTORY | ~May 2028 / ~May 2030 |
+| B2.2 | Shareholder yield (G218, corrected G316) | payout | TTM (`dividends_paid` + `li_payments_to_acquire_or_redeem_entitys_shares` − `share_issue_proceeds`) / mcap | BUILT | `shareholder_yield` (TTM over the CFO bridge's filed periods; a line a filing omits = nil); batch C |
+| B2.3 | Buyback yield | payout | TTM buyback cash / mcap | BUILT | `buyback_yield`; batch C |
+| B2.4 | Net dilution 1Y | dilution | shares_adj(t) / shares_adj(t−1y) − 1 (Reg. 31, adjusted by `eps_factor`) | BUILT | `dilution_1y` (Reg. 31 both ends, today's share basis); batch C |
+| B2.5 | Net dilution 5Y (G219) | dilution | Reg. 31 shares now / the pattern 5 years earlier − 1, today's share basis | BUILT | `dilution_5y` (history-gated, NULL until ~Apr 2030); batch C |
+| B2.6 | Reinvestment rate (G216) | reinvestment | FY (capex − D&A + Δ non-cash working capital) / nopat | BUILT | `reinvestment_rate` (FY capex − D&A + Δ non-cash WC, / NOPAT); batch C |
+| B2.7 | Incremental ROIC 1Y | reinvestment | Δnopat / Δinvested capital, FY26 vs FY25 | BUILT | `incremental_roic_1y`; batch C |
+| B2.8 | Incremental ROIC 3Y / 5Y (G215) | reinvestment |  | BUILT | `incremental_roic_3y`, `incremental_roic_5y` (history-gated, NULL until FY28 / FY30); batch C |
 | B2.9 | Incremental asset turnover 3Y (G220) | reinvestment | Δ3y rev_ops / Δ3y net fixed assets | WHEN HISTORY | ~May 2028 (1Y form buildable now) |
 | B2.10 | Capex / depreciation (G226); CWIP / gross block (G227) | reinvestment | | BUILT | `capex_to_depreciation`, `cwip_to_gross_block` |
 | B2.11 | Capex intensity | reinvestment | TTM capex / TTM rev_ops | BUILDABLE NOW | |
 | B2.12 | Depreciation rate; asset age proxy | reinvestment | FY D&A / avg gross block; accumulated depreciation / gross block | BUILDABLE NOW | Reg. 34 FY25 + FY26 |
 | B2.13 | CROIC (G217); ROTE (G221) | returns | | BUILT | `croic`, `rote` |
-| B2.14 | Net debt / FCF (G233) | leverage | | BUILT | `net_debt_to_fcf` (TTM; 3Y-average form ~May 2027) |
-| B2.15 | Net debt / EBITDA | leverage | net_debt / TTM ebitda | BUILDABLE NOW | |
+| B2.14 | Net debt / FCF (G233) | leverage |  | BUILT | `net_debt_to_fcf` (TTM) and `net_debt_to_fcf_3y` (mean 3-FY FCF; history-gated, NULL until ~May 2027); batch C |
+| B2.15 | Net debt / EBITDA | leverage | net_debt / TTM ebitda | BUILT | `net_debt_to_ebitda`; batch C |
 | B2.16 | Effective cost of debt (G234) | leverage | | BUILT | `cost_of_debt` |
 | B2.17 | Net cash to market cap (owner PDF custom-ratio example) | valuation | (liquid cash + investments − total_debt) / mcap | BUILDABLE NOW | also expressible today as a saved custom ratio only partly (no `debt` column) |
 
@@ -377,14 +377,14 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 | B5.1 | PE percentile; EV/EBITDA percentile (G198, G240) | band | vs own prior quarter-end values, ≥ 4 | BUILT | `pe_percentile`, `ev_ebitda_percentile` |
 | B5.2 | PB percentile (G198 "P/B band missing") | band | same method on PB | BUILDABLE NOW | PB quarter-ends from Mar-2025 |
 | B5.3 | P/S and EV/Sales percentile | band | same method | BUILDABLE NOW | |
-| B5.4 | 5Y (20 quarter-end) valuation band (G240) | band | | WHEN HISTORY | quarter-end 2030-12-31 |
+| B5.4 | 5Y (20 quarter-end) valuation band (G240) | band | rank of EV/EBITDA among the last 20 prior quarter-ends, all > 0 | BUILT | `ev_ebitda_percentile_20q` (history-gated, NULL until quarter-end 2030-12-31 is stored, ~2031; PE / PB 20-quarter forms not built); batch C |
 | B5.5 | Reverse-DCF implied growth (G200, G239) | valuation | WACC fixed 12% | BUILT | `reverse_dcf_implied_g`; live 10Y G-Sec WACC = NEW FREE SOURCE (F25 PLANNED) |
 | B5.6 | EV / Sales | valuation | EV / TTM rev_ops | BUILDABLE NOW | |
 | B5.7 | Discount / premium to industry median PE, PB, EV/EBITDA (G199) | relative | own / industry median − 1 | BUILDABLE NOW | coarse industry only (A1.19); 4-tier = NEW FREE SOURCE (G96) |
 | B5.8 | Peer rank within industry: mcap, PE, ROCE, quarterly profit growth (G112) | relative | percentile rank within industry at as-of | BUILDABLE NOW | coarse industry only |
 | B5.9 | New-gen ratios (G250-G263) | valuation | | BUILT | `ev_to_gross_profit`, `ex_cash_pe`, `ev_to_billings`, `ev_to_esop_adj_ebitda`, `price_to_cfo`, `net_burn_multiple`, `cash_runway_months`, `esop_adj_fcf` |
 | B5.10 | EV / GOV (G265); P/EV (G270) | valuation | EV / `gov`; mcap / `embedded_value` | BUILDABLE NOW | inputs from `supplemental_kpis` (manual `load-kpis`); NULL until loaded |
-| B5.11 | Equity FCF yield (G170) | valuation | TTM fcf / mcap (inverse of A1.8) | BUILDABLE NOW | unlevered `fcff_yield` BUILT |
+| B5.11 | Equity FCF yield (G170) | valuation | TTM fcf / mcap (inverse of A1.8) | BUILT | `equity_fcf_yield` (signed); unlevered `fcff_yield` BUILT; batch C |
 
 ## B6. Price, volume and delivery
 
@@ -466,14 +466,18 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 
 | Status | Part A (Screener gallery) | Part B (beyond Screener) | Total |
 |---|---|---|---|
-| BUILT | 77 | 22 | 99 |
+| BUILT | 132 | 40 | 172 |
 | IN PROGRESS | 0 | 0 | 0 |
-| BUILDABLE NOW | 65 | 70 | 135 |
-| WHEN HISTORY | 26 | 6 | 32 |
+| BUILDABLE NOW | 19 | 56 | 75 |
+| WHEN HISTORY | 17 | 2 | 19 |
 | NEEDS PARSER | 2 | 2 | 4 |
 | NEW FREE SOURCE | 1 | 15 | 16 |
 | NOT POSSIBLE | 2 | 4 | 6 |
 | **Total rows** | 173 | 119 | 292 |
+
+Recounted from the table rows after batch C (features `2026.11.15-6C`); before it the rows gave BUILT 85 / 29,
+BUILDABLE NOW 57 / 63, WHEN HISTORY 26 / 6 (the table above had not been recounted after batches A and B). A
+history-gated row whose column exists (NULL until its window is in scope, C9) counts as BUILT.
 
 ## C2. Proposed implementation order for BUILDABLE NOW
 
@@ -503,6 +507,15 @@ Progress (2026-11-15, batch A, features `2026.11.15-4A`): Batch 0 done (aliases,
 Still open from Batch 1: EBIDT lines (A4.7, A5.4), minority share, dividend, material and employee cost lines
 (A4.16-A4.19), FY YoY (A4.28), accelerations and margin deltas (B4.1, B4.3-B4.6, B4.8), cost shares (B3.4-B3.7),
 exceptional share (B1.14), price to quarterly earnings (A1.12).
+
+Progress (2026-11-15, batch C, features `2026.11.15-6C`, `features_bs.py`): Batches 2 and 3 done for the
+balance-sheet lines (latest BS, preceding year, N years back), annual notes, liquidity / leverage / return ratios,
+Graham number, exports %, FY cash-flow lines and N-year sums, P/FCF, equity FCF yield, shareholder and buyback yield,
+1Y / 5Y dilution, reinvestment rate, incremental ROIC 1/3/5Y, the 20-quarter EV/EBITDA band (G240), net debt / EBITDA and the 3Y conversion forms of G223 / G224 /
+G233. Still open from Batches 2-3: unquoted / quoted investments and revaluation reserve (A6.12-A6.14), Δ CCC and H1
+days (B3.2, B3.3), Reg. 34 notes ratios (B1.20, B1.22-B1.24, B2.12), CFO / PAT, cash tax rate, ETR (B1.8, B1.11,
+B1.12), capex intensity (B2.11), net cash / mcap (B2.17), balance-sheet accruals (B1.7), Screener's average-capital
+ROCE preceding year (A2.6 closing form only); preference capital and secured / unsecured loans stay NEEDS PARSER.
 
 Order rationale: 1-3 are pure FactBook work on already-tested blocks and unlock most of Screener's gallery; 4 is
 independent of fundamentals (can run in parallel); 5 is small; 6 last because cross-sectional steps (industry medians,

@@ -768,6 +768,119 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     book_value_per_share                     DECIMAL(18,4),   -- owners' equity / shares
     is_trade_to_trade                        BOOLEAN,         -- series BE or BZ
     opm_preceding_year_quarter_pct           DOUBLE,          -- same quarter last year (fraction)
+    -- batch C (balance sheet / cash flow): features_bs.py; money in rupees, ratios as fractions, days in days;
+    -- unsuffixed BS lines = latest BS, 'preceding year' / 'N years back' = FY ends; NULL for lenders where noted
+    debt                                     DECIMAL(24,2),      -- latest BS (bs_as_of): borrowings + leases, absent line = 0 [C23]
+    equity_capital                           DECIMAL(24,2),      -- latest BS, rupees
+    reserves                                 DECIMAL(24,2),      -- other equity (banks / insurers: reserves and surplus)
+    balance_sheet_total                      DECIMAL(24,2),      -- total assets net of DTA/DTL netting (Screener) [S10]
+    net_block                                DECIMAL(24,2),      -- PPE + investment property + goodwill + intangibles + ROU
+    cwip                                     DECIMAL(24,2),      -- CWIP + intangibles under development
+    investments                              DECIMAL(24,2),      -- non-current + current + equity-method
+    current_assets                           DECIMAL(24,2),
+    current_liabilities                      DECIMAL(24,2),
+    lease_liabilities                        DECIMAL(24,2),
+    inventory                                DECIMAL(24,2),
+    trade_receivables                        DECIMAL(24,2),
+    trade_payables                           DECIMAL(24,2),
+    cash_equivalents                         DECIMAL(24,2),      -- cash and cash equivalents (BS line)
+    gross_block                              DECIMAL(24,2),      -- Reg. 34 PPE schedule at the last FY end [X71]
+    accumulated_depreciation                 DECIMAL(24,2),      -- Reg. 34 at the last FY end
+    contingent_liabilities                   DECIMAL(24,2),      -- Reg. 34 at the last FY end (excl. commitments) [X73]
+    advance_from_customers                   DECIMAL(24,2),      -- Reg. 34 at the last FY end [X73]
+    debt_preceding_year                      DECIMAL(24,2),      -- BS at the end of the FY before the last FY
+    net_block_preceding_year                 DECIMAL(24,2),
+    gross_block_preceding_year               DECIMAL(24,2),
+    cwip_preceding_year                      DECIMAL(24,2),
+    working_capital_preceding_year           DECIMAL(24,2),      -- Screener: Other Assets - Other Liabilities
+    debt_3y_back                             DECIMAL(24,2),      -- last FY end - N years; NULL until in scope (~May 2028)
+    debt_5y_back                             DECIMAL(24,2),      -- ~May 2030
+    debt_7y_back                             DECIMAL(24,2),      -- ~May 2032
+    debt_10y_back                            DECIMAL(24,2),      -- ~May 2035
+    net_block_3y_back                        DECIMAL(24,2),
+    net_block_5y_back                        DECIMAL(24,2),
+    net_block_7y_back                        DECIMAL(24,2),
+    net_block_10y_back                       DECIMAL(24,2),
+    working_capital_3y_back                  DECIMAL(24,2),
+    working_capital_5y_back                  DECIMAL(24,2),
+    working_capital_7y_back                  DECIMAL(24,2),
+    working_capital_10y_back                 DECIMAL(24,2),
+    cash_3y_back                             DECIMAL(24,2),      -- cash-flow-statement cash, FY end - N years (gated)
+    cash_5y_back                             DECIMAL(24,2),
+    cash_7y_back                             DECIMAL(24,2),
+    cfo_last_year                            DECIMAL(24,2),      -- filed 12-month cash flow, last / preceding FY
+    cfo_preceding_year                       DECIMAL(24,2),
+    cfi_last_year                            DECIMAL(24,2),
+    cfi_preceding_year                       DECIMAL(24,2),
+    cff_last_year                            DECIMAL(24,2),
+    cff_preceding_year                       DECIMAL(24,2),
+    net_cash_flow_last_year                  DECIMAL(24,2),      -- after the FX effect on cash [S12]
+    net_cash_flow_preceding_year             DECIMAL(24,2),
+    cash_beginning_last_year                 DECIMAL(24,2),      -- prior FY-end cash, else cash end - net cash flow
+    cash_beginning_preceding_year            DECIMAL(24,2),
+    cash_end_last_year                       DECIMAL(24,2),
+    cash_end_preceding_year                  DECIMAL(24,2),
+    fcf_last_year                            DECIMAL(24,2),      -- CFO - (PPE + intangibles capex)
+    fcf_preceding_year                       DECIMAL(24,2),
+    fcf_3y                                   DECIMAL(24,2),      -- sum over N FYs; NULL until the oldest FY is in scope (3y ~May 2027)
+    fcf_5y                                   DECIMAL(24,2),
+    fcf_7y                                   DECIMAL(24,2),
+    fcf_10y                                  DECIMAL(24,2),
+    cfo_3y                                   DECIMAL(24,2),
+    cfo_5y                                   DECIMAL(24,2),
+    cfo_7y                                   DECIMAL(24,2),
+    cfo_10y                                  DECIMAL(24,2),
+    cfi_3y                                   DECIMAL(24,2),
+    cfi_5y                                   DECIMAL(24,2),
+    cfi_7y                                   DECIMAL(24,2),
+    cfi_10y                                  DECIMAL(24,2),
+    face_value                               DECIMAL(18,4),      -- INR per share, latest results filing
+    book_value_preceding_year                DECIMAL(18,4),      -- owners' equity / Reg. 31 shares, both at that FY end, today's share basis
+    book_value_3y_back                       DECIMAL(18,4),      -- gated (~May 2028)
+    book_value_5y_back                       DECIMAL(18,4),
+    book_value_10y_back                      DECIMAL(18,4),
+    graham_number                            DECIMAL(18,4),      -- sqrt(22.5 x EPS TTM x book value per share)
+    shares_preceding_year                    BIGINT,             -- Reg. 31 total a year before the latest SHP, today's basis
+    shares_10y_back                          BIGINT,             -- gated (~Apr 2035)
+    current_ratio                            DOUBLE,             -- current assets / current liabilities (latest BS)
+    quick_ratio                              DOUBLE,             -- (current assets - inventory) / current liabilities
+    net_debt_to_equity                       DOUBLE,             -- net_debt / total equity
+    long_term_debt_to_equity                 DOUBLE,             -- (non-current borrowings + leases) / total equity
+    debt_to_equity_preceding_year            DOUBLE,             -- debt / total equity at the preceding FY end
+    financial_leverage                       DOUBLE,             -- avg total assets / avg owners' equity (12 months to bs_as_of)
+    asset_turnover                           DOUBLE,             -- TTM sales to bs_as_of / avg total assets
+    earning_power                            DOUBLE,             -- TTM EBIT / total assets
+    roe_preceding_year                       DOUBLE,             -- FY-1 owners' profit / owners' equity at FY-1 end
+    roce_preceding_year                      DOUBLE,             -- FY-1 EBIT / (debt + total equity) at FY-1 end
+    roa_preceding_year                       DOUBLE,             -- FY-1 owners' profit / avg total assets (needs FY-2 BS)
+    exports_pct                              DOUBLE,             -- foreign / (domestic + foreign) revenue, Reg. 34 [X75]
+    exports_pct_3y_back                      DOUBLE,             -- gated (~Sep 2028)
+    exports_pct_5y_back                      DOUBLE,
+    inventory_turnover_3y_back               DOUBLE,             -- Screener convention, FY N years back (gated)
+    inventory_turnover_5y_back               DOUBLE,
+    inventory_turnover_7y_back               DOUBLE,
+    inventory_turnover_10y_back              DOUBLE,
+    debtor_days_3y_back                      DOUBLE,             -- gated (~May 2028)
+    debtor_days_5y_back                      DOUBLE,
+    avg_debtor_days_3y                       DOUBLE,             -- mean of 3 FYs (gated, ~May 2027)
+    avg_working_capital_days_3y              DOUBLE,             -- mean of 3 FYs (gated, ~May 2027)
+    cfo_to_ebitda_last_year                  DOUBLE,             -- FY CFO / FY EBITDA
+    cfo_to_ebitda_preceding_year             DOUBLE,
+    fcf_conversion_3y                        DOUBLE,             -- 3-FY FCF / 3-FY owners' profit (G224, gated)
+    cfo_to_ebitda_3y                         DOUBLE,             -- 3-FY CFO / 3-FY EBITDA (G223, gated)
+    net_debt_to_fcf_3y                       DOUBLE,             -- net_debt / mean 3-FY FCF > 0 (G233, gated)
+    price_to_fcf                             DOUBLE,             -- market cap / fcf_ttm; NULL when FCF <= 0
+    equity_fcf_yield                         DOUBLE,             -- fcf_ttm / market cap (G170, signed)
+    shareholder_yield                        DOUBLE,             -- TTM (dividends + buybacks - share issues) cash / mcap (G316)
+    buyback_yield                            DOUBLE,             -- TTM buyback cash / market cap
+    dilution_1y                              DOUBLE,             -- Reg. 31 shares now / a year earlier - 1 (today's basis)
+    dilution_5y                              DOUBLE,             -- G219: same, 5 years (gated, ~Apr 2030)
+    reinvestment_rate                        DOUBLE,             -- FY (capex - D&A + change in non-cash WC) / NOPAT (G216)
+    incremental_roic_1y                      DOUBLE,             -- FY change in NOPAT / change in invested capital
+    incremental_roic_3y                      DOUBLE,             -- G215, gated (~May 2028)
+    incremental_roic_5y                      DOUBLE,             -- G215, gated (~May 2030)
+    net_debt_to_ebitda                       DOUBLE,             -- net_debt / ebitda_ttm (> 0)
+    ev_ebitda_percentile_20q                 DOUBLE,             -- G240: rank vs the last 20 quarter-ends (C9: ~2031)
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -1084,6 +1197,119 @@ CREATE TABLE IF NOT EXISTS screener_features (
     book_value_per_share                     DECIMAL(18,4),   -- owners' equity / shares
     is_trade_to_trade                        BOOLEAN,         -- series BE or BZ
     opm_preceding_year_quarter_pct           DOUBLE,          -- same quarter last year (fraction)
+    -- batch C (balance sheet / cash flow): features_bs.py; money in rupees, ratios as fractions, days in days;
+    -- unsuffixed BS lines = latest BS, 'preceding year' / 'N years back' = FY ends; NULL for lenders where noted
+    debt                                     DECIMAL(24,2),      -- latest BS (bs_as_of): borrowings + leases, absent line = 0 [C23]
+    equity_capital                           DECIMAL(24,2),      -- latest BS, rupees
+    reserves                                 DECIMAL(24,2),      -- other equity (banks / insurers: reserves and surplus)
+    balance_sheet_total                      DECIMAL(24,2),      -- total assets net of DTA/DTL netting (Screener) [S10]
+    net_block                                DECIMAL(24,2),      -- PPE + investment property + goodwill + intangibles + ROU
+    cwip                                     DECIMAL(24,2),      -- CWIP + intangibles under development
+    investments                              DECIMAL(24,2),      -- non-current + current + equity-method
+    current_assets                           DECIMAL(24,2),
+    current_liabilities                      DECIMAL(24,2),
+    lease_liabilities                        DECIMAL(24,2),
+    inventory                                DECIMAL(24,2),
+    trade_receivables                        DECIMAL(24,2),
+    trade_payables                           DECIMAL(24,2),
+    cash_equivalents                         DECIMAL(24,2),      -- cash and cash equivalents (BS line)
+    gross_block                              DECIMAL(24,2),      -- Reg. 34 PPE schedule at the last FY end [X71]
+    accumulated_depreciation                 DECIMAL(24,2),      -- Reg. 34 at the last FY end
+    contingent_liabilities                   DECIMAL(24,2),      -- Reg. 34 at the last FY end (excl. commitments) [X73]
+    advance_from_customers                   DECIMAL(24,2),      -- Reg. 34 at the last FY end [X73]
+    debt_preceding_year                      DECIMAL(24,2),      -- BS at the end of the FY before the last FY
+    net_block_preceding_year                 DECIMAL(24,2),
+    gross_block_preceding_year               DECIMAL(24,2),
+    cwip_preceding_year                      DECIMAL(24,2),
+    working_capital_preceding_year           DECIMAL(24,2),      -- Screener: Other Assets - Other Liabilities
+    debt_3y_back                             DECIMAL(24,2),      -- last FY end - N years; NULL until in scope (~May 2028)
+    debt_5y_back                             DECIMAL(24,2),      -- ~May 2030
+    debt_7y_back                             DECIMAL(24,2),      -- ~May 2032
+    debt_10y_back                            DECIMAL(24,2),      -- ~May 2035
+    net_block_3y_back                        DECIMAL(24,2),
+    net_block_5y_back                        DECIMAL(24,2),
+    net_block_7y_back                        DECIMAL(24,2),
+    net_block_10y_back                       DECIMAL(24,2),
+    working_capital_3y_back                  DECIMAL(24,2),
+    working_capital_5y_back                  DECIMAL(24,2),
+    working_capital_7y_back                  DECIMAL(24,2),
+    working_capital_10y_back                 DECIMAL(24,2),
+    cash_3y_back                             DECIMAL(24,2),      -- cash-flow-statement cash, FY end - N years (gated)
+    cash_5y_back                             DECIMAL(24,2),
+    cash_7y_back                             DECIMAL(24,2),
+    cfo_last_year                            DECIMAL(24,2),      -- filed 12-month cash flow, last / preceding FY
+    cfo_preceding_year                       DECIMAL(24,2),
+    cfi_last_year                            DECIMAL(24,2),
+    cfi_preceding_year                       DECIMAL(24,2),
+    cff_last_year                            DECIMAL(24,2),
+    cff_preceding_year                       DECIMAL(24,2),
+    net_cash_flow_last_year                  DECIMAL(24,2),      -- after the FX effect on cash [S12]
+    net_cash_flow_preceding_year             DECIMAL(24,2),
+    cash_beginning_last_year                 DECIMAL(24,2),      -- prior FY-end cash, else cash end - net cash flow
+    cash_beginning_preceding_year            DECIMAL(24,2),
+    cash_end_last_year                       DECIMAL(24,2),
+    cash_end_preceding_year                  DECIMAL(24,2),
+    fcf_last_year                            DECIMAL(24,2),      -- CFO - (PPE + intangibles capex)
+    fcf_preceding_year                       DECIMAL(24,2),
+    fcf_3y                                   DECIMAL(24,2),      -- sum over N FYs; NULL until the oldest FY is in scope (3y ~May 2027)
+    fcf_5y                                   DECIMAL(24,2),
+    fcf_7y                                   DECIMAL(24,2),
+    fcf_10y                                  DECIMAL(24,2),
+    cfo_3y                                   DECIMAL(24,2),
+    cfo_5y                                   DECIMAL(24,2),
+    cfo_7y                                   DECIMAL(24,2),
+    cfo_10y                                  DECIMAL(24,2),
+    cfi_3y                                   DECIMAL(24,2),
+    cfi_5y                                   DECIMAL(24,2),
+    cfi_7y                                   DECIMAL(24,2),
+    cfi_10y                                  DECIMAL(24,2),
+    face_value                               DECIMAL(18,4),      -- INR per share, latest results filing
+    book_value_preceding_year                DECIMAL(18,4),      -- owners' equity / Reg. 31 shares, both at that FY end, today's share basis
+    book_value_3y_back                       DECIMAL(18,4),      -- gated (~May 2028)
+    book_value_5y_back                       DECIMAL(18,4),
+    book_value_10y_back                      DECIMAL(18,4),
+    graham_number                            DECIMAL(18,4),      -- sqrt(22.5 x EPS TTM x book value per share)
+    shares_preceding_year                    BIGINT,             -- Reg. 31 total a year before the latest SHP, today's basis
+    shares_10y_back                          BIGINT,             -- gated (~Apr 2035)
+    current_ratio                            DOUBLE,             -- current assets / current liabilities (latest BS)
+    quick_ratio                              DOUBLE,             -- (current assets - inventory) / current liabilities
+    net_debt_to_equity                       DOUBLE,             -- net_debt / total equity
+    long_term_debt_to_equity                 DOUBLE,             -- (non-current borrowings + leases) / total equity
+    debt_to_equity_preceding_year            DOUBLE,             -- debt / total equity at the preceding FY end
+    financial_leverage                       DOUBLE,             -- avg total assets / avg owners' equity (12 months to bs_as_of)
+    asset_turnover                           DOUBLE,             -- TTM sales to bs_as_of / avg total assets
+    earning_power                            DOUBLE,             -- TTM EBIT / total assets
+    roe_preceding_year                       DOUBLE,             -- FY-1 owners' profit / owners' equity at FY-1 end
+    roce_preceding_year                      DOUBLE,             -- FY-1 EBIT / (debt + total equity) at FY-1 end
+    roa_preceding_year                       DOUBLE,             -- FY-1 owners' profit / avg total assets (needs FY-2 BS)
+    exports_pct                              DOUBLE,             -- foreign / (domestic + foreign) revenue, Reg. 34 [X75]
+    exports_pct_3y_back                      DOUBLE,             -- gated (~Sep 2028)
+    exports_pct_5y_back                      DOUBLE,
+    inventory_turnover_3y_back               DOUBLE,             -- Screener convention, FY N years back (gated)
+    inventory_turnover_5y_back               DOUBLE,
+    inventory_turnover_7y_back               DOUBLE,
+    inventory_turnover_10y_back              DOUBLE,
+    debtor_days_3y_back                      DOUBLE,             -- gated (~May 2028)
+    debtor_days_5y_back                      DOUBLE,
+    avg_debtor_days_3y                       DOUBLE,             -- mean of 3 FYs (gated, ~May 2027)
+    avg_working_capital_days_3y              DOUBLE,             -- mean of 3 FYs (gated, ~May 2027)
+    cfo_to_ebitda_last_year                  DOUBLE,             -- FY CFO / FY EBITDA
+    cfo_to_ebitda_preceding_year             DOUBLE,
+    fcf_conversion_3y                        DOUBLE,             -- 3-FY FCF / 3-FY owners' profit (G224, gated)
+    cfo_to_ebitda_3y                         DOUBLE,             -- 3-FY CFO / 3-FY EBITDA (G223, gated)
+    net_debt_to_fcf_3y                       DOUBLE,             -- net_debt / mean 3-FY FCF > 0 (G233, gated)
+    price_to_fcf                             DOUBLE,             -- market cap / fcf_ttm; NULL when FCF <= 0
+    equity_fcf_yield                         DOUBLE,             -- fcf_ttm / market cap (G170, signed)
+    shareholder_yield                        DOUBLE,             -- TTM (dividends + buybacks - share issues) cash / mcap (G316)
+    buyback_yield                            DOUBLE,             -- TTM buyback cash / market cap
+    dilution_1y                              DOUBLE,             -- Reg. 31 shares now / a year earlier - 1 (today's basis)
+    dilution_5y                              DOUBLE,             -- G219: same, 5 years (gated, ~Apr 2030)
+    reinvestment_rate                        DOUBLE,             -- FY (capex - D&A + change in non-cash WC) / NOPAT (G216)
+    incremental_roic_1y                      DOUBLE,             -- FY change in NOPAT / change in invested capital
+    incremental_roic_3y                      DOUBLE,             -- G215, gated (~May 2028)
+    incremental_roic_5y                      DOUBLE,             -- G215, gated (~May 2030)
+    net_debt_to_ebitda                       DOUBLE,             -- net_debt / ebitda_ttm (> 0)
+    ev_ebitda_percentile_20q                 DOUBLE,             -- G240: rank vs the last 20 quarter-ends (C9: ~2031)
     PRIMARY KEY (as_of_date, security_id)
 );
 

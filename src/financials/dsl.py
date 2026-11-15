@@ -312,6 +312,18 @@ def _period_aliases() -> dict[str, tuple[str, str]]:
 
 ALIASES.update(_period_aliases())
 
+
+def _balance_sheet_aliases() -> dict[str, tuple[str, str]]:
+    """Batches 2-3 (balance sheet, working capital, cash flow, capital allocation): features_bs.dsl_aliases."""
+    from financials.features_bs import dsl_aliases
+
+    return dsl_aliases()
+
+
+ALIASES.update(_balance_sheet_aliases())
+ALIASES["ev to ebitda percentile 20q"] = ("(ev_ebitda_percentile_20q * 100)", "percentile of the last 20 quarter-ends")
+ALIASES["roa"] = ("(roa * 100)", "%, TTM owners' profit / avg total assets (lenders: TTM to the quarter end)")
+
 KEYWORDS = {"and", "or", "not"}
 COMPARATORS = {"<", "<=", ">", ">=", "=", "!="}
 NAME_RE = re.compile(r"^[a-z][a-z0-9 ]{0,62}$")

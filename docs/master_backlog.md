@@ -24,16 +24,17 @@ catalogue as IN PROGRESS. They are counted as BUILT here.
 
 | Area | BUILT | CATALOGUE | DIGEST | MISSED | OOS | Total |
 |---|---|---|---|---|---|---|
-| A. Ratios / metrics | 72 | 39 | 2 | 4 | 1 | 118 |
+| A. Ratios / metrics | 79 | 32 | 2 | 4 | 1 | 118 |
 | B. Data sources | 14 | 22 | 15 | 2 | 3 | 56 |
 | C. Corporate structure / identity | 9 | 1 | 8 | 0 | 2 | 20 |
 | D. Events, flows, corporate actions | 16 | 1 | 7 | 0 | 4 | 28 |
 | E. Data quality / rules / assistant claims | 62 | 0 | 14 | 0 | 8 | 84 |
 | F. Backtest | 6 | 0 | 2 | 0 | 0 | 8 |
 | G. Alerts / UI / tools / ops | 8 | 1 | 11 | 2 | 2 | 24 |
-| **Total** | **187** | **64** | **59** | **8** | **20** | **338** |
+| **Total** | **194** | **57** | **59** | **8** | **20** | **338** |
 
-Counts are tallied from the Class column of section 3 (last bold token per row). Of the 187 BUILT rows, 13 are only
+Counts are tallied from the Class column of section 3 (last bold token per row). Of the 194 BUILT rows (7 moved from
+CATALOGUE by batch C, 2026-11-15), 10 are only
 partly built, 1 is built with a different definition (`opm_last_year_pct`), and 12 are rows where the PDF's claim was
 wrong and the corrected behaviour is built (marked "corrected").
 
@@ -75,12 +76,12 @@ M2 = A113, M3 = A94, M4 = A112, M5 = A114, M6 = B31, M7 = B51, M8 = G23.
 | G292 | "Tables entity_securities, subsidiary_tree, pipeline_audit_log": DONE | `securities`, `promotion_log`, `admin_log` exist; **no `subsidiary_tree`** (schema.sql has none; G277 AOC-1 is DOCUMENTED_PLANNED) | DIGEST SAYS DONE, NOT FOUND (subsidiary_tree) |
 | G94 | "Bhavcopy close, 52-week high/low": DONE | `close`, `dist_52w_high` only (`features._momentum` line ~221). **No 52-week low, no 52W high/low levels** | FIXED 2026-11-15 (batch B): `high_52w`, `low_52w`, `dist_52w_low` |
 | G40, G60, G289 | evening job / daily master sync / "Daily run is automatic" | `run-day` CLI exists (arch §2, schedule documented in arch §13), but **nothing schedules it**: no cron / systemd / Task Scheduler file or install step in the repo | DONE as a command; "automatic" NOT FOUND |
-| G224 | FCF-to-net-income conversion (3Y) | `fcf_to_pat` is TTM; no 3Y-sum column returning NULL until history | PARTLY NOT FOUND (owner decision: history-gated ratios are built and return NULL) |
-| G233 | Net debt / 3Y average FCF | `net_debt_to_fcf` uses TTM FCF; no 3Y-average form | PARTLY NOT FOUND |
-| G240 | 5Y EV/EBITDA band percentile (20 quarters) | `ev_ebitda_percentile` with >= 4 prior quarters; no 20-quarter column | PARTLY NOT FOUND |
+| G224 | FCF-to-net-income conversion (3Y) | `fcf_to_pat` is TTM; no 3Y-sum column returning NULL until history | PARTLY NOT FOUND (owner decision: history-gated ratios are built and return NULL) **FIXED 2026-11-15 (batch C)**: `fcf_conversion_3y` (history-gated) |
+| G233 | Net debt / 3Y average FCF | `net_debt_to_fcf` uses TTM FCF; no 3Y-average form | PARTLY NOT FOUND **FIXED 2026-11-15 (batch C)**: `net_debt_to_fcf_3y` (history-gated) |
+| G240 | 5Y EV/EBITDA band percentile (20 quarters) | `ev_ebitda_percentile` with >= 4 prior quarters; no 20-quarter column | PARTLY NOT FOUND **FIXED 2026-11-15 (batch C)**: `ev_ebitda_percentile_20q` (history-gated) |
 | G198 | Valuation bands PE / PB / EV-EBITDA vs own 3/5/10Y median and percentile | PE and EV/EBITDA percentile only; **no P/B band, no median, no 3/5/10Y windows** | PARTLY NOT FOUND (digest notes P/B) |
 | G200, G239 | Reverse DCF using the live 10Y G-Sec | fixed WACC 12% / terminal 4% stored with the result | PARTLY NOT FOUND (needs F25) |
-| G170 | FCF yield | `fcff_yield` (unlevered, FCFF/EV) only; the plain/equity FCF yield of the PDF's screener list (L1262) is not built | PARTLY NOT FOUND (catalogue B5.11) |
+| G170 | FCF yield | `fcff_yield` (unlevered, FCFF/EV) only; the plain/equity FCF yield of the PDF's screener list (L1262) is not built | PARTLY NOT FOUND (catalogue B5.11) **FIXED 2026-11-15 (batch C)**: `equity_fcf_yield` |
 | G181 | Reg. 30 red-flag count | five separate 90-day counts; **no single "Reg 30 Red Flag Count" column** (L1271); `penalties_90d` always NULL | PARTLY NOT FOUND |
 | G187 | Saved custom ratios | `dsl.save_custom_ratio()` + `user_custom_ratios`; **no CLI command** to save one; not usable as output columns (M1) | PARTLY NOT FOUND |
 | G119 | Allotments / preferential / QIP / warrants | `corporate_events` ALLOTMENT rows; **no warrant-conversion tracker, no dilution column** (PDF L958-959) | PARTLY NOT FOUND (digest notes it) |
@@ -117,7 +118,7 @@ exists (file / column); Class.
 | A09 | 946-947 | automated forensic red-flag score from Reg. 30 | G117 MISSING | B8.7 BUILDABLE NOW (separate counts) | 90-day counts | **CATALOGUE** |
 | A10 | 949-952 | quantify contingent tax / regulatory liabilities from penalty filings | G118 DOC_PLANNED | B8.8 NEW FREE SOURCE | `penalties_90d` NULL | **CATALOGUE** |
 | A11 | 1032-1034 | segment revenue, results, assets, liabilities (Ind AS 108) | G130 IN_PROGRESS (stale) | B9.1-B9.2 BUILDABLE NOW | `segment_observations` BUSINESS promoted; no feature columns | **BUILT** (data; mix columns = catalogue) |
-| A12 | 1036-1037 | geographic revenue split domestic vs export | G131 IN_PROGRESS (stale) | A2.32 BUILDABLE NOW | `segment_observations` GEOGRAPHY; no exports % column | **CATALOGUE** |
+| A12 | 1036-1037 | geographic revenue split domestic vs export | G131 IN_PROGRESS (stale) | A2.32 BUILDABLE NOW | `segment_observations` GEOGRAPHY; `exports_pct`, `exports_pct_{3,5}y_back` (batch C, 2026-11-15) | **BUILT** |
 | A13 | 1036-1037 | geographic **non-current asset** split | not named (G131 is revenue only) | none | `parsers/segments.py` NON_CURRENT_ASSETS on GEOGRAPHY | **BUILT** (data only) |
 | A14 | 1039-1041 | cost-structure shares (materials, power & fuel, freight, subcontracting, employee); crude / power / freight sensitivity screens | G132 DONE (tags), G133 MISSING (screens) | B3.4, B3.5 BUILDABLE NOW | label rules POWER_AND_FUEL, FREIGHT; no share columns | **CATALOGUE** |
 | A15 | 1043-1045 | capex, CWIP -> FCF, CFO/EBITDA, CWIP / gross block | G134 DONE | B2.10 BUILT | `fcf_ttm`, `cfo_to_ebitda`, `cwip_to_gross_block` | **BUILT** |
@@ -133,7 +134,7 @@ exists (file / column); Class.
 | A25 | 1228-1229 | cash conversion CFO/EBITDA and contingent liabilities / net worth flags | G223, G235 DONE | B1.21 BUILT | `cfo_to_ebitda`, `contingent_liabilities_to_net_worth` | **BUILT** |
 | A26 | 1262 | PEG ratio | G168 MISSING | A1.11 WHEN HISTORY (~May 2028) | none | **CATALOGUE** |
 | A27 | 1262 | dividend yield | G169 MISSING (stale) | A1.10 | `dividend_yield_pct` (e085eb5) | **BUILT** |
-| A28 | 1262 | FCF yield | G170 DONE | B5.11 BUILDABLE NOW (equity form) | `fcff_yield` (unlevered) | **BUILT** (partial: equity FCF yield missing) |
+| A28 | 1262 | FCF yield | G170 DONE | B5.11 BUILDABLE NOW (equity form) | `fcff_yield` (unlevered); `equity_fcf_yield`, `price_to_fcf` (batch C, 2026-11-15) | **BUILT** |
 | A29 | 1264 | sales growth, profit growth (TTM YoY) | G171 DONE | A4.26 BUILT | `sales_growth_yoy`, `profit_growth_yoy` (NULL until ~Feb 2027) | **BUILT** |
 | A30 | 1264-1265, 2046 | sales growth 3Y / 5Y, profit growth 3Y, EPS growth 3Y | G172 OOS (mislabelled) | A4.29-A4.32 WHEN HISTORY | `fundamentals.cagr` exists, no column / alias | **CATALOGUE** |
 | A31 | 1265 | QoQ sales %, QoQ profit % | G173 MISSING (stale) | A5.19 | `sales_growth_qoq_pct`, `profit_growth_qoq_pct` (e085eb5) | **BUILT** |
@@ -150,14 +151,14 @@ exists (file / column); Class.
 | A42 | 1273 | returns 1M / 3M / 6M / 12M | G182 DONE | A8.2 BUILT | `return_1m..12m` | **BUILT** |
 | A43 | 1274 | average delivery % 20D | G183 DONE | B6.7 BUILT | `deliv_pct_avg_20d`, `deliv_pct` | **BUILT** |
 | A44 | 1274 | F&O PCR | G184 DOC_PLANNED | B6.15 NEW FREE SOURCE | none | **CATALOGUE** |
-| A45 | 1284-1285 | Net Cash to MCap = (cash + investments - total debt) / mcap (custom-ratio example) | none | B2.17 BUILDABLE NOW | no `debt` column / alias | **CATALOGUE** |
-| A46 | 1353-1355, 1742-1746 | valuation bands: PE, PB, EV/EBITDA vs own 3/5/10Y median and percentile | G198 DONE (partial), G240 DONE | B5.1 BUILT, B5.2-B5.4, A1.20-A1.21 | `pe_percentile`, `ev_ebitda_percentile` | **BUILT** (partial) |
+| A45 | 1284-1285 | Net Cash to MCap = (cash + investments - total debt) / mcap (custom-ratio example) | none | B2.17 BUILDABLE NOW | no column; expressible now as a saved ratio over `cash equivalents`, `investments`, `debt`, `market cap` (batch C, 2026-11-15) (liquid cash = `liquid_cash`) | **CATALOGUE** |
+| A46 | 1353-1355, 1742-1746 | valuation bands: PE, PB, EV/EBITDA vs own 3/5/10Y median and percentile | G198 DONE (partial), G240 DONE | B5.1 BUILT, B5.2-B5.4, A1.20-A1.21 | `pe_percentile`, `ev_ebitda_percentile`; `ev_ebitda_percentile_20q` (G240, history-gated) (batch C, 2026-11-15) | **BUILT** (partial: PB band, medians, 3/10Y windows) |
 | A47 | 1355 | discount / premium to basic-industry median | G199 MISSING | B5.7 BUILDABLE NOW (coarse) | none | **CATALOGUE** |
 | A48 | 1357-1359, 1728-1740 | reverse DCF implied 5Y growth with live 10Y G-Sec | G200, G239 DONE | B5.5 BUILT | `reverse_dcf_implied_g` (WACC fixed 12%) | **BUILT** (partial: live yield needs F25) |
-| A49 | 1361, 1452-1459 | incremental ROIC (1Y / 3Y / 5Y) | G215 DOC_PLANNED | B2.7 BUILDABLE NOW, B2.8 WHEN HISTORY | none | **CATALOGUE** |
+| A49 | 1361, 1452-1459 | incremental ROIC (1Y / 3Y / 5Y) | G215 DOC_PLANNED | B2.7 BUILDABLE NOW, B2.8 WHEN HISTORY | `incremental_roic_1y`, `_3y`, `_5y` (3Y / 5Y history-gated) (batch C, 2026-11-15) | **BUILT** |
 | A50 | 1361 | dividend payout % | G202 MISSING (stale) | B2.1 | `dividend_payout_pct` (e085eb5) | **BUILT** |
-| A51 | 1361 | buyback yield | G201 DOC_PLANNED | B2.3 BUILDABLE NOW | none | **CATALOGUE** |
-| A52 | 1362, 1491-1498 | equity dilution % over 5Y (split/bonus-adjusted share counts) | G219 DOC_PLANNED | B2.4 (1Y) BUILDABLE NOW, B2.5 WHEN HISTORY | none | **CATALOGUE** |
+| A51 | 1361 | buyback yield | G201 DOC_PLANNED | B2.3 BUILDABLE NOW | `buyback_yield` (batch C, 2026-11-15) | **BUILT** |
+| A52 | 1362, 1491-1498 | equity dilution % over 5Y (split/bonus-adjusted share counts) | G219 DOC_PLANNED | B2.4 (1Y) BUILDABLE NOW, B2.5 WHEN HISTORY | `dilution_1y`, `dilution_5y` (5Y history-gated), Reg. 31 counts on today's share basis (batch C, 2026-11-15) | **BUILT** |
 | A53 | 1367-1368 | YoY sales-growth acceleration | G203 MISSING | B4.1 BUILDABLE NOW, B4.2 WHEN HISTORY | none | **CATALOGUE** |
 | A54 | 1368-1369 | OPM expansion vs same quarter last year | G204 MISSING | B4.3 BUILDABLE NOW | base exists as `opm_last_year_pct`; no delta column | **CATALOGUE** |
 | A55 | 1173-1174 | revision velocity / QoQ operating-margin acceleration | G152 MISSING | B4.4 BUILDABLE NOW | none | **CATALOGUE** |
@@ -167,14 +168,14 @@ exists (file / column); Class.
 | A59 | 1390 | average bid-ask | G207 MISSING | none | none (no bid-ask in any ingested EOD file) | **DIGEST** |
 | A60 | 1390-1391 | circuit-lock days | G207, G140 | B6.12 NEW FREE SOURCE | none | **CATALOGUE** |
 | A61 | 1393-1394 | breadth: % Nifty 500 above 50/200 DMA, 52W high/low ratio, advance-decline | G208 DONE | B6.13 BUILT | `market_breadth` table | **BUILT** |
-| A62 | 1470-1474 | reinvestment rate | G216 DOC_PLANNED | B2.6 BUILDABLE NOW | none | **CATALOGUE** |
+| A62 | 1470-1474 | reinvestment rate | G216 DOC_PLANNED | B2.6 BUILDABLE NOW | `reinvestment_rate` (batch C, 2026-11-15) | **BUILT** |
 | A63 | 1476-1477 | cash ROIC (CROIC) | G217 DONE | B2.13 BUILT | `croic` | **BUILT** |
-| A64 | 1483-1485, 2775-2776 | total shareholder yield (corrected: dividends + gross buybacks - gross issuance) | G218, G316 DOC_PLANNED | B2.2 BUILDABLE NOW | none | **CATALOGUE** |
+| A64 | 1483-1485, 2775-2776 | total shareholder yield (corrected: dividends + gross buybacks - gross issuance) | G218, G316 DOC_PLANNED | B2.2 BUILDABLE NOW | `shareholder_yield` (G316 formula) (batch C, 2026-11-15) | **BUILT** |
 | A65 | 1516-1523 | incremental asset turnover 3Y | G220 DOC_PLANNED | B2.9 WHEN HISTORY | none | **CATALOGUE** |
 | A66 | 1534-1535 | ROTE | G221 DONE | B2.13 BUILT | `rote` | **BUILT** |
 | A67 | 1548-1550 | Sloan accrual ratio | G222 DONE | B1.6 BUILT | `sloan_accrual` | **BUILT** |
-| A68 | 1558-1560 | EBITDA-to-CFO conversion (3Y cycle) | G223 DONE | B1.9 (3Y) WHEN HISTORY | `cfo_to_ebitda` (TTM) | **BUILT** (partial) |
-| A69 | 1566-1580 | FCF-to-net-income conversion, 3Y sums | G224 DONE | B1.9 WHEN HISTORY, B1.8 | `fcf_to_pat` (TTM) | **BUILT** (partial) |
+| A68 | 1558-1560 | EBITDA-to-CFO conversion (3Y cycle) | G223 DONE | B1.9 (3Y) WHEN HISTORY | `cfo_to_ebitda` (TTM); `cfo_to_ebitda_last_year` / `_preceding_year`, `cfo_to_ebitda_3y` (history-gated) (batch C, 2026-11-15) | **BUILT** |
+| A69 | 1566-1580 | FCF-to-net-income conversion, 3Y sums | G224 DONE | B1.9 WHEN HISTORY, B1.8 | `fcf_to_pat` (TTM); `fcf_conversion_3y`, `fcf_{3,5,7,10}y` (history-gated) (batch C, 2026-11-15) | **BUILT** |
 | A70 | 1586-1588 | receivables-to-sales divergence | G225 DONE | B1.10 BUILT | `receivables_sales_divergence` | **BUILT** |
 | A71 | 1590-1592 | capex-to-depreciation | G226 DONE | B2.10 BUILT | `capex_to_depreciation` | **BUILT** |
 | A72 | 1598-1607 | CWIP-to-gross-block | G227 DONE | B2.10 BUILT | `cwip_to_gross_block` | **BUILT** |
@@ -183,7 +184,7 @@ exists (file / column); Class.
 | A75 | 1630-1632 | R&D and royalty intensity | G230 DONE | B3.8 BUILT | `rnd_and_royalty_intensity` | **BUILT** |
 | A76 | 1638-1640 | working-capital intensity | G231 DONE | B3.1 BUILT | `working_capital_intensity` | **BUILT** |
 | A77 | 1646-1648 | other-income dependency (OI / PBT) | G232 DONE | B1.13 BUILT | `other_income_to_pbt` | **BUILT** |
-| A78 | 1660-1669 | net debt (incl. leases) / 3Y average FCF | G233 DONE | B2.14 BUILT (TTM; 3Y WHEN HISTORY) | `net_debt_to_fcf` | **BUILT** (partial) |
+| A78 | 1660-1669 | net debt (incl. leases) / 3Y average FCF | G233 DONE | B2.14 BUILT (TTM; 3Y WHEN HISTORY) | `net_debt_to_fcf` (TTM); `net_debt_to_fcf_3y` (history-gated) (batch C, 2026-11-15) | **BUILT** |
 | A79 | 1671-1680 | effective cost of debt | G234 DONE | B2.16 BUILT | `cost_of_debt` | **BUILT** |
 | A80 | 1682-1686 | contingent liabilities / net worth | G235 DONE | B1.21 BUILT | `contingent_liabilities_to_net_worth` | **BUILT** |
 | A81 | 1697-1701 | RPT leak % (purchases + loans given + royalties) / revenue | G236 DOC_PLANNED | B1.19 BUILDABLE NOW (total) / NEEDS PARSER (split) | `rpt_total_amount` only | **CATALOGUE** |
@@ -192,7 +193,7 @@ exists (file / column); Class.
 | A84 | 1754-1763 | institutional absorption rate | G241 DOC_PLANNED | B7.5 BUILDABLE NOW (quarterly) | none | **CATALOGUE** |
 | A85 | 1765-1777, 2788 | float-adjusted delivery velocity (corrected: divide by float) | G242, G315 DONE | B6.8 BUILT | `delivery_velocity`, `float_turnover_pct` | **BUILT** |
 | A86 | 1788-1791 | financial cohort: NIM, cost-to-income, provision coverage, P/B | G246 DONE | none needed | `nim_asset_proxy`, `cost_to_income`, `pcr`, `pb` | **BUILT** |
-| A87 | 1792-1794 | 3Y / 5Y smoothed windows for ROIIC, reinvestment, EBITDA-CFO | G247 OOS (mislabelled) | B2.8, B1.9 WHEN HISTORY | none | **CATALOGUE** |
+| A87 | 1792-1794 | 3Y / 5Y smoothed windows for ROIIC, reinvestment, EBITDA-CFO | G247 OOS (mislabelled) | B2.8, B1.9 WHEN HISTORY | `incremental_roic_3y` / `_5y`, `cfo_to_ebitda_3y`, `fcf_conversion_3y`, 3-10Y cash-flow sums (history-gated) (batch C, 2026-11-15); smoothed reinvestment rate not built | **BUILT** (partial) |
 | A88 | 1837-1846 | EV / gross profit | G250 DONE | B5.9 BUILT | `ev_to_gross_profit` | **BUILT** |
 | A89 | 1848-1852 | ex-cash P/E | G251 DONE | B5.9 BUILT | `ex_cash_pe` | **BUILT** |
 | A90 | 1854-1858 | EV / billings | G252 DONE | B5.9 BUILT | `ev_to_billings` | **BUILT** |
@@ -223,7 +224,7 @@ exists (file / column); Class.
 | A115 | 1408 | rs_rank (thesis snapshot field) | G212 | B6.3 BUILDABLE NOW | none | **CATALOGUE** |
 | A116 | 767-768, 1254 | "exact same screener.in" ratio set (Screener gallery parity) | G89, G3 | Part A: 173 rows, 29 BUILT (+5 by e085eb5) | partial | **CATALOGUE** |
 | A117 | 1259 | ~250-350 pre-computed columns | G166 DONE (~150) | Part C1 batches | 150+ columns | **BUILT** (partial by count) |
-| A118 | 1360-1362 | capital-allocation scorecard as a whole | G201 DOC_PLANNED | B2 | components partly built | **CATALOGUE** |
+| A118 | 1360-1362 | capital-allocation scorecard as a whole | G201 DOC_PLANNED | B2 | components built (batch C, 2026-11-15): incremental ROIC, reinvestment rate, buyback / shareholder yield, dilution 1Y / 5Y; no combined view (arch 10.2) | **CATALOGUE** |
 
 
 ### B. Data sources
@@ -483,7 +484,7 @@ exists (file / column); Class.
 | Batch | MISSED rows added | Already-captured rows it closes (examples) |
 |---|---|---|
 | 0. DSL / CLI | M1 (output columns + `save-ratio` CLI), M6 (T2T alias) | G187 CLI gap; aliases for `shares`, `restatement_suspected`, `book value` per share (catalogue C2) |
-| 1-3. FactBook period lines, BS, CF | — | A4/A5/A6/A7 families; fix `opm_last_year_pct` naming and add FY OPM last year; 3Y forms of G224 / G233 and 20Q of G240 returning NULL (history-gated) |
+| 1-3. FactBook period lines, BS, CF | — | A4/A5/A6/A7 families; fix `opm_last_year_pct` naming and add FY OPM last year; 3Y forms of G224 / G233 and 20Q of G240 returning NULL (history-gated). **DONE 2026-11-15**: batch A (P&L, `features_pl`), batch C (BS / CF / capital allocation, `features_bs`, incl. the G224 / G233 / G240 forms) |
 | 4. Price / technicals | (M6 if not in 0) | DONE 2026-11-15 (batch B): G95, G156-G158, G183, G207 median, G208, 52W low (G94 gap). Open: G283 flag, RS rank, volatility / drawdown, volume spike |
 | 5. Ownership, events, KPIs | M4 (CASA KPI) | G241, G119 dilution column, B7.x, single Reg. 30 red-flag count (G181 gap) |
 | 6. Valuation / cross-section | M3 (Rule of 40 FCF form), M5 (size bucket proxy) | G112, G199, G205, G265, G270, G278 |

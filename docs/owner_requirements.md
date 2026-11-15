@@ -10,10 +10,10 @@ Every concrete item in the chat is mapped to the repository as of 2026-11-14. Th
 
 | Status | Meaning | Count |
 |---|---|---|
-| DONE | implemented and tested (file and test cited) | 179 |
-| DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 72 |
+| DONE | implemented and tested (file and test cited) | 185 |
+| DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 67 |
 | IN_PROGRESS | being built now | 4 |
-| MISSING | not anywhere in docs or code | 41 |
+| MISSING | not anywhere in docs or code | 40 |
 | CONFLICTS_WITH_EVIDENCE | contradicted by our verified fixtures or tests | 17 |
 | OUT_OF_SCOPE_BY_DECISION | excluded by a recorded decision (C2, C7, C9, invariants, CLAUDE.md Don'ts) | 30 |
 | NEEDS_OWNER_DECISION | the docs do not settle it | 0 |
@@ -137,7 +137,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G167 | Valuation: market cap, price, PE, PB, EV/EBITDA | DONE | tests/test_features.py |
 | G168 | PEG ratio | MISSING | not built. Needs multi-year EPS growth (C9 limits) |
 | G169 | Dividend yield | DONE | dividend_yield_pct: trailing-365-day accepted dividends (the TR ledger, C2) restated to today's share basis / close; NULL before a full window (C9) or while a gap freezes prices; tests/test_owner_items_qoq_dividend_promoter.py |
-| G170 | FCF yield | DONE | fcff_yield (unlevered); tests/test_phase1_fixes_b.py. Equity FCF yield not built |
+| G170 | FCF yield | DONE | fcff_yield (unlevered); tests/test_phase1_fixes_b.py. Equity form: equity_fcf_yield = fcf_ttm / market cap, price_to_fcf (features_bs, batch C); tests/test_balance_sheet_cash_flow_family.py |
 | G171 | Sales growth and profit growth YoY | DONE | sales_growth_yoy, profit_growth_yoy; tests/test_features.py. 8 quarters |
 | G172 | Sales / profit growth 3Y and 5Y, EPS growth 3Y | DONE | history-gated (C9, owner rule: built, NULL until history): sales_growth_{3,5,7,10}y_pct, profit_growth_*, operating_profit_growth_*, eps_growth_* (features_pl; FY CAGR via fundamentals.cagr(min_periods_required = 4 x years + 1), EPS restated by later EPS factors); 3Y switches on with FY28 (~May 2028). tests/test_period_pl_family.py (NULL on fixtures, values on synthetic FY25-FY35) |
 | G173 | QoQ sales % and QoQ profit % | DONE | sales_growth_qoq_pct, profit_growth_qoq_pct (owners' profit, NULL on a base <= 0); same scope book; tests/test_owner_items_qoq_dividend_promoter.py, tests/test_phase1_phase2_e2e.py |
@@ -156,7 +156,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G198 | Valuation bands: current PE / PB / EV-EBITDA percentile vs own history | DONE | pe_percentile, ev_ebitda_percentile (C20); tests/test_valuation_bands.py. P/B band missing; 5Y/10Y windows NULL under C9 |
 | G199 | Discount / premium to basic-industry median | MISSING | not built. Needs the industry classification |
 | G200 | Reverse DCF implied growth using the live 10Y G-Sec | DONE | reverse_dcf_implied_g (C20, WACC fixed 12%); tests/test_valuation_bands.py. Live yield needs F25 |
-| G201 | Capital-allocation scorecard (incremental ROIC, buyback yield, 5Y dilution) | DOCUMENTED_PLANNED | arch 10.1 (Phase 2); C9 |
+| G201 | Capital-allocation scorecard (incremental ROIC, buyback yield, 5Y dilution) | DOCUMENTED_PLANNED | components built (batch C, features_bs): incremental_roic_1y/3y/5y, reinvestment_rate, buyback_yield, shareholder_yield, dilution_1y/5y (3Y/5Y forms history-gated, C9); no combined scorecard view yet (arch 10.2: never summed) |
 | G202 | Dividend payout % | DONE | dividend_payout_pct = trailing dividends per share / eps_ttm, NULL if EPS <= 0; arch 10.7; tests/test_owner_items_qoq_dividend_promoter.py. No committed company has both an accepted dividend and a TTM EPS yet |
 | G203 | YoY sales-growth acceleration (current YoY - prior-quarter YoY) | MISSING | not built |
 | G204 | Operating-margin expansion vs the same quarter last year | MISSING | not built |
@@ -164,16 +164,16 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G207 | Liquidity: 20D median traded value; bid-ask / circuit-lock days | MISSING | 20D median traded value built (turnover_median_20d; tests/test_features_price.py); bid-ask is in no ingested EOD file; circuit-lock days wait for an F20 price-band fixture |
 | G208 | Market regime / breadth: % of Nifty 500 above 50/200 DMA, 52W high/low ratio, advance-decline | DONE | market_breadth table, one row per materialised day from the in_nifty500 rows (arch 10.7); tests/test_features_price.py |
 | G214 | 20-30 distinctive ratios for all companies *(owner)* | DOCUMENTED_PLANNED | arch 10 catalogue. Most built; rest Phase 2 |
-| G215 | Incremental ROIC (3Y/5Y) | DOCUMENTED_PLANNED | arch 10.1 (Phase 2); C9 |
-| G216 | Reinvestment rate | DOCUMENTED_PLANNED | arch 10.1 (Phase 2) |
+| G215 | Incremental ROIC (3Y/5Y) | DONE | incremental_roic_1y (on now, FY26 vs FY25), incremental_roic_3y / _5y (history-gated: FY28 ~May 2028 / FY30); ΔNOPAT / Δ invested capital, NULL when ΔIC <= 0; features_bs; tests/test_balance_sheet_cash_flow_family.py |
+| G216 | Reinvestment rate | DONE | reinvestment_rate = FY (capex - D&A + Δ non-cash working capital) / NOPAT; features_bs; tests/test_balance_sheet_cash_flow_family.py |
 | G217 | Cash ROIC (CROIC) | DONE | croic; tests/test_fundamentals.py |
-| G218 | Total shareholder yield (dividends + net buybacks - equity issued) | DOCUMENTED_PLANNED | arch 10.1 (formula corrected: gross buybacks) |
-| G219 | 5Y net equity dilution % | DOCUMENTED_PLANNED | arch 10.1; C9 |
+| G218 | Total shareholder yield (dividends + net buybacks - equity issued) | DONE | shareholder_yield = TTM (dividends_paid + li_payments_to_acquire_or_redeem_entitys_shares - share_issue_proceeds) / market cap over the CFO bridge's filed periods (G316 formula); buyback_yield; features_bs; tests/test_balance_sheet_cash_flow_family.py |
+| G219 | 5Y net equity dilution % | DONE | dilution_5y (history-gated, NULL until the Reg. 31 pattern 5 years back is in scope, ~Apr 2030) and dilution_1y; Reg. 31 counts restated to today's share basis by later EPS factors; features_bs; tests/test_balance_sheet_cash_flow_family.py |
 | G220 | Incremental asset turnover (3Y) | DOCUMENTED_PLANNED | arch 10.1; C9 |
 | G221 | Return on tangible equity (ROTE) | DONE | rote; tests/test_batch9_annual.py |
 | G222 | Sloan accrual ratio | DONE | sloan_accrual (C19); tests/test_cash_conversion.py |
-| G223 | EBITDA-to-CFO conversion | DONE | cfo_to_ebitda (pre-tax CFO, C19); tests/test_cash_conversion.py |
-| G224 | FCF-to-net-income conversion (3Y) | DONE | fcf_to_pat (TTM, C19); tests/test_cash_conversion.py. 3Y sum NULL under C9 |
+| G223 | EBITDA-to-CFO conversion | DONE | cfo_to_ebitda (pre-tax CFO, C19); tests/test_cash_conversion.py. FY forms cfo_to_ebitda_last_year / _preceding_year and 3-FY cfo_to_ebitda_3y (history-gated); features_bs; tests/test_balance_sheet_cash_flow_family.py |
+| G224 | FCF-to-net-income conversion (3Y) | DONE | fcf_to_pat (TTM, C19); tests/test_cash_conversion.py. 3Y form fcf_conversion_3y (3-FY FCF / owners' profit; history-gated, FY27 ~May 2027); features_bs; tests/test_balance_sheet_cash_flow_family.py |
 | G225 | Receivables-to-sales divergence | DONE | receivables_sales_divergence; tests/test_cash_conversion.py |
 | G226 | Capex-to-depreciation | DONE | capex_to_depreciation; tests/test_batch9_annual.py |
 | G227 | CWIP-to-gross-block | DONE | cwip_to_gross_block (X71); tests/test_batch9_annual.py |
@@ -182,21 +182,21 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G230 | R&D and royalty intensity | DONE | rnd_and_royalty_intensity (X73); tests/test_batch9_annual.py. Mostly NULL: R&D is text |
 | G231 | Working-capital intensity | DONE | working_capital_intensity; tests/test_cash_conversion.py |
 | G232 | Other-income dependency (OI / PBT) | DONE | other_income_to_pbt; tests/test_features.py |
-| G233 | Net debt (incl. leases) / 3Y average FCF | DONE | net_debt_to_fcf (TTM FCF); tests/test_cash_conversion.py. 3Y average NULL under C9 |
+| G233 | Net debt (incl. leases) / 3Y average FCF | DONE | net_debt_to_fcf (TTM FCF); tests/test_cash_conversion.py. 3Y form net_debt_to_fcf_3y (history-gated, FY27 ~May 2027); features_bs; tests/test_balance_sheet_cash_flow_family.py |
 | G234 | Effective cost of debt | DONE | cost_of_debt; tests/test_cash_conversion.py |
 | G235 | Contingent liabilities / net worth | DONE | contingent_liabilities_to_net_worth (X73); tests/test_batch9_annual.py |
 | G236 | RPT leak % (purchases + loans + royalties / revenue) | DOCUMENTED_PLANNED | arch 10.1 (Phase 2); X19 |
 | G237 | Composite forensic score combining Piotroski, Beneish and Altman | OUT_OF_SCOPE_BY_DECISION | arch 10.2 (separate columns, never summed) |
 | G238 | Unlevered FCF yield (adds back interest x (1 - t)) | DONE | fcff_yield, per-filing interest classification (X14); tests/test_phase1_fixes_b.py |
 | G239 | Reverse-DCF implied 5Y growth | DONE | C20; tests/test_valuation_bands.py |
-| G240 | 5Y EV/EBITDA band percentile (20 quarters) | DONE | ev_ebitda_percentile (C20, >= 4 prior quarters). 20-quarter window NULL under C9 |
+| G240 | 5Y EV/EBITDA band percentile (20 quarters) | DONE | ev_ebitda_percentile (C20, >= 4 prior quarters); ev_ebitda_percentile_20q (last 20 prior quarter-ends, all > 0; history-gated, ~2031; batch C); tests/test_balance_sheet_cash_flow_family.py |
 | G241 | Institutional absorption rate (MF + FII shares vs 90D median volume) | DOCUMENTED_PLANNED | arch 10.3 (quarterly FII+DII, Phase 2; monthly Phase 3) |
 | G242 | Float-adjusted delivery velocity | DONE | delivery_velocity, float_turnover_pct; tests/test_features.py. Formula corrected (no float multiplication) |
 | G243 | Guardrail: NULL on non-positive denominators | DONE | arch 10 (any ratio with denominator <= 0 is NULL); tests/test_cash_conversion.py |
 | G244 | Guardrail: expose raw numerator and denominator columns | DOCUMENTED_PLANNED | arch 10 (stated rule). Not present in screener_features |
 | G245 | Guardrail: NULL industrial ratios for banks, NBFCs, insurers | DONE | arch 9, 10.5, 10.6; tests/test_batch4_nbfc.py, tests/test_batch6_insurers.py |
 | G246 | Financial cohort metrics: NIM, cost-to-income, provision coverage, P/B | DONE | arch 10.5; tests/test_batch5_bank.py, tests/test_batch4_nbfc.py. PCR NULL for NBFCs (X54) |
-| G247 | Smooth incremental ratios over 3Y / 5Y windows | MISSING | mislabelled OUT_OF_SCOPE (master_backlog §2): under the owner's rule it is a history-gated build item (NULL until history, C9); capital-allocation family, ratio catalogue Batch 3 |
+| G247 | Smooth incremental ratios over 3Y / 5Y windows | DONE | history-gated (C9): incremental_roic_3y / _5y (FY28 / FY30), fcf_ / cfo_ / cfi_{3,5,7,10}y sums, fcf_conversion_3y, cfo_to_ebitda_3y, net_debt_to_fcf_3y; features_bs; tests/test_balance_sheet_cash_flow_family.py |
 | G248 | New-generation businesses need different ratios *(owner)* | DONE | arch 10.8; C21; tests/test_batch7_newgen.py |
 | G250 | EV / gross profit | DONE | ev_to_gross_profit; tests/test_batch7_newgen.py |
 | G251 | Ex-cash PE | DONE | ex_cash_pe; tests/test_batch7_newgen.py |
@@ -221,7 +221,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G278 | Standalone-to-consolidated profit leakage | MISSING | not in docs. Both scopes are already parsed |
 | G314 | Review: forensic scores have different scales; never sum; Altman not for financials *(owner)* | DONE | arch 10.2 |
 | G315 | Review: delivery velocity must divide by free float, not multiply *(owner)* | DONE | arch 10.3 (float_turnover_pct) |
-| G316 | Review: shareholder yield subtracts issuance twice *(owner)* | DOCUMENTED_PLANNED | arch 10.1 (corrected formula) |
+| G316 | Review: shareholder yield subtracts issuance twice *(owner)* | DONE | shareholder_yield subtracts gross share issuance once and adds gross buybacks (TTM cash flow / market cap); features_bs; tests/test_balance_sheet_cash_flow_family.py |
 
 ## Corporate-action (22)
 

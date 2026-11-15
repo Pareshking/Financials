@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
-from financials import features_pl
+from financials import features_bs, features_pl
 from financials.corp_actions import ACCEPTED_STATUSES
 from financials.db import insert_rows, table_columns, version_key
 from financials.features_price import add_price_columns, refresh_breadth
@@ -66,7 +66,7 @@ from financials.timeutil import ist_to_utc, utc_now
 # Reader version of materialised rows. Bump it whenever features.py, fundamentals.py (or another file pinned by
 # tests/test_incremental_materialize.py) changes any output: `materialize --incremental` refuses days built by another
 # version, because only a full run then reproduces the history.
-FEATURES_VERSION = "2026.11.15-5"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
+FEATURES_VERSION = "2026.11.15-6C"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
 # -3: QoQ sales / profit growth, NPM, interest coverage, OPM same quarter last year, dividend yield / payout,
 #     promoter holding QoQ change (owner_requirements items 1, 3, 4)
 # -4A: period P&L family (features_pl: quarter / fiscal-year lines, quarter YoY growth, result dates, history-gated
@@ -74,6 +74,8 @@ FEATURES_VERSION = "2026.11.15-5"  # -2: X106 restatement TTM bridge + flag, X10
 #     fiscal year's OPM, the same-quarter value moved to opm_preceding_year_quarter_pct (ratio catalogue Batches 0-1)
 # -4B: batch B price / volume / technicals (features_price.py) and the market_breadth table
 # -5: batches A and B merged
+# -6C: batch C balance sheet / working capital / cash flow / capital allocation (features_bs.py, ratio catalogue
+#     Batches 2-3); `roa` is now also filled for industrial books
 
 CRITICAL_COLUMNS = ("close", "market_cap", "sales_ttm", "pat_ttm", "total_equity")
 G4_MAX_NULL_RISE = 0.015
@@ -477,18 +479,20 @@ def derived_archetype(book) -> str:
 
 
 def _valuation_history(con, as_of: date, securities=None) -> dict[str, dict[str, list[float]]]:
-    """Each security's PE and EV/EBITDA at the last materialised date of every prior quarter (one query) [C20]."""
+    """Each security's PE and EV/EBITDA at the last materialised date of every prior quarter (one query) [C20],
+    oldest quarter first (the 20-quarter band of G240 takes the last 20)."""
     only, only_p = entity_filter("security_id", securities)
     rows = con.execute(
-        """SELECT security_id, arg_max(pe, as_of_date), arg_max(ev_ebitda, as_of_date)
+        """SELECT security_id, date_trunc('quarter', as_of_date) AS q, arg_max(pe, as_of_date),
+                  arg_max(ev_ebitda, as_of_date)
            FROM screener_features_history
            WHERE as_of_date < date_trunc('quarter', CAST(? AS DATE))"""
         + only
-        + " GROUP BY security_id, date_trunc('quarter', as_of_date)",
+        + " GROUP BY 1, 2 ORDER BY 1, 2",
         [as_of, *only_p],
     ).fetchall()
     out: dict[str, dict[str, list[float]]] = defaultdict(lambda: {"pe": [], "ev_ebitda": []})
-    for sec, pe, eve in rows:
+    for sec, _, pe, eve in rows:
         out[sec]["pe"].append(pe)
         out[sec]["ev_ebitda"].append(eve)
     return out
@@ -526,12 +530,14 @@ def compute_rows(
     rows = []
     prefetch_fundamentals(con, as_of_ts, entities)  # one pass instead of a per-entity scan [benchmarks]
     features_pl.prefetch(con, as_of_ts, entities)
+    features_bs.prefetch(con, as_of_ts, entities)
     try:
         rows = _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all, paid_up, quarter_end,
                      events, kpis, history, curated, arch_override, fundamentals_cache, dividends)  # fmt: skip
     finally:
         clear_prefetch(con, as_of_ts)
         features_pl.clear(con, as_of_ts)
+        features_bs.clear(con, as_of_ts)
     add_price_columns(con, rows, as_of, exchange, factors, frozen, secs)  # batch B (price/technicals)
     return rows
 
@@ -600,6 +606,7 @@ def _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all,
                                      frozen.get(sec), row["eps_ttm"]))  # fmt: skip
         row.update(features_pl.row_columns(fund.get("_pl"), row, fund, factors.get(sec, []), as_of, shares, b,
                                            frozen.get(sec)))  # fmt: skip
+        row.update(features_bs.row_columns(con, as_of_ts, fund.get("_bs"), row, factors.get(sec, []), as_of))  # batch C
         row.update(_newgen_columns(fund.get("_newgen"), mcap, ev, fund))
         hist = history.get(sec, {"pe": [], "ev_ebitda": []})
         fcff = _f(fund["_fcff"]) if fund["_fcff"] is not None else None
@@ -608,6 +615,9 @@ def _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all,
             {
                 "pe_percentile": percentile_rank(row["pe"], hist["pe"]),
                 "ev_ebitda_percentile": percentile_rank(row["ev_ebitda"], hist["ev_ebitda"]),
+                "ev_ebitda_percentile_20q": percentile_rank(
+                    row["ev_ebitda"], hist["ev_ebitda"][-20:], min_periods_required=20
+                ),  # G240 5Y band (C9 gated)
                 "reverse_dcf_implied_g": implied_g,
                 "reverse_dcf_wacc_used": REVERSE_DCF_WACC if implied_g is not None else None,
                 "reverse_dcf_terminal_g": REVERSE_DCF_TERMINAL_G if implied_g is not None else None,
@@ -748,6 +758,7 @@ def _fundamentals(con, entity_id: str, as_of_ts: datetime, end: date) -> dict:
     # NPM on the row's own sales (interest earned for banks, premium for insurers) and owners' TTM profit [X42]
     out["npm_pct"] = _f(safe_div(b["pat_owners"], out["sales_ttm"]))
     out["_pl"] = features_pl.period_values(con, book, end, as_of_ts)  # period P&L family (ratio catalogue Batch 1)
+    out["_bs"] = features_bs.period_values(book, end, b)  # balance sheet / cash flow (ratio catalogue Batches 2-3)
     return out
 
 

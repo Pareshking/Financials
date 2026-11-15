@@ -44,8 +44,11 @@ the full line-by-line audit of the PDF is `docs/master_backlog.md`; ratios are i
 
 **Phase 2 pending: functionality**
 1. AOC-1 group tree (G277) and Reg. 76 (G93), above.
-2. Merger lineage: target -> acquirer, swap ratio, MERGED status, backtest conversion (G37, G56, G57, G58);
-   demerger cost-of-acquisition split (G51).
+2. ~~Merger lineage: target -> acquirer, swap ratio, MERGED status, backtest conversion (G37, G56, G57, G58);
+   demerger cost-of-acquisition split (G51).~~ **Built 2026-11-15 (batch F)**: `entity_lineage`, `lineage
+   add/amend/coa/retire/load/list`, `lineage.convert_position` (architecture §11.7). Still BLOCKED: automatic merger
+   detection (no merger purpose in the corp-action feed, no circular fixture, CA14) and automatic ratios / COA
+   percentages (PDF only; R7 UNVERIFIED): both are admin entries with an evidence URL until a source is verified.
 3. Share classes: DVR / partly-paid ISINs and market cap summed across classes (G275, G306, G336).
 4. Restatement detector, remaining triggers: discontinued operations != 0 and a logged merger/demerger (G67, G68);
    compare Reg. 34 prior-year columns with stored FY figures (G328). The YTD trigger and `restatement_suspected` are

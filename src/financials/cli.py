@@ -15,6 +15,7 @@ from pathlib import Path
 
 import duckdb
 
+from financials import lineage
 from financials.db import apply_schema, connect
 from financials.dsl import run_screen
 from financials.features import materialize, materialize_incremental, settle_full_run
@@ -225,6 +226,7 @@ def build_parser() -> argparse.ArgumentParser:
     sr.add_argument("expression")
     sub.add_parser("ratios", help="list saved custom ratios")
     sub.add_parser("screens", help="list saved screens (docs/hidden_gems.md section B)")
+    lineage.add_cli(sub)
     return p
 
 
@@ -472,6 +474,8 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
                 print(f"error: {exc}", file=out)
                 return 2
             return 0
+        if args.cmd == "lineage":
+            return lineage.run_cli(con, args, out)
         if args.cmd == "backfill-index":
             from financials.admin import AdminError, backfill_index
             from financials.index_changes import IndexInvariantError, read_manifest

@@ -84,7 +84,8 @@ CREATE TABLE IF NOT EXISTS entity_master (
     cin            VARCHAR,                 -- no UNIQUE: DuckDB INSERT OR IGNORE treats NULLs as conflicts
     status         VARCHAR NOT NULL DEFAULT 'ACTIVE',
     inactive_date  DATE,
-    exit_reason    VARCHAR
+    exit_reason    VARCHAR,
+    merged_into    VARCHAR                  -- acquirer entity_id when status = MERGED by an entity_lineage merger (G56)
 );
 
 CREATE TABLE IF NOT EXISTS securities (
@@ -397,11 +398,37 @@ CREATE TABLE IF NOT EXISTS corp_actions (
     eps_factor        DOUBLE,
     observed_gap      DOUBLE,
     status            VARCHAR NOT NULL DEFAULT 'PENDING',
-    related_entity_id VARCHAR REFERENCES entity_master(entity_id),
-    coa_pct           DOUBLE,
+    related_entity_id VARCHAR REFERENCES entity_master(entity_id),  -- never written: lineage is entity_lineage
+    coa_pct           DOUBLE,                                         -- never written: entity_lineage.coa_pct
     source_filing_id  VARCHAR NOT NULL REFERENCES filings(filing_id),
     recorded_at       TIMESTAMP,                 -- when the ledger first held the action (system time)
     decided_at        TIMESTAMP                  -- when status last changed (verification / manual resolution)
+);
+
+-- Directed corporate lineage (G37, architecture §11.7). Read as "child RELATION parent":
+--   MERGED_INTO / AMALGAMATED: the child (target) ceased to exist; its holders received parent (acquirer) shares.
+--   DEMERGED_FROM: the child (resulting company) was carved out of the parent; parent holders kept their shares and
+--   received child shares.
+-- Append-only: a correction or a retirement is a new row naming the row it replaces (supersedes_lineage_id); the
+-- current edges are the ACTIVE rows no other row supersedes. Ids are deterministic over the content. Written only by
+-- financials.admin (lineage add / amend / coa / retire / load), each audited in admin_log and company_overrides.
+CREATE TABLE IF NOT EXISTS entity_lineage (
+    lineage_id            VARCHAR PRIMARY KEY,
+    parent_entity_id      VARCHAR NOT NULL REFERENCES entity_master(entity_id),
+    child_entity_id       VARCHAR NOT NULL REFERENCES entity_master(entity_id),
+    relation              VARCHAR NOT NULL,       -- MERGED_INTO | AMALGAMATED | DEMERGED_FROM
+    effective_date        DATE NOT NULL,          -- first trading day the holders hold the new shares (the ex-date)
+    swap_ratio_num        DECIMAL(18,6),          -- shares received (parent for a merger, child for a demerger) ...
+    swap_ratio_den        DECIMAL(18,6),          -- ... per this many shares held (child / parent); NULL = not verified
+    coa_pct               DECIMAL(9,4),           -- DEMERGED_FROM: % of the parent's pre-scheme cost given to the child
+    parent_coa_pct        DECIMAL(9,4),           -- DEMERGED_FROM: % the parent keeps (parent + children = 100, G51)
+    state                 VARCHAR NOT NULL,       -- ACTIVE | RETIRED
+    supersedes_lineage_id VARCHAR,                -- the row this one corrects or retires (no UNIQUE: [I1])
+    evidence_filing_id    VARCHAR REFERENCES filings(filing_id),
+    evidence_url          VARCHAR,
+    source                VARCHAR NOT NULL,       -- MANIFEST | ADMIN
+    note                  VARCHAR NOT NULL,
+    recorded_at           TIMESTAMP NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS quarantine_queue (

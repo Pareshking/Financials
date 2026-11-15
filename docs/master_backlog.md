@@ -26,15 +26,15 @@ catalogue as IN PROGRESS. They are counted as BUILT here.
 |---|---|---|---|---|---|---|
 | A. Ratios / metrics | 79 | 32 | 2 | 4 | 1 | 118 |
 | B. Data sources | 14 | 22 | 15 | 2 | 3 | 56 |
-| C. Corporate structure / identity | 9 | 1 | 8 | 0 | 2 | 20 |
-| D. Events, flows, corporate actions | 16 | 1 | 7 | 0 | 4 | 28 |
+| C. Corporate structure / identity | 11 | 1 | 6 | 0 | 2 | 20 |
+| D. Events, flows, corporate actions | 18 | 1 | 5 | 0 | 4 | 28 |
 | E. Data quality / rules / assistant claims | 62 | 0 | 14 | 0 | 8 | 84 |
-| F. Backtest | 6 | 0 | 2 | 0 | 0 | 8 |
+| F. Backtest | 7 | 0 | 1 | 0 | 0 | 8 |
 | G. Alerts / UI / tools / ops | 8 | 1 | 11 | 2 | 2 | 24 |
-| **Total** | **194** | **57** | **59** | **8** | **20** | **338** |
+| **Total** | **199** | **57** | **54** | **8** | **20** | **338** |
 
-Counts are tallied from the Class column of section 3 (last bold token per row). Of the 194 BUILT rows (7 moved from
-CATALOGUE by batch C, 2026-11-15), 10 are only
+Counts are tallied from the Class column of section 3 (last bold token per row). Of the 199 BUILT rows (7 moved from
+CATALOGUE by batch C, 5 from DIGEST by batch F, 2026-11-15), 11 are only
 partly built, 1 is built with a different definition (`opm_last_year_pct`), and 12 are rows where the PDF's claim was
 wrong and the corrected behaviour is built (marked "corrected").
 
@@ -293,8 +293,8 @@ exists (file / column); Class.
 | # | Lines | Item | G (status) | Code | Class |
 |---|---|---|---|---|---|
 | C01 | 310-312 | permanent entity master, immutable entity_id; tickers change | G36 DONE | `entity_master`, `securities` | **BUILT** |
-| C02 | 311-312 | directed lineage table (parent, child, relation, effective date, swap ratio) | G37 DOC_PLANNED | `corp_actions.related_entity_id` only | **DIGEST** |
-| C03 | 496-498 | merger: delisting circular sets MERGED, merged_into, swap_ratio | G56 DOC_PLANNED | MERGED only for duplicate repair (D-6) | **DIGEST** |
+| C02 | 311-312 | directed lineage table (parent, child, relation, effective date, swap ratio) | G37 DONE | **DONE 2026-11-15 (batch F)**: `entity_lineage` (append-only, `financials.lineage`, arch 11.7) | **BUILT** |
+| C03 | 496-498 | merger: delisting circular sets MERGED, merged_into, swap_ratio | G56 DONE | **DONE 2026-11-15 (batch F)**: `lineage add --relation MERGED_INTO` sets MERGED + `merged_into` (admin entry with the circular's URL; automatic circular parsing BLOCKED, CA14) | **BUILT** |
 | C04 | 514-515 | daily master sync: symbol master, ISIN changes, new listings, delistings | G60 DONE | F28 `raw_equity_master`; NSE only | **BUILT** |
 | C05 | 686-688, 756, 2528 | map NSE symbols to BSE scrip codes | G79 MISSING | `security_identifier_history.bse_scrip_code` never filled | **DIGEST** |
 | C06 | 751 | key the master on ISIN | G85 CONFLICTS | security_id + FinInstrmId / ISIN history (invariant 3) | **BUILT** (corrected) |
@@ -330,9 +330,9 @@ exists (file / column); Class.
 | D11 | 410-412 | derive F from the pre-open price when missing / mismatched | G47 OOS | invariant 9 | **OOS** |
 | D12 | 438-459 | demerger factor = special pre-open price / prior close | G48 DONE | `test_demerger_factor_is_observed_gap` (uses ex-date open) | **BUILT** |
 | D13 | 459 | apply demerger factor to historical EPS | G50 OOS | invariant 8 (eps_factor 1.0) | **OOS** |
-| D14 | 467-470, 520-523 | COA / swap-ratio watcher; COA sums to 100%; tax cost basis | G51 DOC_PLANNED, G62 MISSING | `corp_actions.coa_pct` column only | **DIGEST** |
+| D14 | 467-470, 520-523 | COA / swap-ratio watcher; COA sums to 100%; tax cost basis | G51 DONE, G62 MISSING | **partial, batch F 2026-11-15**: `entity_lineage.coa_pct` / `parent_coa_pct`, sum-to-100 check, cost basis in `convert_position`; entry by `lineage coa` with an evidence URL. The PDF watcher (G62) is not built (no verified source) | **BUILT** |
 | D15 | 476-477 | spun-off entity starts at listing date, no synthetic bars | G52 DONE | C12, `test_demerger_and_listing.py` | **BUILT** |
-| D16 | 500-502 | merger: acquirer prices not back-adjusted | G57 DOC_PLANNED | merger purposes quarantine as UNKNOWN | **DIGEST** |
+| D16 | 500-502 | merger: acquirer prices not back-adjusted | G57 DONE | **DONE 2026-11-15 (batch F)**: lineage never writes `corp_actions`; test: acquirer and target adjusted series unchanged | **BUILT** |
 | D17 | 517-518 | adjusted overnight gap within +-15% | G61 DONE | +-10% (arch 11.3) | **BUILT** |
 | D18 | 2686-2692 | split creates a new ISIN row; bonus keeps ISIN | G295 | identity + CA13 named rule | **BUILT** |
 | D19 | 940-943 | Reg. 30 order wins (client type, value, timeline) | G114 DONE | `order_wins_90d`, `order_value_90d` | **BUILT** |
@@ -440,7 +440,7 @@ exists (file / column); Class.
 | # | Lines | Item | G (status) | Code | Class |
 |---|---|---|---|---|---|
 | F01 | 476-477 | spun-off entity: no synthetic pre-listing bars | G52 | `test_demerger_and_listing.py` | **BUILT** |
-| F02 | 502 | positions in the target convert into acquirer shares by swap ratio | G58 DOC_PLANNED | — | **DIGEST** |
+| F02 | 502 | positions in the target convert into acquirer shares by swap ratio | G58 DONE | **DONE 2026-11-15 (batch F)**: `lineage.convert_position` (mergers by swap ratio, demergers by entitlement + COA split) | **BUILT** |
 | F03 | 1170-1171 | PIT queries `broadcast <= backtest_date` | G149 DONE | `visible_from_ts <= as_of` | **BUILT** |
 | F04 | 1306-1308 | quarter-end feature snapshots; historical screens | G190 DONE | `screener_features_history` (daily), `screen --as-of` | **BUILT** |
 | F05 | 1294-1308, 2803-2804 | point-in-time screen backtester | G191 DOC_PLANNED | stock TRI exists (`returns.total_return_index`); benchmark TRI F29 UNVERIFIED | **DIGEST** |

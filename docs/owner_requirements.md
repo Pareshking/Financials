@@ -10,8 +10,8 @@ Every concrete item in the chat is mapped to the repository as of 2026-11-14. Th
 
 | Status | Meaning | Count |
 |---|---|---|
-| DONE | implemented and tested (file and test cited) | 188 |
-| DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 67 |
+| DONE | implemented and tested (file and test cited) | 193 |
+| DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 62 |
 | IN_PROGRESS | being built now | 4 |
 | MISSING | not anywhere in docs or code | 37 |
 | CONFLICTS_WITH_EVIDENCE | contradicted by our verified fixtures or tests | 17 |
@@ -229,7 +229,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 |---|---|---|---|
 | G33 | Automate corporate-action adjustment (mergers, demergers like Tata Motors, splits) with zero human intervention *(owner)* | OUT_OF_SCOPE_BY_DECISION | invariant 9; D-6; C4; CA12. Automatic for parsed purposes and named rules; unknowns quarantine |
 | G34 | Adjust per-share series (prices, volume, EPS) by ex-date factors; never multiply absolute financials | DONE | invariant 8; arch 11.1; tests/test_corp_actions.py |
-| G37 | Directed lineage table (parent, child, relation, effective date, swap ratio) | DOCUMENTED_PLANNED | arch 15 gaps (merger lineage); corp_actions.related_entity_id |
+| G37 | Directed lineage table (parent, child, relation, effective date, swap ratio) | DONE | arch 11.7; CA14; `entity_lineage` (append-only, deterministic ids), lineage.py, admin.py `lineage add/amend/coa/retire/load`; reference/entity_lineage.csv (TMCV from TMPV); tests/test_lineage.py |
 | G38 | Corp-action ledger keyed by (entity, ex_date); recompute cumulative backward factors on any change | DONE | corp_actions; rebuild-market; tests/test_corp_actions.py, tests/test_phase1_fixes_a.py |
 | G41 | Split factor F = Y/X (face value X to Y) | DONE | arch 11.1; tests/test_corp_actions.py |
 | G42 | Bonus A:B factor F = B/(A+B) | DONE | arch 11.1; CA5; tests/test_corp_actions.py |
@@ -240,9 +240,9 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G47 | Missing or mismatched factor: derive F automatically from the pre-open price | OUT_OF_SCOPE_BY_DECISION | invariant 9; C4. GAP quarantine freezes the adjusted series; only demergers use the observed gap |
 | G48 | Demerger parent factor = special pre-open price / prior close | DONE | C3; P7; tests/test_corp_actions.py (test_demerger_factor_is_observed_gap). Uses the ex-date open |
 | G50 | Apply the demerger factor to historical EPS | OUT_OF_SCOPE_BY_DECISION | invariant 8; arch 11.1 (eps_factor 1.0) |
-| G51 | Cost-of-acquisition watcher: parse COA %, check they sum to 100%, keep for tax cost basis | DOCUMENTED_PLANNED | arch 15 gaps (demerger COA split); corp_actions.coa_pct; R7 UNVERIFIED. COA is announced as PDF; no source verified |
-| G56 | Merger: delisting circular sets status MERGED, merged_into and swap_ratio on the target | DOCUMENTED_PLANNED | arch 15 gaps (merger lineage). MERGED is used today only for duplicate-security repair (D-6) |
-| G57 | Merger: acquirer prices not back-adjusted (factor 1.0) | DOCUMENTED_PLANNED | arch 11.1. Merger purposes are not among the parsed patterns (CA9) and quarantine as UNKNOWN |
+| G51 | Cost-of-acquisition watcher: parse COA %, check they sum to 100%, keep for tax cost basis | DONE | arch 11.7; `entity_lineage.coa_pct` / `parent_coa_pct`, `lineage.coa_split` (parent + children = 100), cost fraction in `convert_position`; tests/test_lineage.py. Entered by `lineage coa` with an evidence URL: COA is announced as PDF, no source verified, so parsing is BLOCKED (watcher = G62). R7 stays UNVERIFIED and is not stored |
+| G56 | Merger: delisting circular sets status MERGED, merged_into and swap_ratio on the target | DONE | arch 11.7; `lineage add --relation MERGED_INTO --ratio A:B --evidence-url <circular>` sets `entity_master.status = MERGED`, `merged_into`, `inactive_date`; retire reverts; tests/test_lineage.py. Automatic circular parsing BLOCKED: no merger purpose in the corp-action feed and no circular fixture (CA14) |
+| G57 | Merger: acquirer prices not back-adjusted (factor 1.0) | DONE | arch 11.1, 11.7; lineage never writes corp_actions; tests/test_lineage.py::test_merger_marks_target_and_never_adjusts_prices (acquirer and target adjusted series unchanged) |
 | G61 | Ex-date adjuster verifies the adjusted overnight gap within +-15% | DONE | arch 11.3 (+-10%) |
 | G62 | Hourly keyword watcher for 'Cost of Acquisition' and 'Swap Ratio' in announcement PDFs | MISSING | not in docs. PDF text; no source verified |
 | G97 | Corporate actions with ex/record dates, dividend per share, bonus ratios, FV changes | DONE | F03; P12; CA1-CA11; tests/test_nse_corp_actions.py. Reg. 30 OUTCOME XBRL vaulted raw (E2) |
@@ -364,7 +364,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | id | requirement | status | where / next step |
 |---|---|---|---|
 | G52 | Spun-off entity starts at its listing date with no synthetic pre-listing bars | DONE | C12; X52; tests/test_demerger_and_listing.py |
-| G58 | Backtest positions in the target convert into acquirer shares by swap ratio | DOCUMENTED_PLANNED | arch 11.1, 15 |
+| G58 | Backtest positions in the target convert into acquirer shares by swap ratio | DONE | arch 11.7; `lineage.convert_position` (merger by swap ratio, demerger children by entitlement with the COA cost split; chains; raises without a verified ratio); tests/test_lineage.py |
 | G151 | PEAD tracker: abnormal return (vs Nifty 500) and relative volume at T+0/1/5/20 after broadcast | MISSING | not built. Needs index closes (F27) or TRI (F29) |
 | G190 | Historical screens on quarter-end feature snapshots | DONE | screener_features_history (daily); screen --as-of (arch 11.9) |
 | G191 | Point-in-time screen backtester across past years | DOCUMENTED_PLANNED | arch 15 Phase 3 (PIT backtester). Needs TRI benchmark (F29) |

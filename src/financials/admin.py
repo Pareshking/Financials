@@ -805,3 +805,273 @@ def _mark_correction_dirty(con, filing_id: str, entity_id: str, reason: str) -> 
     vis = con.execute("SELECT min(visible_from_ts) FROM filing_meta WHERE filing_id = ?", [filing_id]).fetchone()[0]
     if vis is not None:
         mark_visible(con, entity_id, vis, reason, filing_id)
+
+
+# ── corporate lineage (G37, G51, G56, G57; architecture §11.7) ────────────
+# Append-only edges in entity_lineage (financials.lineage). A merger marks the target MERGED with merged_into; it
+# never writes corp_actions, so neither the acquirer's nor the target's adjusted prices change (factor 1.0, G57).
+
+
+def _dec(x) -> str | None:
+    return None if x is None else f"{Decimal(x).normalize():f}"
+
+
+def _lineage_entity(con, ident: str) -> str:
+    """An entity id, an ISIN or an NSE symbol (any interval of the identifier history); must name one entity."""
+    ident = ident.strip()
+    if con.execute("SELECT 1 FROM entity_master WHERE entity_id = ?", [ident]).fetchone():
+        return ident
+    is_isin = len(ident) == 12 and ident[:2].isalpha() and ident[2:].isalnum() and ident[-1].isdigit()
+    col = "isin" if is_isin else "symbol"
+    rows = con.execute(
+        f"SELECT DISTINCT s.entity_id FROM security_identifier_history h JOIN securities s USING (security_id) "
+        f"WHERE h.{col} = ?",
+        [ident],
+    ).fetchall()
+    if len(rows) != 1:
+        raise AdminError(f"{col} {ident!r} names {len(rows)} entities; pass the entity id")
+    return rows[0][0]
+
+
+def _lineage_rows(con, where: str = "", params: list | None = None) -> list[dict]:
+    return fetch_dicts(con, f"SELECT * FROM entity_lineage {where}", params or [])
+
+
+def _current_lineage(con, lineage_id: str) -> dict:
+    rows = _lineage_rows(con, "WHERE lineage_id = ?", [lineage_id])
+    if not rows:
+        raise AdminError(f"no lineage row {lineage_id}")
+    if lineage_id not in {e.lineage_id for e in _lineage_edges(con)}:
+        raise AdminError(f"{lineage_id} is superseded or retired; amend the current row")
+    return rows[0]
+
+
+def _demerger_evidence(con, parent: str, effective: date) -> str:
+    """A DEMERGED_FROM edge needs the parent's accepted DEMERGER action on the effective date (its price factor)."""
+    from financials.corp_actions import ACCEPTED_STATUSES
+
+    row = con.execute(
+        "SELECT source_filing_id FROM corp_actions c JOIN securities s USING (security_id) WHERE s.entity_id = ? "
+        "AND c.action_type = 'DEMERGER' AND c.ex_date = ? AND c.status IN (SELECT unnest(?)) "
+        "ORDER BY c.action_id LIMIT 1",
+        [parent, effective, sorted(ACCEPTED_STATUSES)],
+    ).fetchone()
+    if row is None:
+        raise AdminError(f"{parent} has no accepted DEMERGER action with ex-date {effective}")
+    return row[0]
+
+
+def _insert_lineage(con, row: dict, *, action: str, note: str, reactivate: bool = False) -> dict:
+    """Validate, insert (deterministic id), apply the merger status, check the COA split and audit one edge row."""
+    from financials.lineage import MERGE_RELATIONS, LineageEdge, LineageError, coa_split, load_edges
+
+    keys = ("parent_entity_id", "child_entity_id", "relation", "effective_date", "swap_ratio_num", "swap_ratio_den",
+            "coa_pct", "parent_coa_pct", "state", "supersedes_lineage_id")  # fmt: skip
+    try:
+        edge = LineageEdge("new", *(row.get(k) for k in keys))
+    except LineageError as exc:
+        raise AdminError(str(exc)) from exc
+    lineage_id = stable_id("lin", edge.parent_entity_id, edge.child_entity_id, edge.relation, edge.effective_date,
+                           _dec(edge.swap_ratio_num), _dec(edge.swap_ratio_den), _dec(edge.coa_pct),
+                           _dec(edge.parent_coa_pct), edge.state, edge.supersedes_lineage_id)  # fmt: skip
+    if con.execute("SELECT 1 FROM entity_lineage WHERE lineage_id = ?", [lineage_id]).fetchone():
+        tip = _chain_tip(con, lineage_id)
+        if not reactivate or tip == lineage_id:
+            return {"lineage_id": lineage_id, "inserted": False}
+        if con.execute("SELECT state FROM entity_lineage WHERE lineage_id = ?", [tip]).fetchone()[0] != "RETIRED":
+            raise AdminError(f"edge exists as {tip}; use `lineage amend` or `lineage coa`")
+        # `lineage add` of an edge retired earlier: a new ACTIVE row supersedes the RETIRED one.
+        return _insert_lineage(con, {**row, "supersedes_lineage_id": tip}, action=action, note=note)
+    if edge.supersedes_lineage_id is None:
+        same = [e for e in load_edges(con) if (e.parent_entity_id, e.child_entity_id, e.relation, e.effective_date)
+                == (edge.parent_entity_id, edge.child_entity_id, edge.relation, edge.effective_date)]  # fmt: skip
+        if same:
+            raise AdminError(f"edge exists as {same[0].lineage_id}; use `lineage amend` or `lineage coa`")
+    now = utc_now()
+    insert_rows(con, "entity_lineage", [{**{k: row.get(k) for k in keys}, "lineage_id": lineage_id,
+                                         "evidence_filing_id": row.get("evidence_filing_id"),
+                                         "evidence_url": row.get("evidence_url"), "source": row["source"],
+                                         "note": note, "recorded_at": now}])  # fmt: skip
+
+    if edge.relation in MERGE_RELATIONS:
+        _apply_merger_status(con, edge, lineage_id)
+    elif edge.state == "ACTIVE":
+        try:
+            coa_split(load_edges(con), edge.parent_entity_id, edge.effective_date)
+        except LineageError as exc:
+            raise AdminError(str(exc)) from exc
+    value = {k: row.get(k) for k in keys if row.get(k) is not None} | {"lineage_id": lineage_id}
+    _override(con, edge.child_entity_id, "lineage", value, edge.effective_date, note)
+    con.execute(
+        "INSERT INTO admin_log VALUES (?, ?, ?, ?, ?, ?)",
+        [stable_id("adm", "lineage", action, lineage_id, now), "LINEAGE_" + action,
+         json.dumps(value, default=str, sort_keys=True), json.dumps({"lineage_id": lineage_id}), note, now],
+    )  # fmt: skip
+    return {"lineage_id": lineage_id, "inserted": True}
+
+
+def _chain_tip(con, lineage_id: str) -> str:
+    """The latest row of a supersession chain (append-only: each row is superseded at most once by design)."""
+    while True:
+        nxt = con.execute("SELECT lineage_id FROM entity_lineage WHERE supersedes_lineage_id = ? ORDER BY recorded_at "
+                          "DESC LIMIT 1", [lineage_id]).fetchone()  # fmt: skip
+        if nxt is None:
+            return lineage_id
+        lineage_id = nxt[0]
+
+
+def _apply_merger_status(con, edge, lineage_id: str) -> None:
+    """G56: the target of a current merger edge is MERGED into the acquirer from the effective date; a retired edge
+    reactivates it. Prices are never touched (G57)."""
+    status, merged_into = con.execute("SELECT status, merged_into FROM entity_master WHERE entity_id = ?",
+                                      [edge.child_entity_id]).fetchone()  # fmt: skip
+    if edge.state == "RETIRED":
+        if merged_into == edge.parent_entity_id:
+            con.execute("UPDATE entity_master SET status = 'ACTIVE', inactive_date = NULL, exit_reason = NULL, "
+                        "merged_into = NULL WHERE entity_id = ?", [edge.child_entity_id])  # fmt: skip
+        return
+    if status == "MERGED" and merged_into != edge.parent_entity_id:
+        raise AdminError(f"{edge.child_entity_id} is already MERGED ({merged_into or 'duplicate-security repair'})")
+    con.execute(
+        "UPDATE entity_master SET status = 'MERGED', inactive_date = ?, exit_reason = ?, merged_into = ? "
+        "WHERE entity_id = ?",
+        [edge.effective_date, f"{edge.relation} {edge.parent_entity_id} ({lineage_id})", edge.parent_entity_id,
+         edge.child_entity_id],
+    )  # fmt: skip
+
+
+def add_lineage(
+    con,
+    *,
+    parent: str,
+    child: str,
+    relation: str,
+    effective_date: date,
+    ratio_num: Decimal | None = None,
+    ratio_den: Decimal | None = None,
+    evidence_url: str,
+    note: str,
+) -> dict:
+    """Record one edge by hand (`lineage add`). Automatic merger parsing is BLOCKED: no merger purpose exists in the
+    NSE corporate-actions feed [CA14], so mergers come only from here, each with the URL of its evidence."""
+    if not evidence_url.strip() or not note.strip():
+        raise AdminError("an evidence URL and a note are required")
+
+    def run(con):
+        p, c = _lineage_entity(con, parent), _lineage_entity(con, child)
+        evidence = _demerger_evidence(con, p, effective_date) if relation == "DEMERGED_FROM" else None
+        return _insert_lineage(con, {
+            "parent_entity_id": p, "child_entity_id": c, "relation": relation, "effective_date": effective_date,
+            "swap_ratio_num": ratio_num, "swap_ratio_den": ratio_den, "state": "ACTIVE",
+            "evidence_filing_id": evidence, "evidence_url": evidence_url.strip(), "source": "ADMIN",
+        }, action="ADD", note=note.strip(), reactivate=True)  # fmt: skip
+
+    return _transaction(con, run)
+
+
+def amend_lineage(con, lineage_id: str, *, ratio_num: Decimal, ratio_den: Decimal, evidence_url: str, note: str):
+    """Set the swap / entitlement ratio of a current edge: a superseding row (the old row stays)."""
+    if not evidence_url.strip() or not note.strip():
+        raise AdminError("an evidence URL and a note are required")
+
+    def run(con):
+        old = _current_lineage(con, lineage_id)
+        new = {**old, "swap_ratio_num": ratio_num, "swap_ratio_den": ratio_den, "supersedes_lineage_id": lineage_id,
+               "evidence_url": evidence_url.strip(), "source": "ADMIN"}  # fmt: skip
+        return _insert_lineage(con, new, action="AMEND", note=note.strip())
+
+    return _transaction(con, run)
+
+
+def set_demerger_coa(
+    con,
+    *,
+    parent: str,
+    effective_date: date,
+    parent_pct: Decimal,
+    children: dict[str, Decimal],
+    evidence_url: str,
+    note: str,
+) -> dict:
+    """G51: the cost-of-acquisition split of one demerger, for every child of the scheme at once; parent + children
+    must sum to 100% (within 0.01 pp). Only from a figure an admin read at `evidence_url` (R7 stays UNVERIFIED)."""
+    from financials.lineage import COA_TOLERANCE, HUNDRED, load_edges
+
+    if not evidence_url.strip() or not note.strip():
+        raise AdminError("an evidence URL and a note are required")
+    total = Decimal(parent_pct) + sum((Decimal(v) for v in children.values()), Decimal(0))
+    if abs(total - HUNDRED) > COA_TOLERANCE:
+        raise AdminError(f"COA split sums to {total}%, not 100")
+
+    def run(con):
+        p = _lineage_entity(con, parent)
+        named = {_lineage_entity(con, c): Decimal(v) for c, v in children.items()}
+        scheme = {
+            e.child_entity_id: e
+            for e in load_edges(con)
+            if e.relation == "DEMERGED_FROM" and e.parent_entity_id == p and e.effective_date == effective_date
+        }
+        if set(named) != set(scheme):
+            raise AdminError(f"the scheme's children are {sorted(scheme)}; name each of them exactly once")
+        out = []
+        for child, pct in sorted(named.items()):
+            old = _current_lineage(con, scheme[child].lineage_id)
+            new = {**old, "coa_pct": pct, "parent_coa_pct": Decimal(parent_pct), "supersedes_lineage_id":
+                   old["lineage_id"], "evidence_url": evidence_url.strip(), "source": "ADMIN"}  # fmt: skip
+            out.append(_insert_lineage(con, new, action="COA", note=note.strip()))
+        return {"parent": p, "effective_date": effective_date, "total_pct": total, "rows": out}
+
+    return _transaction(con, run)
+
+
+def retire_lineage(con, lineage_id: str, *, note: str) -> dict:
+    """Withdraw an edge: a RETIRED row supersedes it; a merged target becomes ACTIVE again."""
+    if not note.strip():
+        raise AdminError("a note is required")
+
+    def run(con):
+        old = _current_lineage(con, lineage_id)
+        new = {**old, "state": "RETIRED", "supersedes_lineage_id": lineage_id, "source": "ADMIN"}
+        return _insert_lineage(con, new, action="RETIRE", note=note.strip())
+
+    return _transaction(con, run)
+
+
+def load_lineage_manifest(con, rows: list[dict], *, source: str = "entity_lineage.csv") -> dict:
+    """Load edges from a manifest whose rows are pinned to committed fixtures (`reference/entity_lineage.csv`, test
+    tests/test_lineage.py). Idempotent. A row whose entities are not in the database yet, or (DEMERGED_FROM) whose
+    parent has no accepted DEMERGER action on the date, is skipped with its reason and loads on a later run."""
+    from financials.lineage import parse_ratio
+
+    def run(con):
+        out: dict[str, Any] = {"inserted": [], "present": [], "skipped": []}
+        current = {(e.parent_entity_id, e.child_entity_id, e.relation, e.effective_date): e.lineage_id
+                   for e in _lineage_edges(con)}  # fmt: skip
+        for r in rows:
+            eff = date.fromisoformat(r["effective_date"])
+            try:
+                p, c = _lineage_entity(con, r["parent"]), _lineage_entity(con, r["child"])
+                evidence = _demerger_evidence(con, p, eff) if r["relation"] == "DEMERGED_FROM" else None
+            except AdminError as exc:
+                out["skipped"].append({"parent": r["parent"], "child": r["child"], "reason": str(exc)})
+                continue
+            if (p, c, r["relation"], eff) in current:  # loaded before (possibly amended since): leave it
+                out["present"].append(current[(p, c, r["relation"], eff)])
+                continue
+            num, den = parse_ratio(f"{r['ratio_num']}:{r['ratio_den']}" if r["ratio_num"] else None)
+            coa, pcoa = (Decimal(r[k]) if r[k] else None for k in ("coa_pct", "parent_coa_pct"))
+            res = _insert_lineage(con, {
+                "parent_entity_id": p, "child_entity_id": c, "relation": r["relation"], "effective_date": eff,
+                "swap_ratio_num": num, "swap_ratio_den": den, "coa_pct": coa, "parent_coa_pct": pcoa, "state": "ACTIVE",
+                "evidence_filing_id": evidence, "evidence_url": r["evidence_url"], "source": "MANIFEST",
+            }, action="LOAD", note=f"{source}: {r['evidence_fixture']}: {r['evidence_quote']}")  # fmt: skip
+            out["inserted" if res["inserted"] else "present"].append(res["lineage_id"])
+        return out
+
+    return _transaction(con, run)
+
+
+def _lineage_edges(con):
+    from financials.lineage import load_edges
+
+    return load_edges(con)

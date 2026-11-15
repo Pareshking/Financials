@@ -10,13 +10,13 @@ Every concrete item in the chat is mapped to the repository as of 2026-11-14. Th
 
 | Status | Meaning | Count |
 |---|---|---|
-| DONE | implemented and tested (file and test cited) | 170 |
+| DONE | implemented and tested (file and test cited) | 171 |
 | DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 72 |
 | IN_PROGRESS | being built now | 4 |
-| MISSING | not anywhere in docs or code | 47 |
+| MISSING | not anywhere in docs or code | 46 |
 | CONFLICTS_WITH_EVIDENCE | contradicted by our verified fixtures or tests | 17 |
-| OUT_OF_SCOPE_BY_DECISION | excluded by a recorded decision (C2, C7, C9, invariants, CLAUDE.md Don'ts) | 26 |
-| NEEDS_OWNER_DECISION | the docs do not settle it | 7 |
+| OUT_OF_SCOPE_BY_DECISION | excluded by a recorded decision (C2, C7, C9, invariants, CLAUDE.md Don'ts) | 33 |
+| NEEDS_OWNER_DECISION | the docs do not settle it | 0 |
 | **Total** | | **343** |
 
 Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows prefixed "Review:" are the code-review points the owner pasted into the chat, so they count as owner requirements.
@@ -259,7 +259,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G21 | Detect restatements by comparing a new filing's comparative quarter with the stored one; supersede the old row | CONFLICTS_WITH_EVIDENCE | X2, X3; invariant 1. No comparative columns exist; rows are never superseded in place |
 | G24 | Confirm whether corrections / restatements are filed as XBRL *(owner)* | DONE | E9, X51, X57, X63; filing_revisions; tests/test_batch10_edge_cases.py. Same-period revisions are XBRL; retrospective restatements are not (X3) |
 | G27 | Same-period correction: ingest the latest submission per (symbol, period, scope) | DONE | E9; arch 6.3; tests/test_x83_visibility.py. Latest-wins only as of a date (invariant 4) |
-| G28 | Retrospective restatement: take restated comparatives from the quarterly PDF or the annual report | NEEDS_OWNER_DECISION | arch 7.6 (PDF extractor deferred) vs arch 15 ('PDFs are out of scope') vs L2 ('verified PDF supplement'). Docs disagree; owner to decide |
+| G28 | Retrospective restatement: take restated comparatives from the quarterly PDF or the annual report | DONE | Decision E (2026-11-15): no PDF recovery of restated comparatives; quarters stay as first published (PIT), TTM uses the restated YTD bridge with `restatement_suspected` (X106); PDFs only for audited error corrections (X107) |
 | G35 | Never overwrite history: immutable raw tables plus a computed adjustment layer | DONE | invariant 1; arch 4; tests/test_foundations.py |
 | G54 | Parent restates comparatives (Ind AS 105); a PDF comparator promotes the continuing-operations series | OUT_OF_SCOPE_BY_DECISION | arch 7.6, 15 (no PDFs); X80 withholds TTM over the re-presented year |
 | G55 | Spun-off baseline from carve-out comparatives in the first PDF / Information Memorandum | OUT_OF_SCOPE_BY_DECISION | C12. History before the first own filing does not exist for PIT reads |
@@ -286,8 +286,8 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 |---|---|---|---|
 | G2 | Verify the owner's belief that insurance and NBFC results are not on NSE *(owner)* | CONFLICTS_WITH_EVIDENCE | references X54, X62-X64; tests/test_batch4_nbfc.py, tests/test_batch6_insurers.py. Both are filed on NSE as XBRL and parsed (10 NBFCs, 10 insurers) |
 | G4 | Insurers sit only under a separate NSE 'Insurance' results tab; an equity-feed scraper never sees them | CONFLICTS_WITH_EVIDENCE | references A7; src/financials/fetch/jobs.py:78; X62-X66. index=insurance exists only for the legacy listing (to Dec 2024); Integrated Filing insurer XBRL is found via the equities integrated-filing endpoint |
-| G32 | MCA AOC-4 XBRL carries full notes and prior-year columns; banks, NBFCs and insurers are exempt | MISSING | not in references.md. Matters for whether Reg. 34 XBRL exists for financials |
-| G74 | Is MCA AOC-4 XBRL free and available? *(owner)* | NEEDS_OWNER_DECISION | not in data_sources.yaml. Paid per company with login/CAPTCHA (per the chat, UNVERIFIED); annual XBRL already free from NSE (F07) |
+| G32 | MCA AOC-4 XBRL carries full notes and prior-year columns; banks, NBFCs and insurers are exempt | OUT_OF_SCOPE_BY_DECISION | Follows G74 (no paid sources). Prior-year columns come from free Reg. 34 XBRL only (G328) |
+| G74 | Is MCA AOC-4 XBRL free and available? *(owner)* | OUT_OF_SCOPE_BY_DECISION | Owner decision 2026-11-15: **no paid source at all**. Annual XBRL stays the free NSE Reg. 34 feed (F07) |
 | G76 | Use free exchange Reg. 34(1) annual XBRL (same MCA taxonomy) instead of MCA | DONE | A8, R2, X36, X69; tests/test_batch9_annual.py. Fetched from NSE; BSE unreachable (A1) |
 | G80 | Should the project move from NSE to BSE? *(owner)* | DONE | C7; arch 1. NSE primary |
 | G81 | NSE has only 150+ exclusive companies; NSE gives the complete universe | OUT_OF_SCOPE_BY_DECISION | C7. Universe is NSE-only by decision |
@@ -338,11 +338,11 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 
 | id | requirement | status | where / next step |
 |---|---|---|---|
-| G89 | A personal website like Screener.in *(owner)* | NEEDS_OWNER_DECISION | arch 1 (non-goal: UI hosting); arch 14, 14b (DSL and statements built). No front end decided |
+| G89 | A personal website like Screener.in *(owner)* | OUT_OF_SCOPE_BY_DECISION | Decision F (2026-11-15, reversible): no hosted site for now; screens run from the CLI/DSL. Revisit after the ratio catalogue is built |
 | G96 | Industry / basic-industry mapping (NSE 4-tier classification) | DOCUMENTED_PLANNED | arch 5 (entity_classification_history 'not yet built'); raw_index_snapshot.industry. No verified source for the 4-tier classification |
 | G112 | Peer comparison table ranked by market cap, PE, ROCE, quarterly profit growth | MISSING | no peer grouping in features. Needs the industry classification |
 | G153 | Screening queries are a must *(owner)* | DONE | dsl.py; arch 14; tests/test_dsl.py; CLI screen |
-| G164 | Concall / presentation / DRHP RAG with citations, separate from XBRL numbers | NEEDS_OWNER_DECISION | arch 15 (PDFs out of scope for numbers) |
+| G164 | Concall / presentation / DRHP RAG with citations, separate from XBRL numbers | OUT_OF_SCOPE_BY_DECISION | Decision G (2026-11-15, reversible): no text retrieval over announcement PDFs for now |
 | G165 | Custom Excel / DCF model exporter over the database | MISSING | export-bundle writes Parquet only |
 | G166 | One wide nightly feature table, one row per security | DONE | screener_features(_history); materialize; tests/test_features.py. About 150 columns |
 | G185 | Alias dictionary mapping readable names to columns | DONE | dsl.ALIASES; tests/test_dsl.py |
@@ -350,10 +350,10 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G187 | Saved custom ratios expand inline in any screen | DONE | dsl.save_custom_ratio; user_custom_ratios; tests/test_dsl.py. No CLI command to save one |
 | G188 | Natural-language to DSL translator that shows the formula for checking | MISSING | not built |
 | G189 | Daily screen alerts when a stock enters or exits a saved screen | DOCUMENTED_PLANNED | arch 15 Phase 3 (daily diff digest) |
-| G211 | Portfolio overlap, sector weights, weighted PE/ROCE, correlation | NEEDS_OWNER_DECISION | arch 1 (purpose: research, screening, backtesting). Scope extension |
-| G212 | Point-in-time thesis snapshot and post-mortem (decision journal) | NEEDS_OWNER_DECISION | arch 1. Scope extension |
+| G211 | Portfolio overlap, sector weights, weighted PE/ROCE, correlation | OUT_OF_SCOPE_BY_DECISION | Decision H (2026-11-15, reversible): portfolio analytics out of scope for now (arch 1) |
+| G212 | Point-in-time thesis snapshot and post-mortem (decision journal) | OUT_OF_SCOPE_BY_DECISION | Follows decision H |
 | G268 | Cross-sector columns (Rule of 40, EV/GP, ex-cash PE) usable in one query | DONE | arch 10.8; tests/test_batch7_newgen.py |
-| G281 | Synchronised price and fundamental charts on each stock page | NEEDS_OWNER_DECISION | arch 1 (non-goal: UI hosting) |
+| G281 | Synchronised price and fundamental charts on each stock page | OUT_OF_SCOPE_BY_DECISION | Follows decision F |
 | G282 | Post-EOD diff engine and digest (watchlist events, screen entries/exits) | DOCUMENTED_PLANNED | arch 15 Phase 3 (daily diff digest). Delivery channel (Telegram / email) undecided |
 | G283 | Alert: 52-week high on > 2x 20-day median delivery volume | MISSING | not built |
 | G332 | Optional read-only SQLite / D1 export of screener_features for a UI | OUT_OF_SCOPE_BY_DECISION | CLAUDE.md Don'ts (no second database engine) |
@@ -421,11 +421,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 
 ## Owner decisions needed first
 
-1. G28: restated comparatives. architecture §7.6 defers an anchor-locked PDF extractor, §15 says PDFs are out of scope, and L2 mentions a "verified PDF supplement". Pick one and fix all three places (G62 depends on it).
-2. G89, G281: whether to build any front end (stock pages, charts, peer tables). §1 lists UI hosting as a non-goal. Also pick the alert channel for the Phase 3 digest (G282).
-3. G74: whether paid sources (MCA AOC-4) are allowed at all.
-4. G164: whether text retrieval over announcement PDFs (concalls, presentations) is in scope, kept apart from numbers.
-5. G211, G212: whether portfolio analytics and a decision journal are in scope (§1 says research, screening, backtesting).
+None open. Decided 2026-11-15: no paid sources at all (G74, by the owner); E-H below (on the owner's behalf, reversible).
 
 ## Missing: proposed to-do (priority order)
 
@@ -475,3 +471,8 @@ The owner asked the assistant to take these with its recommendation. Each is rev
 - **B. Company filing errors:** correct from the signed statutory results PDF through an audited correction path. Raw XBRL is never edited; each correction stores the PDF link, page and printed line, needs two independent reads that agree, and can be reversed. (In progress.)
 - **C. Share count:** the Reg. 31 total is the source of truth for market cap (already so in `market_cap_shares`). Cross-check findings that differ by an exact factor (2, 5, 10, 100, 1000), or by the same gap in 3+ quarters (trust-held treasury shares or rounded paid-up), are closed ACCEPTED with the reason; 92 closed, 12 left open.
 - **D. Non-blocking notes:** segment / geography findings (the filer's own totals not adding up) are ACCEPTED (41). A price gap is ACCEPTED as a market move only when it is not near a split / bonus / consolidation ratio and the next closes hold (114); the other 105, including ratio-like gaps such as Infibeam x10 and Vertoz x10, stay open as candidate missing corporate actions.
+- **E. Restated comparatives (G28):** no PDF extraction of restated earlier quarters. A quarter stays as first published, which is what a point-in-time backtest must see; TTM across a restatement uses the latest YTD (decision A, X106). PDFs are used only for audited corrections of clear filing errors (decision B, X107).
+- **F. Front end (G89, G281):** none for now; screens run through the CLI and DSL. The Phase 3 digest channel (G282) is chosen when the digest is built.
+- **G. Announcement text retrieval (G164):** out of scope for now; numbers come only from XBRL and audited PDF corrections.
+- **H. Portfolio analytics and decision journal (G211, G212):** out of scope for now (architecture §1: research, screening, backtesting).
+- **Paid sources (G74, owner, 2026-11-15):** none at all.

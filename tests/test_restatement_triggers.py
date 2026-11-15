@@ -105,7 +105,11 @@ def test_recording_a_demerger_marks_the_entity_dirty_from_its_ex_date(market):
     record_corp_action(market.con, CorpAction("ca-tm", tm, "DEMERGER", date(2025, 10, 14)), source_filing_id=filing)
     dirty.mark_market_changes(market.con, before, "TEST")
     rows = market.con.execute("SELECT entity_id, from_date FROM materialize_dirty WHERE reason = 'TEST'").fetchall()
-    assert rows == [(ent, date(2025, 10, 14))]
+    # From the ex-date for the restatement flag (X109); batch I adds the day its source listing became visible
+    # (here the 2025-10-13 bhavcopy, EOD rule), because `days_to_next_ex_date` reads announced actions from then.
+    assert rows == [(ent, date(2025, 10, 13))]
+    structural = {r for r in dirty.market_state(market.con)["structural"] if r[2] == "ca-tm"}
+    assert {r[1] for r in structural} == {date(2025, 10, 14)}
 
 
 def test_retired_actions_do_not_flag(market):

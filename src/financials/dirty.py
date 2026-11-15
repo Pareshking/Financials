@@ -81,6 +81,13 @@ _STATE = {
         "WHERE action_type IN ('MERGER', 'DEMERGER')",
         (1,),
     ),
+    # Batch I (features_more): an announced action's listing makes `days_to_next_ex_date` visible from its fetch /
+    # broadcast (UTC date: never later than the IST date that first reads it); a retirement clears it.
+    "announced": (
+        "SELECT a.security_id, CAST(coalesce(f.broadcast_ts, f.fetched_at) AS DATE), a.ex_date, a.action_id, "
+        "a.status IN ('SUPERSEDED', 'REJECTED') FROM corp_actions a JOIN filings f ON f.filing_id = a.source_filing_id",
+        (1,),
+    ),
     "gaps": (
         "SELECT security_id, CAST(json_extract_string(details, '$.trade_date') AS DATE) FROM quarantine_queue "
         "WHERE stage = 'GAP' AND resolved_at IS NULL AND security_id IS NOT NULL",

@@ -10,10 +10,10 @@ Every concrete item in the chat is mapped to the repository as of 2026-11-14. Th
 
 | Status | Meaning | Count |
 |---|---|---|
-| DONE | implemented and tested (file and test cited) | 215 |
+| DONE | implemented and tested (file and test cited) | 219 |
 | DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 51 |
-| IN_PROGRESS | being built now | 4 |
-| MISSING | not anywhere in docs or code | 25 |
+| IN_PROGRESS | being built now | 3 |
+| MISSING | not anywhere in docs or code | 22 |
 | CONFLICTS_WITH_EVIDENCE | contradicted by our verified fixtures or tests | 18 |
 | OUT_OF_SCOPE_BY_DECISION | excluded by a recorded decision (C2, C7, C9, invariants, CLAUDE.md Don'ts) | 30 |
 | NEEDS_OWNER_DECISION | the docs do not settle it | 0 |
@@ -47,7 +47,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G118 | Regulatory / judicial actions and penalty amounts | DOCUMENTED_PLANNED | penalties_90d (NULL); E12 (contents UNVERIFIED) |
 | G119 | Allotments, preferential issues, QIPs, warrants (price, allottees, dilution) | DONE | E6; corporate_events; tests/test_batch10_events.py. Screener column `allotments_90d` (count, batch G); no warrant tracker yet |
 | G120 | Agreements, JVs, MoUs (counterparty, stake) | DOCUMENTED_PLANNED | E2 (ANN_AGREEMENT vaulted raw); arch 15 Phase 3 |
-| G130 | Segment reporting (Ind AS 108): revenue, result, assets, liabilities per segment | IN_PROGRESS | X49; parsers/segments.py; segment table on another branch |
+| G130 | Segment reporting (Ind AS 108): revenue, result, assets, liabilities per segment | DONE | X49, X97-X99; parsers/segments.py, `segment_observations` (point in time, `fundamentals.load_segments`); screener columns `segment_count`, `largest_segment_revenue_share`, `fastest_growing_segment(_growth_yoy)`, `largest_segment_margin_change_yoy_pp` (batch I, features_more.py); tests/test_segment_observations.py, tests/test_features_more.py |
 | G131 | Geographic revenue split (domestic vs export) | IN_PROGRESS | X75 |
 | G143 | NSE RSS feeds per filing type drive targeted XBRL downloads | DONE | A2, A3, A9, CA6, E1; run-day RSS hint. The list of nine feeds is unverified |
 | G192 | Analyst / investor meet XBRL (funds, dates) | DOCUMENTED_PLANNED | E2 (SAIIM vaulted raw); Phase 3 |
@@ -153,14 +153,14 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G183 | Average delivery % over 20 days | DONE | deliv_pct_avg_20d (mean of deliv_qty / volume, = DELIV_PER / 100, P16), deliv_pct; tests/test_features_price.py |
 | G184 | F&O PCR column | DOCUMENTED_PLANNED | F16 |
 | G194 | Ace investor graph across Reg. 31 >1% holders, PIT/SAST and bulk/block deals | DOCUMENTED_PLANNED | SHP12 (shareholding_major_holders); F14. Name normalisation not designed |
-| G198 | Valuation bands: current PE / PB / EV-EBITDA percentile vs own history | DONE | pe_percentile, ev_ebitda_percentile (C20); tests/test_valuation_bands.py. P/B band missing; 5Y/10Y windows NULL under C9 |
+| G198 | Valuation bands: current PE / PB / EV-EBITDA percentile vs own history | DONE | pe_percentile, ev_ebitda_percentile (C20); tests/test_valuation_bands.py. P/B, P/S and EV/Sales bands: pb_percentile, price_to_sales_percentile, ev_to_sales_percentile (batch I, tests/test_features_more.py); 5Y/10Y windows NULL under C9 |
 | G199 | Discount / premium to basic-industry median | DONE | pe_/pb_premium_to_basic_industry and _to_industry (own / median - 1); NSE classification F30, IC1-IC3, C25; features_peers.py; tests/test_batch_h_industry_peers.py |
 | G200 | Reverse DCF implied growth using the live 10Y G-Sec | DONE | reverse_dcf_implied_g (C20, WACC fixed 12%); tests/test_valuation_bands.py. Live yield needs F25 |
 | G201 | Capital-allocation scorecard (incremental ROIC, buyback yield, 5Y dilution) | DONE | view capital_allocation_scorecard (schema.sql, after the column upgrade): batch C / G components side by side, never one score; tests/test_features_extra.py |
 | G202 | Dividend payout % | DONE | dividend_payout_pct = trailing dividends per share / eps_ttm, NULL if EPS <= 0; arch 10.7; tests/test_owner_items_qoq_dividend_promoter.py. No committed company has both an accepted dividend and a TTM EPS yet |
 | G203 | YoY sales-growth acceleration (current YoY - prior-quarter YoY) | DONE | growth_acceleration_pp (quarter form: sales YoY latest - preceding quarter); TTM form waits for 9 quarters (C9); batch D; tests/test_features_gems.py |
 | G204 | Operating-margin expansion vs the same quarter last year | DONE | opm_change_yoy_pp (quarter OPM - same quarter last year, NULL for lenders); batch D; tests/test_features_gems.py |
-| G205 | Sector earnings breadth during results season | MISSING | not built |
+| G205 | Sector earnings breadth during results season | DONE | `industry_earnings_breadth` (+ `_n`): share of the NSE industry's companies reporting its latest quarter with core profit YoY > 0, >= 3 companies, refresh step over the stored day (batch I, features_more.py); tests/test_features_more.py |
 | G207 | Liquidity: 20D median traded value; bid-ask / circuit-lock days | MISSING | 20D median traded value built (turnover_median_20d; tests/test_features_price.py); bid-ask is in no ingested EOD file; circuit-lock days wait for an F20 price-band fixture |
 | G208 | Market regime / breadth: % of Nifty 500 above 50/200 DMA, 52W high/low ratio, advance-decline | DONE | market_breadth table, one row per materialised day from the in_nifty500 rows (arch 10.7); tests/test_features_price.py |
 | G214 | 20-30 distinctive ratios for all companies *(owner)* | DOCUMENTED_PLANNED | arch 10 catalogue. Most built; rest Phase 2 |
@@ -355,7 +355,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G268 | Cross-sector columns (Rule of 40, EV/GP, ex-cash PE) usable in one query | DONE | arch 10.8; tests/test_batch7_newgen.py |
 | G281 | Synchronised price and fundamental charts on each stock page | OUT_OF_SCOPE_BY_DECISION | Follows decision F |
 | G282 | Post-EOD diff engine and digest (watchlist events, screen entries/exits) | DOCUMENTED_PLANNED | arch 15 Phase 3 (daily diff digest). Delivery channel (Telegram / email) undecided |
-| G283 | Alert: 52-week high on > 2x 20-day median delivery volume | MISSING | not built |
+| G283 | Alert: 52-week high on > 2x 20-day median delivery volume | DONE | screenable flag `high_52w_on_delivery_spike` (DSL `New high on delivery`; batch I, features_more.py); tests/test_features_more.py. The alert digest itself waits on owner decision 2 |
 | G332 | Optional read-only SQLite / D1 export of screener_features for a UI | OUT_OF_SCOPE_BY_DECISION | CLAUDE.md Don'ts (no second database engine) |
 | G334 | entity_master carries macro sector, sector, industry, basic industry | DONE | entity_classification_history (date-bounded per entity, PIT) rather than entity_master columns; screener columns nse_macro_sector, nse_sector, nse_industry, nse_basic_industry; tests/test_batch_h_industry_peers.py |
 
@@ -365,7 +365,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 |---|---|---|---|
 | G52 | Spun-off entity starts at its listing date with no synthetic pre-listing bars | DONE | C12; X52; tests/test_demerger_and_listing.py |
 | G58 | Backtest positions in the target convert into acquirer shares by swap ratio | DONE | arch 11.7; `lineage.convert_position` (merger by swap ratio, demerger children by entitlement with the COA cost split; chains; raises without a verified ratio); tests/test_lineage.py |
-| G151 | PEAD tracker: abnormal return (vs Nifty 500) and relative volume at T+0/1/5/20 after broadcast | MISSING | not built. Needs index closes (F27) or TRI (F29) |
+| G151 | PEAD tracker: abnormal return (vs Nifty 500) and relative volume at T+0/1/5/20 after broadcast | DONE | `pead_event_date`, `pead_ar_t0/1/5/20` (vs Nifty 500 closes, index_ohlcv IDX9; NULL without them), `pead_relvol_t0/1/5/20` after the latest results broadcast (batch I, features_more.py); tests/test_features_more.py. Backtest claims still need TRI (F29 UNVERIFIED) |
 | G190 | Historical screens on quarter-end feature snapshots | DONE | screener_features_history (daily); screen --as-of (arch 11.9) |
 | G191 | Point-in-time screen backtester across past years | DOCUMENTED_PLANNED | arch 15 Phase 3 (PIT backtester). Needs TRI benchmark (F29) |
 | G206 | Survivorship-free universe: keep delisted / merged securities with inactive_date and exit_reason | DONE | entity_master; ID1; L1; tests/test_phase1_fixes_b.py, tests/test_index_backfill.py |
@@ -450,8 +450,8 @@ None open. Decided 2026-11-15: no paid sources at all (G74, by the owner); E-H b
 17. **DONE (2026-11-15, batch D)** ~~G168: PEG. Define with `min_periods_required`; NULL until 3 years of in-scope EPS (C9).~~ Built on core profit growth and PE on core profit (docs/hidden_gems.md principle 6): quarter YoY now, TTM-on-TTM once 8 quarters exist.
 
 **Phase 3**
-18. G151, G205: PEAD tracker and results-season sector breadth. Verify: index closes (IDX9) now, Nifty 500 TRI fixture (F29) before any backtest claims.
-19. G283: 52-week-high-on-delivery alert, inside the Phase 3 diff digest (after decision 2).
+18. G151, G205: PEAD tracker and results-season sector breadth (columns DONE in batch I, features_more.py). Verify: index closes (IDX9) now, Nifty 500 TRI fixture (F29) before any backtest claims.
+19. G283: 52-week-high-on-delivery alert, inside the Phase 3 diff digest (after decision 2); the screenable flag `high_52w_on_delivery_spike` is DONE (batch I).
 20. G188: natural-language to DSL translator that only emits a DSL string shown for editing. No data fixture; needs owner approval of an LLM call.
 21. G165: Excel model exporter over `fact_observations`. Verify: a template fixture and round-trip test.
 22. G197: CDR / OTS / CIRP filings. Verify: a `REG30_Restructuring` XBRL fixture (prefix seen in E2).

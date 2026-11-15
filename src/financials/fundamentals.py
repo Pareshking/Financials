@@ -1249,17 +1249,24 @@ def _year(book: FactBook, p: tuple[date, date]) -> dict[str, Decimal | None]:
     }  # fmt: skip
 
 
-def piotroski_f(t: dict, p: dict) -> int | None:
-    """Piotroski (2000) F-score, 0..9. Assets are year-end, not beginning-of-year: the original needs the balance
-    sheet two years back, which is before the data cutoff for FY26 [C9, C23]. Every one of the nine signals needs
-    its inputs; one missing input makes the score NULL, never a partial score. LTD = non-current borrowings."""
+PIOTROSKI_SIGNALS = (
+    "roa_positive", "cfo_positive", "roa_up", "cfo_above_pat", "leverage_down", "current_ratio_up", "no_dilution",
+    "gross_margin_up", "asset_turnover_up",
+)  # fmt: skip
+
+
+def piotroski_signals(t: dict, p: dict) -> tuple[bool, ...] | None:
+    """The nine Piotroski (2000) binary tests, in PIOTROSKI_SIGNALS order (ratio catalogue B1.3). Assets are
+    year-end, not beginning-of-year: the original needs the balance sheet two years back, which is before the data
+    cutoff for FY26 [C9, C23]. Every signal needs its inputs; one missing input makes all of them NULL, never a
+    partial set. LTD = non-current borrowings."""
     need = ("pat", "cfo", "ta", "ltd", "ca", "cl", "share_capital", "gross_margin", "rev")
     if any(t[k] is None for k in need) or any(p[k] is None for k in need) or not t["ta"] or not p["ta"]:
         return None
     if not t["cl"] or not p["cl"]:
         return None
     roa_t, roa_p = t["pat"] / t["ta"], p["pat"] / p["ta"]
-    signals = (
+    return (
         roa_t > 0,
         t["cfo"] > 0,
         roa_t > roa_p,
@@ -1270,14 +1277,20 @@ def piotroski_f(t: dict, p: dict) -> int | None:
         t["gross_margin"] > p["gross_margin"],
         t["rev"] / t["ta"] > p["rev"] / p["ta"],
     )
-    return sum(int(s) for s in signals)
 
 
-def beneish_m(t: dict, p: dict) -> Decimal | None:
-    """Beneish (1999) 8-variable M-score. SG&A proxy = Ind AS `OtherExpenses` (no SG&A line exists) [C23].
-    NULL when any ratio's inputs are missing or a denominator is zero."""
+def piotroski_f(t: dict, p: dict) -> int | None:
+    """Piotroski (2000) F-score, 0..9: the number of `piotroski_signals` passed (NULL when they are)."""
+    signals = piotroski_signals(t, p)
+    return None if signals is None else sum(int(s) for s in signals)
+
+
+def beneish_components(t: dict, p: dict) -> dict[str, Decimal] | None:
+    """The eight Beneish (1999) indices DSRI, GMI, AQI, SGI, DEPI, SGAI, TATA, LVGI (ratio catalogue B1.2). SG&A
+    proxy = Ind AS `OtherExpenses` (no SG&A line exists) [C23]. NULL when any index's inputs are missing or a
+    denominator is zero (all eight or none)."""
     try:
-        idx = {
+        return {
             "DSRI": (t["rec"] / t["rev"]) / (p["rec"] / p["rev"]),
             "GMI": p["gross_margin"] / t["gross_margin"],
             "AQI": (1 - (t["ca"] + t["ppe"]) / t["ta"]) / (1 - (p["ca"] + p["ppe"]) / p["ta"]),
@@ -1289,7 +1302,12 @@ def beneish_m(t: dict, p: dict) -> Decimal | None:
         }
     except (TypeError, ZeroDivisionError, ArithmeticError):
         return None
-    return BENEISH["const"] + sum(BENEISH[k] * v for k, v in idx.items())
+
+
+def beneish_m(t: dict, p: dict) -> Decimal | None:
+    """Beneish (1999) 8-variable M-score on `beneish_components`; NULL when they are."""
+    idx = beneish_components(t, p)
+    return None if idx is None else BENEISH["const"] + sum(BENEISH[k] * v for k, v in idx.items())
 
 
 def annual_ratios(book: FactBook, on_or_before: date) -> dict:

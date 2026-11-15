@@ -1074,6 +1074,67 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     ev_ebitda_denominator                    DECIMAL(24,2),   -- TTM EBITDA
     opm_numerator                            DECIMAL(24,2),   -- TTM EBITDA
     opm_denominator                          DECIMAL(24,2),   -- sales_ttm
+    -- batch I (last catalogue rows): features_more.py; fractions like other _pct columns, days as DOUBLE
+    beneish_dsri                             DOUBLE,          -- B1.2 Beneish indices, last FY vs preceding FY (inputs of beneish_m)
+    beneish_gmi                              DOUBLE,
+    beneish_aqi                              DOUBLE,
+    beneish_sgi                              DOUBLE,
+    beneish_depi                             DOUBLE,
+    beneish_sgai                             DOUBLE,
+    beneish_lvgi                             DOUBLE,
+    beneish_tata                             DOUBLE,
+    piotroski_roa_positive                   BOOLEAN,         -- B1.3 Piotroski tests (inputs of piotroski_f), all or none
+    piotroski_cfo_positive                   BOOLEAN,
+    piotroski_roa_up                         BOOLEAN,
+    piotroski_cfo_above_pat                  BOOLEAN,
+    piotroski_leverage_down                  BOOLEAN,
+    piotroski_current_ratio_up               BOOLEAN,
+    piotroski_no_dilution                    BOOLEAN,
+    piotroski_gross_margin_up                BOOLEAN,
+    piotroski_asset_turnover_up              BOOLEAN,
+    altman_z_original                        DOUBLE,          -- B1.5 original Z, manufacturers (C6 guard), MVE = market cap
+    bs_accruals                              DOUBLE,          -- B1.7 change in NOA / avg total assets, last FY
+    depreciation_rate                        DOUBLE,          -- B2.12 FY D&A / avg gross block (Reg. 34)
+    asset_age_proxy                          DOUBLE,          -- B2.12 accumulated depreciation / gross block
+    debtor_days_change_yoy                   DOUBLE,          -- B3.2 last FY - preceding FY, days
+    ccc_change_yoy                           DOUBLE,
+    h1_bs_as_of                              DATE,            -- B3.3 latest non-FY-end balance sheet (12 months)
+    debtor_days_h1                           DOUBLE,
+    inventory_days_h1                        DOUBLE,
+    debtor_days_h1_change_yoy                DOUBLE,
+    inventory_days_h1_change_yoy             DOUBLE,
+    pb_percentile                            DOUBLE,          -- B5.2 / B5.3 vs own prior quarter-ends [C20], >= 4
+    price_to_sales_percentile                DOUBLE,
+    ev_to_sales_percentile                   DOUBLE,
+    momentum_12m_1m                          DOUBLE,          -- B6.3 (1 + return_12m) / (1 + return_1m) - 1
+    volatility_1y                            DOUBLE,          -- B6.4 annualised std of 252 daily log returns
+    max_drawdown_1y                          DOUBLE,
+    high_52w_on_delivery_spike               BOOLEAN,         -- B6.11 / G283 52W high with delivery > 2x 20D median
+    pead_event_date                          DATE,            -- B6.14 / G151 latest results broadcast (IST)
+    pead_ar_t0                               DOUBLE,          -- stock - Nifty 500 return since the pre-results close
+    pead_ar_t1                               DOUBLE,
+    pead_ar_t5                               DOUBLE,
+    pead_ar_t20                              DOUBLE,
+    pead_relvol_t0                           DOUBLE,          -- volume / mean of the 20 bars before T+0
+    pead_relvol_t1                           DOUBLE,
+    pead_relvol_t5                           DOUBLE,
+    pead_relvol_t20                          DOUBLE,
+    nifty500_inclusion_90d                   BOOLEAN,         -- B8.4 NULL until stored history covers 90 days
+    nifty500_exclusion_90d                   BOOLEAN,
+    days_to_next_ex_date                     INTEGER,         -- B8.5 announced (visible) actions only
+    next_ex_date_action                      VARCHAR,
+    dividend_365d                            BOOLEAN,         -- NULL while the window starts before C9
+    bonus_365d                               BOOLEAN,
+    split_365d                               BOOLEAN,
+    segment_period_end                       DATE,            -- B9.1 / B9.2 BUSINESS SEGMENT members, row scope
+    segment_count                            INTEGER,
+    largest_segment_revenue_share            DOUBLE,
+    fastest_growing_segment                  VARCHAR,
+    fastest_growing_segment_growth_yoy       DOUBLE,
+    largest_segment_margin_change_yoy_pp     DOUBLE,
+    rs_rank_12m_1m                           DOUBLE,          -- cross-section (refresh step): 1 = strongest
+    industry_earnings_breadth                DOUBLE,          -- B4.9 / G205 share of NSE industry with core profit YoY > 0
+    industry_earnings_breadth_n              INTEGER,         -- companies measured (latest quarter of the industry)
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -1669,6 +1730,67 @@ CREATE TABLE IF NOT EXISTS screener_features (
     ev_ebitda_denominator                    DECIMAL(24,2),   -- TTM EBITDA
     opm_numerator                            DECIMAL(24,2),   -- TTM EBITDA
     opm_denominator                          DECIMAL(24,2),   -- sales_ttm
+    -- batch I (last catalogue rows): features_more.py; fractions like other _pct columns, days as DOUBLE
+    beneish_dsri                             DOUBLE,          -- B1.2 Beneish indices, last FY vs preceding FY (inputs of beneish_m)
+    beneish_gmi                              DOUBLE,
+    beneish_aqi                              DOUBLE,
+    beneish_sgi                              DOUBLE,
+    beneish_depi                             DOUBLE,
+    beneish_sgai                             DOUBLE,
+    beneish_lvgi                             DOUBLE,
+    beneish_tata                             DOUBLE,
+    piotroski_roa_positive                   BOOLEAN,         -- B1.3 Piotroski tests (inputs of piotroski_f), all or none
+    piotroski_cfo_positive                   BOOLEAN,
+    piotroski_roa_up                         BOOLEAN,
+    piotroski_cfo_above_pat                  BOOLEAN,
+    piotroski_leverage_down                  BOOLEAN,
+    piotroski_current_ratio_up               BOOLEAN,
+    piotroski_no_dilution                    BOOLEAN,
+    piotroski_gross_margin_up                BOOLEAN,
+    piotroski_asset_turnover_up              BOOLEAN,
+    altman_z_original                        DOUBLE,          -- B1.5 original Z, manufacturers (C6 guard), MVE = market cap
+    bs_accruals                              DOUBLE,          -- B1.7 change in NOA / avg total assets, last FY
+    depreciation_rate                        DOUBLE,          -- B2.12 FY D&A / avg gross block (Reg. 34)
+    asset_age_proxy                          DOUBLE,          -- B2.12 accumulated depreciation / gross block
+    debtor_days_change_yoy                   DOUBLE,          -- B3.2 last FY - preceding FY, days
+    ccc_change_yoy                           DOUBLE,
+    h1_bs_as_of                              DATE,            -- B3.3 latest non-FY-end balance sheet (12 months)
+    debtor_days_h1                           DOUBLE,
+    inventory_days_h1                        DOUBLE,
+    debtor_days_h1_change_yoy                DOUBLE,
+    inventory_days_h1_change_yoy             DOUBLE,
+    pb_percentile                            DOUBLE,          -- B5.2 / B5.3 vs own prior quarter-ends [C20], >= 4
+    price_to_sales_percentile                DOUBLE,
+    ev_to_sales_percentile                   DOUBLE,
+    momentum_12m_1m                          DOUBLE,          -- B6.3 (1 + return_12m) / (1 + return_1m) - 1
+    volatility_1y                            DOUBLE,          -- B6.4 annualised std of 252 daily log returns
+    max_drawdown_1y                          DOUBLE,
+    high_52w_on_delivery_spike               BOOLEAN,         -- B6.11 / G283 52W high with delivery > 2x 20D median
+    pead_event_date                          DATE,            -- B6.14 / G151 latest results broadcast (IST)
+    pead_ar_t0                               DOUBLE,          -- stock - Nifty 500 return since the pre-results close
+    pead_ar_t1                               DOUBLE,
+    pead_ar_t5                               DOUBLE,
+    pead_ar_t20                              DOUBLE,
+    pead_relvol_t0                           DOUBLE,          -- volume / mean of the 20 bars before T+0
+    pead_relvol_t1                           DOUBLE,
+    pead_relvol_t5                           DOUBLE,
+    pead_relvol_t20                          DOUBLE,
+    nifty500_inclusion_90d                   BOOLEAN,         -- B8.4 NULL until stored history covers 90 days
+    nifty500_exclusion_90d                   BOOLEAN,
+    days_to_next_ex_date                     INTEGER,         -- B8.5 announced (visible) actions only
+    next_ex_date_action                      VARCHAR,
+    dividend_365d                            BOOLEAN,         -- NULL while the window starts before C9
+    bonus_365d                               BOOLEAN,
+    split_365d                               BOOLEAN,
+    segment_period_end                       DATE,            -- B9.1 / B9.2 BUSINESS SEGMENT members, row scope
+    segment_count                            INTEGER,
+    largest_segment_revenue_share            DOUBLE,
+    fastest_growing_segment                  VARCHAR,
+    fastest_growing_segment_growth_yoy       DOUBLE,
+    largest_segment_margin_change_yoy_pp     DOUBLE,
+    rs_rank_12m_1m                           DOUBLE,          -- cross-section (refresh step): 1 = strongest
+    industry_earnings_breadth                DOUBLE,          -- B4.9 / G205 share of NSE industry with core profit YoY > 0
+    industry_earnings_breadth_n              INTEGER,         -- companies measured (latest quarter of the industry)
     PRIMARY KEY (as_of_date, security_id)
 );
 

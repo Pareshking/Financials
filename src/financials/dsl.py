@@ -433,6 +433,16 @@ def _extra_aliases() -> dict[str, tuple[str, str]]:
 
 ALIASES.update(_extra_aliases())
 
+
+def _more_aliases() -> dict[str, tuple[str, str]]:
+    """Batch I (last catalogue rows): features_more.dsl_aliases."""
+    from financials.features_more import dsl_aliases
+
+    return dsl_aliases()
+
+
+ALIASES.update(_more_aliases())
+
 KEYWORDS = {"and", "or", "not"}
 COMPARATORS = {"<", "<=", ">", ">=", "=", "!="}
 NAME_RE = re.compile(r"^[a-z][a-z0-9 ]{0,62}$")

@@ -332,7 +332,8 @@ def test_capital_allocation_view_lists_components_side_by_side():
 def test_every_column_is_appended_in_both_tables_and_has_an_alias():
     for t in ("screener_features", "screener_features_history"):
         names = [c for c, _ in declared_columns()[t]]
-        assert names[-len(X.EXTRA_COLUMNS) :] == list(X.EXTRA_COLUMNS), t
+        start = names.index(X.EXTRA_COLUMNS[0])  # one contiguous block (batch I appends after it)
+        assert names[start : start + len(X.EXTRA_COLUMNS)] == list(X.EXTRA_COLUMNS), t
     used = " ".join(sql for sql, _ in ALIASES.values())
     assert [c for c in X.EXTRA_COLUMNS if c not in used] == []
     sql = compile_screen("Margin acceleration > 0 AND Gross margin expansion bps > 50 AND Ad promo intensity > 5 "

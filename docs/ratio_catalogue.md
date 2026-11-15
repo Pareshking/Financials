@@ -82,7 +82,7 @@ context) and Reg. 34 FY25/FY26 comparatives. Due dates assumed: Q1-Q3 results wi
 | A1.16 | Number of equity shares preceding year | per-share | shares at as-of − 1 year, split/bonus-adjusted by `eps_factor` | BUILT | `shares_preceding_year` (Reg. 31 pattern exactly 12 months before the latest, today's share basis; Reg. 31 only); batch C |
 | A1.17 | Number of equity shares 10years back | per-share | same, 10 years | BUILT | `shares_10y_back` (history-gated, NULL until ~Apr 2035); batch C |
 | A1.18 | Face value | per-share | filed FV | BUILT | `face_value` (latest results filing's `face_value_per_share`); batch C |
-| A1.19 | ★ Industry PE / Industry PBV | relative | median PE (PB) of peers in the same industry at as-of | BUILDABLE NOW | coarse only: `raw_index_snapshot.industry` from `ind_nifty500list.csv` (IDX1 VERIFIED): one tier, Nifty 500 members only, PIT only from the first stored snapshot (A6: no history). NSE 4-tier basic industry = NEW FREE SOURCE (G96, no verified source) |
+| A1.19 | ★ Industry PE / Industry PBV | relative | median PE (PB) of peers in the same industry at as-of | BUILT | `industry_pe_median`, `industry_pb_median` (also basic industry and the Nifty 500 industry-group fallback; batch H, features_peers, NSE 4-level classification PIT from its first fetch) |
 | A1.20 | Historical PE 3/5/7/10Years | valuation history | average of PE at each FY results date over N FYs (Screener definition UNVERIFIED) | WHEN HISTORY | FY basis: 3Y ~May 2027, 5Y ~May 2029, 7Y ~2031, 10Y ~2034. Daily-median basis: 3Y ~Feb 2029 |
 | A1.21 | Historical PBV 3/5/7/10Years | valuation history | same with PB | WHEN HISTORY | as A1.20 (PB exists from ~May 2025) |
 | A1.22 | Market Capitalization 3/5/7/10years back | valuation history | mcap at as-of − N years | WHEN HISTORY | ~Apr 2028 / 2030 / 2032 / 2035 |
@@ -294,12 +294,12 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 | ID | Name | Family | Definition (our tags) | Status | Data / notes |
 |---|---|---|---|---|---|
 | B1.1 | Beneish M-score (G161) | forensic | 8-variable | BUILT | `beneish_m` |
-| B1.2 | Beneish components DSRI, GMI, AQI, SGI, DEPI, SGAI, LVGI, TATA | forensic | expose the 8 inputs `beneish_m` already computes | BUILDABLE NOW | `fundamentals.beneish_m(t, p)` (FY26 vs FY25) |
-| B1.3 | Piotroski components (9 binary tests) | forensic | expose the tests behind `piotroski_f` | BUILDABLE NOW | `fundamentals.piotroski_f` |
+| B1.2 | Beneish components DSRI, GMI, AQI, SGI, DEPI, SGAI, LVGI, TATA | forensic | expose the 8 inputs `beneish_m` already computes | BUILT | `beneish_dsri`, `beneish_gmi`, `beneish_aqi`, `beneish_sgi`, `beneish_depi`, `beneish_sgai`, `beneish_lvgi`, `beneish_tata` (batch I, features_more; `fundamentals.beneish_components`, all or none; TCS FY26 rebuilds the pinned −2.3193) |
+| B1.3 | Piotroski components (9 binary tests) | forensic | expose the tests behind `piotroski_f` | BUILT | `piotroski_roa_positive` … `piotroski_asset_turnover_up` (9 BOOLEAN, batch I; `fundamentals.piotroski_signals`, their sum = `piotroski_f`) |
 | B1.4 | Altman Z'' (G162) | forensic | 4-variable, OtherEquity proxy | BUILT | `altman_z_dd` |
-| B1.5 | Altman Z (original, manufacturers) | forensic | 1.2·WC/TA + 1.4·RE/TA + 3.3·EBIT/TA + 0.6·MVE/TL + 1.0·Sales/TA | BUILDABLE NOW | adds market value and asset turnover to Z'' inputs |
+| B1.5 | Altman Z (original, manufacturers) | forensic | 1.2·WC/TA + 1.4·RE/TA + 3.3·EBIT/TA + 0.6·MVE/TL + 1.0·Sales/TA | BUILT | `altman_z_original` (batch I): Z'' inputs + market cap + TTM sales; manufacturer = an industrial book passing the C6 guard (materials + purchases ≥ 10% of sales), else NULL |
 | B1.6 | Sloan accrual (G222) | forensic | (TTM PAT − CFO − CFI) / avg TA | BUILT | `sloan_accrual` |
-| B1.7 | Balance-sheet accruals (ΔNOA / avg TA) | forensic | Δ(operating assets − operating liabilities) FY26 vs FY25 / avg TA | BUILDABLE NOW | |
+| B1.7 | Balance-sheet accruals (ΔNOA / avg TA) | forensic | Δ(operating assets − operating liabilities) FY26 vs FY25 / avg TA | BUILT | `bs_accruals` (batch I): NOA = equity + debt + leases − liquid cash (`invested_capital_at`), last FY vs preceding FY (TCS FY26 8.23%) |
 | B1.8 | CFO / PAT | earnings quality | TTM cfo / TTM pat | BUILT | `cfo_to_pat` on the 12-month cash-flow window (batch G) |
 | B1.9 | CFO / EBITDA 3Y; FCF / PAT 3Y (G223, G224) | earnings quality | 3-FY sums | BUILT | `cfo_to_ebitda_3y` (G223), `fcf_conversion_3y` (G224) (history-gated, NULL until FY27 ~May 2027); batch C |
 | B1.10 | Receivables vs sales divergence (G225) | forensic | YoY receivables − YoY revenue | BUILT | `receivables_sales_divergence` |
@@ -334,7 +334,7 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 | B2.9 | Incremental asset turnover 3Y (G220) | reinvestment | Δ3y rev_ops / Δ3y net fixed assets | BUILT | `incremental_asset_turnover_3y` (Δ FY sales / Δ net block), NULL until FY28 ~May 2028 (batch G) |
 | B2.10 | Capex / depreciation (G226); CWIP / gross block (G227) | reinvestment | | BUILT | `capex_to_depreciation`, `cwip_to_gross_block` |
 | B2.11 | Capex intensity | reinvestment | TTM capex / TTM rev_ops | BUILT | `capex_intensity`, cash-flow window (batch G) |
-| B2.12 | Depreciation rate; asset age proxy | reinvestment | FY D&A / avg gross block; accumulated depreciation / gross block | BUILDABLE NOW | Reg. 34 FY25 + FY26 |
+| B2.12 | Depreciation rate; asset age proxy | reinvestment | FY D&A / avg gross block; accumulated depreciation / gross block | BUILT | `depreciation_rate`, `asset_age_proxy` (batch I; TCS FY26 14.54% / 71.86%) |
 | B2.13 | CROIC (G217); ROTE (G221) | returns | | BUILT | `croic`, `rote` |
 | B2.14 | Net debt / FCF (G233) | leverage |  | BUILT | `net_debt_to_fcf` (TTM) and `net_debt_to_fcf_3y` (mean 3-FY FCF; history-gated, NULL until ~May 2027); batch C |
 | B2.15 | Net debt / EBITDA | leverage | net_debt / TTM ebitda | BUILT | `net_debt_to_ebitda`; batch C |
@@ -346,8 +346,8 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 | ID | Name | Family | Definition (our tags) | Status | Data / notes |
 |---|---|---|---|---|---|
 | B3.1 | Working-capital intensity (G231); negative WC float (G260) | WC | | BUILT | `working_capital_intensity`, `neg_working_capital_float_pct` |
-| B3.2 | Δ CCC / Δ debtor days YoY (FY) | WC | FY26 − FY25 days | BUILDABLE NOW | |
-| B3.3 | Half-year debtor / inventory days, YoY | WC | on the H1 balance sheet with H1-annualised sales; Sep-2026 vs Sep-2025 | BUILDABLE NOW | catches stuffing two quarters earlier than FY |
+| B3.2 | Δ CCC / Δ debtor days YoY (FY) | WC | FY26 − FY25 days | BUILT | `debtor_days_change_yoy`, `ccc_change_yoy` (batch I, Screener-convention days of `features_bs._days`) |
+| B3.3 | Half-year debtor / inventory days, YoY | WC | on the H1 balance sheet with H1-annualised sales; Sep-2026 vs Sep-2025 | BUILT | `h1_bs_as_of`, `debtor_days_h1`, `inventory_days_h1`, `debtor_days_h1_change_yoy`, `inventory_days_h1_change_yoy` (batch I; YoY from the Sep-2026 H1: the Sep-2025 balance sheet is in scope) |
 | B3.4 | Material / employee / other-expense share of revenue (G133) | cost | TTM component / rev_ops | BUILT | `material_cost_`, `employee_cost_`, `other_expenses_{latest_quarter,last_year}_pct` (batch G) |
 | B3.5 | Power & fuel, freight share of revenue (G133, G132) | cost | `power_and_fuel`, `freight` / rev_ops | BUILT | `power_fuel_`, `freight_{latest_quarter,last_year}_pct` (batch G; AIA pinned) |
 | B3.6 | A&P intensity (G258) | cost | `advertising_promotion` / rev_ops | BUILT | `ad_promo_{latest_quarter,last_year}_pct`, DSL `Ad promo intensity` (batch G; Paytm, Eternal pinned) |
@@ -367,7 +367,7 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 | B4.6 | Profit-growth acceleration (quarter form) | acceleration | as B4.1 on owners' profit (NULL when a base ≤ 0) | BUILT | `profit_growth_acceleration_pp` (batch G) |
 | B4.7 | Rule of 40 (G255); billings growth (G259) | growth | | BUILT | `rule_of_40`, `billings_growth_pct` (8 quarters → ~Feb 2027) |
 | B4.8 | Consecutive quarters of YoY sales / profit growth | consistency | count of the last k quarters with quarter YoY > 0 | BUILT | `sales_growth_streak_quarters`, `profit_growth_streak_quarters` (max 8; batch G) |
-| B4.9 | Sector earnings breadth (G205) | cross-section | share of an industry's companies with quarter YoY PAT > 20% in the current season | BUILDABLE NOW | coarse industry (A1.19); a market-level table, not a per-security column |
+| B4.9 | Sector earnings breadth (G205) | cross-section | share of an industry's companies with quarter YoY PAT > 20% in the current season | BUILT | `industry_earnings_breadth`, `industry_earnings_breadth_n` (batch I, refresh step): share of the NSE industry's companies reporting the industry's latest quarter with core profit YoY > 0 (owner brief for G205), ≥ 3 companies; a per-row column, not a market-level table |
 | B4.10 | Earnings surprise vs consensus | forecast | — | NOT POSSIBLE | no free consensus source |
 
 ## B5. Valuation vs own history and vs peers
@@ -375,13 +375,13 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 | ID | Name | Family | Definition (our tags) | Status | Data / notes |
 |---|---|---|---|---|---|
 | B5.1 | PE percentile; EV/EBITDA percentile (G198, G240) | band | vs own prior quarter-end values, ≥ 4 | BUILT | `pe_percentile`, `ev_ebitda_percentile` |
-| B5.2 | PB percentile (G198 "P/B band missing") | band | same method on PB | BUILDABLE NOW | PB quarter-ends from Mar-2025 |
-| B5.3 | P/S and EV/Sales percentile | band | same method | BUILDABLE NOW | |
+| B5.2 | PB percentile (G198 "P/B band missing") | band | same method on PB | BUILT | `pb_percentile` (batch I; vs own prior quarter-ends, ≥ 4 like `pe_percentile` [C20]) |
+| B5.3 | P/S and EV/Sales percentile | band | same method | BUILT | `price_to_sales_percentile`, `ev_to_sales_percentile` (batch I) |
 | B5.4 | 5Y (20 quarter-end) valuation band (G240) | band | rank of EV/EBITDA among the last 20 prior quarter-ends, all > 0 | BUILT | `ev_ebitda_percentile_20q` (history-gated, NULL until quarter-end 2030-12-31 is stored, ~2031; PE / PB 20-quarter forms not built); batch C |
 | B5.5 | Reverse-DCF implied growth (G200, G239) | valuation | WACC fixed 12% | BUILT | `reverse_dcf_implied_g`; live 10Y G-Sec WACC = NEW FREE SOURCE (F25 PLANNED) |
 | B5.6 | EV / Sales | valuation | EV / TTM rev_ops | BUILT | `ev_to_sales` (batch G) |
-| B5.7 | Discount / premium to industry median PE, PB, EV/EBITDA (G199) | relative | own / industry median − 1 | BUILDABLE NOW | coarse industry only (A1.19); 4-tier = NEW FREE SOURCE (G96) |
-| B5.8 | Peer rank within industry: mcap, PE, ROCE, quarterly profit growth (G112) | relative | percentile rank within industry at as-of | BUILDABLE NOW | coarse industry only |
+| B5.7 | Discount / premium to industry median PE, PB, EV/EBITDA (G199) | relative | own / industry median − 1 | BUILT | `pe_premium_to_industry`, `pb_premium_to_industry` (+ `_basic_industry`, `_industry_group`; batch H). An EV/EBITDA premium is not built |
+| B5.8 | Peer rank within industry: mcap, PE, ROCE, quarterly profit growth (G112) | relative | percentile rank within industry at as-of | BUILT | `peer_rank_market_cap`, `peer_rank_pe`, `peer_rank_roce`, `peer_rank_profit_growth`, `peer_count` (batch H, NSE basic industry) |
 | B5.9 | New-gen ratios (G250-G263) | valuation | | BUILT | `ev_to_gross_profit`, `ex_cash_pe`, `ev_to_billings`, `ev_to_esop_adj_ebitda`, `price_to_cfo`, `net_burn_multiple`, `cash_runway_months`, `esop_adj_fcf` |
 | B5.10 | EV / GOV (G265); P/EV (G270) | valuation | EV / `gov`; mcap / `embedded_value` | BUILT | `ev_to_gov` on `gov_ttm` (12-month KPI or 4 quarters), `price_to_embedded_value` (batch G) |
 | B5.11 | Equity FCF yield (G170) | valuation | TTM fcf / mcap (inverse of A1.8) | BUILT | `equity_fcf_yield` (signed); unlevered `fcff_yield` BUILT; batch C |
@@ -392,18 +392,18 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 |---|---|---|---|---|---|
 | B6.1 | ATR% (G157) | volatility | Wilder ATR(14) on adjusted OHLC / close | BUILT | `atr_14_pct`; high/low adjusted by the same factors |
 | B6.2 | Relative strength vs Nifty 500, 3M / 6M / 12M (G158) | momentum | stock return − Nifty 500 return | BUILT | `rs_nifty500_3m/6m/12m` on `index_ohlcv` (F27, IDX9) price index; NULL until the index closes on both dates are loaded |
-| B6.3 | Cross-sectional RS rank (percentile of 12M−1M momentum) | momentum | | BUILDABLE NOW | universe-level ranking at as-of |
-| B6.4 | Beta 1Y vs Nifty 500; volatility 1Y; max drawdown 1Y | risk | daily log returns, 252 bars | BUILDABLE NOW | beta BUILT: `beta_1y_nifty500`; volatility and drawdown not yet |
+| B6.3 | Cross-sectional RS rank (percentile of 12M−1M momentum) | momentum |  | BUILT | `momentum_12m_1m`, `rs_rank_12m_1m` (batch I, refresh step over the day's stored rows; NULL until 253 bars) |
+| B6.4 | Beta 1Y vs Nifty 500; volatility 1Y; max drawdown 1Y | risk | daily log returns, 252 bars | BUILT | `beta_1y_nifty500` (batch B), `volatility_1y`, `max_drawdown_1y` (batch I) |
 | B6.5 | Distance from 52W low; new-52W-high flag | momentum | | BUILT | `dist_52w_low`; new high = `distance from 52w high = 0` |
 | B6.6 | VWAP (daily) and 20D VWAP (G95) | price | `turnover_inr` / `volume` | BUILT | `vwap`, `vwap_20d`; = `AVG_PRICE` of the full bhavcopy (P16) |
 | B6.7 | Delivery % (daily, 20D average) (G183) | delivery | `deliv_qty` / `volume` | BUILT | `deliv_pct`, `deliv_pct_avg_20d` (P16); `deliv_avg_5d/20d` are quantities |
 | B6.8 | Delivery velocity; float turnover (G159, G242) | delivery | | BUILT | `delivery_velocity`, `float_turnover_pct` |
 | B6.9 | 20D median traded value (G207) | liquidity | median `turnover_inr` over 20 bars | BUILT | `turnover_median_20d` |
 | B6.10 | Volume spike | volume | volume / 20D average volume | BUILT | DSL `Volume to 1 month average` = volume / `volume_1m_avg` (21 bars, not 20; alias only, batch G) |
-| B6.11 | 52W high on > 2× 20D median delivery (G283) | alert | flag | BUILDABLE NOW | screenable flag now; the alert digest itself waits on owner decision 2 |
+| B6.11 | 52W high on > 2× 20D median delivery (G283) | alert | flag | BUILT | `high_52w_on_delivery_spike` (batch I); the alert digest itself waits on owner decision 2 |
 | B6.12 | Circuit-lock days; price band (G140, G207) | liquidity | | NEW FREE SOURCE | F20 OBSERVED (no fixture) |
 | B6.13 | Market breadth: % Nifty 500 above 50/200 DMA, 52W high/low ratio, A/D (G208) | regime | market-level daily table | BUILT | `market_breadth` (from each materialised day's `in_nifty500` rows) |
-| B6.14 | PEAD tracker: abnormal return vs Nifty 500 and relative volume at T+0/1/5/20 after broadcast (G151) | event study | | BUILDABLE NOW | `visible_from_ts` + `index_ohlcv`; backtest claims still need TRI (F29 UNVERIFIED) |
+| B6.14 | PEAD tracker: abnormal return vs Nifty 500 and relative volume at T+0/1/5/20 after broadcast (G151) | event study |  | BUILT | `pead_event_date`, `pead_ar_t0/1/5/20`, `pead_relvol_t0/1/5/20` (batch I; NULL without the index closes; backtest claims still need TRI, F29 UNVERIFIED) |
 | B6.15 | F&O PCR, OI change, max pain (G184, G125) | derivatives | | NEW FREE SOURCE | F16 OBSERVED |
 | B6.16 | Short selling, SLBM fee (G103, G128) | derivatives | | NEW FREE SOURCE | F15, F19 OBSERVED |
 | B6.17 | ASM / GSM stage; F&O ban; VaR margin (G139, G127, G141) | surveillance | | NEW FREE SOURCE | F20, F18 OBSERVED |
@@ -430,8 +430,8 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 | B8.1 | Order wins / value 90d; KMP and auditor resignations 90d; fraud/default 90d (G114, G106, G116, G181) | Reg. 30 | | BUILT | `order_wins_90d`, `order_value_90d`, `kmp_resignations_90d`, `auditor_resignations_90d`, `fraud_or_default_90d` |
 | B8.2 | Allotments / preferential / QIP count and shares 90d (G119) | dilution events | `corporate_events` event_type `ALLOTMENT` | BUILT | `allotments_90d` (count; shares not summed; batch G) |
 | B8.3 | Litigation count 90d; fund-raising events 90d | Reg. 30 | event_type `LITIGATION`, family `FUND_RAISING` | BUILT | `litigations_90d`, `fund_raising_events_90d` (batch G) |
-| B8.4 | Index inclusion / exclusion in last N days | index | `index_constituents_history` valid_from / valid_to | BUILDABLE NOW | |
-| B8.5 | Days to next ex-date; dividend / bonus / split in last 365 days | corp action | `corp_actions` ex_date, action_type | BUILDABLE NOW | |
+| B8.4 | Index inclusion / exclusion in last N days | index | `index_constituents_history` valid_from / valid_to | BUILT | `nifty500_inclusion_90d`, `nifty500_exclusion_90d` (batch I; NULL until the stored index history covers the 90 days; the first stored snapshot is not an inclusion) |
+| B8.5 | Days to next ex-date; dividend / bonus / split in last 365 days | corp action | `corp_actions` ex_date, action_type | BUILT | `days_to_next_ex_date`, `next_ex_date_action`, `dividend_365d`, `bonus_365d`, `split_365d` (batch I; the next ex-date only from listings visible at the as-of) |
 | B8.6 | Days since last result; results-season flag | dates | `filing_meta.visible_from_ts` | BUILT | DSL `Days since last result` (alias over `last_result_date`; the results-season flag is not built; batch G) |
 | B8.7 | Reg. 30 red-flag columns (G117) | Reg. 30 | separate counts, never summed | BUILT | `rf_auditor_resignation_90d`, `rf_kmp_resignations_90d`, `rf_fraud_or_default_90d`, `rf_litigation_90d`, `rf_audit_qualified`, `rf_pledge_increase_qoq` (batch G); penalties stay NULL (E12 UNVERIFIED) |
 | B8.8 | Penalties / regulatory actions 90d (G118) | Reg. 30 | | NEW FREE SOURCE | `penalties_90d` column exists but NULL: E12 contents UNVERIFIED |
@@ -444,8 +444,8 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 
 | ID | Name | Family | Definition (our tags) | Status | Data / notes |
 |---|---|---|---|---|---|
-| B9.1 | Number of reportable segments; largest-segment revenue share | mix | `segment_observations` (BUSINESS, REVENUE, member_role SEGMENT) | BUILDABLE NOW | segment parser X49 (G130 listed IN_PROGRESS in the digest; the table is in schema.sql) |
-| B9.2 | Fastest-growing segment YoY; segment margin change | mix | segment RESULT / REVENUE, quarter YoY | BUILDABLE NOW | segment names are free text per filer; compare within one entity only |
+| B9.1 | Number of reportable segments; largest-segment revenue share | mix | `segment_observations` (BUSINESS, REVENUE, member_role SEGMENT) | BUILT | `segment_count`, `largest_segment_revenue_share`, `segment_period_end` (batch I; Cummins Q2 FY27: 2 segments, 76.2%) |
+| B9.2 | Fastest-growing segment YoY; segment margin change | mix | segment RESULT / REVENUE, quarter YoY | BUILT | `fastest_growing_segment`, `fastest_growing_segment_growth_yoy`, `largest_segment_margin_change_yoy_pp` (batch I; matched by filed label within the entity) |
 
 ## B10. Not buildable for lack of a free source (not elsewhere listed)
 
@@ -483,14 +483,21 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 
 | Status | Part A (Screener gallery) | Part B (beyond Screener) | Total |
 |---|---|---|---|
-| BUILT | 149 | 87 | 236 |
+| BUILT | 150 | 107 | 257 |
 | IN PROGRESS | 0 | 0 | 0 |
-| BUILDABLE NOW | 3 | 21 | 24 |
+| BUILDABLE NOW | 2 | 1 | 3 |
 | WHEN HISTORY | 16 | 3 | 19 |
 | NEEDS PARSER | 2 | 1 | 3 |
 | NEW FREE SOURCE | 1 | 15 | 16 |
 | NOT POSSIBLE | 2 | 4 | 6 |
 | **Total rows** | 173 | 131 | 304 |
+
+Recounted from the status column after batch I (2026-11-15, features `2026.11.15-11I`, `features_more.py`): 21 rows
+BUILT (1 in Part A, 20 in Part B): A1.19, B5.7, B5.8 were already built by batch H (`features_peers.py`) and only had
+not been marked; B1.2, B1.3, B1.5, B1.7, B2.12, B3.2, B3.3, B4.9, B5.2, B5.3, B6.3, B6.4, B6.11, B6.14, B8.4, B8.5,
+B9.1, B9.2 are new columns. Left BUILDABLE NOW on purpose: A1.12 (Screener's "Price to Quarterly Earning" definition
+UNVERIFIED: no column until an evidence row pins it), A1.24 (Is SME: a constant 0 in a universe that excludes SME by
+C7, no information) and B1.24 (filed DSCR / ISCR implausible, C26).
 
 Recounted from the status column after batch G (2026-11-15, features `2026.11.15-8G`, `features_extra.py`): 43 rows
 BUILT (11 in Part A, 32 in Part B, incl. B2.9 from WHEN HISTORY and B8.12 from NEEDS PARSER: the business-combination
@@ -527,6 +534,12 @@ tests. Batch 0 is trivial: DSL aliases for built columns that have none (`shares
 | 4. Price, volume and technicals | **Done 2026-11-15 (batch B, `features_price.py`) except** RS rank (B6.3), volatility / drawdown (B6.4), volume spike (B6.10), 52W-high-on-delivery flag (B6.11), Is SME (A1.24: always false, C7), PEAD (B6.14). Scope: 1D/1W returns, volume and averages, 52W high/low levels, DMA levels and previous day, RSI, MACD (A8.1, A8.5-A8.7, A8.9-A8.12), ATR, RS vs Nifty 500 and RS rank, beta / volatility / drawdown, 52W-low distance, VWAP, delivery %, median traded value, volume spike, 52W-high-on-delivery flag (B6.1-B6.7, B6.9-B6.11), Is SME (A1.24); then market breadth and PEAD as separate market-level tables (B6.13, B6.14) | ~25 | `features._momentum` / `_delivery` (one pass over adjusted bars), `index_ohlcv` preload; new market-level table for breadth |
 | 5. Ownership and event flags | FII and DII QoQ separately, unpledged promoter, shareholder counts and changes (A3.5, A3.8, A3.10, A3.11), MF / insurance / retail holdings, pledge change, absorption, >1% holder count (B7.1-B7.6), audit-qualified flag (B1.16), allotment / litigation / fund-raising counts, index inclusion, ex-date and result-date flags (B8.2-B8.7) | ~15 | `shareholding_columns`, `_event_counts`, `_preload` (filing_meta, corp_actions, index history) |
 | 6. Valuation, cross-section and composites | P/S, earnings yield, EV/Sales (A1.7, A1.9, B5.6), PB / P/S percentiles (B5.2, B5.3), coarse industry PE / PBV, discount to industry median, peer rank, sector breadth (A1.19, B5.7, B5.8, B4.9), EV/GOV and P/EV (B5.10), Beneish and Piotroski components, original Altman Z (B1.2, B1.3, B1.5), standalone-vs-consolidated leakage (B1.18), RPT intensity (B1.19), segment mix (B9.1, B9.2) | ~20 | features `_rows` (needs mcap / EV), a cross-sectional pass after rows are built (industry medians, ranks), `raw_index_snapshot` industry PIT lookup, second-scope FactBook prefetch |
+
+Progress (2026-11-15, batch I, features `2026.11.15-11I`, `features_more.py`): every remaining buildable row of Batches
+2-6 except A1.12, A1.24 and B1.24 (see C1): Beneish / Piotroski components, original Altman Z, balance-sheet accruals,
+depreciation rate and asset age, FY and half-year days changes, PB / P/S / EV/Sales percentiles, RS rank of 12M-1M
+momentum, volatility and drawdown, 52W high on a delivery spike, PEAD tracker, index inclusion / exclusion,
+corporate-action recency, segment mix and sector earnings breadth.
 
 Progress (2026-11-15, batch G, features `2026.11.15-8G`, `features_extra.py`): the remaining Phase 2 ratios of
 docs/phase_status.md (G152, G257, G256, G258, G133, G276, G278, G220, G241, G270, G265, G266, M4, G117, G244, G201 as

@@ -81,16 +81,22 @@ capital-allocation scorecard view `capital_allocation_scorecard` (G201), and 30 
 PAT, cash tax rate, ETR, exceptional share, capex intensity, net cash / mcap, RPT intensity, Reg. 34 note ratios, P/S,
 EV/Sales, pledge change, >1% holder count, event counts).
 
+**Last catalogue rows: built 2026-11-15 (batch I, features `2026.11.15-11I`, `features_more.py`, arch §10.7)**
+Beneish components and the nine Piotroski tests, original Altman Z (manufacturers), balance-sheet accruals,
+depreciation rate and asset-age proxy, Δ debtor days / Δ CCC on FY and half-year debtor / inventory days YoY, PB / P/S
+/ EV-Sales percentiles (G198), RS rank of 12M-1M momentum, volatility and max drawdown 1Y, 52W high on a delivery
+spike (G283 flag), PEAD tracker (G151), sector earnings breadth per NSE industry (G205), Nifty 500 inclusion /
+exclusion in 90 days, ex-date recency and days to the next ex-date, segment mix (G130 columns). Industry medians, peer
+ranks and premiums (A1.19, B5.7, B5.8) were built by batch H.
+
 **Phase 2 pending: ratios**
 1. RPT leak % per counterparty type (G236): BLOCKED on a parser. RPT is stored as a total (`rpt_to_sales` is built on
    it); the purchases / loans / royalties split sits in `RelatedPartyTransactionAxis` rows in raw_xbrl_facts (G99).
 2. Order book to sales (G115) only if a filing tags an order book; otherwise drop.
 3. Penalty amounts (G118, needs an E12 content fixture); Reg. 30 acquisition events for G276 (no event type parsed).
 4. Filed ISCR / DSCR (catalogue B1.24): filed values are implausible (C26); needs an evidence row first.
-5. The rest of `docs/ratio_catalogue.md` BUILDABLE NOW rows (24): industry medians / peer ranks / sector breadth (with
-   the industry-classification work), Beneish / Piotroski components, original Altman Z, balance-sheet accruals,
-   depreciation rate, Δ CCC and H1 days, PB / P/S percentiles, RS rank, volatility / drawdown, 52W-high-on-delivery,
-   PEAD, index inclusion and ex-date flags, segment mix; price to quarterly earnings waits on Screener's definition.
+5. Price to quarterly earnings (catalogue A1.12) waits on Screener's definition (UNVERIFIED); "Is SME" (A1.24) is a
+   constant in an SME-free universe (C7) and is not built. Every other BUILDABLE NOW catalogue row is built (batch I).
 
 ## Data quality still open (not a phase item, but blocks trust)
 

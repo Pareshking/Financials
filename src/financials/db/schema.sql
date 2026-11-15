@@ -418,6 +418,31 @@ CREATE TABLE IF NOT EXISTS quarantine_queue (
     resolution_note VARCHAR
 );
 
+-- Owner decision B (2026-11-15): a company's wrong XBRL value corrected from its signed statutory results PDF.
+-- Raw XBRL and fact_observations stay as filed; readers rank a correction above the corrected filing's own value,
+-- visible from that filing's visibility (the PDF was published with it), and a later filing still wins. A NULL
+-- value withdraws the tag for that period (the X86 attribution_withheld marker once owners / NCI are corrected).
+CREATE TABLE IF NOT EXISTS fact_corrections (
+    correction_id   VARCHAR PRIMARY KEY,           -- stable_id(filing, tag, period, value)
+    filing_id       VARCHAR NOT NULL REFERENCES filings(filing_id),
+    entity_id       VARCHAR NOT NULL REFERENCES entity_master(entity_id),
+    scope           VARCHAR NOT NULL,
+    canonical_tag   VARCHAR NOT NULL,
+    period_type     VARCHAR NOT NULL,
+    period_start    DATE NOT NULL,
+    period_end      DATE NOT NULL,
+    value_inr       DECIMAL(20,2),
+    evidence_url    VARCHAR NOT NULL,              -- the statutory results PDF
+    evidence_page   INTEGER NOT NULL,
+    evidence_text   VARCHAR NOT NULL,              -- the printed line(s) the value was read from
+    reads           VARCHAR NOT NULL,              -- independent reads that agreed, e.g. TEXT+HAIKU
+    quarantine_id   VARCHAR,
+    note            VARCHAR NOT NULL,
+    created_at      TIMESTAMP NOT NULL,
+    revoked_at      TIMESTAMP,
+    CHECK (period_type IN ('DURATION', 'INSTANT'))
+);
+
 CREATE TABLE IF NOT EXISTS company_overrides (
     override_id  VARCHAR PRIMARY KEY,
     entity_id    VARCHAR NOT NULL REFERENCES entity_master(entity_id),

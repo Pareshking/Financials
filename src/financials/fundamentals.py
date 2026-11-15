@@ -255,6 +255,34 @@ _ANNUAL_LAST = (
 )
 
 
+# Decision B: PDF-verified corrections ranked above the corrected filing's own row (same visibility).
+_CURRENT_FILING = (
+    "(SELECT filing_id, arg_max(visible_from_ts, "
+    + version_key()
+    + ") AS vis, arg_max(parser_version, "
+    + version_key()
+    + ") AS pv FROM filing_meta GROUP BY filing_id)"
+)
+
+
+def _fact_source(fact_where: str, corr_where: str) -> str:
+    """Candidate rows for the latest-value ranking: filed facts (current version, same basis) and corrections."""
+    return (
+        "(SELECT entity_id, scope, canonical_tag, period_type, period_start, period_end, value_inr, value_other, "
+        "visible_from_ts, parser_version, filing_id, 0 AS corrected FROM fact_observations WHERE "
+        + fact_where
+        + " AND visible_from_ts <= ? AND "
+        + CURRENT_VERSION
+        + " AND {basis} "
+        "UNION ALL SELECT c.entity_id, c.scope, c.canonical_tag, c.period_type, c.period_start, c.period_end, "
+        "c.value_inr, NULL, m.vis, m.pv, c.filing_id, 1 FROM fact_corrections c JOIN "
+        + _CURRENT_FILING
+        + " m USING (filing_id) WHERE c.revoked_at IS NULL AND "
+        + corr_where
+        + " AND m.vis <= ?)"
+    )
+
+
 def load_factbook(con, entity_id: str, scope: str, as_of: datetime) -> FactBook:
     """Latest visible value per (tag, period), from filings on the accounting basis of the entity's latest
     quarterly filing (X90): after a change of basis the older basis drops out, so quarters and TTM rebuild."""
@@ -262,23 +290,23 @@ def load_factbook(con, entity_id: str, scope: str, as_of: datetime) -> FactBook:
     if cached is not None:
         unit, fy_starts = cached["meta"].get((entity_id, scope), (None, None))
         return _build_book(entity_id, scope, cached["facts"].get((entity_id, scope), []), unit, fy_starts)
+    source = _fact_source("entity_id = ? AND scope = ?", "c.entity_id = ? AND c.scope = ?").replace(
+        "{basis}", SAME_BASIS
+    )
     rows = con.execute(
         """SELECT canonical_tag, period_type, period_start, period_end, coalesce(value_inr, value_other)
            FROM (SELECT *, row_number() OVER (
                     PARTITION BY canonical_tag, period_start, period_end
                     ORDER BY """
         + _ANNUAL_LAST
-        + """, visible_from_ts DESC, """
+        + """, visible_from_ts DESC, corrected DESC, """
         + version_key()
         + """ DESC) AS rn
-                 FROM fact_observations
-                 WHERE entity_id = ? AND scope = ? AND visible_from_ts <= ? AND """
-        + CURRENT_VERSION
-        + " AND "
-        + SAME_BASIS
+                 FROM """
+        + source
         + """)
            WHERE rn = 1""",
-        [entity_id, scope, as_of, entity_id, scope, as_of],
+        [entity_id, scope, as_of, entity_id, scope, as_of, entity_id, scope, as_of],
     ).fetchall()
     unit, fy_starts = con.execute(
         "SELECT max(CASE level_of_rounding "
@@ -295,6 +323,8 @@ def _build_book(entity_id: str, scope: str, rows, unit, fy_starts) -> FactBook:
     if rows and unit is not None:
         book.rounding_unit = Decimal(unit)
     for tag, ptype, start, end, value in rows:
+        if value is None:  # a correction withdrawing the tag for this period (decision B)
+            continue
         if ptype == "INSTANT":
             book.instants.setdefault(tag, {})[end] = Decimal(value)
         else:
@@ -319,6 +349,7 @@ _BATCH_SAME_BASIS = SAME_BASIS.replace(
 
 def prefetch_fundamentals(con, as_of: datetime) -> None:
     facts: dict[tuple[str, str], list] = {}
+    source = _fact_source("TRUE", "TRUE").replace("{basis}", _BATCH_SAME_BASIS)
     for ent, scope, *row in con.execute(
         """SELECT entity_id, scope, canonical_tag, period_type, period_start, period_end,
                   coalesce(value_inr, value_other)
@@ -326,17 +357,14 @@ def prefetch_fundamentals(con, as_of: datetime) -> None:
                     PARTITION BY entity_id, scope, canonical_tag, period_start, period_end
                     ORDER BY """
         + _ANNUAL_LAST
-        + """, visible_from_ts DESC, """
+        + """, visible_from_ts DESC, corrected DESC, """
         + version_key()
         + """ DESC) AS rn
-                 FROM fact_observations
-                 WHERE visible_from_ts <= ? AND """
-        + CURRENT_VERSION
-        + " AND "
-        + _BATCH_SAME_BASIS
+                 FROM """
+        + source
         + """)
            WHERE rn = 1""",
-        [as_of, as_of],
+        [as_of, as_of, as_of],
     ).fetchall():
         facts.setdefault((ent, scope), []).append(tuple(row))
     meta = {

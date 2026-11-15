@@ -280,7 +280,8 @@ def _load_missing_fin_instrm_id_bars(con) -> int:
 # ── quarantine ─────────────────────────────────────────────────────────────
 
 RESOLUTIONS = {"ACCEPT": "ACCEPTED", "REJECT": "REJECTED", "OVERRIDE": "OVERRIDDEN", "CORP_ACTION": "OVERRIDDEN",
-               "MERGE_SECURITIES": "OVERRIDDEN"}  # fmt: skip
+               "MERGE_SECURITIES": "OVERRIDDEN", "CORRECT": "CORRECTED"}  # fmt: skip
+ATTRIBUTION_TAGS = ("pat_owners", "pat_nci")
 
 
 def list_quarantine(
@@ -697,3 +698,86 @@ def _set_archetype(con, entity_id: str, archetype: str | None, reason: str) -> d
         "created_at": now,
     }])  # fmt: skip
     return {"entity_id": entity_id, "valuation_archetype": body}
+
+
+# ── PDF-verified corrections (owner decision B, 2026-11-15) ──
+
+
+def correct_from_pdf(
+    con,
+    filing_id: str,
+    corrections: list[dict],
+    *,
+    evidence_url: str,
+    evidence_page: int,
+    evidence_text: str,
+    reads: str,
+    note: str,
+    quarantine_id: str | None = None,
+) -> list[str]:
+    """Record values read from the filing's signed statutory results PDF, where the company's XBRL is wrong. Each
+    correction: {canonical_tag, period_start, period_end, value_inr} in rupees. Requires the evidence (URL, page,
+    printed text) and at least two independent reads that agreed (`reads`, e.g. "TEXT+HAIKU"). Correcting owners
+    or NCI also withdraws the X86 attribution_withheld marker for that period. Raw XBRL and fact_observations are
+    never touched; readers rank a correction above the filing's own value (fundamentals._fact_source). Resolves
+    `quarantine_id` as CORRECTED when given. Returns the correction ids."""
+    if not corrections or not evidence_url or not evidence_text.strip() or not note.strip():
+        raise AdminError("corrections, evidence_url, evidence_text and note are required")
+    if "+" not in reads:
+        raise AdminError("a correction needs at least two independent reads that agreed, e.g. TEXT+HAIKU")
+    return _transaction(con, _correct, filing_id, corrections, evidence_url, int(evidence_page),
+                        evidence_text.strip(), reads, note.strip(), quarantine_id)  # fmt: skip
+
+
+def _correct(con, filing_id, corrections, url, page, text, reads, note, qid) -> list[str]:
+    meta = con.execute("SELECT entity_id, scope FROM filing_meta WHERE filing_id = ? LIMIT 1", [filing_id]).fetchone()
+    if meta is None:
+        raise AdminError(f"{filing_id} has no promoted filing_meta")
+    entity, scope = meta
+    rows, now = [], utc_now()
+    rows_in = list(corrections)
+    for c in corrections:
+        if c["canonical_tag"] in ATTRIBUTION_TAGS:
+            marker = {"canonical_tag": "attribution_withheld", "period_start": c["period_start"],
+                      "period_end": c["period_end"], "value_inr": None}  # fmt: skip
+            if marker not in rows_in:
+                rows_in.append(marker)
+    for c in rows_in:
+        start, end = date.fromisoformat(str(c["period_start"])), date.fromisoformat(str(c["period_end"]))
+        value = None if c["value_inr"] is None else Decimal(str(c["value_inr"]))
+        cid = stable_id("corr", filing_id, c["canonical_tag"], start, end, value)
+        rows.append({
+            "correction_id": cid, "filing_id": filing_id, "entity_id": entity, "scope": scope,
+            "canonical_tag": c["canonical_tag"], "period_type": "INSTANT" if start == end else "DURATION",
+            "period_start": start, "period_end": end, "value_inr": value, "evidence_url": url,
+            "evidence_page": page, "evidence_text": text, "reads": reads, "quarantine_id": qid, "note": note,
+            "created_at": now, "revoked_at": None,
+        })  # fmt: skip
+    existing = {r[0] for r in con.execute("SELECT correction_id FROM fact_corrections").fetchall()}
+    new = [r for r in rows if r["correction_id"] not in existing]
+    if new:
+        insert_rows(con, "fact_corrections", new)
+    if qid is not None:
+        q = con.execute("SELECT resolved_at FROM quarantine_queue WHERE quarantine_id = ?", [qid]).fetchone()
+        if q is None:
+            raise AdminError(f"unknown quarantine id {qid}")
+        if q[0] is None:
+            con.execute(
+                "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'CORRECTED', resolution_note = ? "
+                "WHERE quarantine_id = ?",
+                [now, f"{note} [PDF {url} p.{page}; reads {reads}]", qid],
+            )
+    return [r["correction_id"] for r in rows]
+
+
+def revoke_correction(con, correction_id: str, note: str) -> None:
+    """Withdraw a correction (the filed value applies again); the row stays for the audit trail."""
+    if not note.strip():
+        raise AdminError("a note is required")
+    n = con.execute(
+        "UPDATE fact_corrections SET revoked_at = ?, note = note || ' | revoked: ' || ? "
+        "WHERE correction_id = ? AND revoked_at IS NULL RETURNING correction_id",
+        [utc_now(), note.strip(), correction_id],
+    ).fetchall()
+    if not n:
+        raise AdminError(f"no active correction {correction_id}")

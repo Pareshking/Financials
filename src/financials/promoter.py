@@ -69,6 +69,7 @@ def promote(con: duckdb.DuckDBPyConnection, stage_dir: Path) -> PromotionResult:
         "kpis": _promote_kpis,
         "index_close": _promote_vault_and_raw,
         "equity_master": _promote_vault_and_raw,
+        "classification": _promote_classification,
     }.get(job)
     if handler is None:
         raise ValueError(f"unknown job {job!r}")
@@ -1259,6 +1260,10 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     # table that never feeds fact_observations or a ratio.
     segs = read_table(con, stage_dir, "stg_segments")
     insert_rows(con, "segment_observations", [{**r, "entity_id": entity_id, "visible_from_ts": visible} for r in segs])
+    # AOC-1 group structure [X108]: same entity, scope and visibility as the annual filing; never feeds a ratio.
+    group = read_table(con, stage_dir, "stg_group_structure")
+    insert_rows(con, "group_structure", [{**r, "entity_id": entity_id, "visible_from_ts": visible} for r in group],
+                or_ignore=True)  # fmt: skip
     # Non-blocking parse findings (X86 ATTRIBUTION_WITHHELD): the filing is promoted, the finding stays open.
     finding_rows = [
         _quarantine_row(stage=i["stage"], reason_code=i["reason_code"], filing_id=fid, entity_id=entity_id,
@@ -1794,6 +1799,55 @@ def _promote_kpis(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionRe
         first[g["entity_id"]] = min(first.get(g["entity_id"], date.max), utc_to_ist_date(g["visible_from_ts"]))
     dirty.mark(con, first, "KPI", filing["filing_id"])
     return PromotionResult("PROMOTED", "kpis", message=f"{len(good)} KPI rows", quarantined=quarantined)
+
+
+CLASSIFICATION_SOURCE = "NSE_QUOTE"
+
+
+def _promote_classification(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
+    """NSE quote classification [IC1-IC3]: raw row as sent, then the entity's date-bounded history. The answer has
+    no effective date, so an interval starts on the IST date it was observed and is visible from the fetch. The same
+    answer again extends nothing (idempotent); a different one closes the open interval on its observation date. An
+    answer older than the open interval, or a second different answer on the same date, changes no history and is
+    quarantined (CLASSIFICATION_CONFLICT) for a human."""
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_quote_classification"))
+    filing = read_table(con, stage_dir, "filings")[0]
+    r = read_table(con, stage_dir, "raw_quote_classification")[0]
+    fid, on = filing["filing_id"], r["observed_date"]
+    secs, method = resolve_corp_action_security(con, filing["exchange"], r["isin"], r["symbol"], on)
+    ents = sorted({e for (e,) in con.execute(
+        "SELECT DISTINCT entity_id FROM securities WHERE security_id IN (SELECT unnest(?))", [secs]
+    ).fetchall()})  # fmt: skip
+    details = {"symbol": r["symbol"], "isin": r["isin"], "observed": on}
+    if len(ents) != 1:
+        q = _quarantine(con, stage="CLASSIFICATION", reason_code=method if not ents else "AMBIGUOUS_SECURITY",
+                        filing_id=fid, details=details)  # fmt: skip
+        return PromotionResult("QUARANTINED", "classification", message=r["symbol"], quarantined=[q])
+    ent = ents[0]
+    levels = (r["macro"], r["sector"], r["industry"], r["basic_industry"])
+    if all(v is None for v in levels):
+        return PromotionResult("PROMOTED", "classification", message=f"{r['symbol']}: no classification in answer")
+    cur = con.execute(
+        "SELECT macro, sector, industry, basic_industry, valid_from FROM entity_classification_history "
+        "WHERE entity_id = ? AND source = ? AND valid_to IS NULL", [ent, CLASSIFICATION_SOURCE]).fetchone()  # fmt: skip
+    if cur is not None and tuple(cur[:4]) == levels:
+        return PromotionResult("PROMOTED", "classification", message=f"{r['symbol']}: unchanged since {cur[4]}")
+    if cur is not None and on <= cur[4]:
+        q = _quarantine(con, stage="CLASSIFICATION", reason_code="CLASSIFICATION_CONFLICT", entity_id=ent,
+                        filing_id=fid, details={**details, "open_from": cur[4], "open": list(cur[:4]),
+                                                "answer": list(levels)})  # fmt: skip
+        return PromotionResult("QUARANTINED", "classification", message=r["symbol"], quarantined=[q])
+    if cur is not None:
+        con.execute(
+            "UPDATE entity_classification_history SET valid_to = ? WHERE entity_id = ? AND source = ? "
+            "AND valid_to IS NULL", [on, ent, CLASSIFICATION_SOURCE])  # fmt: skip
+    insert_rows(con, "entity_classification_history", [{
+        "entity_id": ent, "source": CLASSIFICATION_SOURCE, "macro": levels[0], "sector": levels[1],
+        "industry": levels[2], "basic_industry": levels[3], "valid_from": on, "valid_to": None,
+        "visible_from_ts": filing["fetched_at"], "evidence_filing_id": fid}])  # fmt: skip
+    # Peer columns are cross-sectional: every company of the day reads this entity's industry.
+    dirty.mark_all(con, on, "CLASSIFICATION", fid)
+    return PromotionResult("PROMOTED", "classification", message=f"{r['symbol']}: {' / '.join(map(str, levels))}")
 
 
 def _promote_raw_only(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:

@@ -24,6 +24,7 @@ from financials.parsers.shareholding import parse_shp_master
 from financials.scope import MIN_PERIOD_END_DATE
 from financials.staging import (
     read_manifest,
+    stage_classification,
     stage_corp_actions,
     stage_equity_master,
     stage_holidays,
@@ -93,6 +94,13 @@ EVENT_PREFIXES = ("REG30_PARA_B_", "CIM_", "ALTERATION_OF_CAPITAL_AND_FUND_RAISI
 
 def annual_listing_url(symbol: str) -> str:
     return f"{API}/annual-reports-xbrl?index=equities&symbol={_sym(symbol)}"
+
+
+def quote_url(symbol: str, series: str = "EQ") -> str:
+    """NSE quote answer carrying the 4-level industry classification in `secInfo` [IC1]. `/api/quote-equity`
+    answered 403 from the container on 2026-11-15; this endpoint answered 200 (A1-style, no warm-up needed)."""
+    return (f"{API}/NextApi/apiClient/GetQuoteApi?functionName=getSymbolData&marketType=N&series={quote(series)}"
+            f"&symbol={_sym(symbol)}")  # fmt: skip
 
 
 def shp_master_url(symbol: str) -> str:
@@ -241,6 +249,23 @@ class Jobs:
             stage_index_snapshot(self.vault, self.stage_root, data=data, source_url=url, index_name=index_name,
                                  snapshot_date=snapshot_date, fetched_at=utc_now())
         ]  # fmt: skip
+
+    def classification(
+        self, symbols: Iterable[str], series: dict[str, str] | None = None
+    ) -> tuple[list[Path], list[str]]:
+        """fetch-classification: one quote answer per symbol (API host, 1 request/s), vaulted and staged [IC1].
+        Answers change daily (prices), so they are always fetched; a failure on one symbol is reported and the rest
+        continues."""
+        staged, errors = [], []
+        for sym in symbols:
+            url = quote_url(sym, (series or {}).get(sym, "EQ"))
+            try:
+                data = self._get(url, accept=JSON)
+                staged.append(stage_classification(self.vault, self.stage_root, data=data, source_url=url,
+                                                   fetched_at=utc_now()))  # fmt: skip
+            except (FetchError, ParseError) as exc:
+                errors.append(f"{sym} classification: {exc}")
+        return staged, errors
 
     # ── filings ──
 

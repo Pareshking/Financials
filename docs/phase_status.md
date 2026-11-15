@@ -19,9 +19,13 @@ the full line-by-line audit of the PDF is `docs/master_backlog.md`; ratios are i
 | §7 adds: Reg. 31 shareholding, wide screener_features + DSL, "full Screener.in parity" | DONE except the parity gaps below | features*.py, dsl.py |
 
 **Phase 1 pending (Screener parity gaps):**
-1. Industry PE / PBV, peer table, discount to industry median (G112, G199) need NSE's 4-level industry
-   classification (G96, G334): a new free source; today only the 20 sector groups of the Nifty 500 file exist.
-2. Daily run is not scheduled: `run-day` exists, nothing runs it automatically (G40/G60/G289 were overclaimed).
+1. **DONE (batch H)** Industry PE / PBV, peer ranks, premium / discount to the industry and basic-industry median
+   (G112, G199) on NSE's 4-level classification (G96, G334) from the quote API (F30, IC1-IC3): `fetch-classification`,
+   `entity_classification_history`, `features_peers.py`. Point in time from the first fetch (never backdated, C25), so
+   the columns are NULL on earlier days; the owner runs `fetch-classification --universe nifty500` once to start it.
+2. **DONE (batch H)** Daily run scheduled: `ops/` systemd timer + service, crontab line, Windows Task Scheduler XML
+   (20:15 IST daily: `run-day`, then `materialize --incremental`; arch §13). `run-day` takes today's IST date and
+   publishes no feature day on a holiday. Installing the unit on the owner's machine is the remaining step.
 3. Credit rating (Screener ratio) needs credit-rating XBRL (G98, F22 UNVERIFIED).
 4. Not possible by design: all-time high/low (data starts 2024-10-01), "Expected quarterly …" (forecasts),
    G Factor (formula unpublished).
@@ -34,16 +38,16 @@ the full line-by-line audit of the PDF is `docs/master_backlog.md`; ratios are i
 |---|---|---|
 | INDAS_NBFC, IGAAP_BANK, IRDAI_INSURANCE parsers | DONE | batches 4-6; insurer basis, bank columns |
 | Reg. 34 annual XBRL: notes, segments, CWIP | DONE | reg34_annual.py; segment_observations (X97-X99) |
-| Reg. 34 annual XBRL: AOC-1 subsidiary/associate/JV tree | **PENDING** (G277, G292) | no fixture with the schedule; table not built |
+| Reg. 34 annual XBRL: AOC-1 subsidiary/associate/JV tree | DONE (batch H) | `group_structure` from the schedule already in committed annual fixtures (X108); `backfill-group-structure` for filings promoted earlier |
 | Reg. 31 shareholding (full) | DONE | incl. pledge, FII/DII/MF/insurance/retail, shareholder count |
-| Reg. 76 share capital reconciliation | **PENDING** (G93) | source F09 UNVERIFIED; Reg. 31 x paid-up cross-check stands in |
+| Reg. 76 share capital reconciliation | **BLOCKED** (G93) | no machine-readable NSE source found (probes A15, 2026-11-15); F09 UNVERIFIED; Reg. 31 x paid-up cross-check stands in |
 | Materialized screener_features + DSL-to-SQL compiler | DONE | ~490 columns, saved screens, custom ratios |
 | §7 adds: corporate-action auto-adjuster | DONE | prices adjusted for splits/bonus/rights/demergers |
 | §7 adds: AMFI monthly MF holdings | Moved to Phase 3 by the PDF's own review (per-AMC files, R8) | quarterly MF % from Reg. 31 is built |
 | §7 adds: PIT/SDD insider, bulk/block deals | Phase 3 in §5 (G100, G102, G138) | sources UNVERIFIED / OBSERVED |
 
 **Phase 2 pending: functionality**
-1. AOC-1 group tree (G277) and Reg. 76 (G93), above.
+1. Reg. 76 (G93), above: BLOCKED until a source is found. (AOC-1 group tree G277: done in batch H.)
 2. Merger lineage: target -> acquirer, swap ratio, MERGED status, backtest conversion (G37, G56, G57, G58);
    demerger cost-of-acquisition split (G51).
 3. Share classes: DVR / partly-paid ISINs and market cap summed across classes (G275, G306, G336).

@@ -390,6 +390,36 @@ def _gem_aliases() -> dict[str, tuple[str, str]]:
 
 ALIASES.update(_gem_aliases())
 
+
+def _peer_aliases() -> dict[str, tuple[str, str]]:
+    """Batch H (features_peers, C25): NSE industry / basic-industry medians, premiums and peer ranks (Screener's
+    "Industry PE" / "Industry PBV"); the Nifty 500 industry-group fallback keeps its own names."""
+    out: dict[str, tuple[str, str]] = {
+        "industry pe": ("industry_pe_median", "median PE (> 0) of the NSE industry, >= 3 companies"),
+        "industry pbv": ("industry_pb_median", "median PB (> 0) of the NSE industry"),
+        "industry roce": ("(industry_roce_median * 100)", "%, median ROCE of the NSE industry"),
+        "industry sales growth": ("(industry_sales_growth_median * 100)", "%, median sales growth YoY"),
+        "basic industry pe": ("basic_industry_pe_median", "median PE (> 0) of the NSE basic industry"),
+        "basic industry pbv": ("basic_industry_pb_median", "median PB (> 0) of the NSE basic industry"),
+        "basic industry roce": ("(basic_industry_roce_median * 100)", "%"),
+        "basic industry sales growth": ("(basic_industry_sales_growth_median * 100)", "%"),
+        "pe premium to industry": ("(pe_premium_to_industry * 100)", "%, PE / industry median - 1 (< 0 = discount)"),
+        "pbv premium to industry": ("(pb_premium_to_industry * 100)", "%"),
+        "pe premium to basic industry": ("(pe_premium_to_basic_industry * 100)", "%"),
+        "pbv premium to basic industry": ("(pb_premium_to_basic_industry * 100)", "%"),
+        "peer count": ("peer_count", "companies in the NSE basic industry"),
+        "peer rank market cap": ("peer_rank_market_cap", "1 = largest in the basic industry"),
+        "peer rank pe": ("peer_rank_pe", "1 = lowest PE (> 0)"),
+        "peer rank roce": ("peer_rank_roce", "1 = highest ROCE"),
+        "peer rank profit growth": ("peer_rank_profit_growth", "1 = highest quarterly profit growth YoY"),
+        "industry group pe": ("industry_group_pe_median", "median PE over the Nifty 500 file's industry group"),
+        "industry group pbv": ("industry_group_pb_median", "median PB over the Nifty 500 file's industry group"),
+    }  # fmt: skip
+    return out
+
+
+ALIASES.update(_peer_aliases())
+
 KEYWORDS = {"and", "or", "not"}
 COMPARATORS = {"<", "<=", ">", ">=", "=", "!="}
 NAME_RE = re.compile(r"^[a-z][a-z0-9 ]{0,62}$")

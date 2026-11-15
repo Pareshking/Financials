@@ -24,17 +24,17 @@ catalogue as IN PROGRESS. They are counted as BUILT here.
 
 | Area | BUILT | CATALOGUE | DIGEST | MISSED | OOS | Total |
 |---|---|---|---|---|---|---|
-| A. Ratios / metrics | 79 | 32 | 2 | 4 | 1 | 118 |
-| B. Data sources | 14 | 22 | 15 | 2 | 3 | 56 |
-| C. Corporate structure / identity | 9 | 1 | 8 | 0 | 2 | 20 |
+| A. Ratios / metrics | 81 | 30 | 2 | 4 | 1 | 118 |
+| B. Data sources | 15 | 22 | 14 | 2 | 3 | 56 |
+| C. Corporate structure / identity | 11 | 1 | 6 | 0 | 2 | 20 |
 | D. Events, flows, corporate actions | 16 | 1 | 7 | 0 | 4 | 28 |
 | E. Data quality / rules / assistant claims | 62 | 0 | 14 | 0 | 8 | 84 |
 | F. Backtest | 6 | 0 | 2 | 0 | 0 | 8 |
 | G. Alerts / UI / tools / ops | 8 | 1 | 11 | 2 | 2 | 24 |
-| **Total** | **194** | **57** | **59** | **8** | **20** | **338** |
+| **Total** | **199** | **55** | **56** | **8** | **20** | **338** |
 
-Counts are tallied from the Class column of section 3 (last bold token per row). Of the 194 BUILT rows (7 moved from
-CATALOGUE by batch C, 2026-11-15), 10 are only
+Counts are tallied from the Class column of section 3 (last bold token per row). Of the 199 BUILT rows (7 moved from
+CATALOGUE by batch C, 2026-11-15; 5 moved by batch H: A07, A47, B06, C08, C15), 8 are only
 partly built, 1 is built with a different definition (`opm_last_year_pct`), and 12 are rows where the PDF's claim was
 wrong and the corrected behaviour is built (marked "corrected").
 
@@ -73,9 +73,9 @@ M2 = A113, M3 = A94, M4 = A112, M5 = A114, M6 = B31, M7 = B51, M8 = G23.
 
 | G | Digest claim | What the code has | Finding |
 |---|---|---|---|
-| G292 | "Tables entity_securities, subsidiary_tree, pipeline_audit_log": DONE | `securities`, `promotion_log`, `admin_log` exist; **no `subsidiary_tree`** (schema.sql has none; G277 AOC-1 is DOCUMENTED_PLANNED) | DIGEST SAYS DONE, NOT FOUND (subsidiary_tree) |
+| G292 | "Tables entity_securities, subsidiary_tree, pipeline_audit_log": DONE | `securities`, `promotion_log`, `admin_log` exist; **no `subsidiary_tree`** (schema.sql has none; G277 AOC-1 is DOCUMENTED_PLANNED) | DIGEST SAYS DONE, NOT FOUND (subsidiary_tree) **FIXED 2026-11-15 (batch H)**: `group_structure` (AOC-1, X108) |
 | G94 | "Bhavcopy close, 52-week high/low": DONE | `close`, `dist_52w_high` only (`features._momentum` line ~221). **No 52-week low, no 52W high/low levels** | FIXED 2026-11-15 (batch B): `high_52w`, `low_52w`, `dist_52w_low` |
-| G40, G60, G289 | evening job / daily master sync / "Daily run is automatic" | `run-day` CLI exists (arch §2, schedule documented in arch §13), but **nothing schedules it**: no cron / systemd / Task Scheduler file or install step in the repo | DONE as a command; "automatic" NOT FOUND |
+| G40, G60, G289 | evening job / daily master sync / "Daily run is automatic" | `run-day` CLI exists (arch §2, schedule documented in arch §13), but **nothing schedules it**: no cron / systemd / Task Scheduler file or install step in the repo | DONE as a command; "automatic" NOT FOUND **FIXED 2026-11-15 (batch H)**: `ops/` systemd timer + service, crontab line, Windows Task Scheduler XML (arch §13); `run-day` defaults to today IST and publishes no feature day on a non-trading day. Installing them is the owner's step |
 | G224 | FCF-to-net-income conversion (3Y) | `fcf_to_pat` is TTM; no 3Y-sum column returning NULL until history | PARTLY NOT FOUND (owner decision: history-gated ratios are built and return NULL) **FIXED 2026-11-15 (batch C)**: `fcf_conversion_3y` (history-gated) |
 | G233 | Net debt / 3Y average FCF | `net_debt_to_fcf` uses TTM FCF; no 3Y-average form | PARTLY NOT FOUND **FIXED 2026-11-15 (batch C)**: `net_debt_to_fcf_3y` (history-gated) |
 | G240 | 5Y EV/EBITDA band percentile (20 quarters) | `ev_ebitda_percentile` with >= 4 prior quarters; no 20-quarter column | PARTLY NOT FOUND **FIXED 2026-11-15 (batch C)**: `ev_ebitda_percentile_20q` (history-gated) |
@@ -113,7 +113,7 @@ exists (file / column); Class.
 | A04 | 904, 1262 | market cap, current price, PE, PB, EV/EBITDA | G110, G167 DONE | A1.1-A1.6 BUILT | `market_cap`, `pe`, `pb`, `ev_ebitda`, `enterprise_value` | **BUILT** |
 | A05 | 904-906 | EV adds net debt from latest H1/FY balance sheet; TTM from Reg. 33 | G110 DONE | A1.3 | `net_debt`, `bs_as_of` | **BUILT** |
 | A06 | 908-909 | ROCE, ROE, working-capital days, ROIC | G111 DONE | A2.5, A2.1, A2.29, A2.11 | `roce`, `roe`, `working_capital_days`, `roic` | **BUILT** |
-| A07 | 911-913, 835 | peer table ranked by mcap, PE, ROCE, quarterly profit growth | G112 MISSING | B5.8 BUILDABLE NOW (coarse industry) | none | **CATALOGUE** |
+| A07 | 911-913, 835 | peer table ranked by mcap, PE, ROCE, quarterly profit growth | G112 DONE | B5.8 | `peer_rank_market_cap` / `_pe` / `_roce` / `_profit_growth`, `peer_count` within the NSE basic industry (batch H, 2026-11-15, C25) | **BUILT** |
 | A08 | 940-943 | order-book-to-sales ratio | G115 MISSING | B8.11 NOT POSSIBLE | `order_value_90d` only | **CATALOGUE** |
 | A09 | 946-947 | automated forensic red-flag score from Reg. 30 | G117 MISSING | B8.7 BUILDABLE NOW (separate counts) | 90-day counts | **CATALOGUE** |
 | A10 | 949-952 | quantify contingent tax / regulatory liabilities from penalty filings | G118 DOC_PLANNED | B8.8 NEW FREE SOURCE | `penalties_90d` NULL | **CATALOGUE** |
@@ -153,7 +153,7 @@ exists (file / column); Class.
 | A44 | 1274 | F&O PCR | G184 DOC_PLANNED | B6.15 NEW FREE SOURCE | none | **CATALOGUE** |
 | A45 | 1284-1285 | Net Cash to MCap = (cash + investments - total debt) / mcap (custom-ratio example) | none | B2.17 BUILDABLE NOW | no column; expressible now as a saved ratio over `cash equivalents`, `investments`, `debt`, `market cap` (batch C, 2026-11-15) (liquid cash = `liquid_cash`) | **CATALOGUE** |
 | A46 | 1353-1355, 1742-1746 | valuation bands: PE, PB, EV/EBITDA vs own 3/5/10Y median and percentile | G198 DONE (partial), G240 DONE | B5.1 BUILT, B5.2-B5.4, A1.20-A1.21 | `pe_percentile`, `ev_ebitda_percentile`; `ev_ebitda_percentile_20q` (G240, history-gated) (batch C, 2026-11-15) | **BUILT** (partial: PB band, medians, 3/10Y windows) |
-| A47 | 1355 | discount / premium to basic-industry median | G199 MISSING | B5.7 BUILDABLE NOW (coarse) | none | **CATALOGUE** |
+| A47 | 1355 | discount / premium to basic-industry median | G199 DONE | B5.7 | `pe_` / `pb_premium_to_basic_industry`, `_to_industry`; Nifty 500 group fallback `_to_industry_group` (batch H) | **BUILT** |
 | A48 | 1357-1359, 1728-1740 | reverse DCF implied 5Y growth with live 10Y G-Sec | G200, G239 DONE | B5.5 BUILT | `reverse_dcf_implied_g` (WACC fixed 12%) | **BUILT** (partial: live yield needs F25) |
 | A49 | 1361, 1452-1459 | incremental ROIC (1Y / 3Y / 5Y) | G215 DOC_PLANNED | B2.7 BUILDABLE NOW, B2.8 WHEN HISTORY | `incremental_roic_1y`, `_3y`, `_5y` (3Y / 5Y history-gated) (batch C, 2026-11-15) | **BUILT** |
 | A50 | 1361 | dividend payout % | G202 MISSING (stale) | B2.1 | `dividend_payout_pct` (e085eb5) | **BUILT** |
@@ -234,9 +234,9 @@ exists (file / column); Class.
 | B01 | 801-805, 1029 | Integrated Filing quarterly XBRL + Reg. 34 annual XBRL (statements, segments, notes) | G90 DONE | — | `parsers/integrated.py`, `parsers/reg34_annual.py` (F06, F07) | **BUILT** |
 | B02 | 819-823 | Reg. 31 shareholding XBRL (promoter, FII, DII incl. MF / insurance / banks, public, pledge) | G91 DONE | — | `parsers/shareholding.py` (F08) | **BUILT** |
 | B03 | 819-823 | SAST 31(1)/31(2) encumbrance events with lender details | G92 DOC_PLANNED | B7.10 NEW FREE SOURCE | F12 | **CATALOGUE** |
-| B04 | 826-829, 904, 1498 | Reg. 76 share-capital audit (issued, listed, demat shares) | G93 DOC_PLANNED | — | F09 UNVERIFIED; Reg. 31 stands in (decision C) | **DIGEST** |
+| B04 | 826-829, 904, 1498 | Reg. 76 share-capital audit (issued, listed, demat shares) | G93 DOC_PLANNED | — | F09 UNVERIFIED, BLOCKED: no NSE file found (probes A15, 2026-11-15); Reg. 31 stands in (decision C) | **DIGEST** |
 | B05 | 831-835 | full bhavcopy (`sec_bhavdata_full`) | G94, G101 DONE | — | F01, F02 | **BUILT** |
-| B06 | 832-835, 911-913, 1156 | NSE 4-tier industry classification ("in the exchange equity master CSV") | G96 DOC_PLANNED, G334 | A1.19 note | `raw_index_snapshot.industry` (one tier) | **DIGEST** |
+| B06 | 832-835, 911-913, 1156 | NSE 4-tier industry classification ("in the exchange equity master CSV") | G96 DONE, G334 | A1.19 note | not in EQUITY_L (IDX10); from the NSE quote API (F30, IC1-IC3): `fetch-classification`, `entity_classification_history` (batch H) | **BUILT** |
 | B07 | 837-841 | corporate-actions feed + Reg. 30 board-outcome XBRL | G97 DONE | — | F03; outcome XBRL vaulted raw (E2) | **BUILT** |
 | B08 | 843-847 | credit-rating disclosure XBRL | G98 DOC_PLANNED | A1.23, B8.9 NEW FREE SOURCE | F22 | **CATALOGUE** |
 | B09 | 857-861 | Reg. 23(9) RPT XBRL | G99 DONE | B1.19 | `rpt_total_amount` (total only) | **BUILT** (partial) |
@@ -299,14 +299,14 @@ exists (file / column); Class.
 | C05 | 686-688, 756, 2528 | map NSE symbols to BSE scrip codes | G79 MISSING | `security_identifier_history.bse_scrip_code` never filled | **DIGEST** |
 | C06 | 751 | key the master on ISIN | G85 CONFLICTS | security_id + FinInstrmId / ISIN history (invariant 3) | **BUILT** (corrected) |
 | C07 | 2162-2174 | dual-ISIN (INE + IN9 partly paid / DVR) under one entity; market cap summed | G275 DOC_PLANNED | only COMMON securities created (`promoter.py:236`) | **DIGEST** |
-| C08 | 2184-2187 | AOC-1 subsidiary / associate / JV tree (name, %, net worth, turnover, PAT) | G277 DOC_PLANNED | not parsed (X75) | **DIGEST** |
-| C09 | 2266-2267 | tables entity_securities, subsidiary_tree, pipeline_audit_log | G292 DONE | `securities`, `promotion_log`, `admin_log`; no subsidiary_tree | **BUILT** (partial; §2) |
+| C08 | 2184-2187 | AOC-1 subsidiary / associate / JV tree (name, %, net worth, turnover, PAT) | G277 DONE | `group_structure` from the Reg. 34 schedule (X108, batch H) | **BUILT** |
+| C09 | 2266-2267 | tables entity_securities, subsidiary_tree, pipeline_audit_log | G292 DONE | `securities`, `promotion_log`, `admin_log`; subsidiary tree = `group_structure` (batch H) | **BUILT** |
 | C10 | 2283-2284 | surrogate security_id + dated ISIN / symbol history | G295 DONE | `security_identifier_history` | **BUILT** |
 | C11 | 2305-2306 | DVR shares get INE ISINs, only partly-paid IN9 | G306 DOC_PLANNED | R10 UNVERIFIED | **DIGEST** |
 | C12 | 2513-2520, 2531 | share classes COMMON / DVR / PARTLY_PAID, voting_rights_ratio, face_value per identifier | G336 DOC_PLANNED | `securities.share_class`; no voting-rights ratio | **DIGEST** |
 | C13 | 2035-2043 | valuation_archetype per company, classified automatically | G267 DONE | `derived_archetype`, `reference/valuation_archetypes.csv`, override | **BUILT** |
 | C14 | 2503-2504 | accounting_profile and archetype on entity_master | G333 OOS | per filing / per as-of (invariant 5) | **OOS** |
-| C15 | 2505-2508 | macro sector, sector, industry, basic industry on the master | G334 DOC_PLANNED | `entity_classification_history` not built | **DIGEST** |
+| C15 | 2505-2508 | macro sector, sector, industry, basic industry on the master | G334 DONE | `entity_classification_history` (date-bounded, PIT from the first fetch, IC3) and the `nse_*` screener columns (batch H) | **BUILT** |
 | C16 | 2502 | cin UNIQUE | G335 CONFLICTS | no nullable UNIQUE (invariant 13) | **BUILT** (corrected) |
 | C17 | 2509-2510 | status ACTIVE / MERGED / DELISTED, inactive_date | G206 DONE | `inactive_date`, `exit_reason` | **BUILT** |
 | C18 | 148-150 | company override table (forced_profile, custom_revenue_tags) | G22 OOS | audited scope / archetype overrides instead | **OOS** |
@@ -320,7 +320,7 @@ exists (file / column); Class.
 | D01 | 292-293 | zero-human-intervention corporate-action adjustment (mergers, demergers, splits) | G33 OOS | automatic for parsed purposes and named rules; unknowns quarantine (invariant 9, owner review G298) | **OOS** |
 | D02 | 298-301, 481 | adjust per-share series; never multiply absolute financials | G34, G53 DONE | invariant 8 | **BUILT** |
 | D03 | 314-319 | immutable raw ledger + CA ledger keyed (entity, ex_date); recompute cumulative factors | G35, G38 DONE | `corp_actions`, `rebuild-market` | **BUILT** |
-| D04 | 322-324, 517-518 | evening job polls CA feed + bhavcopy; deterministic purpose rules | G40 DONE | `run-day`; not scheduled (§2) | **BUILT** |
+| D04 | 322-324, 517-518 | evening job polls CA feed + bhavcopy; deterministic purpose rules | G40 DONE | `run-day`, scheduled daily 20:15 IST by `ops/` (arch §13, batch H) | **BUILT** |
 | D05 | 326-335 | split F = Y/X | G41 DONE | `corp_actions.py` | **BUILT** |
 | D06 | 337-347 | bonus F = B/(A+B) | G42 DONE | `corp_actions.py` | **BUILT** |
 | D07 | 349-362 | rights factor | G43 DONE | `corp_actions.py` | **BUILT** |
@@ -471,7 +471,7 @@ exists (file / column); Class.
 | G17 | 2222 | 52W high on > 2x 20-day median delivery | G283 MISSING | B6.11 BUILDABLE NOW (flag) | **CATALOGUE** |
 | G18 | 1134-1135 | poll RSS every 1-2 minutes | G144 OOS | CLAUDE.md Fetching | **OOS** |
 | G19 | 2228-2229 | schema-drift alert while parsers keep running | G284 DONE | UNKNOWN_TAXONOMY quarantine, registry audit | **BUILT** |
-| G20 | 2244-2246, 514-523 | self-healing, autonomous from next quarter; 08:00 master sync, 18:00 adjuster, hourly watcher | G289 DONE | `run-day`; schedule in arch §13 but **no scheduler shipped** | **BUILT** (partial; §2) |
+| G20 | 2244-2246, 514-523 | self-healing, autonomous from next quarter; 08:00 master sync, 18:00 adjuster, hourly watcher | G289 DONE | `run-day` + `materialize --incremental` scheduled once daily by `ops/` (systemd / cron / Windows); one evening run, not the PDF's three slots | **BUILT** |
 | G21 | 2052-2054, 2078, 2104 | compile everything into one double-checked document | G271 IN_PROGRESS | digest + catalogue + this file | **DIGEST** |
 | G22 | 921-922, 1077 | beat Screener / Tijori / Trendlyne with machine-readable data; what is still missing | G113 DOC_PLANNED, G137 IN_PROGRESS | — | **DIGEST** |
 | G23 | 1184-1188 | survey all competitor and new-generation sites for inputs | (G113 goal only) | none | **MISSED** (M8) |

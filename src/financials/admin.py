@@ -149,6 +149,7 @@ def rebuild_market(con, from_date: date, *, note: str = "rebuild-market") -> dic
           [now, REBUILD_SUPERSEDED, f"rebuild-market --from {from_date}: {note}", from_date])  # fmt: skip
         n("features", "DELETE FROM screener_features_history WHERE as_of_date >= ?", [from_date])
         con.execute("DELETE FROM features_meta WHERE as_of_date >= ?", [from_date])
+        con.execute("DELETE FROM market_breadth WHERE as_of_date >= ?", [from_date])
         dirty.mark_all(con, from_date, "REBUILD_MARKET", str(from_date))
         con.execute("DELETE FROM screener_features")
         con.execute("INSERT INTO screener_features SELECT * FROM screener_features_history WHERE as_of_date = "

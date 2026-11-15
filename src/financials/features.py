@@ -22,6 +22,7 @@ from decimal import Decimal
 
 from financials.corp_actions import ACCEPTED_STATUSES
 from financials.db import insert_rows, table_columns, version_key
+from financials.features_price import add_price_columns, refresh_breadth
 from financials.fundamentals import (
     ANNUAL_COLUMNS,
     BANK_COLUMNS,
@@ -64,9 +65,10 @@ from financials.timeutil import ist_to_utc, utc_now
 # Reader version of materialised rows. Bump it whenever features.py, fundamentals.py (or another file pinned by
 # tests/test_incremental_materialize.py) changes any output: `materialize --incremental` refuses days built by another
 # version, because only a full run then reproduces the history.
-FEATURES_VERSION = "2026.11.15-3"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
+FEATURES_VERSION = "2026.11.15-4B"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
 # -3: QoQ sales / profit growth, NPM, interest coverage, OPM same quarter last year, dividend yield / payout,
 #     promoter holding QoQ change (owner_requirements items 1, 3, 4)
+# -4B: batch B price / volume / technicals (features_price.py) and the market_breadth table
 
 CRITICAL_COLUMNS = ("close", "market_cap", "sales_ttm", "pat_ttm", "total_equity")
 G4_MAX_NULL_RISE = 0.015
@@ -523,6 +525,7 @@ def compute_rows(
                      events, kpis, history, curated, arch_override, fundamentals_cache, dividends)  # fmt: skip
     finally:
         clear_prefetch(con, as_of_ts)
+    add_price_columns(con, rows, as_of, exchange, factors, frozen, secs)  # batch B (price/technicals)
     return rows
 
 
@@ -875,6 +878,7 @@ def materialize(
                 [as_of, *by_ent[1], *by_sec[1]],
             )
         insert_rows(con, "screener_features_history", rows)
+        refresh_breadth(con, as_of)  # batch B: market-level breadth from the day's stored rows
         latest = con.execute("SELECT max(as_of_date) FROM screener_features_history").fetchone()[0]
         if latest == as_of or entities is None:
             con.execute("DELETE FROM screener_features")

@@ -617,6 +617,43 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     dividend_yield_pct  DOUBLE,              -- trailing-365-day accepted cash dividends (today's share basis) / close
     dividend_payout_pct DOUBLE,              -- the same dividends per share / eps_ttm; NULL if EPS <= 0
     promoter_holding_change_qoq_pp DOUBLE,   -- Reg. 31 promoter % now minus the previous quarter end, in pp
+    -- batch B (price/technicals): features_price.py; adjusted = x price factors of later accepted share-count / demerger
+    -- actions (volume / the same); NULL while a gap freezes the series or the window exceeds the stored bars [C9]
+    return_1d           DOUBLE,              -- adjusted close / close 1 bar earlier - 1
+    return_1w           DOUBLE,              -- 5 bars
+    return_3y           DOUBLE,              -- 756 bars, cumulative (not annualised); NULL until ~Oct 2027
+    return_5y           DOUBLE,              -- 1,260 bars, cumulative; NULL until ~Oct 2029
+    return_7y           DOUBLE,              -- 1,764 bars, cumulative; NULL until ~Oct 2031
+    return_10y          DOUBLE,              -- 2,520 bars, cumulative; NULL until ~Oct 2034
+    volume              BIGINT,              -- today's traded quantity as filed (TtlTradgVol)
+    volume_1w_avg       DOUBLE,              -- mean adjusted volume, 5 bars
+    volume_1m_avg       DOUBLE,              -- 21 bars
+    volume_1y_avg       DOUBLE,              -- 252 bars
+    high_52w            DECIMAL(18,4),       -- max adjusted close, 252 bars
+    low_52w             DECIMAL(18,4),       -- min adjusted close, 252 bars
+    dist_52w_low        DOUBLE,              -- adjusted close / low_52w - 1 (>= 0)
+    high_since_data_start DECIMAL(18,4),     -- max adjusted close since the first bar (>= 2024-10-01): NOT all-time
+    low_since_data_start  DECIMAL(18,4),     -- min adjusted close since the first bar: NOT all-time
+    dma50               DECIMAL(18,4),       -- mean adjusted close, 50 bars
+    dma200              DECIMAL(18,4),       -- 200 bars
+    dma50_prev          DECIMAL(18,4),       -- same, window ending one bar earlier
+    dma200_prev         DECIMAL(18,4),
+    rsi_14              DOUBLE,              -- Wilder RSI(14) on adjusted closes, seeded at the first bar
+    rsi_14_prev         DOUBLE,
+    macd                DOUBLE,              -- EMA12 - EMA26 of adjusted closes (EMAs seeded by an SMA)
+    macd_signal         DOUBLE,              -- EMA9 of MACD (34 bars)
+    macd_prev           DOUBLE,
+    macd_signal_prev    DOUBLE,
+    atr_14_pct          DOUBLE,              -- Wilder ATR(14) on adjusted H/L/C / adjusted close (fraction)
+    rs_nifty500_3m      DOUBLE,              -- stock return - Nifty 500 price-index return over 63 bars (fraction points)
+    rs_nifty500_6m      DOUBLE,              -- 126 bars
+    rs_nifty500_12m     DOUBLE,              -- 252 bars
+    beta_1y_nifty500    DOUBLE,              -- OLS beta of daily log returns vs Nifty 500, 252 returns
+    turnover_median_20d DECIMAL(24,2),       -- median daily traded value (TtlTrfVal), 20 bars, rupees
+    deliv_pct           DOUBLE,              -- today's deliv_qty / volume (fraction) [P16]
+    deliv_pct_avg_20d   DOUBLE,              -- mean daily delivery fraction, 20 bars
+    vwap                DECIMAL(18,4),       -- today's turnover / volume (= AVG_PRICE) [P16]
+    vwap_20d            DECIMAL(18,4),       -- 20-bar traded value / adjusted volume (today's share basis)
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -782,7 +819,62 @@ CREATE TABLE IF NOT EXISTS screener_features (
     dividend_yield_pct  DOUBLE,              -- trailing-365-day accepted cash dividends (today's share basis) / close
     dividend_payout_pct DOUBLE,              -- the same dividends per share / eps_ttm; NULL if EPS <= 0
     promoter_holding_change_qoq_pp DOUBLE,   -- Reg. 31 promoter % now minus the previous quarter end, in pp
+    -- batch B (price/technicals): features_price.py; adjusted = x price factors of later accepted share-count / demerger
+    -- actions (volume / the same); NULL while a gap freezes the series or the window exceeds the stored bars [C9]
+    return_1d           DOUBLE,              -- adjusted close / close 1 bar earlier - 1
+    return_1w           DOUBLE,              -- 5 bars
+    return_3y           DOUBLE,              -- 756 bars, cumulative (not annualised); NULL until ~Oct 2027
+    return_5y           DOUBLE,              -- 1,260 bars, cumulative; NULL until ~Oct 2029
+    return_7y           DOUBLE,              -- 1,764 bars, cumulative; NULL until ~Oct 2031
+    return_10y          DOUBLE,              -- 2,520 bars, cumulative; NULL until ~Oct 2034
+    volume              BIGINT,              -- today's traded quantity as filed (TtlTradgVol)
+    volume_1w_avg       DOUBLE,              -- mean adjusted volume, 5 bars
+    volume_1m_avg       DOUBLE,              -- 21 bars
+    volume_1y_avg       DOUBLE,              -- 252 bars
+    high_52w            DECIMAL(18,4),       -- max adjusted close, 252 bars
+    low_52w             DECIMAL(18,4),       -- min adjusted close, 252 bars
+    dist_52w_low        DOUBLE,              -- adjusted close / low_52w - 1 (>= 0)
+    high_since_data_start DECIMAL(18,4),     -- max adjusted close since the first bar (>= 2024-10-01): NOT all-time
+    low_since_data_start  DECIMAL(18,4),     -- min adjusted close since the first bar: NOT all-time
+    dma50               DECIMAL(18,4),       -- mean adjusted close, 50 bars
+    dma200              DECIMAL(18,4),       -- 200 bars
+    dma50_prev          DECIMAL(18,4),       -- same, window ending one bar earlier
+    dma200_prev         DECIMAL(18,4),
+    rsi_14              DOUBLE,              -- Wilder RSI(14) on adjusted closes, seeded at the first bar
+    rsi_14_prev         DOUBLE,
+    macd                DOUBLE,              -- EMA12 - EMA26 of adjusted closes (EMAs seeded by an SMA)
+    macd_signal         DOUBLE,              -- EMA9 of MACD (34 bars)
+    macd_prev           DOUBLE,
+    macd_signal_prev    DOUBLE,
+    atr_14_pct          DOUBLE,              -- Wilder ATR(14) on adjusted H/L/C / adjusted close (fraction)
+    rs_nifty500_3m      DOUBLE,              -- stock return - Nifty 500 price-index return over 63 bars (fraction points)
+    rs_nifty500_6m      DOUBLE,              -- 126 bars
+    rs_nifty500_12m     DOUBLE,              -- 252 bars
+    beta_1y_nifty500    DOUBLE,              -- OLS beta of daily log returns vs Nifty 500, 252 returns
+    turnover_median_20d DECIMAL(24,2),       -- median daily traded value (TtlTrfVal), 20 bars, rupees
+    deliv_pct           DOUBLE,              -- today's deliv_qty / volume (fraction) [P16]
+    deliv_pct_avg_20d   DOUBLE,              -- mean daily delivery fraction, 20 bars
+    vwap                DECIMAL(18,4),       -- today's turnover / volume (= AVG_PRICE) [P16]
+    vwap_20d            DECIMAL(18,4),       -- 20-bar traded value / adjusted volume (today's share basis)
     PRIMARY KEY (as_of_date, security_id)
+);
+
+-- Market breadth per materialised day (G208): from the day's screener_features_history rows with in_nifty500,
+-- refreshed inside the materialize transaction (features_price.refresh_breadth).
+CREATE TABLE IF NOT EXISTS market_breadth (
+    as_of_date          DATE    NOT NULL,
+    universe            VARCHAR NOT NULL,    -- NIFTY 500
+    members             INTEGER,             -- rows with in_nifty500 on the day
+    pct_above_dma50     DOUBLE,              -- share with price_to_dma50 > 1, of members with a value
+    pct_above_dma200    DOUBLE,
+    new_52w_highs       INTEGER,             -- dist_52w_high = 0 (close is the 252-bar high)
+    new_52w_lows        INTEGER,             -- dist_52w_low = 0
+    high_low_ratio      DOUBLE,              -- new highs / new lows; NULL without a new low
+    advances            INTEGER,             -- return_1d > 0
+    declines            INTEGER,             -- return_1d < 0
+    unchanged           INTEGER,             -- return_1d = 0
+    ad_ratio            DOUBLE,              -- advances / declines; NULL without a decline
+    PRIMARY KEY (as_of_date, universe)
 );
 
 CREATE TABLE IF NOT EXISTS user_custom_ratios (

@@ -29,8 +29,9 @@ Operator commands (`python -m financials --data-dir data …`):
 | `fetch-days START [END]`, `fetch-corp-actions START END`, `fetch-holidays`, `fetch-index --as-of D`, `fetch-shareholding SYM…\|--universe U`, `fetch-annual SYM…\|--universe U`, `fetch-results [URL] [--symbols …\|--universe U]`, `discover-filings [--symbols …\|--universe nifty500\|active\|--from-rss] [--workers N]` | download → vault → staging only (`--workers` threads overlap hosts; each host stays at ≥ 1 s between requests). Vaulted archive files are never downloaded again (vault URL index); a failed day or file is reported and the run goes on; corporate actions are asked in 30-day windows |
 | `promote` | the single writer: applies pending stages in order (holidays, market days by date, index snapshots, corporate actions, results, shareholding, raw-only) and records them in `promotion_log`. ABORTED batches stay pending, and every later market day waits behind an aborted one |
 | `rebuild-market --from D` | rolls market-derived state back to `D` (bars, bhavcopy/inferred calendar rows, identifier intervals, auto-decided corporate actions, feature history), replays the staged days and re-materialises; raw tables untouched; audited in `admin_log` |
-| `materialize D` / `materialize --from D1 --to D2` | builds features for `D` (or every promoted trading day in the range, ascending) with gates G4/G5 |
-| `run-day --date D` | holiday list, market days D−7..D, corporate actions D−7..D+30, discovery for symbols with results in the day's RSS (A9) + Reg. 30 events, promote, materialise D; idempotent |
+| `materialize D` / `materialize --from D1 --to D2` | builds features for `D` (or every promoted trading day in the range, ascending) with gates G4/G5; consumes the dirty markers the range covers (§11.10) |
+| `materialize --incremental [--to D]` | recomputes only the rows marked dirty since the last run, on already-materialised days, with G4/G5 on each merged day (§11.10); refuses when a day was built by another `FEATURES_VERSION` |
+| `run-day --date D` | holiday list, market days D−7..D, corporate actions D−7..D+30, discovery for symbols with results in the day's RSS (A9) + Reg. 30 events, promote, `materialize --incremental --to D−1`, materialise D in full; idempotent |
 | `screen "QUERY" [--as-of D]` | runs a DSL screen on the live table or point-in-time on history (read-only connection) |
 | `load-kpis FILE` | stages a supplemental-KPI CSV/JSON (`parsers.kpis`) for `promote` into `supplemental_kpis` |
 | `export-bundle --out DIR [--include-raw --max-file-mb 50 --max-total-mb 250]`, `import-bundle DIR --db PATH` | zstd Parquet shards of every table (raw facts optional) with a manifest of row counts and checksums; import verifies them. Local or private storage only: the data is NSE-derived and the repository is public |
@@ -476,6 +477,52 @@ Price inputs are read in one of two knowledge modes (`features._price_inputs`):
 - `system` (`compute_rows(..., knowledge="system")`): what this system had decided by `as_of_ts` (an action counts
   once `decided_at <= as_of_ts`; a finding freezes if created by then and not resolved by then). For auditing what
   the live system showed; never written to history.
+
+## 11.10 Incremental materialisation
+
+A row `(D, security)` depends only on that security's and entity's own inputs: bars, accepted factors and gap
+freezes up to `D`, fundamentals / shareholding / Reg. 30 events / KPIs visible at the end of `D` (IST), Nifty 500
+membership on `D`, overrides, and its own earlier rows (the PE / EV-EBITDA percentile history, C20). No column compares
+securities. So after a change that touches a few entities only their rows need recomputing.
+
+**Dirty markers** (`materialize_dirty`, `financials.dirty`): "rows of entity E on `as_of_date >= from_date` may be
+stale" (`entity_id = '*'` = every entity). Only the single writers write them, inside the transaction of the change:
+
+| Writer | Marker |
+|---|---|
+| `promoter._promote_results_xbrl` (results + Reg. 34 annual, revisions, re-parses) | the filing's entity (and the entity of any earlier version of the filing) from the IST date of the earliest `visible_from_ts` of any version: a re-parse can move visibility later (X83) |
+| `promoter._promote_shareholding` | same rule on `shareholding_meta` |
+| `promoter._promote_reg30_event`, `promoter._promote_kpis` | the entity from the IST date of `visible_from_ts` |
+| `promoter._promote_market_day` | `'*'` from the trade date (new bars move every lookback from that day on) |
+| `promoter._attach_delivery` (late delivery file) | the entities of the bars it filled, from the trade date |
+| `promote()` around `market_day`, `corp_actions`, `index_snapshot`; `admin._transaction` around every admin operation (quarantine resolution incl. CORP_ACTION / ACCEPT / REJECT / MERGE_SECURITIES, backfill-index, rebuild-market, overrides) | market-state diff: accepted factors (`corp_actions` with status in `ACCEPTED_STATUSES`), open `GAP` findings, identifier intervals, Nifty 500 intervals, security → entity map are snapshotted before and compared after; each changed row marks its security's entity from the earliest date in the row (ex-date, gap trade date, `valid_from` / `valid_to`). This catches every rule that writes them (verification, CA11–CA13, gap auditor, inactivity closing, manual actions) without a hook per statement |
+| `admin._merge_securities` | both entities from the first trade date (prices, identity and, when entities merge, fundamentals move) |
+| `admin._set_scope`, `admin._set_archetype` | the entity from the first trade date (overrides apply at every as-of) |
+| `admin._load_missing_fin_instrm_id_bars` (reprocess) | the bar's entity from its trade date |
+| `admin.rebuild_market` | `'*'` from the date (it also deletes the feature history and `features_meta` from there) |
+
+A corporate action changes bars before its ex-date, but `_price_inputs` reads an action only once `ex_date <= D`
+(and the share roll-forward only for `count date < ex_date <= D`), so rows before the ex-date never change: the
+marker starts at the ex-date. Writes that feed no feature column (raw tables, vault rows, quarantines other than
+`GAP`, `segment_observations`, the calendar, `promotion_log`) mark nothing.
+
+**`materialize --incremental [--to D]`** (`features.materialize_incremental`): refuses unless every materialised day
+was built by the code's `FEATURES_VERSION` (`features_meta`, written in each day's publish transaction; a day built
+before the table existed counts as another version). Then, for every materialised day ≥ the earliest marker
+(≤ `D`), ascending so each day's percentile history sees the recomputed earlier days: the entities whose marker
+`from_date <= day` (all, if a `'*'` marker applies) are recomputed through the same `compute_rows`, with every batched
+read restricted to them (one prefetch per day, never a per-entity query), merged with the day's other stored rows,
+gated by G5 (the merged day's securities = the universe) and G4 (null rates of the merged day vs the previous day),
+and published atomically (only the recomputed rows are replaced). A failed gate stops the run: that day stays as it
+was and every marker stays, so a rerun resumes. After a successful run the consumed markers are deleted, or moved
+to `D + 1` when materialised days after `D` exist. A full `materialize --from/--to` consumes the markers whose date
+falls in the range (or after the last materialised day before it), provided every materialised day in the range was
+rebuilt. Equivalence with a full rebuild, row for row, is pinned by `tests/test_incremental_materialize.py` for a
+results filing, a shareholding filing, a corporate-action batch, a gap resolution and a scope override.
+
+**Reader changes**: `FEATURES_VERSION` must be bumped whenever `features.py`, `fundamentals.py`, `scope.py`,
+`money.py` or `reference/valuation_archetypes.csv` changes; a test pins a hash of those files together with the
+version. After a bump only a full `materialize --from --to` is equivalent.
 
 ## 12. Promoter quality gates (in order)
 

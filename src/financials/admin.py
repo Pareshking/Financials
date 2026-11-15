@@ -15,6 +15,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
+from financials import dirty
 from financials.corp_actions import CorpAction, audit_day
 from financials.db import fetch_dicts, insert_rows
 from financials.ids import stable_id
@@ -36,9 +37,13 @@ class AdminError(ValueError):
 
 
 def _transaction(con, fn, *args, **kwargs):
+    """Run `fn` atomically. Every admin operation can change price-side feature inputs (a manual action, a resolved
+    gap, a merge, index membership), so the market state is diffed around it into materialize_dirty (dirty.py)."""
     con.execute("BEGIN TRANSACTION")
     try:
+        before = dirty.market_state(con)
         out = fn(con, *args, **kwargs)
+        dirty.mark_market_changes(con, before, "ADMIN" + fn.__name__.upper(), str(args[0]) if args else "")
     except BaseException:
         con.execute("ROLLBACK")
         raise
@@ -143,6 +148,8 @@ def rebuild_market(con, from_date: date, *, note: str = "rebuild-market") -> dic
           "AND CAST(json_extract_string(details, '$.trade_date') AS DATE) >= ?",
           [now, REBUILD_SUPERSEDED, f"rebuild-market --from {from_date}: {note}", from_date])  # fmt: skip
         n("features", "DELETE FROM screener_features_history WHERE as_of_date >= ?", [from_date])
+        con.execute("DELETE FROM features_meta WHERE as_of_date >= ?", [from_date])
+        dirty.mark_all(con, from_date, "REBUILD_MARKET", str(from_date))
         con.execute("DELETE FROM screener_features")
         con.execute("INSERT INTO screener_features SELECT * FROM screener_features_history WHERE as_of_date = "
                     "(SELECT max(as_of_date) FROM screener_features_history)")  # fmt: skip
@@ -262,6 +269,7 @@ def _load_missing_fin_instrm_id_bars(con) -> int:
             "turnover_inr": r["turnover_inr"], "deliv_qty": None, "price_filing_id": r["filing_id"],
             "delivery_filing_id": None,
         }], or_ignore=True)  # fmt: skip
+        dirty.mark_securities(con, {sec: day}, "BAR_LOADED", q["quarantine_id"])  # bar and its gap findings
         prev = _prev_closes(con, r["exchange"], day).get(sec)
         for f in audit_day(
             sec, day, r["open"], prev, _actions(con, "security_id = ? AND ex_date = ?", [sec, day]), False
@@ -592,6 +600,8 @@ def _merge_securities(con, q: dict, details: dict, note: str) -> dict:
             [drop_start, f"duplicate of {keep_entity} (security merge)", drop_entity],
         )
     _override(con, keep_entity, "merged_security", {"merged": drop, "into": keep}, drop_start, note)
+    # Prices, identity and (when the entities merge) fundamentals move: both entities, every materialised day.
+    dirty.mark_entities(con, {keep_entity, drop_entity}, MIN_TRADE_DATE, "MERGE_SECURITIES", q["quarantine_id"])
 
     # Load the bar that collided, now that identity is unambiguous.
     raw = fetch_dicts(
@@ -663,6 +673,7 @@ def _set_scope(con, entity_id: str, quarterly: str | None, annual: str | None, r
                "recorded_at": now}  # fmt: skip
         insert_rows(con, "entity_scope_override", [row])
     body = value if isinstance(value, str) else json.dumps(value, sort_keys=True)
+    dirty.mark_entities(con, [entity_id], MIN_TRADE_DATE, "SCOPE_OVERRIDE", body)  # applies at every as-of
     insert_rows(con, "company_overrides", [{
         "override_id": stable_id("ovr", entity_id, "scope_policy", body, now), "entity_id": entity_id,
         "field": "scope_policy", "value": body, "valid_from": now.date(), "valid_to": None, "reason": reason,
@@ -692,6 +703,7 @@ def _set_archetype(con, entity_id: str, archetype: str | None, reason: str) -> d
         insert_rows(con, "entity_archetype_override", [{"entity_id": entity_id, "valuation_archetype": archetype,
                                                         "reason": reason, "recorded_at": now}])  # fmt: skip
     body = archetype or "CLEARED"
+    dirty.mark_entities(con, [entity_id], MIN_TRADE_DATE, "ARCHETYPE_OVERRIDE", body)  # applies at every as-of
     insert_rows(con, "company_overrides", [{
         "override_id": stable_id("ovr", entity_id, "valuation_archetype", body, now), "entity_id": entity_id,
         "field": "valuation_archetype", "value": body, "valid_from": now.date(), "valid_to": None, "reason": reason,
@@ -757,6 +769,7 @@ def _correct(con, filing_id, corrections, url, page, text, reads, note, qid) -> 
     new = [r for r in rows if r["correction_id"] not in existing]
     if new:
         insert_rows(con, "fact_corrections", new)
+        _mark_correction_dirty(con, filing_id, entity, "fact_correction")
     if qid is not None:
         q = con.execute("SELECT resolved_at FROM quarantine_queue WHERE quarantine_id = ?", [qid]).fetchone()
         if q is None:
@@ -776,8 +789,18 @@ def revoke_correction(con, correction_id: str, note: str) -> None:
         raise AdminError("a note is required")
     n = con.execute(
         "UPDATE fact_corrections SET revoked_at = ?, note = note || ' | revoked: ' || ? "
-        "WHERE correction_id = ? AND revoked_at IS NULL RETURNING correction_id",
+        "WHERE correction_id = ? AND revoked_at IS NULL RETURNING filing_id, entity_id",
         [utc_now(), note.strip(), correction_id],
     ).fetchall()
     if not n:
         raise AdminError(f"no active correction {correction_id}")
+    _mark_correction_dirty(con, n[0][0], n[0][1], "fact_correction_revoked")
+
+
+def _mark_correction_dirty(con, filing_id: str, entity_id: str, reason: str) -> None:
+    """Incremental materialisation: the entity's rows change from the corrected filing's earliest visibility."""
+    from financials.dirty import mark_visible
+
+    vis = con.execute("SELECT min(visible_from_ts) FROM filing_meta WHERE filing_id = ?", [filing_id]).fetchone()[0]
+    if vis is not None:
+        mark_visible(con, entity_id, vis, reason, filing_id)

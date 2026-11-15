@@ -19,7 +19,7 @@ from typing import Any
 
 import duckdb
 
-from financials import PARSER_VERSION
+from financials import PARSER_VERSION, dirty
 from financials.corp_actions import ACCEPTED_STATUSES, CorpAction, adjust_closes, audit_day, verify_group
 from financials.db import fetch_dicts, insert_rows, version_key
 from financials.fundamentals import CURRENT_VERSION
@@ -50,6 +50,10 @@ class PromotionResult:
     quarantined: list[str] = field(default_factory=list)
 
 
+# Jobs whose rules can change price-side feature inputs (factors, GAP freezes, identifiers, Nifty 500 membership).
+MARKET_STATE_JOBS = frozenset({"market_day", "corp_actions", "index_snapshot"})
+
+
 def promote(con: duckdb.DuckDBPyConnection, stage_dir: Path) -> PromotionResult:
     manifest = read_manifest(stage_dir)
     job = manifest["job"]
@@ -70,7 +74,10 @@ def promote(con: duckdb.DuckDBPyConnection, stage_dir: Path) -> PromotionResult:
         raise ValueError(f"unknown job {job!r}")
     con.execute("BEGIN TRANSACTION")
     try:
+        before = dirty.market_state(con) if job in MARKET_STATE_JOBS else None
         result = handler(con, Path(stage_dir), manifest)
+        if before is not None:  # price-side changes made by any rule this batch ran (dirty.py)
+            dirty.mark_market_changes(con, before, job.upper(), Path(stage_dir).name)
     except GateFailure as exc:
         con.execute("ROLLBACK")
         return PromotionResult("ABORTED", job, exc.gate, str(exc))
@@ -279,6 +286,7 @@ def _promote_market_day(con, stage_dir: Path, manifest: dict[str, Any]) -> Promo
             }
         )
     insert_rows(con, "ohlcv", ohlcv_rows)
+    dirty.mark_all(con, trade_date, "MARKET_DAY", filing_id)  # new bars: every row from this day on (lookbacks)
     # A bhavcopy is ground truth: it overrides a holiday row (e.g. a special/Muhurat session).
     con.execute(
         "INSERT OR REPLACE INTO trading_calendar (exchange, cal_date, is_trading, note, source) "
@@ -482,11 +490,12 @@ def _attach_delivery(con, stage_dir: Path, exchange: str, trade_date: date) -> P
             AND h.valid_from <= d.trade_date AND (h.valid_to IS NULL OR h.valid_to > d.trade_date)
            WHERE o.security_id = h.security_id AND o.exchange = d.exchange AND o.series = d.series
              AND o.trade_date = d.trade_date AND o.trade_date = ? AND o.deliv_qty IS NULL AND d.deliv_qty IS NOT NULL
-           RETURNING 1""",
+           RETURNING o.security_id""",
         [path, trade_date],
     ).fetchall()
     if not updated:  # a replay, or every bar already has delivery
         return PromotionResult("ALREADY_PROMOTED", "market_day", message=str(trade_date))
+    dirty.mark_securities(con, {sec: trade_date for (sec,) in updated}, "DELIVERY", str(trade_date))
     return PromotionResult("PROMOTED", "market_day", message=f"{trade_date}: delivery attached to {len(updated)} bars")
 
 
@@ -1209,6 +1218,13 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
         )
         return PromotionResult("QUARANTINED", "results_xbrl", message=fid, quarantined=[q])
 
+    # Dirty from the earliest visibility of any version of this filing: a re-parse can move visibility later (X83)
+    # or to another entity (identity override), and the older version's rows stop being read at once.
+    earlier = con.execute(
+        "SELECT entity_id, min(visible_from_ts) FROM filing_meta WHERE filing_id = ? GROUP BY 1", [fid]
+    ).fetchall()
+    for ent, ts in [*earlier, (entity_id, visible)]:
+        dirty.mark_visible(con, ent, min(ts, visible), "RESULTS", fid)
     insert_rows(
         con,
         "filing_meta",
@@ -1650,6 +1666,11 @@ def _promote_shareholding(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
             details={"as_of": meta["as_of_date"]},
         )
         return PromotionResult("QUARANTINED", "shareholding", message=fid, quarantined=[q])
+    earlier = con.execute(
+        "SELECT entity_id, min(visible_from_ts) FROM shareholding_meta WHERE filing_id = ? GROUP BY 1", [fid]
+    ).fetchall()
+    for ent, ts in [*earlier, (entity_id, visible)]:
+        dirty.mark_visible(con, ent, min(ts, visible), "SHAREHOLDING", fid)
     insert_rows(
         con,
         "shareholding_meta",
@@ -1768,6 +1789,10 @@ def _promote_kpis(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionRe
             }
         )
     insert_rows(con, "supplemental_kpis", good, or_ignore=True)
+    first: dict[str, date] = {}
+    for g in good:
+        first[g["entity_id"]] = min(first.get(g["entity_id"], date.max), utc_to_ist_date(g["visible_from_ts"]))
+    dirty.mark(con, first, "KPI", filing["filing_id"])
     return PromotionResult("PROMOTED", "kpis", message=f"{len(good)} KPI rows", quarantined=quarantined)
 
 
@@ -1842,4 +1867,5 @@ def _promote_reg30_event(con, stage_dir: Path, manifest: dict[str, Any]) -> Prom
         ],
         or_ignore=True,  # a byte-identical re-send is the same event [E4]
     )  # fmt: skip
+    dirty.mark_visible(con, entities[0], filing["broadcast_ts"], "REG30_EVENT", fid)
     return PromotionResult("PROMOTED", "reg30_event", message=fid)

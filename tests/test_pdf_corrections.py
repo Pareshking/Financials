@@ -84,3 +84,13 @@ def test_revoking_restores_the_filed_values_and_corrections_need_two_reads(marke
     with pytest.raises(AdminError):
         correct_from_pdf(market.con, fid, [{"canonical_tag": "pat", "period_start": Q4[0], "period_end": Q4[1],
                                            "value_inr": "1"}], **{**EVIDENCE, "reads": "HAIKU"})  # fmt: skip
+
+
+def test_correction_marks_the_entity_for_incremental_materialisation(market):
+    fid, ent, _scope = _promote(market)
+    market.con.execute("DELETE FROM materialize_dirty")
+    correct_from_pdf(market.con, fid, [
+        {"canonical_tag": "pat_owners", "period_start": Q4[0], "period_end": Q4[1], "value_inr": "11667000000"},
+    ], **EVIDENCE)  # fmt: skip
+    rows = market.con.execute("SELECT entity_id, from_date FROM materialize_dirty").fetchall()
+    assert rows and {e for e, _ in rows} == {ent} and min(d for _, d in rows) <= VISIBLE.date()

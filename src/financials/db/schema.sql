@@ -841,3 +841,26 @@ CREATE TABLE IF NOT EXISTS entity_archetype_override (
     reason              VARCHAR NOT NULL,
     recorded_at         TIMESTAMP NOT NULL
 );
+
+-- Incremental materialisation (architecture §11.10). A work queue, not data: written only by the single writers
+-- (promoter.py, admin.py) in the same transaction as the change it describes, consumed by `materialize
+-- --incremental` (rows deleted, or moved forward, only after a successful run). One row = "materialised rows of
+-- this entity on as_of_date >= from_date may be stale". entity_id '*' marks every entity (FULL).
+CREATE TABLE IF NOT EXISTS materialize_dirty (
+    dirty_id    VARCHAR PRIMARY KEY,         -- stable_id(entity_id, from_date, reason, source_id)
+    entity_id   VARCHAR NOT NULL,            -- entity_master.entity_id, or '*' = every entity
+    from_date   DATE    NOT NULL,            -- first as_of_date that may be affected (IST calendar date)
+    reason      VARCHAR NOT NULL,            -- RESULTS | SHAREHOLDING | REG30_EVENT | KPI | MARKET_DAY | ...
+    source_id   VARCHAR NOT NULL,            -- filing_id / quarantine_id / stage path / '' when none
+    created_at  TIMESTAMP NOT NULL
+);
+
+-- Reader version of each materialised day (features.FEATURES_VERSION); `materialize --incremental` refuses when
+-- any materialised day was built by another version (or by code that predates this table).
+CREATE TABLE IF NOT EXISTS features_meta (
+    as_of_date        DATE PRIMARY KEY,
+    features_version  VARCHAR NOT NULL,
+    mode              VARCHAR NOT NULL,      -- FULL | INCREMENTAL (how the day was last published)
+    row_count         INTEGER NOT NULL,
+    materialized_at   TIMESTAMP NOT NULL
+);

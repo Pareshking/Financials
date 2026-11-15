@@ -13,7 +13,8 @@ Evidence (docs/references.md SHP1-SHP15):
 - pre-listing / allotment patterns date every category context on the declared DateOfListing / DateOfAllotment, not
   on DateOfReport; rule SHP17_EVENT_DATED takes that event date as the as-of date [SHP17];
 - percentages are fractions in some filings and percent points in others, per filing even within one taxonomy;
-  the filing's own TOTAL percentage (1 or 100) decides, and rule SHP18_PERCENT_SCALE stores fractions [SHP18].
+  the filing's own TOTAL percentage (1 or 100) decides, and rule SHP18_PERCENT_SCALE stores fractions [SHP18];
+- the 2022-09-30 taxonomy spells the mutual-fund member and its holder axis `…MutualFundsOrUti…` [SHP20].
 """
 
 from __future__ import annotations
@@ -36,6 +37,7 @@ CATEGORIES = {
     "InstitutionsDomesticMember": "DII",
     "InstitutionsForeignMember": "FII",
     "MutualFundsOrUTIMember": "MUTUAL_FUNDS",
+    "MutualFundsOrUtiMember": "MUTUAL_FUNDS",  # 2022-09-30 taxonomy spelling [SHP20]
     "NonInstitutionsMember": "NON_INSTITUTIONS",
     "SharesHeldByNonPromoterNonPublicShareholdersMember": "NON_PROMOTER_NON_PUBLIC",
     "CustodianOrDRHolderMember": "DR_CUSTODIAN",
@@ -66,6 +68,7 @@ ENCUMBRANCE_FLAGS = {
 # sub-category totals (WhetherACategoryOrMoreThan1PercentageOfShareholding = "Category"), are excluded.
 PUBLIC_HOLDER_AXES = {
     "DetailsOfSharesHeldByMutualFundsOrUTIAxis": "MUTUAL_FUNDS",
+    "DetailsOfSharesHeldByMutualFundsOrUtiAxis": "MUTUAL_FUNDS",  # 2022-09-30 taxonomy spelling [SHP20]
     "DetailsOfSharesHeldByInsuranceCompaniesAxis": "INSURANCE",
     "DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis": "PENSION_FUNDS",
     "DetailsOfSharesHeldByAlternativeInvestmentFundsAxis": "AIF",

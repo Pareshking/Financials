@@ -233,7 +233,10 @@ ALIASES.update(
     {
         "shares": ("shares", "count (Reg. 31 total, else paid-up / face value)"),
         "number of equity shares": ("shares", "count (Reg. 31 total, else paid-up / face value)"),
-        "restatement suspected": ("CAST(restatement_suspected AS INTEGER)", "1/0 (X106 YTD identity break in the TTM)"),
+        "restatement suspected": (
+            "CAST(restatement_suspected AS INTEGER)",
+            "1/0 (X106 YTD break in the TTM; X108 discontinued ops, X109 merger in 5 quarters)",
+        ),
         "non promoter non public holding": ("(non_promoter_non_public_pct * 100)", "% (employee trusts, DRs)"),
         "annual fy end": (_yyyymmdd("annual_fy_end"), "YYYYMMDD, fiscal year of the annual ratios"),
         "fundamentals end": (_yyyymmdd("fundamentals_end"), "YYYYMMDD, latest quarter end of the TTM window"),

@@ -177,6 +177,11 @@ Flag `restatement_suspected` for an entity-period when any of these hold:
 - a DEMERGER or MERGER corp action falls within the last 5 quarters;
 - a later annual (Reg. 34) prior-year figure differs from the stored as-reported FY figure by more than the tolerance.
 
+Built (2026-11-15): the YTD identity break [X106], discontinued operations in the last 5 quarter ends [X108] and a
+MERGER / DEMERGER ledger action with ex-date in the last 5 quarters [X109] set the flag (`FactBook.restatement_triggers`).
+The Reg. 34 comparison runs at promotion and raises CONSISTENCY / ANNUAL_PRIOR_YEAR_DIFFERS [X110]; it is a finding,
+not yet a flag input.
+
 YoY growth across a flagged boundary is set to NULL in screens (with a reason). The PDF anchor-locking extractor from the original blueprint is **deferred**. If built, it must prove its numbers against the same filing's XBRL `OneD`/`FourD` before any row is promoted.
 
 ## 8. Canonical building blocks (defined once; every ratio uses these)

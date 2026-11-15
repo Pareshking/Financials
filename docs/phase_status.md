@@ -14,7 +14,7 @@ the full line-by-line audit of the PDF is `docs/master_backlog.md`; ratios are i
 | SHA-256 raw vault | DONE | vault.py; blob != filing |
 | UDiFF bhavcopy + delivery loader | DONE | parsers; P-rows in references.md |
 | Corporate-action ledger + unconditional gap auditor | DONE | corp_actions.py; quarantine on unexplained gaps |
-| INDAS_CORP quarterly XBRL parser | DONE | parser 0.10.3; rules X1-X107 |
+| INDAS_CORP quarterly XBRL parser | DONE | parser 0.10.4; rules X1-X107 (X108-X111: readers and promotion checks) |
 | 20-company golden test suite | DONE | G342; Screener-export goldens |
 | §7 adds: Reg. 31 shareholding, wide screener_features + DSL, "full Screener.in parity" | DONE except the parity gaps below | features*.py, dsl.py |
 
@@ -49,13 +49,23 @@ the full line-by-line audit of the PDF is `docs/master_backlog.md`; ratios are i
    add/amend/coa/retire/load/list`, `lineage.convert_position` (architecture §11.7). Still BLOCKED: automatic merger
    detection (no merger purpose in the corp-action feed, no circular fixture, CA14) and automatic ratios / COA
    percentages (PDF only; R7 UNVERIFIED): both are admin entries with an evidence URL until a source is verified.
-3. Share classes: DVR / partly-paid ISINs and market cap summed across classes (G275, G306, G336).
-4. Restatement detector, remaining triggers: discontinued operations != 0 and a logged merger/demerger (G67, G68);
-   compare Reg. 34 prior-year columns with stored FY figures (G328). The YTD trigger and `restatement_suspected` are
-   built (X80, X106). Owner decision E: no PDF recovery of restated quarters (G28, G69 closed by it).
-5. BSE scrip codes from the in-filing ScripCode (G79).
-6. Mutual-fund holding for the 2022 Reg. 31 taxonomy: the parser does not map `MutualFundsOrUtiMember`
-   (Q3-Q4 FY25 patterns), a parser rule + version bump.
+3. Share classes: DVR / partly-paid ISINs and market cap summed across classes (G275, G336). **BLOCKED** (2026-11-15):
+   the classes exist in the committed bhavcopies (P17: partly-paid = `IN9` + series E1, e.g. OLAPP; DVR in EQ / BZ with
+   `IN9` or `INE` ISINs: JISLDVREQS, FELDVR, GATECHDVR; each shares the issuer code with its ordinary share, so G306 /
+   R10 are corrected). Not built because (a) partly-paid trade only in series E1, outside the v1 universe (needs an
+   owner decision to admit E1), (b) summing market cap needs the share count per class, and whether Reg. 31 counts
+   DVR shares with the ordinary shares is unverified: no DVR issuer is in the Nifty 500 and no such pattern is
+   committed or in the vault, (c) no fixture states a DVR voting-rights ratio or face value.
+4. **DONE (2026-11-15, batch E)** Restatement detector: `restatement_suspected` now also fires on discontinued
+   operations != 0 (X108, G67) and a logged MERGER / DEMERGER (X109, G68) in the last 5 quarters
+   (`FactBook.restatement_triggers`); Reg. 34 prior-year columns are compared with the stored FY figures at promotion,
+   differences are CONSISTENCY / ANNUAL_PRIOR_YEAR_DIFFERS findings (X110, G328; TCS FY26 restates FY25 directors'
+   remuneration and salaries). The YTD trigger is X106. Owner decision E: no PDF recovery of restated quarters.
+5. **DONE (2026-11-15, batch E)** BSE scrip codes from the in-filing ScripCode (X111, G79); a disagreement with a stored
+   code is IDENTIFIER / BSE_SCRIP_CODE_CONFLICT.
+6. **DONE (2026-11-15, batch E)** Mutual-fund holding for the 2022 Reg. 31 taxonomy: `MutualFundsOrUtiMember` and its
+   holder axis map to MUTUAL_FUNDS (SHP20, parser 0.10.4). A `restage` of the Q3-Q4 FY25 shareholding files is needed
+   on the live database for the MF columns of those quarters.
 
 **Phase 2 pending: ratios (architecture §15 "remaining §10 ratios"; all have inputs in the database)**
 1. RPT leak % per counterparty type (G236): RPT is stored as a total; the purchases/loans/royalties split needs parsing (G99).

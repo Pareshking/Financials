@@ -1265,6 +1265,7 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
                         details=json.loads(i["details"]))
         for i in read_table(con, stage_dir, "stg_findings")
     ]  # fmt: skip
+    finding_rows += _filing_check_rows(con, fid, filing["exchange"], entity_id, meta, visible)  # G328, G79
     _close_filing_findings(con, fid, f"parser {meta['parser_version']}: promoted",
                            keep=[r["quarantine_id"] for r in finding_rows])  # fmt: skip
     qs = (_quarantine_many(con, finding_rows) if finding_rows else []) + audit_ytd_identity(
@@ -1272,6 +1273,29 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     )
     q = cross_check_shares(con, entity_id, meta["period_end"])
     return PromotionResult("PROMOTED", "results_xbrl", message=fid, quarantined=qs + ([q] if q else []))
+
+
+def _filing_check_rows(con, fid: str, exchange: str, entity_id: str, meta: dict, visible: datetime) -> list[dict]:
+    """Non-blocking findings of filing_checks: Reg. 34 prior-year columns vs stored FY figures [G328, X110]; the
+    in-filing BSE scrip code onto the matching NSE identifier rows [G79, X111]."""
+    from financials import filing_checks as fc
+
+    rows = []
+    if meta["accounting_profile"] == "REG34_ANNUAL":
+        diffs = fc.annual_prior_year_differences(
+            con, filing_id=fid, parser_version=meta["parser_version"], entity_id=entity_id, scope=meta["scope"],
+            fy_start=meta["fy_start"], level_of_rounding=meta["level_of_rounding"], visible_from_ts=visible,
+        )  # fmt: skip
+        if diffs:
+            details = {"scope": meta["scope"], "differences": diffs}
+            rows.append(_quarantine_row(stage="CONSISTENCY", reason_code=fc.PRIOR_YEAR_REASON, filing_id=fid,
+                                        entity_id=entity_id, details=details))  # fmt: skip
+    conflicts = fc.apply_bse_scrip_code(con, exchange=exchange, entity_id=entity_id, isin=meta["stated_isin"],
+                                        symbol=meta["stated_symbol"], code=fc.filed_scrip_code(con, fid))  # fmt: skip
+    for c in conflicts:
+        rows.append(_quarantine_row(stage="IDENTIFIER", reason_code=fc.SCRIP_CONFLICT_REASON, filing_id=fid,
+                                    entity_id=entity_id, security_id=c["security_id"], details=c))  # fmt: skip
+    return rows
 
 
 def filing_overrides(con, filing_id: str) -> dict[str, str]:

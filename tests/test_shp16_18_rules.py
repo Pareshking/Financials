@@ -125,3 +125,15 @@ def test_restaged_filing_promotes_as_new_parser_version_and_closes_old_findings(
         "SELECT pct FROM shareholding_observations WHERE filing_id = ? AND category = 'PROMOTER'", [fid]
     ).fetchone()[0]
     assert abs(pct - 0.5011) < 1e-9  # stored as a fraction (SHP18)
+
+
+def test_shp20_old_taxonomy_mutual_fund_member_and_holder_axis():
+    """SHP20: the 2022-09-30 taxonomy spells the MF category member `MutualFundsOrUtiMember` and the named-holder
+    axis `DetailsOfSharesHeldByMutualFundsOrUtiAxis`; both map to MUTUAL_FUNDS (parser 0.10.4). RELIANCE Q4 FY25
+    files MF 9.21 percent points over 89 funds; the 2025-05-31 spelling (Jun 2025) gives 9.32 over 90."""
+    old, new = parse_shareholding(_read(REL_Q4FY25)), parse_shareholding(_read(REL_JUN25))
+    mf = old.categories["MUTUAL_FUNDS"]
+    assert (mf["pct"], mf["holders"], mf["shares"]) == (Decimal("0.0921"), 89, 1_222_067_813)
+    assert new.categories["MUTUAL_FUNDS"]["pct"] == Decimal("0.0932")
+    named = {h["holder_name"]: h["pct"] for h in old.major_holders if h["holder_category"] == "MUTUAL_FUNDS"}
+    assert named == {"SBI Mutual Funds": Decimal("0.0247"), "ICICI Prudential Mutual Funds": Decimal("0.0144")}

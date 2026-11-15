@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
+from financials.corp_actions import RETIRED_STATUSES
 from financials.db import version_key
 from financials.money import ROUNDING_UNITS
 from financials.parsers.indas_corp import period_months
@@ -37,6 +38,11 @@ TAX_COPY_WITHHELD_TAGS = frozenset(
     {"tax_expense", "current_tax", "deferred_tax", "pat", "pat_continuing", "pat_owners", "pat_nci",
      "total_comprehensive_income"}
 )  # fmt: skip
+# Restatement triggers beyond the YTD identity (architecture §7.6, G67 / G68): a non-zero discontinued-operations
+# line, or a MERGER / DEMERGER in the corporate-action ledger, inside the last 5 quarters to the row's quarter end
+# (the TTM window plus the year-ago quarter it is compared with). Retired actions (SUPERSEDED, REJECTED) do not count.
+RESTATEMENT_QUARTERS = 5
+STRUCTURAL_ACTION_TYPES = ("MERGER", "DEMERGER")
 
 
 def _add_months(d: date, months: int) -> date:
@@ -62,6 +68,9 @@ class FactBook:
     fy_starts: frozenset[date] = frozenset()
 
     tax_copied: list[dict] = field(default_factory=list)  # X94 breaks found (and withheld) by load_factbook
+    # G68: (ex_date, action_type) of MERGER / DEMERGER ledger rows of this entity (as issuer or related entity),
+    # ex-date on or before as_of. Loaded with the book; empty for a book built by hand.
+    structural_actions: tuple[tuple[date, str], ...] = ()
 
     def tax_copy_breaks(self) -> list[dict]:
         """X94: periods whose current and deferred tax both equal, to the rupee and non-zero, those of the same-length
@@ -113,8 +122,23 @@ class FactBook:
         return out
 
     def restatement_suspected(self, end: date) -> bool:
-        """X106: some guarded tag breaks the YTD identity inside the 4 quarters to `end` (a restatement)."""
-        return any(not self._ytd_consistent(t, end) for t in YTD_GUARDED_TAGS)
+        """X106 / architecture §7.6: any restatement trigger holds for the row ending `end`."""
+        return bool(self.restatement_triggers(end))
+
+    def restatement_triggers(self, end: date) -> list[str]:
+        """YTD_IDENTITY: some guarded tag breaks the YTD identity inside the 4 quarters to `end` [X106].
+        DISCONTINUED_OPERATIONS: a filed period ending in the last 5 quarter ends carries a non-zero
+        `pat_discontinued` [G67, X108]. MERGER / DEMERGER: such a ledger action of the entity has its ex-date
+        inside the last 5 quarters [G68, X109]. Flags only: no number is changed by the last two."""
+        out = []
+        if any(not self._ytd_consistent(t, end) for t in YTD_GUARDED_TAGS):
+            out.append("YTD_IDENTITY")
+        ends = {_add_months(end, -3 * i) for i in range(RESTATEMENT_QUARTERS)}
+        if any(e in ends and v != 0 for (_, e), v in self.durations.get("pat_discontinued", {}).items()):
+            out.append("DISCONTINUED_OPERATIONS")
+        first = _add_months(end, -3 * RESTATEMENT_QUARTERS)  # exclusive: the window is (first, end]
+        out += sorted({t for d, t in self.structural_actions if first < d <= end})
+        return out
 
     def _ytd_consistent(self, tag: str, end: date) -> bool:
         """False when any YTD ending inside the 4 quarters to `end` breaks the identity (guarded tags only)."""
@@ -289,7 +313,8 @@ def load_factbook(con, entity_id: str, scope: str, as_of: datetime) -> FactBook:
     cached = _PREFETCH.get((id(con), as_of))
     if cached is not None:
         unit, fy_starts = cached["meta"].get((entity_id, scope), (None, None))
-        return _build_book(entity_id, scope, cached["facts"].get((entity_id, scope), []), unit, fy_starts)
+        return _build_book(entity_id, scope, cached["facts"].get((entity_id, scope), []), unit, fy_starts,
+                           cached["structural"].get(entity_id, ()))  # fmt: skip
     source = _fact_source("entity_id = ? AND scope = ?", "c.entity_id = ? AND c.scope = ?").replace(
         "{basis}", SAME_BASIS
     )
@@ -315,11 +340,33 @@ def load_factbook(con, entity_id: str, scope: str, as_of: datetime) -> FactBook:
         "AND visible_from_ts <= ?",
         [entity_id, scope, as_of],
     ).fetchone()
-    return _build_book(entity_id, scope, rows, unit, fy_starts)
+    structural = _structural_actions(con, as_of, " AND e = ?", [entity_id]).get(entity_id, ())
+    return _build_book(entity_id, scope, rows, unit, fy_starts, structural)
 
 
-def _build_book(entity_id: str, scope: str, rows, unit, fy_starts) -> FactBook:
-    book = FactBook(entity_id, scope, fy_starts=frozenset(fy_starts or ()))
+def _structural_actions(con, as_of: datetime, where: str, params: list) -> dict[str, tuple[tuple[date, str], ...]]:
+    """G68: MERGER / DEMERGER ledger rows per entity, ex-date <= as_of, for the issuer's entity (the ledger's entity_id,
+    else the security's) and for the related entity (the other party). Retired rows (SUPERSEDED, REJECTED) do not
+    count; PENDING / QUARANTINED ones do: the scheme was announced, whatever its price verification says."""
+    types = ", ".join(f"'{t}'" for t in STRUCTURAL_ACTION_TYPES)
+    retired = ", ".join(f"'{t}'" for t in sorted(RETIRED_STATUSES))
+    rows = con.execute(
+        "SELECT e, ex_date, action_type FROM (SELECT coalesce(a.entity_id, s.entity_id) AS e, a.ex_date, "
+        "a.action_type, a.status FROM corp_actions a JOIN securities s USING (security_id) UNION ALL "
+        "SELECT related_entity_id, ex_date, action_type, status FROM corp_actions WHERE related_entity_id IS NOT NULL) "
+        f"WHERE action_type IN ({types}) AND status NOT IN ({retired}) AND ex_date <= CAST(? AS DATE)"
+        + where
+        + " GROUP BY ALL ORDER BY e, ex_date, action_type",
+        [as_of, *params],
+    ).fetchall()
+    out: dict[str, list[tuple[date, str]]] = {}
+    for e, d, t in rows:
+        out.setdefault(e, []).append((d, t))
+    return {e: tuple(v) for e, v in out.items()}
+
+
+def _build_book(entity_id: str, scope: str, rows, unit, fy_starts, structural=()) -> FactBook:
+    book = FactBook(entity_id, scope, fy_starts=frozenset(fy_starts or ()), structural_actions=tuple(structural))
     if rows and unit is not None:
         book.rounding_unit = Decimal(unit)
     for tag, ptype, start, end, value in rows:
@@ -410,7 +457,9 @@ def prefetch_fundamentals(con, as_of: datetime, entities=None) -> None:
         anchors.setdefault(ent, []).append((months, scope, end))
     overrides = {e: (q, a) for e, q, a in con.execute(
         "SELECT entity_id, quarterly_scope, annual_scope FROM entity_scope_override").fetchall()}  # fmt: skip
-    _PREFETCH[(id(con), as_of)] = {"facts": facts, "meta": meta, "anchors": anchors, "overrides": overrides}
+    structural = _structural_actions(con, as_of, only.replace("entity_id", "e"), only_p)
+    _PREFETCH[(id(con), as_of)] = {"facts": facts, "meta": meta, "anchors": anchors, "overrides": overrides,
+                                   "structural": structural}  # fmt: skip
 
 
 def clear_prefetch(con, as_of: datetime) -> None:

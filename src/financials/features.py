@@ -66,7 +66,7 @@ from financials.timeutil import ist_to_utc, utc_now
 # Reader version of materialised rows. Bump it whenever features.py, fundamentals.py (or another file pinned by
 # tests/test_incremental_materialize.py) changes any output: `materialize --incremental` refuses days built by another
 # version, because only a full run then reproduces the history.
-FEATURES_VERSION = "2026.11.15-7"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
+FEATURES_VERSION = "2026.11.15-8E"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
 # -3: QoQ sales / profit growth, NPM, interest coverage, OPM same quarter last year, dividend yield / payout,
 #     promoter holding QoQ change (owner_requirements items 1, 3, 4)
 # -4A: period P&L family (features_pl: quarter / fiscal-year lines, quarter YoY growth, result dates, history-gated
@@ -79,6 +79,7 @@ FEATURES_VERSION = "2026.11.15-7"  # -2: X106 restatement TTM bridge + flag, X10
 # -6D: batch D ownership (FII / DII / MF change QoQ, shareholder counts, insurance / retail holding) and hidden-gem
 #      signals, hats and cross-sectional scores (features_gems.py, docs/hidden_gems.md)
 # -7: batches C and D merged
+# -8E: restatement_suspected also on discontinued operations and a logged merger / demerger (X108, X109)
 
 CRITICAL_COLUMNS = ("close", "market_cap", "sales_ttm", "pat_ttm", "total_equity")
 G4_MAX_NULL_RISE = 0.015

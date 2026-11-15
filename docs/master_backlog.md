@@ -28,13 +28,13 @@ catalogue as IN PROGRESS. They are counted as BUILT here.
 | B. Data sources | 14 | 22 | 15 | 2 | 3 | 56 |
 | C. Corporate structure / identity | 11 | 1 | 6 | 0 | 2 | 20 |
 | D. Events, flows, corporate actions | 18 | 1 | 5 | 0 | 4 | 28 |
-| E. Data quality / rules / assistant claims | 62 | 0 | 14 | 0 | 8 | 84 |
+| E. Data quality / rules / assistant claims | 63 | 0 | 13 | 0 | 8 | 84 |
 | F. Backtest | 7 | 0 | 1 | 0 | 0 | 8 |
 | G. Alerts / UI / tools / ops | 8 | 1 | 11 | 2 | 2 | 24 |
-| **Total** | **199** | **57** | **54** | **8** | **20** | **338** |
+| **Total** | **202** | **57** | **51** | **8** | **20** | **338** |
 
-Counts are tallied from the Class column of section 3 (last bold token per row). Of the 199 BUILT rows (7 moved from
-CATALOGUE by batch C, 5 from DIGEST by batch F, 2026-11-15), 11 are only
+Counts are tallied from the Class column of section 3 (last bold token per row). Of the 202 BUILT rows (7 moved from
+CATALOGUE by batch C, 5 from DIGEST by batch F, 3 by batch E, 2026-11-15), 11 are only
 partly built, 1 is built with a different definition (`opm_last_year_pct`), and 12 are rows where the PDF's claim was
 wrong and the corrected behaviour is built (marked "corrected").
 
@@ -91,7 +91,7 @@ M2 = A113, M3 = A94, M4 = A112, M5 = A114, M6 = B31, M7 = B51, M8 = G23.
 Stale the other way (digest says open, code has it): G130 / G131 IN_PROGRESS, but segment and geography rows are
 promoted on this branch (`segment_observations`, `axis_kind` BUSINESS | GEOGRAPHY, `promoter.py:1261`); G67 / G68
 say "restatement_suspected not implemented", but the X106 flag exists (`FactBook.restatement_suspected`, YTD trigger
-only; the discontinued-ops and corporate-action triggers are still missing); G169 / G173 / G175 / G178 / G202 MISSING
+only at the time; the discontinued-ops and corporate-action triggers were added by batch E, X108 / X109); G169 / G173 / G175 / G178 / G202 MISSING
 are now BUILT (e085eb5); G28 NEEDS_OWNER_DECISION was settled by decisions A and B (2026-11-15). Also mislabelled:
 G172, G176, G247 are marked OUT_OF_SCOPE_BY_DECISION, but under the owner's rule they are history-gated BUILD items
 (catalogue A4.29-A4.32, A2.34, B2.8; `fundamentals.cagr(min_periods_required=...)` exists but no feature uses it).
@@ -296,14 +296,14 @@ exists (file / column); Class.
 | C02 | 311-312 | directed lineage table (parent, child, relation, effective date, swap ratio) | G37 DONE | **DONE 2026-11-15 (batch F)**: `entity_lineage` (append-only, `financials.lineage`, arch 11.7) | **BUILT** |
 | C03 | 496-498 | merger: delisting circular sets MERGED, merged_into, swap_ratio | G56 DONE | **DONE 2026-11-15 (batch F)**: `lineage add --relation MERGED_INTO` sets MERGED + `merged_into` (admin entry with the circular's URL; automatic circular parsing BLOCKED, CA14) | **BUILT** |
 | C04 | 514-515 | daily master sync: symbol master, ISIN changes, new listings, delistings | G60 DONE | F28 `raw_equity_master`; NSE only | **BUILT** |
-| C05 | 686-688, 756, 2528 | map NSE symbols to BSE scrip codes | G79 MISSING | `security_identifier_history.bse_scrip_code` never filled | **DIGEST** |
+| C05 | 686-688, 756, 2528 | map NSE symbols to BSE scrip codes | G79 DONE | filled from the in-filing ScripCode at promotion (X111, `filing_checks.py`, 2026-11-15 batch E) | **BUILT** |
 | C06 | 751 | key the master on ISIN | G85 CONFLICTS | security_id + FinInstrmId / ISIN history (invariant 3) | **BUILT** (corrected) |
-| C07 | 2162-2174 | dual-ISIN (INE + IN9 partly paid / DVR) under one entity; market cap summed | G275 DOC_PLANNED | only COMMON securities created (`promoter.py:236`) | **DIGEST** |
+| C07 | 2162-2174 | dual-ISIN (INE + IN9 partly paid / DVR) under one entity; market cap summed | G275 DOC_PLANNED | only COMMON securities created (`promoter.py:236`); BLOCKED: two-class listings exist (P17) but shares per class are unknown and partly-paid E1 is outside the universe | **DIGEST** |
 | C08 | 2184-2187 | AOC-1 subsidiary / associate / JV tree (name, %, net worth, turnover, PAT) | G277 DOC_PLANNED | not parsed (X75) | **DIGEST** |
 | C09 | 2266-2267 | tables entity_securities, subsidiary_tree, pipeline_audit_log | G292 DONE | `securities`, `promotion_log`, `admin_log`; no subsidiary_tree | **BUILT** (partial; §2) |
 | C10 | 2283-2284 | surrogate security_id + dated ISIN / symbol history | G295 DONE | `security_identifier_history` | **BUILT** |
-| C11 | 2305-2306 | DVR shares get INE ISINs, only partly-paid IN9 | G306 DOC_PLANNED | R10 UNVERIFIED | **DIGEST** |
-| C12 | 2513-2520, 2531 | share classes COMMON / DVR / PARTLY_PAID, voting_rights_ratio, face_value per identifier | G336 DOC_PLANNED | `securities.share_class`; no voting-rights ratio | **DIGEST** |
+| C11 | 2305-2306 | DVR shares get INE ISINs, only partly-paid IN9 | G306 CONFLICTS | P17: DVRs carry IN9 (JISLDVREQS, FELDVR) or INE (GATECHDVR); partly-paid IN9 + E1 | **BUILT** (corrected) |
+| C12 | 2513-2520, 2531 | share classes COMMON / DVR / PARTLY_PAID, voting_rights_ratio, face_value per identifier | G336 DOC_PLANNED | `securities.share_class`; no voting-rights ratio; BLOCKED as G275 (no fixture states a DVR voting ratio or face value) | **DIGEST** |
 | C13 | 2035-2043 | valuation_archetype per company, classified automatically | G267 DONE | `derived_archetype`, `reference/valuation_archetypes.csv`, override | **BUILT** |
 | C14 | 2503-2504 | accounting_profile and archetype on entity_master | G333 OOS | per filing / per as-of (invariant 5) | **OOS** |
 | C15 | 2505-2508 | macro sector, sector, industry, basic industry on the master | G334 DOC_PLANNED | `entity_classification_history` not built | **DIGEST** |
@@ -379,7 +379,7 @@ exists (file / column); Class.
 | E27 | 526-529, 599-619 | restatement checksums (continuing + discontinued, A + B, YTD) | G63 OOS | owner review L2312-2314 | **OOS** |
 | E28 | 538-547 | scanned PDFs must never corrupt the DB | G64 DONE | invariant 9; corrections need two agreeing reads | **BUILT** |
 | E29 | 549-566 | skip PDFs; YTD vs sum-of-quarters identity; ~95% hold | G65, G66 DONE | `audit-ytd`, X80 | **BUILT** |
-| E30 | 567-569 | also flag on discontinued ops != 0 or a logged demerger / merger | G67, G68 DOC_PLANNED | only the YTD trigger in `restatement_suspected` | **DIGEST** |
+| E30 | 567-569 | also flag on discontinued ops != 0 or a logged demerger / merger | G67, G68 DONE | `FactBook.restatement_triggers`: YTD (X106), discontinued ops (X108), merger / demerger (X109); Reg. 34 prior-year comparison as a finding (G328, X110) | **BUILT** |
 | E31 | 573-578 | XBRL anchor locking of PDF columns | G69 DOC_PLANNED | — | **DIGEST** |
 | E32 | 580-593 | unit detection by ratio; +-0.01% / +-0.02 tolerance | G70, G71 CONFLICTS | G310: rounding-unit tolerance | **BUILT** (corrected) |
 | E33 | 599-601 | vertical P&L identities | G72 DONE | gate G3 | **BUILT** |

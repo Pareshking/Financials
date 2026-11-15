@@ -10,11 +10,11 @@ Every concrete item in the chat is mapped to the repository as of 2026-11-14. Th
 
 | Status | Meaning | Count |
 |---|---|---|
-| DONE | implemented and tested (file and test cited) | 193 |
-| DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 62 |
+| DONE | implemented and tested (file and test cited) | 197 |
+| DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 58 |
 | IN_PROGRESS | being built now | 4 |
-| MISSING | not anywhere in docs or code | 37 |
-| CONFLICTS_WITH_EVIDENCE | contradicted by our verified fixtures or tests | 17 |
+| MISSING | not anywhere in docs or code | 36 |
+| CONFLICTS_WITH_EVIDENCE | contradicted by our verified fixtures or tests | 18 |
 | OUT_OF_SCOPE_BY_DECISION | excluded by a recorded decision (C2, C7, C9, invariants, CLAUDE.md Don'ts) | 30 |
 | NEEDS_OWNER_DECISION | the docs do not settle it | 0 |
 | **Total** | | **343** |
@@ -31,7 +31,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G30 | PDF checks: note tie-out 0.5%, balance-sheet identity, cross-source scale check vs XBRL; quarantine failures | OUT_OF_SCOPE_BY_DECISION | arch 7.6, arch 15. Gate G3 already checks filed XBRL identities |
 | G36 | Permanent entity master: immutable entity_id mapped to ISIN; tickers may change | DONE | entity_master, securities, security_identifier_history; arch 5.1; tests/test_identity.py. Keyed by FinInstrmId + ISIN, not ISIN alone |
 | G40 | Evening job polls NSE corporate actions and bhavcopy; purposes parsed by deterministic rules | DONE | run-day; arch 11.2; CA9; tests/test_nse_corp_actions.py, tests/test_phase1_fixes_b.py |
-| G79 | Map NSE symbols to BSE scrip codes | MISSING | security_identifier_history.bse_scrip_code (column never filled). ScripCode is inside every results XBRL (X7) |
+| G79 | Map NSE symbols to BSE scrip codes | DONE | X111; filing_checks.apply_bse_scrip_code fills security_identifier_history.bse_scrip_code from the in-filing ScripCode (rows matching the filing's ISIN and symbol); IDENTIFIER/BSE_SCRIP_CODE_CONFLICT on disagreement; tests/test_restatement_triggers.py (TCS, HDFC Bank) |
 | G85 | Key the master table on ISIN, identical across NSE and BSE | CONFLICTS_WITH_EVIDENCE | P5 (split changes ISIN), P13; arch 5.1 |
 | G90 | Quarterly + annual XBRL: statements, notes (borrowings, leases, fixed assets) | DONE | F06, F07; parsers/integrated.py, parsers/reg34_annual.py; X71-X73. Segments tracked separately |
 | G91 | Shareholding XBRL: promoter, FII, DII (MF, insurance, banks), public, pledged shares | DONE | F08; SHP7-SHP15; tests/test_batch8_shareholding.py |
@@ -56,9 +56,9 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G277 | AOC-1 subsidiary, associate and JV tree from annual XBRL | DOCUMENTED_PLANNED | arch 15 gaps; X75 (axes inspected, not parsed) |
 | G295 | Review: ISINs change on splits; use a surrogate security_id with dated identifier history *(owner)* | DONE | arch 5.1; P5; tests/test_identity.py |
 | G296 | Review: price table needs exchange and series columns *(owner)* | DONE | ohlcv PK (security_id, exchange, series, trade_date) |
-| G306 | Review: DVR shares get INE ISINs; only partly-paid get IN9 *(owner)* | DOCUMENTED_PLANNED | R10 (UNVERIFIED) |
+| G306 | Review: DVR shares get INE ISINs; only partly-paid get IN9 *(owner)* | CONFLICTS_WITH_EVIDENCE | P17, R10: partly-paid are IN9 + series E1 (true); DVRs carry IN9 (JISLDVREQS, FELDVR) or INE (GATECHDVR) ISINs; tests/test_share_class_fixture_facts.py |
 | G313 | Review: insurer and new-gen KPIs (VNB, EV, APE, platform KPIs) are not in XBRL *(owner)* | DONE | X62; supplemental_kpis; tests/test_supplemental_kpis.py |
-| G336 | Share classes COMMON / DVR / PARTLY_PAID with voting-rights ratio and face value | DOCUMENTED_PLANNED | arch 8; securities.share_class. voting_rights_ratio and identifier face_value not stored |
+| G336 | Share classes COMMON / DVR / PARTLY_PAID with voting-rights ratio and face value | DOCUMENTED_PLANNED | arch 8; securities.share_class. BLOCKED (2026-11-15): P17 shows the classes exist, but partly-paid trade only in series E1 (outside the v1 universe: owner decision), DVR voting ratio and face value are in no fixture, and no DVR issuer's Reg. 31 pattern is committed |
 
 ## Taxonomy/profile (17)
 
@@ -216,7 +216,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G266 | ARPU and MTU growth | MISSING | not in supplemental_kpis |
 | G269 | Insurance archetype metrics: P/EV, VNB margin, combined ratio | DONE | combined_ratio (X66), vnb_margin, embedded_value (supplemental); tests/test_batch6_insurers.py. P/EV itself not built |
 | G270 | P/EV for life insurers | MISSING | not built. embedded_value is loadable |
-| G275 | Dual-ISIN securities (partly paid, DVR): sum market cap over all linked ISINs | DOCUMENTED_PLANNED | arch 8 (market_cap over active share classes). Code creates only COMMON securities (promoter.py:229); partly-paid only skips the share cross-check |
+| G275 | Dual-ISIN securities (partly paid, DVR): sum market cap over all linked ISINs | DOCUMENTED_PLANNED | arch 8 (market_cap over active share classes). BLOCKED (2026-11-15): P17 links DVR / partly-paid ISINs to the ordinary share by issuer code, but the share count per class is unknown (whether Reg. 31 counts DVRs is unverified; no DVR issuer pattern committed or vaulted; none is in the Nifty 500), and partly-paid E1 is outside the universe |
 | G276 | Organic vs inorganic perimeter flag (business-combination outflows, acquisition filings) | MISSING | not in docs |
 | G278 | Standalone-to-consolidated profit leakage | MISSING | not in docs. Both scopes are already parsed |
 | G314 | Review: forensic scores have different scales; never sum; Altman not for financials *(owner)* | DONE | arch 10.2 |
@@ -267,8 +267,8 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G64 | Scanned quarterly PDFs and vision LLMs misread digits and units; they must never corrupt the database *(owner)* | DONE | arch 7.6; invariant 9. No PDF number enters canonical tables |
 | G65 | Skip PDFs for most filings: flag only where YTD != sum of quarters | DONE | X80; audit-ytd; tests/test_x80_ytd_identity.py. Not a Q4 restatement detector (arch 6.2); a break withholds TTM |
 | G66 | About 95% of filings satisfy the YTD identity | DONE | X80 (94% of 8,081 comparisons tie). Claim verified on live data |
-| G67 | Also flag restatement when ProfitLossFromDiscontinuedOperations != 0 | DOCUMENTED_PLANNED | arch 7.6, 15 gaps. restatement_suspected not implemented |
-| G68 | Also flag restatement when a demerger / merger effective date is logged | DOCUMENTED_PLANNED | arch 7.6, 15 gaps. restatement_suspected not implemented |
+| G67 | Also flag restatement when ProfitLossFromDiscontinuedOperations != 0 | DONE | X108; FactBook.restatement_triggers (last 5 quarter ends); tests/test_restatement_triggers.py (Reliance Power Q4 FY25) |
+| G68 | Also flag restatement when a demerger / merger effective date is logged | DONE | X109; MERGER / DEMERGER ledger ex-date in the last 5 quarters (issuer or related entity); tests/test_restatement_triggers.py (Tata Motors CV demerger) |
 | G69 | XBRL anchor locking: PDF current columns must match XBRL OneD / FourD before restated columns are trusted | DOCUMENTED_PLANNED | arch 7.6 (deferred; must prove itself against the same filing). Depends on the PDF decision |
 | G73 | Safe failure: if any check fails, keep the verified XBRL numbers | DONE | invariant 9 |
 | G149 | Bitemporal rows: period end + broadcast timestamp; queries filter broadcast <= as-of | DONE | invariant 4; arch 6.3; tests/test_x83_visibility.py |
@@ -278,7 +278,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G309 | Review: YTD identity misses prior-year re-presentations and holds trivially in Q4 *(owner)* | DONE | arch 6.2; X80 |
 | G311 | Review: capture broadcast time at fetch time (not in XBRL or bhavcopy) *(owner)* | DONE | X83; arch 6.3 |
 | G319 | Review: Q3 TTM cash flow is stale; expose an as-of date *(owner)* | DONE | cf_as_of, bs_as_of; L3 |
-| G328 | Prior-year columns come from Reg. 34 annual XBRL: compare them with stored FY figures | DOCUMENTED_PLANNED | arch 7.6 (third trigger); L2. Not implemented |
+| G328 | Prior-year columns come from Reg. 34 annual XBRL: compare them with stored FY figures | DONE | X110; CONSISTENCY/ANNUAL_PRIOR_YEAR_DIFFERS at promotion (non-blocking, filing_checks.py); tests/test_restatement_triggers.py (TCS FY26 vs FY25 annual) |
 
 ## Data-source (49)
 
@@ -435,11 +435,11 @@ None open. Decided 2026-11-15: no paid sources at all (G74, by the owner); E-H b
 7. G256, G257, G258: A&P intensity, gross-margin expansion, marketing-efficiency proxy. Verify: the `ADVERTISING` label rule on the Batch 7 fixtures (X68).
 8. G265, G266, G270: EV/GOV, ARPU/MTU growth, P/EV. Verify: a sample KPI CSV fixture for `load-kpis` with the new KPI names; P/EV reads `embedded_value`.
 9. G278: standalone-to-consolidated profit leakage. Verify: a company with both scopes committed for the same quarter.
-10. G79: fill `bse_scrip_code` from the in-filing `ScripCode` (X7). Verify: corporate and bank fixtures; quarantine on disagreement.
+10. **DONE (2026-11-15, batch E)** ~~G79: fill `bse_scrip_code` from the in-filing `ScripCode` (X7). Verify: corporate and bank fixtures; quarantine on disagreement.~~ X111.
 11. G11, G32, G39, G49, G59, G75, G77, G87, G279: record the chat's unverified claims as UNVERIFIED rows in `docs/references.md` (also the BRSR tag count and the nine-RSS-feed list). No code.
 
-11a. Documented but not implemented: the `restatement_suspected` flag (architecture §7.6). Verify: a restated-quarter pair already committed (Tata Motors CV, X80) pins the flag.
-11b. Documented but not implemented: market cap summed across share classes (architecture §8; the code creates only COMMON securities). Verify: a real two-class listing (e.g. a DVR) in a bhavcopy fixture.
+11a. **DONE (2026-11-15)** ~~the `restatement_suspected` flag (architecture §7.6).~~ YTD trigger (X106), discontinued operations (X108), logged merger / demerger (X109); Reg. 34 prior-year comparison as a finding (X110).
+11b. Documented but not implemented: market cap summed across share classes (architecture §8; the code creates only COMMON securities). The two-class listing exists (P17: JISLDVREQS / JISLJALEQS, FELDVR / FEL, GATECHDVR / GATECH in the bhavcopy fixtures). **BLOCKED**: needs the share count per class (a DVR issuer's Reg. 31 pattern, none committed or vaulted) and, for partly-paid, an owner decision to admit series E1.
 
 **Phase 2 completion**
 12. G276: organic vs inorganic perimeter flag. Verify: a Reg. 34 fixture with a business-combination cash-flow element and a Reg. 30 acquisition XBRL fixture.

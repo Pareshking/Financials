@@ -129,10 +129,13 @@ def test_percent_point_filings_are_scaled_to_fractions(shp_market):
     assert r["num_shareholders"] == _member_value(REL_JUN25, "NumberOfShareholders", TOTAL)
     assert r["num_shareholders_preceding_quarter"] == _member_value(REL_MAR25, "NumberOfShareholders", TOTAL)
     assert r["mf_holding_pct"] == float(_member_value(REL_JUN25, pct, "MutualFundsOrUTIMember") / 100)
-    # The 2022-09-30 taxonomy spells the member MutualFundsOrUtiMember, which the parser does not map (open, like the
-    # SHP16 FPI spelling): no Mar-2025 MF category, so no MF change, never a guess.
-    assert _member_value(REL_MAR25, pct, "MutualFundsOrUtiMember") is not None
-    assert r["mf_holding_change_qoq_pct"] is None
+    # The 2022-09-30 taxonomy spells the member MutualFundsOrUtiMember; mapped since parser 0.10.4 [SHP20], so the
+    # Mar-2025 pattern has an MF category and the Jun-2025 change is defined.
+    mar = _member_value(REL_MAR25, pct, "MutualFundsOrUtiMember")
+    assert mar == Decimal("9.21")
+    assert r["mf_holding_change_qoq_pct"] == pytest.approx(
+        float(_member_value(REL_JUN25, pct, "MutualFundsOrUTIMember") / 100 - mar / 100)
+    )
     assert r["fii_holding_change_qoq_pct"] is not None
 
 

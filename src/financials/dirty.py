@@ -10,9 +10,10 @@ Two kinds of hooks:
   FULL marker (entity '*') from the date of every market day promoted;
 - a market-state diff around every batch / admin operation that can change price-side state, because those writes
   are spread over many rules (verification, CA11-CA13, gap auditor, inactivity, merges): the accepted
-  corporate-action factors, the open GAP findings (the series freeze), identifier intervals, the security -> entity
-  map and Nifty 500 membership are snapshotted before and compared after; every changed row marks its security's
-  entity from the earliest date in the row (an action changes bars before its ex-date only for as_of >= ex_date).
+  corporate-action factors, MERGER / DEMERGER rows (restatement flag, X109), the open GAP findings (the series
+  freeze), identifier intervals, the security -> entity map and Nifty 500 membership are snapshotted before and
+  compared after; every changed row marks its security's entity from the earliest date in the row (an action
+  changes bars before its ex-date only for as_of >= ex_date).
 """
 
 from __future__ import annotations
@@ -71,6 +72,13 @@ _STATE = {
     "factors": (
         "SELECT security_id, ex_date, action_id, price_factor, coalesce(eps_factor, 1) FROM corp_actions "
         "WHERE price_factor IS NOT NULL AND status IN (" + ", ".join(f"'{s}'" for s in sorted(ACCEPTED_STATUSES)) + ")",
+        (1,),
+    ),
+    # X109: a MERGER / DEMERGER (any status) sets restatement_suspected from its ex-date; a status change can clear it.
+    # The related entity (other party) is not marked here: rows of that entity rebuild on their next full run.
+    "structural": (
+        "SELECT security_id, ex_date, action_id, action_type, status FROM corp_actions "
+        "WHERE action_type IN ('MERGER', 'DEMERGER')",
         (1,),
     ),
     "gaps": (

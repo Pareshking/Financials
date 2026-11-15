@@ -212,17 +212,19 @@ def build_parser() -> argparse.ArgumentParser:
     ao.add_argument("--clear", action="store_true")
     ao.add_argument("--reason", required=True)
     sc = sub.add_parser("screen")
-    sc.add_argument("query")
+    sc.add_argument("query", nargs="?", help="DSL filter; omit with --saved")
+    sc.add_argument("--saved", help='run a saved screen (see `screens`), e.g. "hidden compounder"')
     sc.add_argument("--as-of", type=_date)
     sc.add_argument("--columns", help='extra result columns, comma-separated DSL expressions or custom ratios, e.g. '
                     '"Sales latest quarter, OPM last year, Sales / Market cap"')  # fmt: skip
     sc.add_argument("--order-by", help="sort the matches by this DSL expression (NULLs last)")
     sc.add_argument("--desc", action="store_true", help="with --order-by: descending")
-    sc.add_argument("--limit", type=int, default=500)
+    sc.add_argument("--limit", type=int, help="default 500, or the saved screen's own limit")
     sr = sub.add_parser("save-ratio", help="save (or replace) a custom ratio usable in screens and --columns")
     sr.add_argument("name")
     sr.add_argument("expression")
     sub.add_parser("ratios", help="list saved custom ratios")
+    sub.add_parser("screens", help="list saved screens (docs/hidden_gems.md section B)")
     return p
 
 
@@ -377,6 +379,13 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
         print(f"{len(events)} events from {len(sorted(args.text_dir.glob('*.txt')))} notices -> {args.out}", file=out)
         return 0
 
+    if args.cmd == "screens":  # curated file, no database needed
+        from dataclasses import asdict
+
+        from financials.dsl import load_saved_screens
+
+        print(json.dumps([asdict(v) for v in load_saved_screens().values()], indent=1), file=out)
+        return 0
     if args.cmd in ("screen", "ratios") or (args.cmd == "quarantine" and args.qcmd in ("list", "inspect")):
         return read_command(args, db_path, out)
 
@@ -644,15 +653,20 @@ def read_command(args, db_path: Path, out) -> int:
             from financials.dsl import DslError, split_columns
 
             try:
-                rows = run_screen(
-                    con,
-                    args.query,
-                    as_of=args.as_of,
-                    limit=args.limit,
-                    columns=split_columns(args.columns),
-                    order_by=args.order_by,
-                    descending=args.desc,
-                )
+                if args.saved:
+                    from financials.dsl import run_saved_screen
+
+                    if args.query or args.order_by:
+                        raise DslError("--saved takes no query and no --order-by (the saved screen has its own)")
+                    rows = run_saved_screen(con, args.saved, args.as_of, columns=split_columns(args.columns),
+                                            limit=args.limit)  # fmt: skip
+                elif not args.query:
+                    raise DslError("give a query or --saved NAME")
+                else:
+                    limit = 500 if args.limit is None else args.limit
+                    rows = run_screen(con, args.query, as_of=args.as_of, limit=limit,
+                                      columns=split_columns(args.columns), order_by=args.order_by,
+                                      descending=args.desc)  # fmt: skip
             except DslError as exc:
                 print(f"error: {exc}", file=out)
                 return 2

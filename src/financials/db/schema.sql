@@ -768,6 +768,57 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     book_value_per_share                     DECIMAL(18,4),   -- owners' equity / shares
     is_trade_to_trade                        BOOLEAN,         -- series BE or BZ
     opm_preceding_year_quarter_pct           DOUBLE,          -- same quarter last year (fraction)
+    -- batch D (ownership / hidden gems): features_gems.py; fractions like other _pct columns
+    fii_holding_change_qoq_pct               DOUBLE,          -- Reg. 31 FII (Institutions Foreign) now - previous quarter end (fraction points)
+    dii_holding_change_qoq_pct               DOUBLE,          -- same for DII; NULL unless the two latest are adjacent quarters [SHP14]
+    inst_holding_pct                         DOUBLE,          -- FII + DII (fraction)
+    unpledged_promoter_holding_pct           DOUBLE,          -- promoter pct x (1 - pledge of promoter shares)
+    mf_holding_pct                           DOUBLE,          -- Reg. 31 mutual funds / UTI (fraction)
+    mf_holding_change_qoq_pct                DOUBLE,          -- adjacent quarters (fraction points)
+    insurance_holding_pct                    DOUBLE,          -- InsuranceCompaniesMember line item [SHP19]
+    retail_holding_pct                       DOUBLE,          -- resident individuals up to Rs 2 lakh nominal capital [SHP19]
+    num_shareholders                         BIGINT,          -- TOTAL NumberOfShareholders, latest visible pattern [SHP19]
+    num_shareholders_preceding_quarter       BIGINT,          -- adjacent previous quarter end
+    num_shareholders_change_qoq_pct          DOUBLE,          -- growth vs the preceding quarter (fraction)
+    num_shareholders_1y_back                 BIGINT,          -- pattern exactly 12 months before the latest
+    sales_growth_yoy_preceding_quarter_pct   DOUBLE,          -- preceding quarter vs the same quarter a year earlier
+    profit_growth_yoy_preceding_quarter_pct  DOUBLE,          -- same for owners' profit; NULL if the base <= 0
+    core_profit_latest_quarter               DECIMAL(24,2),   -- PBT - other income - exceptional items, rupees
+    core_profit_yoy_latest_q                 DOUBLE,          -- core profit YoY, latest quarter; NULL if the base <= 0 or lender
+    core_profit_yoy_preceding_q              DOUBLE,          -- same, preceding quarter
+    other_income_lift_pp                     DOUBLE,          -- profit YoY - core profit YoY, latest quarter (fraction points)
+    pe_core                                  DOUBLE,          -- market cap / TTM core profit after TTM tax, owners' share
+    growth_sustained                         BOOLEAN,         -- sales YoY >= 12% in both latest and preceding quarter
+    growth_acceleration_pp                   DOUBLE,          -- sales YoY latest - preceding quarter (fraction points)
+    opm_change_yoy_pp                        DOUBLE,          -- quarter OPM - same quarter last year (fraction points)
+    operating_leverage                       DOUBLE,          -- core profit YoY / sales YoY, latest quarter; NULL if sales YoY <= 0
+    peg                                      DOUBLE,          -- pe_core / (100 x core growth): quarter YoY, TTM YoY once 8 quarters exist
+    earnings_yield                           DOUBLE,          -- TTM EBIT / EV; NULL if EV <= 0 or lender
+    industry                                 VARCHAR,         -- Nifty 500 snapshot industry (latest on/before as-of listing the ISIN)
+    cyclical_flag                            BOOLEAN,         -- industry in the cyclical set or reference/cyclical_symbols.csv
+    under_owned                              BOOLEAN,         -- inst <= 15% and promoter >= 50% and pledge = 0
+    forensic_clean                           BOOLEAN,         -- no measured red flag (features_gems.forensic_clean)
+    cash_conversion_ok                       BOOLEAN,         -- CFO / EBITDA >= 0.7
+    capex_pay_off_signal                     BOOLEAN,         -- CWIP / gross block >= 25% and capex / D&A >= 2 and D/E <= 1
+    roce_stability_5y                        DOUBLE,          -- 1 - std / mean of 5 FY ROCE (gated, C9)
+    opm_stability_5y                         DOUBLE,          -- 1 - std / mean of 5 FY OPM (gated, C9)
+    pe_vs_own_5y_median                      DOUBLE,          -- PE / own 5-year median daily PE (gated, C9)
+    magic_formula_rank                       INTEGER,         -- EY rank + ROCE rank position in the gated non-financial universe (1 = best)
+    pe_core_universe_median                  DOUBLE,          -- median pe_core of the day's gated non-financial universe
+    market_cap_universe_median               DECIMAL(24,2),   -- median market cap of the same universe, rupees
+    gem_score                                DOUBLE,          -- weighted clipped z-score blend (hidden_gems.md), non-cyclical universe
+    hat_hidden_compounder                    BOOLEAN,         -- hidden_gems.md section B screen
+    hat_quality_fair_price                   BOOLEAN,
+    hat_magic_formula                        BOOLEAN,
+    hat_garp                                 BOOLEAN,
+    hat_turnaround                           BOOLEAN,
+    hat_under_owned                          BOOLEAN,
+    hat_cash_machine                         BOOLEAN,
+    hat_fallen_quality                       BOOLEAN,
+    hat_capex_pay_off                        BOOLEAN,
+    hat_cyclical                             BOOLEAN,
+    hat_lender                               BOOLEAN,
+    hats_passed                              INTEGER,         -- count of hat_* TRUE
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -1084,6 +1135,57 @@ CREATE TABLE IF NOT EXISTS screener_features (
     book_value_per_share                     DECIMAL(18,4),   -- owners' equity / shares
     is_trade_to_trade                        BOOLEAN,         -- series BE or BZ
     opm_preceding_year_quarter_pct           DOUBLE,          -- same quarter last year (fraction)
+    -- batch D (ownership / hidden gems): features_gems.py; fractions like other _pct columns
+    fii_holding_change_qoq_pct               DOUBLE,          -- Reg. 31 FII (Institutions Foreign) now - previous quarter end (fraction points)
+    dii_holding_change_qoq_pct               DOUBLE,          -- same for DII; NULL unless the two latest are adjacent quarters [SHP14]
+    inst_holding_pct                         DOUBLE,          -- FII + DII (fraction)
+    unpledged_promoter_holding_pct           DOUBLE,          -- promoter pct x (1 - pledge of promoter shares)
+    mf_holding_pct                           DOUBLE,          -- Reg. 31 mutual funds / UTI (fraction)
+    mf_holding_change_qoq_pct                DOUBLE,          -- adjacent quarters (fraction points)
+    insurance_holding_pct                    DOUBLE,          -- InsuranceCompaniesMember line item [SHP19]
+    retail_holding_pct                       DOUBLE,          -- resident individuals up to Rs 2 lakh nominal capital [SHP19]
+    num_shareholders                         BIGINT,          -- TOTAL NumberOfShareholders, latest visible pattern [SHP19]
+    num_shareholders_preceding_quarter       BIGINT,          -- adjacent previous quarter end
+    num_shareholders_change_qoq_pct          DOUBLE,          -- growth vs the preceding quarter (fraction)
+    num_shareholders_1y_back                 BIGINT,          -- pattern exactly 12 months before the latest
+    sales_growth_yoy_preceding_quarter_pct   DOUBLE,          -- preceding quarter vs the same quarter a year earlier
+    profit_growth_yoy_preceding_quarter_pct  DOUBLE,          -- same for owners' profit; NULL if the base <= 0
+    core_profit_latest_quarter               DECIMAL(24,2),   -- PBT - other income - exceptional items, rupees
+    core_profit_yoy_latest_q                 DOUBLE,          -- core profit YoY, latest quarter; NULL if the base <= 0 or lender
+    core_profit_yoy_preceding_q              DOUBLE,          -- same, preceding quarter
+    other_income_lift_pp                     DOUBLE,          -- profit YoY - core profit YoY, latest quarter (fraction points)
+    pe_core                                  DOUBLE,          -- market cap / TTM core profit after TTM tax, owners' share
+    growth_sustained                         BOOLEAN,         -- sales YoY >= 12% in both latest and preceding quarter
+    growth_acceleration_pp                   DOUBLE,          -- sales YoY latest - preceding quarter (fraction points)
+    opm_change_yoy_pp                        DOUBLE,          -- quarter OPM - same quarter last year (fraction points)
+    operating_leverage                       DOUBLE,          -- core profit YoY / sales YoY, latest quarter; NULL if sales YoY <= 0
+    peg                                      DOUBLE,          -- pe_core / (100 x core growth): quarter YoY, TTM YoY once 8 quarters exist
+    earnings_yield                           DOUBLE,          -- TTM EBIT / EV; NULL if EV <= 0 or lender
+    industry                                 VARCHAR,         -- Nifty 500 snapshot industry (latest on/before as-of listing the ISIN)
+    cyclical_flag                            BOOLEAN,         -- industry in the cyclical set or reference/cyclical_symbols.csv
+    under_owned                              BOOLEAN,         -- inst <= 15% and promoter >= 50% and pledge = 0
+    forensic_clean                           BOOLEAN,         -- no measured red flag (features_gems.forensic_clean)
+    cash_conversion_ok                       BOOLEAN,         -- CFO / EBITDA >= 0.7
+    capex_pay_off_signal                     BOOLEAN,         -- CWIP / gross block >= 25% and capex / D&A >= 2 and D/E <= 1
+    roce_stability_5y                        DOUBLE,          -- 1 - std / mean of 5 FY ROCE (gated, C9)
+    opm_stability_5y                         DOUBLE,          -- 1 - std / mean of 5 FY OPM (gated, C9)
+    pe_vs_own_5y_median                      DOUBLE,          -- PE / own 5-year median daily PE (gated, C9)
+    magic_formula_rank                       INTEGER,         -- EY rank + ROCE rank position in the gated non-financial universe (1 = best)
+    pe_core_universe_median                  DOUBLE,          -- median pe_core of the day's gated non-financial universe
+    market_cap_universe_median               DECIMAL(24,2),   -- median market cap of the same universe, rupees
+    gem_score                                DOUBLE,          -- weighted clipped z-score blend (hidden_gems.md), non-cyclical universe
+    hat_hidden_compounder                    BOOLEAN,         -- hidden_gems.md section B screen
+    hat_quality_fair_price                   BOOLEAN,
+    hat_magic_formula                        BOOLEAN,
+    hat_garp                                 BOOLEAN,
+    hat_turnaround                           BOOLEAN,
+    hat_under_owned                          BOOLEAN,
+    hat_cash_machine                         BOOLEAN,
+    hat_fallen_quality                       BOOLEAN,
+    hat_capex_pay_off                        BOOLEAN,
+    hat_cyclical                             BOOLEAN,
+    hat_lender                               BOOLEAN,
+    hats_passed                              INTEGER,         -- count of hat_* TRUE
     PRIMARY KEY (as_of_date, security_id)
 );
 

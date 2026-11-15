@@ -312,6 +312,72 @@ def _period_aliases() -> dict[str, tuple[str, str]]:
 
 ALIASES.update(_period_aliases())
 
+
+def _gem_aliases() -> dict[str, tuple[str, str]]:
+    """Batch D (features_gems): ownership (ratio catalogue Batch 5, Screener's names) and the hidden-gem signals,
+    flags, ranks and hats of docs/hidden_gems.md. Fractions are shown x100; booleans as 1/0 (NULL when unknown)."""
+    from financials.features_gems import HATS
+
+    pp = "percentage points"
+    out: dict[str, tuple[str, str]] = {
+        "change in fii holding": ("(fii_holding_change_qoq_pct * 100)", f"{pp}, QoQ (adjacent quarters)"),
+        "change in dii holding": ("(dii_holding_change_qoq_pct * 100)", f"{pp}, QoQ (adjacent quarters)"),
+        "institutional holding": ("(inst_holding_pct * 100)", "%, FII + DII"),
+        "inst holding": ("(inst_holding_pct * 100)", "%, FII + DII"),
+        "change in institutional holding": ("(fii_dii_qoq_change_pct * 100)", f"{pp}, FII + DII QoQ"),
+        "unpledged promoter holding": ("(unpledged_promoter_holding_pct * 100)", "%, promoter x (1 - pledged share)"),
+        "mf holding": ("(mf_holding_pct * 100)", "%, mutual funds / UTI"),
+        "mutual fund holding": ("(mf_holding_pct * 100)", "%, mutual funds / UTI"),
+        "change in mf holding": ("(mf_holding_change_qoq_pct * 100)", f"{pp}, QoQ"),
+        "insurance holding": ("(insurance_holding_pct * 100)", "%, insurance companies"),
+        "retail holding": ("(retail_holding_pct * 100)", "%, resident individuals up to Rs 2 lakh"),
+        "number of shareholders": ("num_shareholders", "count, latest Reg. 31"),
+        "number of shareholders preceding quarter": ("num_shareholders_preceding_quarter", "count"),
+        "number of shareholders 1year back": ("num_shareholders_1y_back", "count, Reg. 31 12 months earlier"),
+        "change in number of shareholders": ("(num_shareholders_change_qoq_pct * 100)", "% QoQ"),
+        "sales yoy latest quarter": ("(sales_growth_yoy_quarter_pct * 100)", "% vs same quarter last year"),
+        "sales yoy preceding quarter": ("(sales_growth_yoy_preceding_quarter_pct * 100)", "% vs a year earlier"),
+        "profit yoy latest quarter": ("(profit_growth_yoy_quarter_pct * 100)", "% owners' profit vs a year earlier"),
+        "profit yoy preceding quarter": ("(profit_growth_yoy_preceding_quarter_pct * 100)", "% owners' profit"),
+        "core profit latest quarter": ("(core_profit_latest_quarter / 10000000)", "INR crore, PBT - OI - exceptional"),
+        "core profit growth": ("(core_profit_yoy_latest_q * 100)", "% YoY, latest quarter (PBT - OI - exceptional)"),
+        "core profit yoy latest quarter": ("(core_profit_yoy_latest_q * 100)", "% YoY, latest quarter"),
+        "core profit yoy preceding quarter": ("(core_profit_yoy_preceding_q * 100)", "% YoY, preceding quarter"),
+        "other income lift": ("(other_income_lift_pp * 100)", f"{pp}, profit YoY - core profit YoY"),
+        "pe core": ("pe_core", "x, market cap / TTM core profit after tax (owners)"),
+        "core pe": ("pe_core", "x, market cap / TTM core profit after tax (owners)"),
+        "growth sustained": ("CAST(growth_sustained AS INTEGER)", "1/0, sales YoY >= 12% in both quarters"),
+        "growth acceleration": ("(growth_acceleration_pp * 100)", f"{pp}, sales YoY latest - preceding quarter"),
+        "opm change yoy": ("(opm_change_yoy_pp * 100)", f"{pp}, quarter OPM vs same quarter last year"),
+        "operating leverage": ("operating_leverage", "x, core profit YoY / sales YoY"),
+        "peg": ("peg", "x, pe core / core profit growth"),
+        "earnings yield": ("(earnings_yield * 100)", "%, TTM EBIT / EV"),
+        "magic formula rank": ("magic_formula_rank", "1 = best, gated non-financial universe of the day"),
+        "under owned": ("CAST(under_owned AS INTEGER)", "1/0, inst <= 15%, promoter >= 50%, no pledge"),
+        "cyclical": ("CAST(cyclical_flag AS INTEGER)", "1/0, Metals & Mining, Oil Gas, curated shipping"),
+        "forensic clean": ("CAST(forensic_clean AS INTEGER)", "1/0, no measured red flag"),
+        "cash conversion ok": ("CAST(cash_conversion_ok AS INTEGER)", "1/0, CFO / EBITDA >= 0.7"),
+        "capex pay off signal": ("CAST(capex_pay_off_signal AS INTEGER)", "1/0, CWIP / gross block >= 25%, ..."),
+        "roce stability 5years": ("roce_stability_5y", "1 - std / mean of 5 FY ROCE (NULL until FY29)"),
+        "opm stability 5years": ("opm_stability_5y", "1 - std / mean of 5 FY OPM (NULL until FY29)"),
+        "pe vs own 5year median": ("pe_vs_own_5y_median", "x (NULL until 2029-10)"),
+        "pe core universe median": ("pe_core_universe_median", "x, the day's gated non-financial universe"),
+        "market cap universe median": ("(market_cap_universe_median / 10000000)", "INR crore, same universe"),
+        "gem score": ("gem_score", "z-score blend (docs/hidden_gems.md)"),
+        "hats passed": ("hats_passed", "count of hidden-gem screens passed"),
+        "financial": ("CAST(valuation_archetype IN ('FINANCIAL_LENDING', 'INSURANCE') AS INTEGER)",
+                      "1/0, lender or insurer"),
+        "lender": ("CAST(valuation_archetype = 'FINANCIAL_LENDING' AS INTEGER)", "1/0"),
+        "piotroski known": ("CAST(piotroski_f IS NOT NULL AS INTEGER)", "1/0"),
+        "gnpa known": ("CAST(gnpa_pct IS NOT NULL AS INTEGER)", "1/0"),
+    }  # fmt: skip
+    for h in HATS:
+        out[f"hat {h.replace('_', ' ')}"] = (f"CAST(hat_{h} AS INTEGER)", "1/0, docs/hidden_gems.md section B")
+    return out
+
+
+ALIASES.update(_gem_aliases())
+
 KEYWORDS = {"and", "or", "not"}
 COMPARATORS = {"<", "<=", ">", ">=", "=", "!="}
 NAME_RE = re.compile(r"^[a-z][a-z0-9 ]{0,62}$")
@@ -665,3 +731,46 @@ def run_screen(
     cur = con.execute(sql, params)
     names = [d[0] for d in cur.description]
     return [dict(zip(names, r, strict=True)) for r in cur.fetchall()]
+
+
+# ── saved screens (docs/hidden_gems.md section B; reference/saved_screens.csv) ─────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class SavedScreen:
+    name: str
+    hat_column: str  # the features_gems hat boolean computing the same rule ("" if none)
+    expression: str
+    order_by: str
+    descending: bool
+    limit: int
+    description: str
+
+
+def load_saved_screens() -> dict[str, SavedScreen]:
+    """The curated saved screens, keyed by normalised name (reference/saved_screens.csv, a reviewed file)."""
+    import csv
+
+    from financials.sources import ROOT
+
+    with (ROOT / "reference" / "saved_screens.csv").open(encoding="utf-8") as fh:
+        return {
+            normalise(r["name"]): SavedScreen(normalise(r["name"]), r["hat_column"], r["expression"], r["order_by"],
+                                              r["descending"] == "1", int(r["limit"]), r["description"])
+            for r in csv.DictReader(fh)
+        }  # fmt: skip
+
+
+def run_saved_screen(
+    con, name: str, as_of: date | None = None, *, columns: list[str] | None = None, limit: int | None = None
+) -> list[dict]:
+    """Run a saved screen with its own order and limit (`limit` overrides); the order-by expression is also returned
+    as a column."""
+    screens = load_saved_screens()
+    key = normalise(name)
+    if key not in screens:
+        raise DslError(f"unknown saved screen {name!r}; saved: {', '.join(sorted(screens))}")
+    s = screens[key]
+    n = s.limit if limit is None else limit
+    return run_screen(con, s.expression, as_of, n, columns=[s.order_by, *(columns or [])], order_by=s.order_by,
+                      descending=s.descending)  # fmt: skip

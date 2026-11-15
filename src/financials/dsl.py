@@ -423,6 +423,16 @@ def _peer_aliases() -> dict[str, tuple[str, str]]:
 
 ALIASES.update(_peer_aliases())
 
+
+def _extra_aliases() -> dict[str, tuple[str, str]]:
+    """Batch G (remaining Phase 2 ratios): features_extra.dsl_aliases."""
+    from financials.features_extra import dsl_aliases
+
+    return dsl_aliases()
+
+
+ALIASES.update(_extra_aliases())
+
 KEYWORDS = {"and", "or", "not"}
 COMPARATORS = {"<", "<=", ">", ">=", "=", "!="}
 NAME_RE = re.compile(r"^[a-z][a-z0-9 ]{0,62}$")

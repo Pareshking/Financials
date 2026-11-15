@@ -12,6 +12,7 @@ import duckdb
 import pyarrow as pa
 
 SCHEMA_SQL = files(__package__).joinpath("schema.sql").read_text(encoding="utf-8")
+VIEWS_MARKER = "-- views (after column upgrade)\n"  # schema.sql: views run after upgrade_columns
 
 
 def connect(path: str | Path = ":memory:", *, read_only: bool = False) -> duckdb.DuckDBPyConnection:
@@ -28,10 +29,15 @@ def apply_schema(con: duckdb.DuckDBPyConnection) -> list[str]:
 
     Idempotent: a second run changes nothing. Only nullable, constraint-free columns are added automatically;
     a new NOT NULL / PRIMARY KEY / UNIQUE / REFERENCES column needs a deliberate migration and raises.
-    Returns the statements executed by the upgrade (empty for a fresh or current database).
+    Returns the statements executed by the upgrade (empty for a fresh or current database). Views (below
+    VIEWS_MARKER in schema.sql) are created last, so they may name columns the upgrade just added.
     """
-    con.execute(SCHEMA_SQL)
-    return upgrade_columns(con)
+    tables, _, views = SCHEMA_SQL.partition(VIEWS_MARKER)
+    con.execute(tables)
+    executed = upgrade_columns(con)
+    if views.strip():
+        con.execute(views)
+    return executed
 
 
 _TABLE_RE = re.compile(r"CREATE TABLE IF NOT EXISTS (\w+) \((.*?)\n\);", re.S)

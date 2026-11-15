@@ -10,10 +10,10 @@ Every concrete item in the chat is mapped to the repository as of 2026-11-14. Th
 
 | Status | Meaning | Count |
 |---|---|---|
-| DONE | implemented and tested (file and test cited) | 202 |
-| DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 55 |
+| DONE | implemented and tested (file and test cited) | 215 |
+| DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 51 |
 | IN_PROGRESS | being built now | 4 |
-| MISSING | not anywhere in docs or code | 34 |
+| MISSING | not anywhere in docs or code | 25 |
 | CONFLICTS_WITH_EVIDENCE | contradicted by our verified fixtures or tests | 18 |
 | OUT_OF_SCOPE_BY_DECISION | excluded by a recorded decision (C2, C7, C9, invariants, CLAUDE.md Don'ts) | 30 |
 | NEEDS_OWNER_DECISION | the docs do not settle it | 0 |
@@ -39,13 +39,13 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G93 | Reg. 76 reconciliation of share capital audit (exact issued / listed shares) | DOCUMENTED_PLANNED | F09 UNVERIFIED, BLOCKED: probed 2026-11-15 (vault ledger, announcements RSS, TCS announcements API Jul-Nov 2026; BSE 403), no Reg. 76 file found (A15); Reg. 31 x paid-up cross-check (X103) stands in |
 | G99 | Related-party transactions from Reg. 23(9) half-yearly Integrated Filing | DONE | X19; RPT contexts land in raw_xbrl_facts. RPT ratio planned |
 | G101 | Daily delivery % | DONE | F02; P10; tests/test_market_parsers.py |
-| G105 | Audit qualification / modified opinion flag | DONE | E8; X75 filing_meta.auditor_qualified; tests/test_batch9_annual.py, tests/test_batch10_edge_cases.py. Not yet a screener column |
+| G105 | Audit qualification / modified opinion flag | DONE | E8; X75 filing_meta.auditor_qualified; tests/test_batch9_annual.py, tests/test_batch10_edge_cases.py. Screener column `rf_audit_qualified` (batch G) |
 | G106 | Reg. 30 director / auditor / KMP change alerts | DONE | E5; kmp_resignations_90d, auditor_resignations_90d; tests/test_batch10_events.py |
 | G107 | Reg. 30 scheme of arrangement (merger / demerger) filings | DOCUMENTED_PLANNED | E2 (REG30_Restructuring vaulted raw); arch 15 Phase 3 |
 | G114 | Reg. 30 order wins (client type, value, timeline) | DONE | E3; order_wins_90d, order_value_90d; tests/test_batch10_events.py |
 | G116 | Fraud / default / arrest / forensic-audit filings | DONE | E7; fraud_or_default_90d; tests/test_batch10_events.py. Amount is free text, never parsed |
 | G118 | Regulatory / judicial actions and penalty amounts | DOCUMENTED_PLANNED | penalties_90d (NULL); E12 (contents UNVERIFIED) |
-| G119 | Allotments, preferential issues, QIPs, warrants (price, allottees, dilution) | DONE | E6; corporate_events; tests/test_batch10_events.py. No screener column or warrant tracker yet |
+| G119 | Allotments, preferential issues, QIPs, warrants (price, allottees, dilution) | DONE | E6; corporate_events; tests/test_batch10_events.py. Screener column `allotments_90d` (count, batch G); no warrant tracker yet |
 | G120 | Agreements, JVs, MoUs (counterparty, stake) | DOCUMENTED_PLANNED | E2 (ANN_AGREEMENT vaulted raw); arch 15 Phase 3 |
 | G130 | Segment reporting (Ind AS 108): revenue, result, assets, liabilities per segment | IN_PROGRESS | X49; parsers/segments.py; segment table on another branch |
 | G131 | Geographic revenue split (domestic vs export) | IN_PROGRESS | X75 |
@@ -122,10 +122,10 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G110 | Live PE, PB, EV/EBITDA from close x shares + net debt + TTM | DONE | arch 8, 10.1; tests/test_features.py |
 | G111 | ROCE, ROE, working-capital days, ROIC | DONE | roce, roe, roic, working_capital_days; tests/test_features.py, tests/test_batch9_annual.py |
 | G115 | Order-book-to-sales ratio | MISSING | not built. Needs an order-book field (E3) |
-| G117 | Automated forensic red-flag score from Reg. 30 events | MISSING | not built. Keep components as separate columns (arch 10.2 spirit) |
-| G133 | Screens for sensitivity to crude, power or freight inflation | MISSING | no cost-share columns |
+| G117 | Automated forensic red-flag score from Reg. 30 events | DONE | batch G (features_extra): rf_auditor_resignation_90d, rf_kmp_resignations_90d, rf_fraud_or_default_90d, rf_litigation_90d, rf_audit_qualified, rf_pledge_increase_qoq + litigations / allotments / fund-raising 90d counts, separate columns never summed (arch 10.2); penalties wait for E12; tests/test_features_extra.py |
+| G133 | Screens for sensitivity to crude, power or freight inflation | DONE | batch G: material / employee / other-expense / power & fuel / freight / A&P shares of sales, latest quarter and last FY (X50, X68, X74); tests/test_features_extra.py |
 | G134 | Capex, CWIP -> FCF, CFO/EBITDA, CWIP / gross block | DONE | arch 8; C19; X71; tests/test_cash_conversion.py, tests/test_batch9_annual.py |
-| G152 | Revision velocity / QoQ operating-margin acceleration | MISSING | not built |
+| G152 | Revision velocity / QoQ operating-margin acceleration | DONE | batch G: opm_acceleration_pp = [OPM(Q) - OPM(Q-4)] - [OPM(Q-1) - OPM(Q-5)]; revision velocity (estimates) stays out (no forecasts); tests/test_features_extra.py |
 | G155 | 50 / 200 DMA | DONE | dma50, dma200 and previous-day values, price_to_dma50/200; tests/test_features.py, tests/test_features_price.py |
 | G156 | RSI(14) | DONE | rsi_14, rsi_14_prev (Wilder, adjusted closes); tests/test_features_price.py |
 | G157 | ATR% | DONE | atr_14_pct (Wilder ATR(14) on adjusted H/L/C / close); tests/test_features_price.py |
@@ -156,7 +156,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G198 | Valuation bands: current PE / PB / EV-EBITDA percentile vs own history | DONE | pe_percentile, ev_ebitda_percentile (C20); tests/test_valuation_bands.py. P/B band missing; 5Y/10Y windows NULL under C9 |
 | G199 | Discount / premium to basic-industry median | DONE | pe_/pb_premium_to_basic_industry and _to_industry (own / median - 1); NSE classification F30, IC1-IC3, C25; features_peers.py; tests/test_batch_h_industry_peers.py |
 | G200 | Reverse DCF implied growth using the live 10Y G-Sec | DONE | reverse_dcf_implied_g (C20, WACC fixed 12%); tests/test_valuation_bands.py. Live yield needs F25 |
-| G201 | Capital-allocation scorecard (incremental ROIC, buyback yield, 5Y dilution) | DOCUMENTED_PLANNED | components built (batch C, features_bs): incremental_roic_1y/3y/5y, reinvestment_rate, buyback_yield, shareholder_yield, dilution_1y/5y (3Y/5Y forms history-gated, C9); no combined scorecard view yet (arch 10.2: never summed) |
+| G201 | Capital-allocation scorecard (incremental ROIC, buyback yield, 5Y dilution) | DONE | view capital_allocation_scorecard (schema.sql, after the column upgrade): batch C / G components side by side, never one score; tests/test_features_extra.py |
 | G202 | Dividend payout % | DONE | dividend_payout_pct = trailing dividends per share / eps_ttm, NULL if EPS <= 0; arch 10.7; tests/test_owner_items_qoq_dividend_promoter.py. No committed company has both an accepted dividend and a TTM EPS yet |
 | G203 | YoY sales-growth acceleration (current YoY - prior-quarter YoY) | DONE | growth_acceleration_pp (quarter form: sales YoY latest - preceding quarter); TTM form waits for 9 quarters (C9); batch D; tests/test_features_gems.py |
 | G204 | Operating-margin expansion vs the same quarter last year | DONE | opm_change_yoy_pp (quarter OPM - same quarter last year, NULL for lenders); batch D; tests/test_features_gems.py |
@@ -169,7 +169,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G217 | Cash ROIC (CROIC) | DONE | croic; tests/test_fundamentals.py |
 | G218 | Total shareholder yield (dividends + net buybacks - equity issued) | DONE | shareholder_yield = TTM (dividends_paid + li_payments_to_acquire_or_redeem_entitys_shares - share_issue_proceeds) / market cap over the CFO bridge's filed periods (G316 formula); buyback_yield; features_bs; tests/test_balance_sheet_cash_flow_family.py |
 | G219 | 5Y net equity dilution % | DONE | dilution_5y (history-gated, NULL until the Reg. 31 pattern 5 years back is in scope, ~Apr 2030) and dilution_1y; Reg. 31 counts restated to today's share basis by later EPS factors; features_bs; tests/test_balance_sheet_cash_flow_family.py |
-| G220 | Incremental asset turnover (3Y) | DOCUMENTED_PLANNED | arch 10.1; C9 |
+| G220 | Incremental asset turnover (3Y) | DONE | batch G: incremental_asset_turnover_3y (d FY sales / d net block), NULL until FY28 (C9); tests/test_features_extra.py |
 | G221 | Return on tangible equity (ROTE) | DONE | rote; tests/test_batch9_annual.py |
 | G222 | Sloan accrual ratio | DONE | sloan_accrual (C19); tests/test_cash_conversion.py |
 | G223 | EBITDA-to-CFO conversion | DONE | cfo_to_ebitda (pre-tax CFO, C19); tests/test_cash_conversion.py. FY forms cfo_to_ebitda_last_year / _preceding_year and 3-FY cfo_to_ebitda_3y (history-gated); features_bs; tests/test_balance_sheet_cash_flow_family.py |
@@ -185,15 +185,15 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G233 | Net debt (incl. leases) / 3Y average FCF | DONE | net_debt_to_fcf (TTM FCF); tests/test_cash_conversion.py. 3Y form net_debt_to_fcf_3y (history-gated, FY27 ~May 2027); features_bs; tests/test_balance_sheet_cash_flow_family.py |
 | G234 | Effective cost of debt | DONE | cost_of_debt; tests/test_cash_conversion.py |
 | G235 | Contingent liabilities / net worth | DONE | contingent_liabilities_to_net_worth (X73); tests/test_batch9_annual.py |
-| G236 | RPT leak % (purchases + loans + royalties / revenue) | DOCUMENTED_PLANNED | arch 10.1 (Phase 2); X19 |
+| G236 | RPT leak % (purchases + loans + royalties / revenue) | DOCUMENTED_PLANNED | BLOCKED on a parser: only the RPT total is a fact; the per-counterparty rows (RelatedPartyTransactionAxis, X19) stay in raw_xbrl_facts. Partial: rpt_to_sales (total / same-period sales, batch G) |
 | G237 | Composite forensic score combining Piotroski, Beneish and Altman | OUT_OF_SCOPE_BY_DECISION | arch 10.2 (separate columns, never summed) |
 | G238 | Unlevered FCF yield (adds back interest x (1 - t)) | DONE | fcff_yield, per-filing interest classification (X14); tests/test_phase1_fixes_b.py |
 | G239 | Reverse-DCF implied 5Y growth | DONE | C20; tests/test_valuation_bands.py |
 | G240 | 5Y EV/EBITDA band percentile (20 quarters) | DONE | ev_ebitda_percentile (C20, >= 4 prior quarters); ev_ebitda_percentile_20q (last 20 prior quarter-ends, all > 0; history-gated, ~2031; batch C); tests/test_balance_sheet_cash_flow_family.py |
-| G241 | Institutional absorption rate (MF + FII shares vs 90D median volume) | DOCUMENTED_PLANNED | arch 10.3 (quarterly FII+DII, Phase 2; monthly Phase 3) |
+| G241 | Institutional absorption rate (MF + FII shares vs 90D median volume) | DONE | batch G: inst_shares_change_qoq / volume_median_90d = institutional_absorption_90d (FII + DII, adjacent quarters; NULL after a share-count action); monthly MF form is Phase 3; tests/test_features_extra.py |
 | G242 | Float-adjusted delivery velocity | DONE | delivery_velocity, float_turnover_pct; tests/test_features.py. Formula corrected (no float multiplication) |
 | G243 | Guardrail: NULL on non-positive denominators | DONE | arch 10 (any ratio with denominator <= 0 is NULL); tests/test_cash_conversion.py |
-| G244 | Guardrail: expose raw numerator and denominator columns | DOCUMENTED_PLANNED | arch 10 (stated rule). Not present in screener_features |
+| G244 | Guardrail: expose raw numerator and denominator columns | DONE | batch G: pe / roe / roce / ev_ebitda / opm _numerator and _denominator columns; tests/test_features_extra.py |
 | G245 | Guardrail: NULL industrial ratios for banks, NBFCs, insurers | DONE | arch 9, 10.5, 10.6; tests/test_batch4_nbfc.py, tests/test_batch6_insurers.py |
 | G246 | Financial cohort metrics: NIM, cost-to-income, provision coverage, P/B | DONE | arch 10.5; tests/test_batch5_bank.py, tests/test_batch4_nbfc.py. PCR NULL for NBFCs (X54) |
 | G247 | Smooth incremental ratios over 3Y / 5Y windows | DONE | history-gated (C9): incremental_roic_3y / _5y (FY28 / FY30), fcf_ / cfo_ / cfi_{3,5,7,10}y sums, fcf_conversion_3y, cfo_to_ebitda_3y, net_debt_to_fcf_3y; features_bs; tests/test_balance_sheet_cash_flow_family.py |
@@ -204,18 +204,18 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G253 | EV / ESOP-adjusted EBITDA | DONE | ev_to_esop_adj_ebitda; tests/test_batch7_newgen.py |
 | G254 | Price / operating cash flow | DONE | price_to_cfo; tests/test_batch7_newgen.py |
 | G255 | Rule of 40 | DONE | rule_of_40; tests/test_batch7_newgen.py |
-| G256 | Marketing efficiency (magic-number proxy) | MISSING | not built. Advertising label rule exists (X68) |
-| G257 | Gross / contribution margin expansion (bps YoY) | MISSING | not built |
-| G258 | Advertising and promotion intensity % | MISSING | not built. Advertising label rule exists (X68) |
+| G256 | Marketing efficiency (magic-number proxy) | DONE | batch G: marketing_efficiency_latest_quarter / _last_year (Eternal FY26 pinned); tests/test_features_extra.py |
+| G257 | Gross / contribution margin expansion (bps YoY) | DONE | batch G: gpm_change_yoy_pp (C6 guard; DSL 'Gross margin expansion bps'), contribution_margin_change_yoy_pp (KPI); tests/test_features_extra.py |
+| G258 | Advertising and promotion intensity % | DONE | batch G: ad_promo_latest_quarter_pct / ad_promo_last_year_pct (ADVERTISING rule X68, Reg. 34 element X74); tests/test_features_extra.py |
 | G259 | Billings growth vs revenue growth | DONE | billings_growth_pct; tests/test_batch7_newgen.py |
 | G260 | Negative working-capital float % | DONE | neg_working_capital_float_pct; tests/test_batch7_newgen.py |
 | G261 | Net burn multiple | DONE | net_burn_multiple; tests/test_batch7_newgen.py |
 | G262 | Cash runway (months) | DONE | cash_runway_months; tests/test_batch7_newgen.py |
 | G263 | ESOP-adjusted free cash flow | DONE | esop_adj_fcf; tests/test_batch7_newgen.py |
-| G265 | EV / GOV | MISSING | gov column exists; ratio not built |
-| G266 | ARPU and MTU growth | MISSING | not in supplemental_kpis |
+| G265 | EV / GOV | DONE | batch G: gov_ttm (12-month KPI or 4 quarters), ev_to_gov; tests/test_features_extra.py |
+| G266 | ARPU and MTU growth | DONE | batch G: KPI names arpu (INR), mtu (COUNT) in parsers/kpis.py; arpu, mtu, arpu_ / mtu_ / gov_growth_yoy_pct; tests/test_features_extra.py |
 | G269 | Insurance archetype metrics: P/EV, VNB margin, combined ratio | DONE | combined_ratio (X66), vnb_margin, embedded_value (supplemental); tests/test_batch6_insurers.py. P/EV itself not built |
-| G270 | P/EV for life insurers | MISSING | not built. embedded_value is loadable |
+| G270 | P/EV for life insurers | DONE | batch G: price_to_embedded_value; tests/test_features_extra.py |
 | G275 | Dual-ISIN securities (partly paid, DVR): sum market cap over all linked ISINs | DOCUMENTED_PLANNED | arch 8 (market_cap over active share classes). BLOCKED (2026-11-15): P17 links DVR / partly-paid ISINs to the ordinary share by issuer code, but the share count per class is unknown (whether Reg. 31 counts DVRs is unverified; no DVR issuer pattern committed or vaulted; none is in the Nifty 500), and partly-paid E1 is outside the universe |
 | G276 | Organic vs inorganic perimeter flag (business-combination outflows, acquisition filings) | MISSING | not in docs |
 | G278 | Standalone-to-consolidated profit leakage | MISSING | not in docs. Both scopes are already parsed |
@@ -427,22 +427,22 @@ None open. Decided 2026-11-15: no paid sources at all (G74, by the owner); E-H b
 
 **Phase 1-2 clean-up (inputs already promoted)**
 1. **DONE (2026-11-15)** ~~G173, G175: QoQ sales %, QoQ profit %, OPM last year, NPM, interest coverage. Verify: pin values on committed Q2 FY27 fixtures against the Screener export goldens; pin filed `InterestServiceCoverageRatio` / `DebtServiceCoverageRatio` (X41) on a committed fixture before exposing them.~~ Built as specified in arch 10.7, pinned on the facts of Finolex Cables Q4 FY25-Q2 FY26 and Glenmark FY26 (the Screener goldens hold one quarter only, so no QoQ golden exists); filed ISCR / DSCR still not exposed.
-2. **G203, G204 DONE (2026-11-15, batch D: `growth_acceleration_pp`, `opm_change_yoy_pp`); open: G152** G203, G204, G152: YoY sales-growth acceleration, OPM expansion vs same quarter last year, margin acceleration. Verify: FactBook unit test over committed quarters; NULL until 9 same-scope quarters exist (C9).
+2. **DONE (G203, G204 batch D; G152 batch G: `opm_acceleration_pp`)** G203, G204, G152: YoY sales-growth acceleration, OPM expansion vs same quarter last year, margin acceleration. Verify: FactBook unit test over committed quarters; NULL until 9 same-scope quarters exist (C9).
 3. **DONE (2026-11-15)** ~~G178: change in promoter holding QoQ. Verify: the two-quarter Reg. 31 fixtures (SHP14: ADANIENT, JSWSTEEL).~~
 4. **DONE (2026-11-15)** ~~G169, G202: dividend yield and dividend payout %. Verify: dividend records in the committed corporate-actions fixture (CA9) and the dividends-paid element in a committed Reg. 34 fixture.~~
 5. **DONE (2026-11-15)** ~~G183, G95: 20-day average delivery % and VWAP. Verify: `DELIV_PER` (P10) and confirm an average-price column exists in the committed `sec_bhavdata_full` fixture; add a P-row.~~ `AVG_PRICE` = turnover / volume on every row (P16); `deliv_pct_avg_20d`, `vwap`, `vwap_20d`.
 6. **DONE (2026-11-15) except G207 bid-ask / circuit-lock** ~~G156, G157, G158, G207, G208: RSI(14), ATR%, relative strength vs Nifty 500, 20-day median traded value, market breadth. Verify: index closes fixture (IDX9 / `index_ohlcv`) and `TtlTrfVal` (P1); circuit-lock days wait for an F20 price-band fixture.~~ Batch B (`features_price.py`, arch 10.7): RSI, MACD, ATR%, RS and beta vs Nifty 500, 20D median traded value, `market_breadth`; RS / beta switch on once the daily `ind_close_all` closes (IDX9, fetched with each market day) cover the window.
-7. G256, G257, G258: A&P intensity, gross-margin expansion, marketing-efficiency proxy. Verify: the `ADVERTISING` label rule on the Batch 7 fixtures (X68).
-8. G265, G266, G270: EV/GOV, ARPU/MTU growth, P/EV. Verify: a sample KPI CSV fixture for `load-kpis` with the new KPI names; P/EV reads `embedded_value`.
-9. G278: standalone-to-consolidated profit leakage. Verify: a company with both scopes committed for the same quarter.
-10. **DONE (2026-11-15, batch E)** ~~G79: fill `bse_scrip_code` from the in-filing `ScripCode` (X7). Verify: corporate and bank fixtures; quarantine on disagreement.~~ X111.
+7. **DONE (2026-11-15, batch G)** G256, G257, G258: A&P intensity, gross-margin expansion, marketing-efficiency proxy. Verify: the `ADVERTISING` label rule on the Batch 7 fixtures (X68).
+8. **DONE (2026-11-15, batch G)** G265, G266, G270: EV/GOV, ARPU/MTU growth, P/EV. Verify: a sample KPI CSV fixture for `load-kpis` with the new KPI names; P/EV reads `embedded_value`.
+9. **DONE (2026-11-15, batch G)** G278: standalone-to-consolidated profit leakage. Verify: a company with both scopes committed for the same quarter.
+10. G79: fill `bse_scrip_code` from the in-filing `ScripCode` (X7). Verify: corporate and bank fixtures; quarantine on disagreement.
 11. G11, G32, G39, G49, G59, G75, G77, G87, G279: record the chat's unverified claims as UNVERIFIED rows in `docs/references.md` (also the BRSR tag count and the nine-RSS-feed list). No code.
 
 11a. **DONE (2026-11-15)** ~~the `restatement_suspected` flag (architecture §7.6).~~ YTD trigger (X106), discontinued operations (X108), logged merger / demerger (X109); Reg. 34 prior-year comparison as a finding (X110).
 11b. Documented but not implemented: market cap summed across share classes (architecture §8; the code creates only COMMON securities). The two-class listing exists (P17: JISLDVREQS / JISLJALEQS, FELDVR / FEL, GATECHDVR / GATECH in the bhavcopy fixtures). **BLOCKED**: needs the share count per class (a DVR issuer's Reg. 31 pattern, none committed or vaulted) and, for partly-paid, an owner decision to admit series E1.
 
 **Phase 2 completion**
-12. G276: organic vs inorganic perimeter flag. Verify: a Reg. 34 fixture with a business-combination cash-flow element and a Reg. 30 acquisition XBRL fixture.
+12. **DONE (2026-11-15, batch G; cash-flow element only, Reg. 30 acquisition events unparsed)** G276: organic vs inorganic perimeter flag. Verify: a Reg. 34 fixture with a business-combination cash-flow element and a Reg. 30 acquisition XBRL fixture.
 13. **DONE (2026-11-15, batch H)** ~~G112, G199: peer comparison and discount to industry median. Verify: a real fixture of NSE's industry classification feeding a point-in-time `entity_classification_history`.~~ NSE quote API fixtures (IC1-IC3), `features_peers.py`.
 14. G133: input-cost sensitivity columns (materials, power, freight as % of revenue). Verify: X50 fixtures (AIA, SRF).
 15. G117: Reg. 30 red-flag columns, kept separate (never summed). Verify: E3/E5/E7 fixtures; penalties wait for an E12 content fixture.

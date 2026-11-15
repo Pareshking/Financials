@@ -23,7 +23,6 @@ from conftest import FETCHED_AT, Market
 
 from _fixture_helpers import FIXTURES, XBRL_DIR
 from financials import features_gems as G
-from financials import features_peers
 from financials.db import apply_schema, connect, declared_columns, insert_rows
 from financials.dsl import ALIASES, load_saved_screens, run_saved_screen
 from financials.features import compute_rows
@@ -542,8 +541,8 @@ def test_every_column_is_in_both_tables_in_order_and_has_an_alias():
     cols = declared_columns()
     for t in ("screener_features", "screener_features_history"):
         names = [c for c, _ in cols[t]]
-        names = names[: len(names) - len(features_peers.COLUMNS)]  # batch H columns follow batch D
-        assert names[-len(G.GEM_COLUMNS) :] == list(G.GEM_COLUMNS), t
+        start = names.index(G.GEM_COLUMNS[0])  # one contiguous block, in order (batch G appends after it)
+        assert names[start : start + len(G.GEM_COLUMNS)] == list(G.GEM_COLUMNS), t
     used = " ".join(sql for sql, _ in ALIASES.values())
     assert [c for c in G.GEM_COLUMNS if c not in used and c != "industry"] == []
     for name in ("fii holding", "change in fii holding", "dii holding", "change in dii holding",

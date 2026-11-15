@@ -227,11 +227,12 @@ def test_industry_and_basic_industry_medians_premiums_and_ranks():
     assert by["e"]["industry_group_pe_median"] is None  # not in the Nifty 500 file: no fallback either
 
 
-def test_columns_are_declared_at_the_end_of_both_feature_tables():
+def test_columns_are_declared_as_one_block_in_both_feature_tables():
     cols = declared_columns()
     for table in ("screener_features_history", "screener_features"):
         names = [c for c, _ in cols[table]]
-        assert set(names[-len(P.COLUMNS) :]) == set(P.COLUMNS), table
+        start = min(names.index(c) for c in P.COLUMNS)  # one contiguous block (later batches append after it)
+        assert set(names[start : start + len(P.COLUMNS)]) == set(P.COLUMNS), table
 
 
 def test_refresh_ranks_the_stored_day(tmp_path):

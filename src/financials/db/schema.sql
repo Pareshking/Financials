@@ -987,6 +987,93 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     industry_group_sales_growth_median       DOUBLE,
     pe_premium_to_industry_group             DOUBLE,          -- pe / industry_group_pe_median - 1
     pb_premium_to_industry_group             DOUBLE,          -- pb / industry_group_pb_median - 1
+    -- batch G (remaining Phase 2 ratios): features_extra.py; fractions like other _pct columns, money in rupees
+    opm_acceleration_pp                      DOUBLE,          -- [OPM(Q) - OPM(Q-4)] - [OPM(Q-1) - OPM(Q-5)] (G152)
+    gpm_change_yoy_pp                        DOUBLE,          -- quarter GPM - same quarter last year, C6 guard (G257)
+    profit_growth_acceleration_pp            DOUBLE,          -- owners' profit YoY latest - preceding quarter (B4.6)
+    sales_growth_streak_quarters             INTEGER,         -- consecutive quarters with sales YoY > 0, newest first (B4.8)
+    profit_growth_streak_quarters            INTEGER,         -- same for owners' profit
+    material_cost_latest_quarter_pct         DOUBLE,          -- (materials + purchases + inventory change) / sales (G133, B3.4)
+    material_cost_last_year_pct              DOUBLE,
+    employee_cost_latest_quarter_pct         DOUBLE,
+    employee_cost_last_year_pct              DOUBLE,
+    other_expenses_latest_quarter_pct        DOUBLE,
+    other_expenses_last_year_pct             DOUBLE,
+    power_fuel_latest_quarter_pct            DOUBLE,          -- labelled power & fuel / sales [X50]; NULL when not labelled
+    power_fuel_last_year_pct                 DOUBLE,
+    freight_latest_quarter_pct               DOUBLE,          -- labelled freight / sales [X50]
+    freight_last_year_pct                    DOUBLE,
+    ad_promo_latest_quarter_pct              DOUBLE,          -- advertising & promotion / sales, A&P intensity [X68] (G258)
+    ad_promo_last_year_pct                   DOUBLE,          -- same on the last FY (Reg. 34 element [X74])
+    marketing_efficiency_latest_quarter      DOUBLE,          -- sales change YoY / A&P of the quarter a year earlier (G256)
+    marketing_efficiency_last_year           DOUBLE,          -- FY sales change / preceding FY A&P
+    material_cost_last_year                  DECIMAL(24,2),   -- rupees, fiscal-year lines (A4.16-A4.19)
+    material_cost_preceding_year             DECIMAL(24,2),
+    employee_cost_last_year                  DECIMAL(24,2),
+    employee_cost_preceding_year             DECIMAL(24,2),
+    minority_share_last_year                 DECIMAL(24,2),
+    minority_share_preceding_year            DECIMAL(24,2),
+    dividends_paid_last_year                 DECIMAL(24,2),   -- cash-flow dividends paid; nil when the FY cash flow omits the line
+    dividends_paid_preceding_year            DECIMAL(24,2),
+    acquisition_outflow_last_year            DECIMAL(24,2),   -- CF obtaining control of subsidiaries / businesses, FY (G276)
+    acquisition_outflow_preceding_year       DECIMAL(24,2),
+    acquisition_outflow_to_sales_last_year   DOUBLE,          -- the same / FY sales
+    inorganic_growth_flag                    BOOLEAN,         -- acquisitions >= 5% of sales in either of the last two FYs [C26]
+    standalone_pat_ttm                       DECIMAL(24,2),   -- standalone TTM PAT (G278 input)
+    profit_leakage_pct                       DOUBLE,          -- 1 - consolidated owners' TTM profit / standalone TTM PAT (G278)
+    profit_leakage_latest_quarter_pct        DOUBLE,          -- same on the latest quarter
+    incremental_asset_turnover_3y            DOUBLE,          -- FY sales change / net block change over 3 FYs (G220, C9 gated)
+    cfo_to_pat                               DOUBLE,          -- cash-flow window CFO / PAT (B1.8)
+    cash_tax_rate                            DOUBLE,          -- taxes paid / tax expense, cash-flow window (B1.11)
+    effective_tax_rate                       DOUBLE,          -- TTM tax / TTM PBT, not clamped (B1.12)
+    exceptional_to_pbt                       DOUBLE,          -- TTM exceptional items / PBT (B1.14)
+    exceptional_quarters_4q                  INTEGER,         -- last 4 quarters with exceptional items != 0
+    capex_intensity                          DOUBLE,          -- capex / sales, cash-flow window (B2.11)
+    net_cash_to_market_cap                   DOUBLE,          -- -(net debt) / market cap (B2.17)
+    rpt_to_sales                             DOUBLE,          -- RPT total / sales of the same period (B1.19; G236 split blocked)
+    intangibles_to_equity                    DOUBLE,          -- (goodwill + other intangibles) / owners' equity (B1.23)
+    audit_fees_to_sales                      DOUBLE,          -- Reg. 34 last FY (B1.20)
+    managerial_remuneration_to_pat           DOUBLE,          -- Reg. 34 last FY (B1.20)
+    capital_commitments_to_net_worth         DOUBLE,          -- Reg. 34 last FY end (B1.22)
+    unquoted_investments                     DECIMAL(24,2),   -- book value, non-current + current, last FY end (A6.12)
+    quoted_investments_market_value          DECIMAL(24,2),   -- market value, non-current + current (A6.13)
+    revaluation_reserve                      DECIMAL(24,2),   -- PPE revaluation surplus (A6.14)
+    price_to_sales                           DOUBLE,          -- market cap / sales_ttm (A1.7)
+    ev_to_sales                              DOUBLE,          -- EV / sales_ttm (B5.6)
+    price_to_embedded_value                  DOUBLE,          -- market cap / embedded value KPI (G270)
+    gov_ttm                                  DECIMAL(24,2),   -- TTM gross order value KPI, rupees (12M period or 4 quarters)
+    ev_to_gov                                DOUBLE,          -- EV / gov_ttm (G265)
+    gov_growth_yoy_pct                       DOUBLE,          -- latest KPI period vs the same period a year earlier
+    arpu                                     DECIMAL(24,2),   -- KPI, rupees per user, latest period (G266)
+    arpu_growth_yoy_pct                      DOUBLE,          -- YoY, same-length period
+    mtu                                      BIGINT,          -- KPI, monthly transacting users, latest period (G266)
+    mtu_growth_yoy_pct                       DOUBLE,          -- YoY, same-length period
+    contribution_margin_change_yoy_pp        DOUBLE,          -- KPI contribution margin YoY change (G257)
+    casa_pct                                 DOUBLE,          -- banks, KPI (master backlog M4)
+    inst_shares_change_qoq                   BIGINT,          -- FII + DII shares, adjacent Reg. 31 quarters
+    volume_median_90d                        DOUBLE,          -- median daily volume, 90 calendar days
+    institutional_absorption_90d             DOUBLE,          -- inst_shares_change_qoq / volume_median_90d, days (G241)
+    promoter_pledge_change_qoq_pp            DOUBLE,          -- pledged / promoter shares QoQ (B7.4)
+    public_holders_above_1pct                INTEGER,         -- named public holders > 1%, latest Reg. 31 (B7.6)
+    litigations_90d                          INTEGER,         -- Reg. 30 LITIGATION disclosures in 90 days (B8.3)
+    allotments_90d                           INTEGER,         -- Reg. 30 ALLOTMENT records (B8.2)
+    fund_raising_events_90d                  INTEGER,         -- Reg. 30 FUND_RAISING family
+    rf_auditor_resignation_90d               BOOLEAN,         -- red flags (G117): separate columns, never summed
+    rf_kmp_resignations_90d                  BOOLEAN,         -- >= 2 KMP / director resignations in 90 days
+    rf_fraud_or_default_90d                  BOOLEAN,
+    rf_litigation_90d                        BOOLEAN,
+    rf_audit_qualified                       BOOLEAN,         -- qualified Reg. 34 report or IF qualification statement [E8] (B1.16)
+    rf_pledge_increase_qoq                   BOOLEAN,         -- promoter_pledge_change_qoq_pp > 0
+    pe_numerator                             DECIMAL(24,2),   -- G244 raw inputs: market cap
+    pe_denominator                           DECIMAL(24,2),   -- continuing owners' TTM profit
+    roe_numerator                            DECIMAL(24,2),   -- owners' TTM profit
+    roe_denominator                          DECIMAL(24,2),   -- owners' equity
+    roce_numerator                           DECIMAL(24,2),   -- TTM EBIT
+    roce_denominator                         DECIMAL(24,2),   -- total equity + debt
+    ev_ebitda_numerator                      DECIMAL(24,2),   -- EV
+    ev_ebitda_denominator                    DECIMAL(24,2),   -- TTM EBITDA
+    opm_numerator                            DECIMAL(24,2),   -- TTM EBITDA
+    opm_denominator                          DECIMAL(24,2),   -- sales_ttm
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -1495,6 +1582,93 @@ CREATE TABLE IF NOT EXISTS screener_features (
     industry_group_sales_growth_median       DOUBLE,
     pe_premium_to_industry_group             DOUBLE,          -- pe / industry_group_pe_median - 1
     pb_premium_to_industry_group             DOUBLE,          -- pb / industry_group_pb_median - 1
+    -- batch G (remaining Phase 2 ratios): features_extra.py; fractions like other _pct columns, money in rupees
+    opm_acceleration_pp                      DOUBLE,          -- [OPM(Q) - OPM(Q-4)] - [OPM(Q-1) - OPM(Q-5)] (G152)
+    gpm_change_yoy_pp                        DOUBLE,          -- quarter GPM - same quarter last year, C6 guard (G257)
+    profit_growth_acceleration_pp            DOUBLE,          -- owners' profit YoY latest - preceding quarter (B4.6)
+    sales_growth_streak_quarters             INTEGER,         -- consecutive quarters with sales YoY > 0, newest first (B4.8)
+    profit_growth_streak_quarters            INTEGER,         -- same for owners' profit
+    material_cost_latest_quarter_pct         DOUBLE,          -- (materials + purchases + inventory change) / sales (G133, B3.4)
+    material_cost_last_year_pct              DOUBLE,
+    employee_cost_latest_quarter_pct         DOUBLE,
+    employee_cost_last_year_pct              DOUBLE,
+    other_expenses_latest_quarter_pct        DOUBLE,
+    other_expenses_last_year_pct             DOUBLE,
+    power_fuel_latest_quarter_pct            DOUBLE,          -- labelled power & fuel / sales [X50]; NULL when not labelled
+    power_fuel_last_year_pct                 DOUBLE,
+    freight_latest_quarter_pct               DOUBLE,          -- labelled freight / sales [X50]
+    freight_last_year_pct                    DOUBLE,
+    ad_promo_latest_quarter_pct              DOUBLE,          -- advertising & promotion / sales, A&P intensity [X68] (G258)
+    ad_promo_last_year_pct                   DOUBLE,          -- same on the last FY (Reg. 34 element [X74])
+    marketing_efficiency_latest_quarter      DOUBLE,          -- sales change YoY / A&P of the quarter a year earlier (G256)
+    marketing_efficiency_last_year           DOUBLE,          -- FY sales change / preceding FY A&P
+    material_cost_last_year                  DECIMAL(24,2),   -- rupees, fiscal-year lines (A4.16-A4.19)
+    material_cost_preceding_year             DECIMAL(24,2),
+    employee_cost_last_year                  DECIMAL(24,2),
+    employee_cost_preceding_year             DECIMAL(24,2),
+    minority_share_last_year                 DECIMAL(24,2),
+    minority_share_preceding_year            DECIMAL(24,2),
+    dividends_paid_last_year                 DECIMAL(24,2),   -- cash-flow dividends paid; nil when the FY cash flow omits the line
+    dividends_paid_preceding_year            DECIMAL(24,2),
+    acquisition_outflow_last_year            DECIMAL(24,2),   -- CF obtaining control of subsidiaries / businesses, FY (G276)
+    acquisition_outflow_preceding_year       DECIMAL(24,2),
+    acquisition_outflow_to_sales_last_year   DOUBLE,          -- the same / FY sales
+    inorganic_growth_flag                    BOOLEAN,         -- acquisitions >= 5% of sales in either of the last two FYs [C26]
+    standalone_pat_ttm                       DECIMAL(24,2),   -- standalone TTM PAT (G278 input)
+    profit_leakage_pct                       DOUBLE,          -- 1 - consolidated owners' TTM profit / standalone TTM PAT (G278)
+    profit_leakage_latest_quarter_pct        DOUBLE,          -- same on the latest quarter
+    incremental_asset_turnover_3y            DOUBLE,          -- FY sales change / net block change over 3 FYs (G220, C9 gated)
+    cfo_to_pat                               DOUBLE,          -- cash-flow window CFO / PAT (B1.8)
+    cash_tax_rate                            DOUBLE,          -- taxes paid / tax expense, cash-flow window (B1.11)
+    effective_tax_rate                       DOUBLE,          -- TTM tax / TTM PBT, not clamped (B1.12)
+    exceptional_to_pbt                       DOUBLE,          -- TTM exceptional items / PBT (B1.14)
+    exceptional_quarters_4q                  INTEGER,         -- last 4 quarters with exceptional items != 0
+    capex_intensity                          DOUBLE,          -- capex / sales, cash-flow window (B2.11)
+    net_cash_to_market_cap                   DOUBLE,          -- -(net debt) / market cap (B2.17)
+    rpt_to_sales                             DOUBLE,          -- RPT total / sales of the same period (B1.19; G236 split blocked)
+    intangibles_to_equity                    DOUBLE,          -- (goodwill + other intangibles) / owners' equity (B1.23)
+    audit_fees_to_sales                      DOUBLE,          -- Reg. 34 last FY (B1.20)
+    managerial_remuneration_to_pat           DOUBLE,          -- Reg. 34 last FY (B1.20)
+    capital_commitments_to_net_worth         DOUBLE,          -- Reg. 34 last FY end (B1.22)
+    unquoted_investments                     DECIMAL(24,2),   -- book value, non-current + current, last FY end (A6.12)
+    quoted_investments_market_value          DECIMAL(24,2),   -- market value, non-current + current (A6.13)
+    revaluation_reserve                      DECIMAL(24,2),   -- PPE revaluation surplus (A6.14)
+    price_to_sales                           DOUBLE,          -- market cap / sales_ttm (A1.7)
+    ev_to_sales                              DOUBLE,          -- EV / sales_ttm (B5.6)
+    price_to_embedded_value                  DOUBLE,          -- market cap / embedded value KPI (G270)
+    gov_ttm                                  DECIMAL(24,2),   -- TTM gross order value KPI, rupees (12M period or 4 quarters)
+    ev_to_gov                                DOUBLE,          -- EV / gov_ttm (G265)
+    gov_growth_yoy_pct                       DOUBLE,          -- latest KPI period vs the same period a year earlier
+    arpu                                     DECIMAL(24,2),   -- KPI, rupees per user, latest period (G266)
+    arpu_growth_yoy_pct                      DOUBLE,          -- YoY, same-length period
+    mtu                                      BIGINT,          -- KPI, monthly transacting users, latest period (G266)
+    mtu_growth_yoy_pct                       DOUBLE,          -- YoY, same-length period
+    contribution_margin_change_yoy_pp        DOUBLE,          -- KPI contribution margin YoY change (G257)
+    casa_pct                                 DOUBLE,          -- banks, KPI (master backlog M4)
+    inst_shares_change_qoq                   BIGINT,          -- FII + DII shares, adjacent Reg. 31 quarters
+    volume_median_90d                        DOUBLE,          -- median daily volume, 90 calendar days
+    institutional_absorption_90d             DOUBLE,          -- inst_shares_change_qoq / volume_median_90d, days (G241)
+    promoter_pledge_change_qoq_pp            DOUBLE,          -- pledged / promoter shares QoQ (B7.4)
+    public_holders_above_1pct                INTEGER,         -- named public holders > 1%, latest Reg. 31 (B7.6)
+    litigations_90d                          INTEGER,         -- Reg. 30 LITIGATION disclosures in 90 days (B8.3)
+    allotments_90d                           INTEGER,         -- Reg. 30 ALLOTMENT records (B8.2)
+    fund_raising_events_90d                  INTEGER,         -- Reg. 30 FUND_RAISING family
+    rf_auditor_resignation_90d               BOOLEAN,         -- red flags (G117): separate columns, never summed
+    rf_kmp_resignations_90d                  BOOLEAN,         -- >= 2 KMP / director resignations in 90 days
+    rf_fraud_or_default_90d                  BOOLEAN,
+    rf_litigation_90d                        BOOLEAN,
+    rf_audit_qualified                       BOOLEAN,         -- qualified Reg. 34 report or IF qualification statement [E8] (B1.16)
+    rf_pledge_increase_qoq                   BOOLEAN,         -- promoter_pledge_change_qoq_pp > 0
+    pe_numerator                             DECIMAL(24,2),   -- G244 raw inputs: market cap
+    pe_denominator                           DECIMAL(24,2),   -- continuing owners' TTM profit
+    roe_numerator                            DECIMAL(24,2),   -- owners' TTM profit
+    roe_denominator                          DECIMAL(24,2),   -- owners' equity
+    roce_numerator                           DECIMAL(24,2),   -- TTM EBIT
+    roce_denominator                         DECIMAL(24,2),   -- total equity + debt
+    ev_ebitda_numerator                      DECIMAL(24,2),   -- EV
+    ev_ebitda_denominator                    DECIMAL(24,2),   -- TTM EBITDA
+    opm_numerator                            DECIMAL(24,2),   -- TTM EBITDA
+    opm_denominator                          DECIMAL(24,2),   -- sales_ttm
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -1557,7 +1731,7 @@ CREATE TABLE IF NOT EXISTS promotion_log (
 CREATE TABLE IF NOT EXISTS supplemental_kpis (
     entity_id       VARCHAR NOT NULL REFERENCES entity_master(entity_id),
     kpi             VARCHAR NOT NULL,        -- vnb_margin | embedded_value | ape_growth | persistency_13m | persistency_61m
-                                             -- | gov | take_rate | contribution_margin | nrr | cac_payback
+                                             -- | gov | take_rate | contribution_margin | nrr | cac_payback | arpu | mtu | casa_pct
     period_start    DATE    NOT NULL,
     period_end      DATE    NOT NULL,
     value           DECIMAL(24,6) NOT NULL,
@@ -1672,3 +1846,17 @@ CREATE TABLE IF NOT EXISTS group_structure (
     CHECK (relation IN ('SUBSIDIARY', 'ASSOCIATE', 'JOINT_VENTURE')),
     CHECK (holding_fraction IS NULL OR (holding_fraction >= 0 AND holding_fraction <= 1))
 );
+-- ── Views ──────────────────────────────────────────────────────────────
+-- Everything below VIEWS_MARKER runs after the column upgrade (db.apply_schema), so a view may name columns that an
+-- existing database gains in the same run. Views hold no data; CREATE OR REPLACE keeps them at this definition.
+-- views (after column upgrade)
+
+-- Capital-allocation scorecard (G201): the batch C / G components side by side, one row per security of the latest
+-- materialised day. Never summed into one score (architecture §10.2); history-gated components stay NULL (C9).
+CREATE OR REPLACE VIEW capital_allocation_scorecard AS
+SELECT as_of_date, security_id, symbol, valuation_archetype,
+       roic, incremental_roic_1y, incremental_roic_3y, incremental_roic_5y, reinvestment_rate,
+       capex_to_depreciation, capex_intensity, cfo_to_ebitda, fcf_conversion_3y,
+       dividend_payout_pct, buyback_yield, shareholder_yield, dilution_1y, dilution_5y,
+       net_debt_to_ebitda, acquisition_outflow_last_year, acquisition_outflow_to_sales_last_year, inorganic_growth_flag
+FROM screener_features;

@@ -5,7 +5,8 @@ One row per (company, KPI, period, publication):
     symbol, kpi, period_start, period_end, value, unit, source_kind, source_url, visible_from_utc[, notes]
 
 - `kpi`: life insurers vnb_margin | embedded_value | ape_growth | persistency_13m | persistency_61m; new-gen tech
-  gov | take_rate (alias net_take_rate) | contribution_margin | nrr | cac_payback.
+  gov | take_rate (alias net_take_rate) | contribution_margin | nrr | cac_payback | arpu (INR per user) | mtu (monthly
+  transacting users, COUNT); banks casa_pct (alias casa; CASA deposits / total deposits, RATIO) [master backlog M4].
 - `unit`: INR (absolute rupees) | RATIO (0.27 = 27%) | MONTHS | COUNT; each KPI has exactly one allowed unit.
 - `visible_from_utc`: when the source document became public (ISO timestamp, UTC). It is the point-in-time key.
 - `source_kind`: INVESTOR_PRESENTATION | IRDAI_PUBLIC_DISCLOSURE | ANNUAL_REPORT | MANUAL.
@@ -26,9 +27,9 @@ from financials.parsers import ParseError
 KPI_UNITS = {
     "vnb_margin": "RATIO", "embedded_value": "INR", "ape_growth": "RATIO", "persistency_13m": "RATIO",
     "persistency_61m": "RATIO", "gov": "INR", "take_rate": "RATIO", "contribution_margin": "RATIO",
-    "nrr": "RATIO", "cac_payback": "MONTHS",
+    "nrr": "RATIO", "cac_payback": "MONTHS", "arpu": "INR", "mtu": "COUNT", "casa_pct": "RATIO",
 }  # fmt: skip
-ALIASES = {"net_take_rate": "take_rate"}
+ALIASES = {"net_take_rate": "take_rate", "casa": "casa_pct"}
 SOURCE_KINDS = {"INVESTOR_PRESENTATION", "IRDAI_PUBLIC_DISCLOSURE", "ANNUAL_REPORT", "MANUAL"}
 REQUIRED = ("symbol", "kpi", "period_start", "period_end", "value", "unit", "source_kind", "source_url",
             "visible_from_utc")  # fmt: skip

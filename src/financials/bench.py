@@ -116,6 +116,22 @@ def run(fixtures: Path, work: Path) -> dict:
     res["materialize_ms"] = (time.perf_counter() - t) * 1000
     res["materialize_rows"] = m.rows
     res["materialize_status"] = m.status
+    # Incremental (§11.10): one filed entity dirty since 2025-10-14 (2 materialised days), then 300 entities on 1 day.
+    from financials import dirty
+    from financials.features import materialize_incremental
+
+    con.execute("DELETE FROM materialize_dirty")
+    ent = con.execute("SELECT DISTINCT entity_id FROM filing_meta ORDER BY 1").fetchone()[0]
+    dirty.mark_entities(con, [ent], date(2025, 10, 14), "BENCH")
+    t = time.perf_counter()
+    inc = materialize_incremental(con)
+    res["incremental_1_ms"], res["incremental_1_days"] = (time.perf_counter() - t) * 1000, len(inc.days)
+    ents = [e for (e,) in con.execute("SELECT DISTINCT entity_id FROM screener_features_history WHERE as_of_date = ? "
+                                       "ORDER BY 1 LIMIT 300", [date(2026, 11, 12)]).fetchall()]  # fmt: skip
+    dirty.mark_entities(con, ents, date(2026, 11, 12), "BENCH")
+    t = time.perf_counter()
+    inc = materialize_incremental(con)
+    res["incremental_300_ms"], res["incremental_status"] = (time.perf_counter() - t) * 1000, inc.status
 
     save_custom_ratio(con, "net cash to mcap", "(0 - net debt) / market cap * 100")
     res["screens"] = {}
@@ -166,6 +182,10 @@ def render(res: dict) -> str:
         "",
         f"Full universe for 2026-11-12: **{res['materialize_rows']:,} rows in {res['materialize_ms']:.0f} ms** "
         f"({res['materialize_status']}), including G4 (null-spike vs 2025-10-14) and G5 (atomic swap).",
+        "",
+        f"Incremental (`materialize --incremental`, {res['incremental_status']}): one dirty entity over "
+        f"{res['incremental_1_days']} materialised days **{res['incremental_1_ms']:.0f} ms**; 300 dirty entities on "
+        f"2026-11-12 **{res['incremental_300_ms']:.0f} ms** (restricted batch reads, then G5/G4 on the merged day).",
         "",
         "## 4. DSL screen latency (50 runs each, warm)",
         "",

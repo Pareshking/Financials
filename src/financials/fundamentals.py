@@ -310,7 +310,26 @@ _BATCH_SAME_BASIS = SAME_BASIS.replace(
 )
 
 
-def prefetch_fundamentals(con, as_of: datetime) -> None:
+def in_list(column: str, values) -> tuple[str, list]:
+    """("column IN (...)", params) for a set of ids, bound as one comma-joined string: DuckDB binds a Python list
+    parameter element by element (~1 ms per 30 elements, with failed optional imports), which dominated a
+    300-entity incremental day. Ids (stable_id) never contain commas."""
+    if not values:
+        return "FALSE", []
+    return f"{column} IN (SELECT unnest(string_split(?, ',')))", [",".join(sorted(values))]
+
+
+def entity_filter(column: str, entities) -> tuple[str, list]:
+    """(" AND column IN (...)", params) for an entity subset (incremental materialisation); ("", []) for all."""
+    if entities is None:
+        return "", []
+    sql, params = in_list(column, entities)
+    return " AND " + sql, params
+
+
+def prefetch_fundamentals(con, as_of: datetime, entities=None) -> None:
+    """`entities`: restrict the pass to these entities (same rows for them as an unrestricted pass)."""
+    only, only_p = entity_filter("entity_id", entities)
     facts: dict[tuple[str, str], list] = {}
     for ent, scope, *row in con.execute(
         """SELECT entity_id, scope, canonical_tag, period_type, period_start, period_end,
@@ -323,13 +342,15 @@ def prefetch_fundamentals(con, as_of: datetime) -> None:
         + version_key()
         + """ DESC) AS rn
                  FROM fact_observations
-                 WHERE visible_from_ts <= ? AND """
+                 WHERE visible_from_ts <= ?"""
+        + only
+        + " AND "
         + CURRENT_VERSION
         + " AND "
         + _BATCH_SAME_BASIS
         + """)
            WHERE rn = 1""",
-        [as_of, as_of],
+        [as_of, *only_p, as_of],
     ).fetchall():
         facts.setdefault((ent, scope), []).append(tuple(row))
     meta = {
@@ -337,16 +358,20 @@ def prefetch_fundamentals(con, as_of: datetime) -> None:
         for e, s, u, f in con.execute(
             "SELECT entity_id, scope, max(CASE level_of_rounding "
             + _ROUNDING_CASE
-            + " ELSE 1 END), list(DISTINCT fy_start) FROM filing_meta WHERE visible_from_ts <= ? GROUP BY ALL",
-            [as_of],
+            + " ELSE 1 END), list(DISTINCT fy_start) FROM filing_meta WHERE visible_from_ts <= ?"
+            + only
+            + " GROUP BY ALL",
+            [as_of, *only_p],
         ).fetchall()
     }
     anchors: dict[str, list] = {}
     for ent, months, scope, end in con.execute(
         """SELECT entity_id, period_months, scope, period_end FROM fact_observations
            WHERE canonical_tag = ? AND period_type = 'DURATION' AND period_months IN (3, 12)
-             AND visible_from_ts <= ? GROUP BY entity_id, period_months, scope, period_end""",
-        [ANCHOR_TAG, as_of],
+             AND visible_from_ts <= ?"""
+        + only
+        + " GROUP BY entity_id, period_months, scope, period_end",
+        [ANCHOR_TAG, as_of, *only_p],
     ).fetchall():
         anchors.setdefault(ent, []).append((months, scope, end))
     overrides = {e: (q, a) for e, q, a in con.execute(

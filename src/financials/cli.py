@@ -17,7 +17,7 @@ import duckdb
 
 from financials.db import apply_schema, connect
 from financials.dsl import run_screen
-from financials.features import materialize
+from financials.features import materialize, materialize_incremental, settle_full_run
 from financials.fetch.http import PoliteFetcher, Transport
 from financials.fetch.jobs import WARMUP, Jobs
 from financials.promoter import close_resolved_share_findings, close_wrong_template_duplicates, promote
@@ -169,6 +169,11 @@ def build_parser() -> argparse.ArgumentParser:
     mt.add_argument("as_of", type=_date, nargs="?")
     mt.add_argument("--from", dest="from_date", type=_date)
     mt.add_argument("--to", dest="to_date", type=_date)
+    mt.add_argument(
+        "--incremental",
+        action="store_true",
+        help="recompute only rows marked dirty since the last run, on materialised days (<= --to)",
+    )
     q = sub.add_parser("quarantine", help="list or resolve quarantined items (audited)")
     qs = q.add_subparsers(dest="qcmd", required=True)
     ql = qs.add_parser("list")
@@ -383,11 +388,22 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
             r = rebuild_market(con, args.from_date, note=args.note)
             print(json.dumps(r, default=str), file=out)
             waiting = promote_pending(con, stage_root, out)
+            done = []
             for d in r["features_dates"]:
                 fr = materialize(con, d)
                 print(f"{fr.status} {fr.as_of_date} rows={fr.rows} {fr.gate or ''} {fr.message}", file=out)
+                if fr.status != "PROMOTED":
+                    break
+                done.append(d)
+            if done == r["features_dates"]:
+                settle_full_run(con, done)
             return 1 if waiting else 0
         if args.cmd == "materialize":
+            if args.incremental:
+                if args.as_of is not None or args.from_date is not None:
+                    print("error: --incremental takes only --to", file=out)
+                    return 2
+                return materialize_incremental_cli(con, args.to_date, out)
             return materialize_dates(con, args.as_of, args.from_date, args.to_date, out)
         if args.cmd == "quarantine":
             from financials.admin import AdminError, resolve_quarantine
@@ -539,7 +555,16 @@ def materialize_dates(con, as_of: date | None, start: date | None, end: date | N
         print(f"{r.status} {r.as_of_date} rows={r.rows} {r.gate or ''} {r.message}", file=out)
         if r.status != "PROMOTED":
             return 1
+    settle_full_run(con, dates)  # dirty markers this full run made obsolete
     return 0
+
+
+def materialize_incremental_cli(con, to: date | None, out) -> int:
+    r = materialize_incremental(con, to)
+    for d in r.days:
+        print(f"{d.status} {d.as_of_date} rows={d.rows} {d.gate or ''} {d.message}", file=out)
+    print(f"incremental: {r.status} {r.message}" + (f", {r.entities} dirty entities" if r.entities else ""), file=out)
+    return 0 if r.status in ("DONE", "NOTHING") else 1
 
 
 def run_day(args, transport: Transport | None, out) -> int:
@@ -573,7 +598,10 @@ def run_day(args, transport: Transport | None, out) -> int:
     try:
         apply_schema(con)
         waiting = promote_pending(con, stage_root, out)
-        rc = materialize_dates(con, d, None, None, out)
+        # Dirty rows of earlier days first (a late filing, a resolved gap), so D's percentile history is current;
+        # then D in full. A version mismatch skips the catch-up (it needs a full run) but still publishes D.
+        caught_up = materialize_incremental_cli(con, d - timedelta(days=1), out)
+        rc = materialize_dates(con, d, None, None, out) or caught_up
     finally:
         con.close()
     for e in errors:

@@ -54,17 +54,26 @@ the full line-by-line audit of the PDF is `docs/master_backlog.md`; ratios are i
 6. Mutual-fund holding for the 2022 Reg. 31 taxonomy: the parser does not map `MutualFundsOrUtiMember`
    (Q3-Q4 FY25 patterns), a parser rule + version bump.
 
-**Phase 2 pending: ratios (architecture §15 "remaining §10 ratios"; all have inputs in the database)**
-1. RPT leak % per counterparty type (G236): RPT is stored as a total; the purchases/loans/royalties split needs parsing (G99).
+**Phase 2 ratios: built 2026-11-15 (batch G, features `2026.11.15-8G`, `features_extra.py`, arch §10.7)**
+Margin acceleration (G152), gross / contribution margin expansion (G257), A&P intensity and marketing efficiency (G256,
+G258), input-cost shares (G133), organic vs inorganic flag from business-combination cash outflows (G276, C25),
+standalone-to-consolidated profit leakage (G278), incremental asset turnover 3Y (G220, NULL until FY28), institutional
+absorption (G241), P/EV (G270), EV/GOV and ARPU / MTU growth (G265, G266; KPI names `arpu`, `mtu`, `casa_pct`), bank
+CASA (M4), Reg. 30 red-flag columns kept separate (G117), raw numerator / denominator columns (G244), the
+capital-allocation scorecard view `capital_allocation_scorecard` (G201), and 30 more catalogue rows (cost lines, CFO /
+PAT, cash tax rate, ETR, exceptional share, capex intensity, net cash / mcap, RPT intensity, Reg. 34 note ratios, P/S,
+EV/Sales, pledge change, >1% holder count, event counts).
+
+**Phase 2 pending: ratios**
+1. RPT leak % per counterparty type (G236): BLOCKED on a parser. RPT is stored as a total (`rpt_to_sales` is built on
+   it); the purchases / loans / royalties split sits in `RelatedPartyTransactionAxis` rows in raw_xbrl_facts (G99).
 2. Order book to sales (G115) only if a filing tags an order book; otherwise drop.
-3. Margin acceleration / revision velocity (G152), gross/contribution margin expansion (G257), A&P intensity and
-   marketing efficiency (G256, G258), input-cost sensitivity (G133), organic vs inorganic growth flag (G276),
-   standalone-to-consolidated profit leakage (G278), incremental asset turnover 3Y (G220), institutional absorption
-   (G241), P/EV for life insurers (G270), EV/GOV and ARPU/MTU growth for platforms (G265, G266, manual KPIs).
-4. Reg. 30 red-flag columns kept separate (G117), penalty amounts (G118, needs an E12 content fixture).
-5. Expose raw numerator and denominator columns (G244), capital-allocation scorecard view (G201; components built).
-6. The rest of `docs/ratio_catalogue.md` BUILDABLE NOW rows (65): mostly forensic components, cost shares,
-   valuation percentiles by industry, event flags.
+3. Penalty amounts (G118, needs an E12 content fixture); Reg. 30 acquisition events for G276 (no event type parsed).
+4. Filed ISCR / DSCR (catalogue B1.24): filed values are implausible (C25); needs an evidence row first.
+5. The rest of `docs/ratio_catalogue.md` BUILDABLE NOW rows (24): industry medians / peer ranks / sector breadth (with
+   the industry-classification work), Beneish / Piotroski components, original Altman Z, balance-sheet accruals,
+   depreciation rate, Δ CCC and H1 days, PB / P/S percentiles, RS rank, volatility / drawdown, 52W-high-on-delivery,
+   PEAD, index inclusion and ex-date flags, segment mix; price to quarterly earnings waits on Screener's definition.
 
 ## Data quality still open (not a phase item, but blocks trust)
 

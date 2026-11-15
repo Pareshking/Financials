@@ -538,7 +538,8 @@ def test_every_column_is_in_both_tables_in_order_and_has_an_alias():
     cols = declared_columns()
     for t in ("screener_features", "screener_features_history"):
         names = [c for c, _ in cols[t]]
-        assert names[-len(G.GEM_COLUMNS) :] == list(G.GEM_COLUMNS), t
+        start = names.index(G.GEM_COLUMNS[0])  # one contiguous block, in order (batch G appends after it)
+        assert names[start : start + len(G.GEM_COLUMNS)] == list(G.GEM_COLUMNS), t
     used = " ".join(sql for sql, _ in ALIASES.values())
     assert [c for c in G.GEM_COLUMNS if c not in used and c != "industry"] == []
     for name in ("fii holding", "change in fii holding", "dii holding", "change in dii holding",

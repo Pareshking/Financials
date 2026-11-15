@@ -346,3 +346,68 @@ def test_batch_c_lenders_and_insurers_keep_only_capital_and_cash_flow_lines(unif
     (jpoly,) = [r for r in rows if r["symbol"] == "JPOLYINVST"]
     assert jpoly["is_lending_nbfc"] is not None and jpoly["opm"] is None
     assert all(jpoly[c] is None for c in NOT_FOR_LENDERS)
+
+
+def test_saved_screens_run_and_match_the_hat_columns(unified):
+    """Batch D: every saved screen (reference/saved_screens.csv) compiles and runs on the real market and selects
+    exactly the rows its hat boolean marks; the cross-sectional columns are consistent on real data."""
+    from financials.dsl import load_saved_screens, run_saved_screen
+
+    con = unified.con
+    for s in load_saved_screens().values():
+        got = {r["symbol"] for r in run_saved_screen(con, s.name)}
+        want = {sym for (sym,) in con.execute(f"SELECT symbol FROM screener_features WHERE {s.hat_column}").fetchall()}
+        assert got == want, s.name
+    ranks = [r for (r,) in con.execute("SELECT magic_formula_rank FROM screener_features "
+                                       "WHERE magic_formula_rank IS NOT NULL ORDER BY 1").fetchall()]  # fmt: skip
+    assert ranks == list(range(1, len(ranks) + 1)) and len(ranks) >= 5
+    gated = con.execute(
+        "SELECT median(pe_core), median(market_cap), any_value(pe_core_universe_median), "
+        "any_value(market_cap_universe_median), count(*) FILTER (WHERE gem_score IS NOT NULL AND cyclical_flag) "
+        "FROM screener_features WHERE forensic_clean AND valuation_archetype NOT IN ('FINANCIAL_LENDING', 'INSURANCE')"
+    ).fetchone()
+    assert gated[0] == pytest.approx(gated[2]) and gated[1] == gated[3] and gated[4] == 0
+    hats = " + ".join(f"CAST(coalesce({c}, false) AS INTEGER)" for c in
+                      ("hat_hidden_compounder", "hat_quality_fair_price", "hat_magic_formula", "hat_garp",
+                       "hat_turnaround", "hat_under_owned", "hat_cash_machine", "hat_fallen_quality",
+                       "hat_capex_pay_off", "hat_cyclical", "hat_lender"))  # fmt: skip
+    assert con.execute(f"SELECT count(*) FROM screener_features WHERE hats_passed <> {hats}").fetchone()[0] == 0
+    # Glenmark FY26 consolidated (the Q4 filing's 12-month context is the TTM): a Rs 2,266 Cr exceptional loss
+    # halves the reported PE; PE on core profit = mcap / ((PBT - other income - exceptional) x (1 - ETR) x owners'
+    # share), owners after the X95 swap (PAT - the 1.01 Cr tagged as owners).
+    from _fixture_helpers import load_instance
+
+    inst = load_instance(next(XBRL_DIR.glob("INTEGRATED_FILING_INDAS_1677062_*.xml")))
+    fy = {n: v for (n, c), v in inst.numeric.items() if not inst.contexts[c].has_dimensions
+          and inst.contexts[c].start == "2025-04-01"}  # fmt: skip
+    pbt, pat = fy["ProfitBeforeTax"], fy["ProfitLossForPeriod"]
+    core = (pbt - fy["OtherIncome"] - fy["ExceptionalItemsBeforeTax"]) * (1 - fy["TaxExpense"] / pbt)
+    owners = pat - fy["ProfitOrLossAttributableToOwnersOfParent"]
+    mcap, pe, pe_core = con.execute(
+        "SELECT market_cap, pe, pe_core FROM screener_features WHERE symbol = 'GLENMARK'").fetchone()  # fmt: skip
+    assert pe_core == pytest.approx(float(mcap / (core * owners / pat))) and pe_core < pe / 1.5
+    flags = dict(con.execute("SELECT symbol, cyclical_flag FROM screener_features WHERE symbol IN "
+                             "('JSWSTEEL', 'RELIANCE', 'TCS', 'HDFCBANK')").fetchall())  # fmt: skip
+    assert flags == {"JSWSTEEL": True, "RELIANCE": True, "TCS": False, "HDFCBANK": False}
+
+
+def test_cli_lists_and_runs_saved_screens(unified, tmp_path):
+    import json
+    import shutil
+
+    from financials.cli import main
+
+    out = io.StringIO()
+    assert main(["--data-dir", str(tmp_path), "screens"], out=out) == 0
+    assert len(json.loads(out.getvalue())) == 11
+    unified.con.execute("CHECKPOINT")
+    shutil.copy(unified.stage_root.parent / "market.duckdb", tmp_path / "market.duckdb")
+    out = io.StringIO()
+    assert main(["--data-dir", str(tmp_path), "screen", "--saved", "Magic formula", "--columns", "Earnings yield"],
+                out=out) == 0, out.getvalue()  # fmt: skip
+    rows = json.loads(out.getvalue())
+    assert rows and [r["magic formula rank"] for r in rows] == sorted(r["magic formula rank"] for r in rows)
+    assert all("earnings yield" in r for r in rows) and len(rows) <= 15
+    out = io.StringIO()
+    assert main(["--data-dir", str(tmp_path), "screen", "--saved", "no such screen"], out=out) == 2
+    assert "unknown saved screen" in out.getvalue()

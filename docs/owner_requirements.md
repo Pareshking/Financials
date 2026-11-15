@@ -10,10 +10,10 @@ Every concrete item in the chat is mapped to the repository as of 2026-11-14. Th
 
 | Status | Meaning | Count |
 |---|---|---|
-| DONE | implemented and tested (file and test cited) | 185 |
+| DONE | implemented and tested (file and test cited) | 188 |
 | DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 67 |
 | IN_PROGRESS | being built now | 4 |
-| MISSING | not anywhere in docs or code | 40 |
+| MISSING | not anywhere in docs or code | 37 |
 | CONFLICTS_WITH_EVIDENCE | contradicted by our verified fixtures or tests | 17 |
 | OUT_OF_SCOPE_BY_DECISION | excluded by a recorded decision (C2, C7, C9, invariants, CLAUDE.md Don'ts) | 30 |
 | NEEDS_OWNER_DECISION | the docs do not settle it | 0 |
@@ -135,7 +135,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G161 | Beneish M-score | DONE | C23; tests/test_batch9_annual.py |
 | G162 | Altman Z-score | DONE | altman_z_dd (Z''); tests/test_fundamentals.py. NULL for financials |
 | G167 | Valuation: market cap, price, PE, PB, EV/EBITDA | DONE | tests/test_features.py |
-| G168 | PEG ratio | MISSING | not built. Needs multi-year EPS growth (C9 limits) |
+| G168 | PEG ratio | DONE | peg = pe_core / (100 x core profit YoY of the latest quarter), TTM-on-TTM core growth once 8 quarters are in scope (C9); batch D, features_gems; docs/hidden_gems.md; tests/test_features_gems.py |
 | G169 | Dividend yield | DONE | dividend_yield_pct: trailing-365-day accepted dividends (the TR ledger, C2) restated to today's share basis / close; NULL before a full window (C9) or while a gap freezes prices; tests/test_owner_items_qoq_dividend_promoter.py |
 | G170 | FCF yield | DONE | fcff_yield (unlevered); tests/test_phase1_fixes_b.py. Equity form: equity_fcf_yield = fcf_ttm / market cap, price_to_fcf (features_bs, batch C); tests/test_balance_sheet_cash_flow_family.py |
 | G171 | Sales growth and profit growth YoY | DONE | sales_growth_yoy, profit_growth_yoy; tests/test_features.py. 8 quarters |
@@ -158,8 +158,8 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G200 | Reverse DCF implied growth using the live 10Y G-Sec | DONE | reverse_dcf_implied_g (C20, WACC fixed 12%); tests/test_valuation_bands.py. Live yield needs F25 |
 | G201 | Capital-allocation scorecard (incremental ROIC, buyback yield, 5Y dilution) | DOCUMENTED_PLANNED | components built (batch C, features_bs): incremental_roic_1y/3y/5y, reinvestment_rate, buyback_yield, shareholder_yield, dilution_1y/5y (3Y/5Y forms history-gated, C9); no combined scorecard view yet (arch 10.2: never summed) |
 | G202 | Dividend payout % | DONE | dividend_payout_pct = trailing dividends per share / eps_ttm, NULL if EPS <= 0; arch 10.7; tests/test_owner_items_qoq_dividend_promoter.py. No committed company has both an accepted dividend and a TTM EPS yet |
-| G203 | YoY sales-growth acceleration (current YoY - prior-quarter YoY) | MISSING | not built |
-| G204 | Operating-margin expansion vs the same quarter last year | MISSING | not built |
+| G203 | YoY sales-growth acceleration (current YoY - prior-quarter YoY) | DONE | growth_acceleration_pp (quarter form: sales YoY latest - preceding quarter); TTM form waits for 9 quarters (C9); batch D; tests/test_features_gems.py |
+| G204 | Operating-margin expansion vs the same quarter last year | DONE | opm_change_yoy_pp (quarter OPM - same quarter last year, NULL for lenders); batch D; tests/test_features_gems.py |
 | G205 | Sector earnings breadth during results season | MISSING | not built |
 | G207 | Liquidity: 20D median traded value; bid-ask / circuit-lock days | MISSING | 20D median traded value built (turnover_median_20d; tests/test_features_price.py); bid-ask is in no ingested EOD file; circuit-lock days wait for an F20 price-band fixture |
 | G208 | Market regime / breadth: % of Nifty 500 above 50/200 DMA, 52W high/low ratio, advance-decline | DONE | market_breadth table, one row per materialised day from the in_nifty500 rows (arch 10.7); tests/test_features_price.py |
@@ -427,7 +427,7 @@ None open. Decided 2026-11-15: no paid sources at all (G74, by the owner); E-H b
 
 **Phase 1-2 clean-up (inputs already promoted)**
 1. **DONE (2026-11-15)** ~~G173, G175: QoQ sales %, QoQ profit %, OPM last year, NPM, interest coverage. Verify: pin values on committed Q2 FY27 fixtures against the Screener export goldens; pin filed `InterestServiceCoverageRatio` / `DebtServiceCoverageRatio` (X41) on a committed fixture before exposing them.~~ Built as specified in arch 10.7, pinned on the facts of Finolex Cables Q4 FY25-Q2 FY26 and Glenmark FY26 (the Screener goldens hold one quarter only, so no QoQ golden exists); filed ISCR / DSCR still not exposed.
-2. G203, G204, G152: YoY sales-growth acceleration, OPM expansion vs same quarter last year, margin acceleration. Verify: FactBook unit test over committed quarters; NULL until 9 same-scope quarters exist (C9).
+2. **G203, G204 DONE (2026-11-15, batch D: `growth_acceleration_pp`, `opm_change_yoy_pp`); open: G152** G203, G204, G152: YoY sales-growth acceleration, OPM expansion vs same quarter last year, margin acceleration. Verify: FactBook unit test over committed quarters; NULL until 9 same-scope quarters exist (C9).
 3. **DONE (2026-11-15)** ~~G178: change in promoter holding QoQ. Verify: the two-quarter Reg. 31 fixtures (SHP14: ADANIENT, JSWSTEEL).~~
 4. **DONE (2026-11-15)** ~~G169, G202: dividend yield and dividend payout %. Verify: dividend records in the committed corporate-actions fixture (CA9) and the dividends-paid element in a committed Reg. 34 fixture.~~
 5. **DONE (2026-11-15)** ~~G183, G95: 20-day average delivery % and VWAP. Verify: `DELIV_PER` (P10) and confirm an average-price column exists in the committed `sec_bhavdata_full` fixture; add a P-row.~~ `AVG_PRICE` = turnover / volume on every row (P16); `deliv_pct_avg_20d`, `vwap`, `vwap_20d`.
@@ -447,7 +447,7 @@ None open. Decided 2026-11-15: no paid sources at all (G74, by the owner); E-H b
 14. G133: input-cost sensitivity columns (materials, power, freight as % of revenue). Verify: X50 fixtures (AIA, SRF).
 15. G117: Reg. 30 red-flag columns, kept separate (never summed). Verify: E3/E5/E7 fixtures; penalties wait for an E12 content fixture.
 16. G115: order-book-to-sales. Verify first whether any committed Reg. 30 order XBRL (E3) or results XBRL tags an order book; otherwise drop.
-17. G168: PEG. Define with `min_periods_required`; NULL until 3 years of in-scope EPS (C9).
+17. **DONE (2026-11-15, batch D)** ~~G168: PEG. Define with `min_periods_required`; NULL until 3 years of in-scope EPS (C9).~~ Built on core profit growth and PE on core profit (docs/hidden_gems.md principle 6): quarter YoY now, TTM-on-TTM once 8 quarters exist.
 
 **Phase 3**
 18. G151, G205: PEAD tracker and results-season sector breadth. Verify: index closes (IDX9) now, Nifty 500 TRI fixture (F29) before any backtest claims.

@@ -441,8 +441,9 @@ def test_every_new_column_has_an_alias_and_a_schema_column():
 
     for table in ("screener_features", "screener_features_history"):
         cols = [c for c, _ in declared_columns()[table]]
-        block = [*B.OUTPUT_COLUMNS, "ev_ebitda_percentile_20q"]  # appended at the end, in order
-        assert cols[-len(block) :] == block, table
+        block = [*B.OUTPUT_COLUMNS, "ev_ebitda_percentile_20q"]  # appended as one contiguous block, in order
+        start = cols.index(block[0])
+        assert cols[start : start + len(block)] == block, table
     used = " ".join(sql for sql, _ in ALIASES.values())
     assert [c for c in (*B.OUTPUT_COLUMNS, "ev_ebitda_percentile_20q") if c not in used] == []
     sql = compile_screen(

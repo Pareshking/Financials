@@ -72,9 +72,9 @@ context) and Reg. 34 FY25/FY26 comparatives. Due dates assumed: Q1-Q3 results wi
 | A1.6 | ★ EVEBITDA | valuation | EV / TTM ebitda | BUILT | `ev_ebitda` |
 | A1.7 | ★ Price to Sales | valuation | mcap / TTM rev_ops | BUILDABLE NOW | `market_cap`, `sales_ttm` (both already columns) |
 | A1.8 | ★ Price to Free Cash Flow | valuation | mcap / TTM fcf (CFO − capex, H1/FY bridge) | BUILT | `price_to_fcf` (mcap / `fcf_ttm`; NULL when FCF ≤ 0); batch C |
-| A1.9 | ★ Earnings yield | valuation | TTM ebit / EV (Greenblatt form; Screener's exact formula UNVERIFIED) | BUILDABLE NOW | `building_blocks.ebit`, `enterprise_value` |
+| A1.9 | ★ Earnings yield | valuation | TTM ebit / EV (Greenblatt form; Screener's exact formula UNVERIFIED) | BUILT | `earnings_yield` (batch D, features_gems: TTM `ebit` / `enterprise_value`, NULL if EV <= 0 or lender); DSL `earnings yield` |
 | A1.10 | ★ Dividend yield (G169) | valuation | TTM cash dividends per share (ex-date in last 365 days) / close | BUILT | `dividend_yield_pct`; `corp_actions` DIVIDEND `cash_per_share` |
-| A1.11 | ★ PEG Ratio (G168) | valuation | PE / (3Y EPS CAGR × 100) | WHEN HISTORY | FY28 vs FY25 EPS → ~May 2028. Interim "PEG on FY YoY" is computable now but is not Screener's ratio |
+| A1.11 | ★ PEG Ratio (G168) | valuation | PE / (3Y EPS CAGR × 100) | BUILT | `peg` (batch D) = `pe_core` / (100 x core profit growth): the latest quarter's YoY now, TTM-on-TTM once 8 quarters exist (hidden_gems.md principle 6, catalogue G168). Screener's 3Y EPS-CAGR form is `PE / EPS growth 3Years` in the DSL once FY28 exists (~May 2028) |
 | A1.12 | Price to Quarterly Earning | valuation | mcap / (4 × latest quarter continuing owners' profit) (definition UNVERIFIED) | BUILDABLE NOW | `FactBook.quarter(continuing_owners)` |
 | A1.13 | Book value (per share) | per-share | owners' equity / shares | BUILT | `book_value_per_share` (owners' equity, fallback total equity / `shares`); DSL `book value` now per share, `net worth` = total equity in Rs Cr (batch A) |
 | A1.14 | ★ EPS | per-share | TTM owners' profit / current shares | BUILT | `eps_ttm` (+ `eps_continuing_ttm`) |
@@ -139,13 +139,13 @@ context) and Reg. 34 FY25/FY26 comparatives. Due dates assumed: Q1-Q3 results wi
 | A3.2 | ★ Change in promoter holding (G178) | ownership | QoQ percentage points | BUILT | `promoter_holding_change_qoq_pp` |
 | A3.3 | Change in promoter holding 3Years | ownership history | pp change vs SHP 12 quarters earlier | WHEN HISTORY | ~Apr 2028 |
 | A3.4 | ★ Pledged percentage | ownership | pledged / promoter shares | BUILT | `promoter_pledge_pct` (+ `promoter_encumbered_pct`) |
-| A3.5 | Unpledged promoter holding | ownership | promoter pct × (1 − pledge pct) | BUILDABLE NOW | `shareholding_observations` + `shareholding_meta.promoter_pledged_shares` |
+| A3.5 | Unpledged promoter holding | ownership | promoter pct × (1 − pledge pct) | BUILT | `unpledged_promoter_holding_pct` (batch D); 0 without a promoter group |
 | A3.6 | Public holding | ownership | PUBLIC pct | BUILT | `public_holding_pct` |
 | A3.7 | FII holding; DII holding | ownership | FII / DII pct | BUILT | `fii_holding_pct`, `fpi_holding_pct`, `dii_holding_pct` |
-| A3.8 | Change in FII holding; Change in DII holding | ownership | QoQ pp, each separately | BUILDABLE NOW | only the combined `fii_dii_qoq_change_pct` is built |
+| A3.8 | Change in FII holding; Change in DII holding | ownership | QoQ pp, each separately | BUILT | `fii_holding_change_qoq_pct`, `dii_holding_change_qoq_pct` (batch D; fraction points, adjacent quarters only); combined `fii_dii_qoq_change_pct` |
 | A3.9 | Change in FII holding 3Years; Change in DII holding 3Years | ownership history | | WHEN HISTORY | ~Apr 2028 |
-| A3.10 | Number of Shareholders | ownership | TOTAL `holders` | BUILDABLE NOW | `shareholding_observations.holders` (`NumberOfShareholders`) |
-| A3.11 | Number of Shareholders preceding quarter; 1year back | ownership | same, previous SHP / SHP 4 quarters back | BUILDABLE NOW | Reg. 31 Sep-2025 exists |
+| A3.10 | Number of Shareholders | ownership | TOTAL `holders` | BUILT | `num_shareholders` (batch D; TOTAL `NumberOfShareholders` [SHP19]) |
+| A3.11 | Number of Shareholders preceding quarter; 1year back | ownership | same, previous SHP / SHP 4 quarters back | BUILT | `num_shareholders_preceding_quarter` (adjacent quarter), `num_shareholders_1y_back` (pattern exactly 12 months earlier), `num_shareholders_change_qoq_pct` (batch D) |
 
 ## A4. Annual P&L family ("last year" = latest FY, "preceding year" = FY before; growth windows)
 
@@ -359,9 +359,9 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 
 | ID | Name | Family | Definition (our tags) | Status | Data / notes |
 |---|---|---|---|---|---|
-| B4.1 | Quarterly YoY sales-growth acceleration (G203, quarter form) | acceleration | YoY(Q) − YoY(Q−1): needs Sep-26, Jun-26, Sep-25, Jun-25 | BUILDABLE NOW | |
+| B4.1 | Quarterly YoY sales-growth acceleration (G203, quarter form) | acceleration | YoY(Q) − YoY(Q−1): needs Sep-26, Jun-26, Sep-25, Jun-25 | BUILT | `growth_acceleration_pp` (batch D) |
 | B4.2 | TTM YoY sales-growth acceleration (G203, TTM form) | acceleration | TTM YoY now − TTM YoY one quarter earlier (9 quarters) | WHEN HISTORY | ~end-May 2027 |
-| B4.3 | OPM expansion vs same quarter last year (G204) | margin delta | OPM(Q) − OPM(Q−4), percentage points | BUILDABLE NOW | |
+| B4.3 | OPM expansion vs same quarter last year (G204) | margin delta | OPM(Q) − OPM(Q−4), percentage points | BUILT | `opm_change_yoy_pp` (batch D; fraction points, NULL for lenders) |
 | B4.4 | Margin acceleration (G152) | margin delta | [OPM(Q) − OPM(Q−4)] − [OPM(Q−1) − OPM(Q−5)] | BUILDABLE NOW | oldest Q−5 = Jun-2025 |
 | B4.5 | Gross-margin expansion bps YoY (G257) | margin delta | GPM(Q) − GPM(Q−4) | BUILDABLE NOW | C6 guard |
 | B4.6 | Profit-growth acceleration (quarter form) | acceleration | as B4.1 on owners' profit (NULL when a base ≤ 0) | BUILDABLE NOW | |
@@ -412,9 +412,9 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 
 | ID | Name | Family | Definition (our tags) | Status | Data / notes |
 |---|---|---|---|---|---|
-| B7.1 | MF holding %; MF change QoQ | ownership | Reg. 31 MUTUAL_FUNDS category | BUILDABLE NOW | `shareholding_observations` (category `MUTUAL_FUNDS`) |
-| B7.2 | Insurance / pension / retail (individuals) holding %, QoQ | ownership | category totals from `shareholding_line_items` | BUILDABLE NOW | exact category-member names must be read off the committed SHP fixtures first (zero-drop C24 stores them) |
-| B7.3 | Change in number of shareholders QoQ / YoY | ownership | Δ TOTAL `holders` | BUILDABLE NOW | retail-crowding signal |
+| B7.1 | MF holding %; MF change QoQ | ownership | Reg. 31 MUTUAL_FUNDS category | BUILT | `mf_holding_pct`, `mf_holding_change_qoq_pct` (batch D). The 2022-09-30 SHP taxonomy spells the member `MutualFundsOrUtiMember`, unmapped by the parser: no MF category for Q3 / Q4 FY25 patterns (NEEDS PARSER rule) |
+| B7.2 | Insurance / pension / retail (individuals) holding %, QoQ | ownership | category totals from `shareholding_line_items` | BUILT | partial (batch D): `insurance_holding_pct` (`InsuranceCompaniesMember`), `retail_holding_pct` (resident individuals up to Rs 2 lakh) from the latest pattern's line items, SHP18-scaled [SHP19]. Pension funds and the QoQ changes of these two are not built |
+| B7.3 | Change in number of shareholders QoQ / YoY | ownership | Δ TOTAL `holders` | BUILT | `num_shareholders_change_qoq_pct` (batch D); YoY from `num_shareholders_1y_back` |
 | B7.4 | Pledge / encumbrance change QoQ | ownership | Δ `promoter_pledge_pct`, Δ `promoter_encumbered_pct` | BUILDABLE NOW | |
 | B7.5 | Quarterly institutional absorption (G241) | ownership flow | Δ(FII + DII shares) QoQ / median 90D volume | BUILDABLE NOW | |
 | B7.6 | Count of > 1% public holders; named-holder screens (G194, partial) | ownership | `shareholding_major_holders` | BUILDABLE NOW | names not normalised (G194 "not designed") |
@@ -458,6 +458,23 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 | B10.5 | Board independence, dissent % (G108, G121) | governance | | NEW FREE SOURCE | F23 OBSERVED |
 | B10.6 | Paid-database items (MCA AOC-4 prior-year columns, consensus estimates, analyst targets) | — | | NOT POSSIBLE | owner decision 2026-11-15: no paid source at all |
 
+## B11. Hidden gems (docs/hidden_gems.md; batch D, `features_gems.py`)
+
+| ID | Name | Family | Definition (our tags) | Status | Data / notes |
+|---|---|---|---|---|---|
+| B11.1 | Core profit growth, latest and preceding quarter | quality growth | (PBT − other income − exceptional items) vs the same quarter a year earlier; NULL on a base ≤ 0 or for lenders / insurers | BUILT | `core_profit_latest_quarter`, `core_profit_yoy_latest_q`, `core_profit_yoy_preceding_q`; also `sales_growth_yoy_preceding_quarter_pct`, `profit_growth_yoy_preceding_quarter_pct` |
+| B11.2 | Other-income lift | forensic | owners' profit YoY − core profit YoY, latest quarter | BUILT | `other_income_lift_pp` |
+| B11.3 | PE on core profit | valuation | market cap / (TTM core pre-tax × (1 − TTM ETR) × owners' share) | BUILT | `pe_core`; Glenmark FY26 pinned in the e2e test |
+| B11.4 | Sustained growth, operating leverage | growth | both quarters' sales YoY ≥ 12%; core YoY / sales YoY | BUILT | `growth_sustained`, `operating_leverage` |
+| B11.5 | Magic formula rank | cross-section | EY rank + ROCE rank in the day's forensic-clean non-financial universe | BUILT | `magic_formula_rank` |
+| B11.6 | Gem score | cross-section | weighted clipped z-scores (ROCE, sustained growth, EY, under-ownership, cash conversion, margin trend), non-cyclical universe | BUILT | `gem_score`, `pe_core_universe_median`, `market_cap_universe_median` |
+| B11.7 | Forensic gate | forensic | no measured red flag (lift, restatement, Beneish, pledge, auditor / fraud events, OI / PBT); a gate, never a summed score (B1.25) | BUILT | `forensic_clean` |
+| B11.8 | Industry and cyclical flag | classification | Nifty 500 list industry (PIT snapshot); Metals & Mining, Oil Gas & Consumable Fuels, curated shipping | BUILT | `industry`, `cyclical_flag`, `reference/cyclical_symbols.csv` |
+| B11.9 | Under-owned, cash conversion, capex pay-off flags | flags | inst ≤ 15%, promoter ≥ 50%, no pledge; CFO / EBITDA ≥ 0.7; CWIP / GB ≥ 25%, capex / D&A ≥ 2, D/E ≤ 1 | BUILT | `under_owned`, `cash_conversion_ok`, `capex_pay_off_signal`, `inst_holding_pct` |
+| B11.10 | Investor-hat screens | screens | the 11 screens of hidden_gems.md section B | BUILT | `hat_*`, `hats_passed`; saved screens `reference/saved_screens.csv` (`screen --saved NAME`, `screens`) |
+| B11.11 | ROCE / OPM stability 5Y | quality history | 1 − std / mean over 5 FYs | WHEN HISTORY | `roce_stability_5y`, `opm_stability_5y`: FY25-FY29, ~May 2029 |
+| B11.12 | PE vs own 5Y median | valuation history | PE / median of own stored daily PE over 5 years | WHEN HISTORY | `pe_vs_own_5y_median`: 2029-10 |
+
 ---
 
 # Part C. Summary
@@ -466,14 +483,17 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 
 | Status | Part A (Screener gallery) | Part B (beyond Screener) | Total |
 |---|---|---|---|
-| BUILT | 132 | 40 | 172 |
+| BUILT | 138 | 55 | 193 |
 | IN PROGRESS | 0 | 0 | 0 |
-| BUILDABLE NOW | 19 | 56 | 75 |
-| WHEN HISTORY | 17 | 2 | 19 |
+| BUILDABLE NOW | 14 | 51 | 65 |
+| WHEN HISTORY | 16 | 4 | 20 |
 | NEEDS PARSER | 2 | 2 | 4 |
 | NEW FREE SOURCE | 1 | 15 | 16 |
 | NOT POSSIBLE | 2 | 4 | 6 |
-| **Total rows** | 173 | 119 | 292 |
+| **Total rows** | 173 | 131 | 304 |
+
+Recounted from the status column after batch D (2026-11-15, features `2026.11.15-6D`; the earlier batch A / B row
+updates had not been carried into this table). Section B11 (hidden gems) added 12 rows.
 
 Recounted from the table rows after batch C (features `2026.11.15-6C`); before it the rows gave BUILT 85 / 29,
 BUILDABLE NOW 57 / 63, WHEN HISTORY 26 / 6 (the table above had not been recounted after batches A and B). A
@@ -500,6 +520,12 @@ tests. Batch 0 is trivial: DSL aliases for built columns that have none (`shares
 | 4. Price, volume and technicals | **Done 2026-11-15 (batch B, `features_price.py`) except** RS rank (B6.3), volatility / drawdown (B6.4), volume spike (B6.10), 52W-high-on-delivery flag (B6.11), Is SME (A1.24: always false, C7), PEAD (B6.14). Scope: 1D/1W returns, volume and averages, 52W high/low levels, DMA levels and previous day, RSI, MACD (A8.1, A8.5-A8.7, A8.9-A8.12), ATR, RS vs Nifty 500 and RS rank, beta / volatility / drawdown, 52W-low distance, VWAP, delivery %, median traded value, volume spike, 52W-high-on-delivery flag (B6.1-B6.7, B6.9-B6.11), Is SME (A1.24); then market breadth and PEAD as separate market-level tables (B6.13, B6.14) | ~25 | `features._momentum` / `_delivery` (one pass over adjusted bars), `index_ohlcv` preload; new market-level table for breadth |
 | 5. Ownership and event flags | FII and DII QoQ separately, unpledged promoter, shareholder counts and changes (A3.5, A3.8, A3.10, A3.11), MF / insurance / retail holdings, pledge change, absorption, >1% holder count (B7.1-B7.6), audit-qualified flag (B1.16), allotment / litigation / fund-raising counts, index inclusion, ex-date and result-date flags (B8.2-B8.7) | ~15 | `shareholding_columns`, `_event_counts`, `_preload` (filing_meta, corp_actions, index history) |
 | 6. Valuation, cross-section and composites | P/S, earnings yield, EV/Sales (A1.7, A1.9, B5.6), PB / P/S percentiles (B5.2, B5.3), coarse industry PE / PBV, discount to industry median, peer rank, sector breadth (A1.19, B5.7, B5.8, B4.9), EV/GOV and P/EV (B5.10), Beneish and Piotroski components, original Altman Z (B1.2, B1.3, B1.5), standalone-vs-consolidated leakage (B1.18), RPT intensity (B1.19), segment mix (B9.1, B9.2) | ~20 | features `_rows` (needs mcap / EV), a cross-sectional pass after rows are built (industry medians, ranks), `raw_index_snapshot` industry PIT lookup, second-scope FactBook prefetch |
+
+Progress (2026-11-15, batch D, features `2026.11.15-6D`): Batch 5 ownership part done (A3.5, A3.8, A3.10, A3.11,
+B7.1-B7.3; FII / DII / MF change QoQ, shareholder counts, insurance / retail holding), plus earnings yield (A1.9), PEG
+on core growth (A1.11), B4.1 / B4.3 and the hidden-gem section B11 (`features_gems.py`, saved screens). Still open from
+Batch 5: pledge change (B7.4), absorption (B7.5), >1% holder count (B7.6), audit-qualified flag (B1.16), event flags
+(B8.2-B8.7).
 
 Progress (2026-11-15, batch A, features `2026.11.15-4A`): Batch 0 done (aliases, `book value` per share, `screen
 --columns` / `--order-by`, `save-ratio`, trade-to-trade flag). Batch 1 done for the P&L lines × 5 quarter offsets and

@@ -132,7 +132,7 @@ exists (file / column); Class.
 | A23 | 1224-1226 | Beneish M-score | G161 DONE | B1.1 BUILT | `beneish_m` | **BUILT** |
 | A24 | 1226 | Altman Z-score | G162 DONE | B1.4 BUILT (Z''); B1.5 original Z BUILDABLE | `altman_z_dd` | **BUILT** |
 | A25 | 1228-1229 | cash conversion CFO/EBITDA and contingent liabilities / net worth flags | G223, G235 DONE | B1.21 BUILT | `cfo_to_ebitda`, `contingent_liabilities_to_net_worth` | **BUILT** |
-| A26 | 1262 | PEG ratio | G168 MISSING | A1.11 WHEN HISTORY (~May 2028) | none | **CATALOGUE** |
+| A26 | 1262 | PEG ratio | G168 DONE (batch D) | A1.11 | `peg` = `pe_core` / core profit growth (quarter YoY now, TTM-on-TTM after 8 quarters) | **BUILT** |
 | A27 | 1262 | dividend yield | G169 MISSING (stale) | A1.10 | `dividend_yield_pct` (e085eb5) | **BUILT** |
 | A28 | 1262 | FCF yield | G170 DONE | B5.11 BUILDABLE NOW (equity form) | `fcff_yield` (unlevered); `equity_fcf_yield`, `price_to_fcf` (batch C, 2026-11-15) | **BUILT** |
 | A29 | 1264 | sales growth, profit growth (TTM YoY) | G171 DONE | A4.26 BUILT | `sales_growth_yoy`, `profit_growth_yoy` (NULL until ~Feb 2027) | **BUILT** |
@@ -486,7 +486,7 @@ exists (file / column); Class.
 | 0. DSL / CLI | M1 (output columns + `save-ratio` CLI), M6 (T2T alias) | G187 CLI gap; aliases for `shares`, `restatement_suspected`, `book value` per share (catalogue C2) |
 | 1-3. FactBook period lines, BS, CF | — | A4/A5/A6/A7 families; fix `opm_last_year_pct` naming and add FY OPM last year; 3Y forms of G224 / G233 and 20Q of G240 returning NULL (history-gated). **DONE 2026-11-15**: batch A (P&L, `features_pl`), batch C (BS / CF / capital allocation, `features_bs`, incl. the G224 / G233 / G240 forms) |
 | 4. Price / technicals | (M6 if not in 0) | DONE 2026-11-15 (batch B): G95, G156-G158, G183, G207 median, G208, 52W low (G94 gap). Open: G283 flag, RS rank, volatility / drawdown, volume spike |
-| 5. Ownership, events, KPIs | M4 (CASA KPI) | G241, G119 dilution column, B7.x, single Reg. 30 red-flag count (G181 gap) |
+| 5. Ownership, events, KPIs | M4 (CASA KPI) | DONE 2026-11-15 (batch D, ownership part): FII / DII / MF change QoQ, unpledged promoter, shareholder counts, MF / insurance / retail holding (A3.5, A3.8, A3.10, A3.11, B7.1-B7.3), plus the hidden-gem signals, hats and saved screens (docs/hidden_gems.md; G168, G203, G204). Open: G241, G119 dilution column, pledge change (B7.4), >1% holder count (B7.6), event flags (B8.2-B8.7), single Reg. 30 red-flag count (G181 gap), M4 |
 | 6. Valuation / cross-section | M3 (Rule of 40 FCF form), M5 (size bucket proxy) | G112, G199, G205, G265, G270, G278 |
 | Docs | M8 (competitor inventory) | update digest statuses (§2 stale list) |
 | Phase 3 sources | M2 (G-Sec / MCLR spreads, ERP), M7 (NSE-vs-BSE check) | F25, F29, F11-F20, G86 / G291 |

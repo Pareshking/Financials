@@ -16,6 +16,7 @@ from pathlib import Path
 import duckdb
 
 from financials import lineage
+from financials.calendar import is_trading_day
 from financials.db import apply_schema, connect
 from financials.dsl import run_screen
 from financials.features import materialize, materialize_incremental, settle_full_run
@@ -24,13 +25,14 @@ from financials.fetch.jobs import WARMUP, Jobs
 from financials.promoter import close_resolved_share_findings, close_wrong_template_duplicates, promote
 from financials.scope import MIN_TRADE_DATE
 from financials.staging import read_manifest
-from financials.timeutil import utc_now
+from financials.timeutil import utc_now, utc_to_ist_date
 from financials.vault import Vault
 
 UNIVERSES = ("nifty500", "active")
 
 JOB_ORDER = {"holidays": 0, "market_day": 1, "index_close": 2, "index_snapshot": 2, "corp_actions": 3,
-             "results_xbrl": 4, "shareholding": 5, "raw_only": 6, "kpis": 7, "equity_master": 8}  # fmt: skip
+             "results_xbrl": 4, "shareholding": 5, "raw_only": 6, "kpis": 7, "equity_master": 8,
+             "classification": 8}  # fmt: skip
 
 
 def _paths(data_dir: Path) -> tuple[Path, Path, Path]:
@@ -114,6 +116,9 @@ def build_parser() -> argparse.ArgumentParser:
     fs.add_argument("symbols", nargs="*")
     fs.add_argument("--universe", choices=UNIVERSES)
     fs.add_argument("--all-history", action="store_true")
+    fcl = sub.add_parser("fetch-classification", help="NSE 4-level industry classification (quote API, 1 request/s)")
+    fcl.add_argument("symbols", nargs="*")
+    fcl.add_argument("--universe", choices=UNIVERSES)
     fe = sub.add_parser("fetch-events", help="Reg. 30 structured event XBRL from the announcements RSS")
     fe.add_argument("--limit", type=int)
     fa = sub.add_parser("fetch-annual", help="Reg. 34 annual report XBRL (FY ending 2025 onwards)")
@@ -134,7 +139,7 @@ def build_parser() -> argparse.ArgumentParser:
     df.add_argument("--workers", type=int, default=1, help="threads (per-host limits still apply)")
     df.add_argument("--shp-from", type=_date, help="shareholding quarters from this date (default: latest only)")
     rd = sub.add_parser("run-day", help="holidays, days, corporate actions, discovery, promote, materialize")
-    rd.add_argument("--date", type=_date, required=True)
+    rd.add_argument("--date", type=_date, help="trading date to run (default: today in IST, for schedulers)")
     rd.add_argument("--lookback-days", type=int, default=7)
     lk = sub.add_parser("load-kpis", help="stage a supplemental KPI file (CSV/JSON: parsers.kpis) for promote")
     lk.add_argument("path", type=Path)
@@ -161,6 +166,11 @@ def build_parser() -> argparse.ArgumentParser:
                          "output to clean filings, e.g. segment rows in 0.10.0)")  # fmt: skip
     evidence_help = "stage raw_results_listing rows from vaulted RESULTS_LISTING blobs (then promote) [X83]"
     sub.add_parser("backfill-listing-evidence", help=evidence_help)
+    bg = sub.add_parser(
+        "backfill-group-structure",
+        help="AOC-1 rows for annual filings promoted before batch H, from the vault (audited) [X112]",
+    )
+    bg.add_argument("--limit", type=int)
     sub.add_parser("audit-ytd", help="raise YTD_QUARTER_MISMATCH findings for every entity and scope [X80]")
     sub.add_parser("promote", help="apply all pending staged batches (single writer)")
     rb = sub.add_parser("rebuild-market", help="roll market-derived state back to a date and replay it (audited)")
@@ -346,6 +356,19 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
                                   fetched_at=fetched, exchange=exch, run_suffix="evidence")  # fmt: skip
         print(f"staged {len(rows)} results listings (run promote)", file=out)
         return 0
+    if args.cmd == "backfill-group-structure":
+        from financials.group_structure import backfill_group_structure
+
+        con = connect(db_path)
+        try:
+            apply_schema(con)
+            con.execute("BEGIN")
+            r = backfill_group_structure(con, Vault(vault_dir), limit=args.limit)
+            con.execute("COMMIT")
+        finally:
+            con.close()
+        print(json.dumps(r, indent=1), file=out)
+        return 1 if r["error_count"] else 0
     if args.cmd == "audit-ytd":
         from financials.promoter import audit_ytd_identity
 
@@ -522,6 +545,19 @@ def universe_symbols(db_path: Path, name: str, as_of: date) -> list[str]:
     return [r[0] for r in rows]
 
 
+def universe_series(db_path: Path) -> dict[str, str]:
+    """Current series of every symbol with an open identifier interval (read-only); EQ wins over BE / BZ."""
+    con = connect(db_path, read_only=True)
+    try:
+        rows = con.execute(
+            "SELECT symbol, min(CASE series WHEN 'EQ' THEN '0' ELSE series END) FROM security_identifier_history "
+            "WHERE valid_to IS NULL GROUP BY 1"
+        ).fetchall()
+    finally:
+        con.close()
+    return {sym: "EQ" if s == "0" else s for sym, s in rows}
+
+
 def _symbols(args, db_path: Path, explicit: list[str]) -> list[str]:
     syms = list(explicit)
     if getattr(args, "universe", None):
@@ -552,6 +588,10 @@ def run_fetch(args, jobs: Jobs, db_path: Path, out) -> tuple[list[Path], list[st
                 staged += jobs.shareholding(sym, latest_only=False)
         else:
             staged, errors = jobs.discover(syms, ["shareholding"], events=False)
+    elif args.cmd == "fetch-classification":
+        syms = _symbols(args, db_path, args.symbols)
+        series = universe_series(db_path) if args.universe else {}
+        staged, errors = jobs.classification(syms, series)
     elif args.cmd == "fetch-events":
         staged += jobs.reg30_events(limit=args.limit)
     elif args.cmd == "fetch-annual":
@@ -606,7 +646,7 @@ def run_day(args, transport: Transport | None, out) -> int:
     run continues, and the next run picks up what failed."""
     vault_dir, stage_root, db_path = _paths(args.data_dir)
     jobs = Jobs(PoliteFetcher(transport, warmup=WARMUP), Vault(vault_dir), stage_root)
-    d = args.date
+    d = args.date or utc_to_ist_date(utc_now())
     errors: list[str] = []
     steps = (
         ("holidays", jobs.holidays),
@@ -633,7 +673,11 @@ def run_day(args, transport: Transport | None, out) -> int:
         # Dirty rows of earlier days first (a late filing, a resolved gap), so D's percentile history is current;
         # then D in full. A version mismatch skips the catch-up (it needs a full run) but still publishes D.
         caught_up = materialize_incremental_cli(con, d - timedelta(days=1), out)
-        rc = materialize_dates(con, d, None, None, out) or caught_up
+        if is_trading_day(con, "NSE", d) is False:  # holiday / weekend per the promoted calendar: no day to publish
+            print(f"{d}: not a trading day; nothing to materialise", file=out)
+            rc = caught_up
+        else:
+            rc = materialize_dates(con, d, None, None, out) or caught_up
     finally:
         con.close()
     for e in errors:

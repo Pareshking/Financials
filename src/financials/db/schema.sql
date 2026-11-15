@@ -959,6 +959,34 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     hat_cyclical                             BOOLEAN,
     hat_lender                               BOOLEAN,
     hats_passed                              INTEGER,         -- count of hat_* TRUE
+    -- batch H (industry / peers): features_peers.py; NSE 4-level classification [IC1-IC3], visible from its first fetch
+    nse_macro_sector                         VARCHAR,         -- NSE macro-economic sector (quote API secInfo.macro), PIT
+    nse_sector                               VARCHAR,         -- NSE sector (secInfo.sector)
+    nse_industry                             VARCHAR,         -- NSE industry (secInfo.industryInfo)
+    nse_basic_industry                       VARCHAR,         -- NSE basic industry (secInfo.basicIndustry)
+    industry_pe_median                       DOUBLE,          -- median PE (> 0) of the day's companies in nse_industry (>= 3 values)
+    industry_pb_median                       DOUBLE,          -- same for PB (> 0)
+    industry_roce_median                     DOUBLE,          -- same for ROCE (fraction)
+    industry_sales_growth_median             DOUBLE,          -- same for sales_growth_yoy (fraction)
+    basic_industry_pe_median                 DOUBLE,          -- the four medians within nse_basic_industry
+    basic_industry_pb_median                 DOUBLE,
+    basic_industry_roce_median               DOUBLE,
+    basic_industry_sales_growth_median       DOUBLE,
+    pe_premium_to_industry                   DOUBLE,          -- pe / industry_pe_median - 1 (negative = discount)
+    pb_premium_to_industry                   DOUBLE,          -- pb / industry_pb_median - 1
+    pe_premium_to_basic_industry             DOUBLE,          -- pe / basic_industry_pe_median - 1 (G199)
+    pb_premium_to_basic_industry             DOUBLE,          -- pb / basic_industry_pb_median - 1
+    peer_count                               INTEGER,         -- companies in nse_basic_industry on the day (incl. itself)
+    peer_rank_market_cap                     INTEGER,         -- 1 = largest market cap in nse_basic_industry (G112)
+    peer_rank_pe                             INTEGER,         -- 1 = lowest PE (> 0)
+    peer_rank_roce                           INTEGER,         -- 1 = highest ROCE
+    peer_rank_profit_growth                  INTEGER,         -- 1 = highest profit_growth_yoy_quarter_pct
+    industry_group_pe_median                 DOUBLE,          -- fallback: medians over the Nifty 500 file's `industry` (never mixed with NSE levels)
+    industry_group_pb_median                 DOUBLE,
+    industry_group_roce_median               DOUBLE,
+    industry_group_sales_growth_median       DOUBLE,
+    pe_premium_to_industry_group             DOUBLE,          -- pe / industry_group_pe_median - 1
+    pb_premium_to_industry_group             DOUBLE,          -- pb / industry_group_pb_median - 1
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -1439,6 +1467,34 @@ CREATE TABLE IF NOT EXISTS screener_features (
     hat_cyclical                             BOOLEAN,
     hat_lender                               BOOLEAN,
     hats_passed                              INTEGER,         -- count of hat_* TRUE
+    -- batch H (industry / peers): features_peers.py; NSE 4-level classification [IC1-IC3], visible from its first fetch
+    nse_macro_sector                         VARCHAR,         -- NSE macro-economic sector (quote API secInfo.macro), PIT
+    nse_sector                               VARCHAR,         -- NSE sector (secInfo.sector)
+    nse_industry                             VARCHAR,         -- NSE industry (secInfo.industryInfo)
+    nse_basic_industry                       VARCHAR,         -- NSE basic industry (secInfo.basicIndustry)
+    industry_pe_median                       DOUBLE,          -- median PE (> 0) of the day's companies in nse_industry (>= 3 values)
+    industry_pb_median                       DOUBLE,          -- same for PB (> 0)
+    industry_roce_median                     DOUBLE,          -- same for ROCE (fraction)
+    industry_sales_growth_median             DOUBLE,          -- same for sales_growth_yoy (fraction)
+    basic_industry_pe_median                 DOUBLE,          -- the four medians within nse_basic_industry
+    basic_industry_pb_median                 DOUBLE,
+    basic_industry_roce_median               DOUBLE,
+    basic_industry_sales_growth_median       DOUBLE,
+    pe_premium_to_industry                   DOUBLE,          -- pe / industry_pe_median - 1 (negative = discount)
+    pb_premium_to_industry                   DOUBLE,          -- pb / industry_pb_median - 1
+    pe_premium_to_basic_industry             DOUBLE,          -- pe / basic_industry_pe_median - 1 (G199)
+    pb_premium_to_basic_industry             DOUBLE,          -- pb / basic_industry_pb_median - 1
+    peer_count                               INTEGER,         -- companies in nse_basic_industry on the day (incl. itself)
+    peer_rank_market_cap                     INTEGER,         -- 1 = largest market cap in nse_basic_industry (G112)
+    peer_rank_pe                             INTEGER,         -- 1 = lowest PE (> 0)
+    peer_rank_roce                           INTEGER,         -- 1 = highest ROCE
+    peer_rank_profit_growth                  INTEGER,         -- 1 = highest profit_growth_yoy_quarter_pct
+    industry_group_pe_median                 DOUBLE,          -- fallback: medians over the Nifty 500 file's `industry` (never mixed with NSE levels)
+    industry_group_pb_median                 DOUBLE,
+    industry_group_roce_median               DOUBLE,
+    industry_group_sales_growth_median       DOUBLE,
+    pe_premium_to_industry_group             DOUBLE,          -- pe / industry_group_pe_median - 1
+    pb_premium_to_industry_group             DOUBLE,          -- pb / industry_group_pb_median - 1
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -1554,4 +1610,65 @@ CREATE TABLE IF NOT EXISTS features_meta (
     mode              VARCHAR NOT NULL,      -- FULL | INCREMENTAL (how the day was last published)
     row_count         INTEGER NOT NULL,
     materialized_at   TIMESTAMP NOT NULL
+);
+
+-- ── batch H: industry classification (NSE quote API) and AOC-1 group structure ─────────────────────
+-- Raw: one row per fetched quote answer, exactly as sent [IC1]. Append-only.
+CREATE TABLE IF NOT EXISTS raw_quote_classification (
+    filing_id        VARCHAR NOT NULL REFERENCES filings(filing_id),
+    symbol           VARCHAR NOT NULL,
+    series           VARCHAR NOT NULL,
+    isin             VARCHAR NOT NULL,
+    company_name     VARCHAR,
+    macro            VARCHAR,                -- secInfo.macro
+    sector           VARCHAR,                -- secInfo.sector
+    industry         VARCHAR,                -- secInfo.industryInfo
+    basic_industry   VARCHAR,                -- secInfo.basicIndustry
+    quote_update_ts  TIMESTAMP,              -- lastUpdateTime (IST in the answer), UTC
+    observed_date    DATE NOT NULL,          -- IST date of the fetch
+    PRIMARY KEY (filing_id)
+);
+
+-- L2: date-bounded classification per entity (promoter._promote_classification). NSE gives no effective date
+-- [IC3]: an interval starts on the IST date it was first observed and is visible from that fetch; a changed answer
+-- closes the open interval (valid_to, exclusive) and opens a new one. PIT read: valid_from <= as_of AND (valid_to
+-- IS NULL OR valid_to > as_of) AND visible_from_ts <= as_of_ts. Never backdated.
+CREATE TABLE IF NOT EXISTS entity_classification_history (
+    entity_id           VARCHAR NOT NULL REFERENCES entity_master(entity_id),
+    source              VARCHAR NOT NULL,       -- NSE_QUOTE
+    macro               VARCHAR,
+    sector              VARCHAR,
+    industry            VARCHAR,
+    basic_industry      VARCHAR,
+    valid_from          DATE NOT NULL,
+    valid_to            DATE,                   -- exclusive; NULL = current
+    visible_from_ts     TIMESTAMP NOT NULL,
+    evidence_filing_id  VARCHAR NOT NULL REFERENCES filings(filing_id),
+    PRIMARY KEY (entity_id, source, valid_from)
+);
+
+-- Reg. 34 AOC-1 schedule (parsers/aoc1.py) [X112]: one row per subsidiary / associate / JV row of a fiscal year in an
+-- annual filing, promoted with its filing (same entity, scope, visibility). row_member is a row position inside the
+-- year, not an identity across years. Never feeds fact_observations or a ratio.
+CREATE TABLE IF NOT EXISTS group_structure (
+    filing_id         VARCHAR NOT NULL REFERENCES filings(filing_id),
+    parser_version    VARCHAR NOT NULL,          -- parsers.aoc1.AOC1_PARSER_VERSION
+    entity_id         VARCHAR NOT NULL REFERENCES entity_master(entity_id),   -- the filer (parent)
+    scope             VARCHAR NOT NULL,
+    relation          VARCHAR NOT NULL,          -- SUBSIDIARY | ASSOCIATE | JOINT_VENTURE
+    row_member        VARCHAR NOT NULL,          -- typed axis member as filed
+    period_end        DATE NOT NULL,             -- fiscal year end of the row
+    name              VARCHAR NOT NULL,
+    cin               VARCHAR,
+    country           VARCHAR,
+    holding_as_filed  VARCHAR,
+    holding_fraction  DECIMAL(9,6),              -- 0..1; NULL when the filed value is outside 0..1
+    net_worth_inr     DECIMAL(20,2),
+    turnover_inr      DECIMAL(20,2),
+    pat_inr           DECIMAL(20,2),
+    investment_inr    DECIMAL(20,2),
+    visible_from_ts   TIMESTAMP NOT NULL,
+    PRIMARY KEY (filing_id, parser_version, relation, row_member, period_end),
+    CHECK (relation IN ('SUBSIDIARY', 'ASSOCIATE', 'JOINT_VENTURE')),
+    CHECK (holding_fraction IS NULL OR (holding_fraction >= 0 AND holding_fraction <= 1))
 );

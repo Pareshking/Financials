@@ -10,10 +10,10 @@ Every concrete item in the chat is mapped to the repository as of 2026-11-14. Th
 
 | Status | Meaning | Count |
 |---|---|---|
-| DONE | implemented and tested (file and test cited) | 197 |
-| DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 58 |
+| DONE | implemented and tested (file and test cited) | 202 |
+| DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 55 |
 | IN_PROGRESS | being built now | 4 |
-| MISSING | not anywhere in docs or code | 36 |
+| MISSING | not anywhere in docs or code | 34 |
 | CONFLICTS_WITH_EVIDENCE | contradicted by our verified fixtures or tests | 18 |
 | OUT_OF_SCOPE_BY_DECISION | excluded by a recorded decision (C2, C7, C9, invariants, CLAUDE.md Don'ts) | 30 |
 | NEEDS_OWNER_DECISION | the docs do not settle it | 0 |
@@ -36,7 +36,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G90 | Quarterly + annual XBRL: statements, notes (borrowings, leases, fixed assets) | DONE | F06, F07; parsers/integrated.py, parsers/reg34_annual.py; X71-X73. Segments tracked separately |
 | G91 | Shareholding XBRL: promoter, FII, DII (MF, insurance, banks), public, pledged shares | DONE | F08; SHP7-SHP15; tests/test_batch8_shareholding.py |
 | G92 | SAST Reg. 31(1)/31(2) encumbrance events with lender details | DOCUMENTED_PLANNED | F12 (Phase 3, OBSERVED) |
-| G93 | Reg. 76 reconciliation of share capital audit (exact issued / listed shares) | DOCUMENTED_PLANNED | F09 (UNVERIFIED, not searched); arch 15 gaps |
+| G93 | Reg. 76 reconciliation of share capital audit (exact issued / listed shares) | DOCUMENTED_PLANNED | F09 UNVERIFIED, BLOCKED: probed 2026-11-15 (vault ledger, announcements RSS, TCS announcements API Jul-Nov 2026; BSE 403), no Reg. 76 file found (A15); Reg. 31 x paid-up cross-check (X103) stands in |
 | G99 | Related-party transactions from Reg. 23(9) half-yearly Integrated Filing | DONE | X19; RPT contexts land in raw_xbrl_facts. RPT ratio planned |
 | G101 | Daily delivery % | DONE | F02; P10; tests/test_market_parsers.py |
 | G105 | Audit qualification / modified opinion flag | DONE | E8; X75 filing_meta.auditor_qualified; tests/test_batch9_annual.py, tests/test_batch10_edge_cases.py. Not yet a screener column |
@@ -53,7 +53,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G192 | Analyst / investor meet XBRL (funds, dates) | DOCUMENTED_PLANNED | E2 (SAIIM vaulted raw); Phase 3 |
 | G193 | Forward event calendar: board intimations, AGM/EGM notices | DOCUMENTED_PLANNED | E2 (PRIOR_INTIMATION, NOTICE_OF_SHAREHOLDERS_MEETINGS vaulted raw); CA11 |
 | G264 | Platform KPIs side table (GOV, take rate, contribution margin, NRR, CAC payback) | DONE | supplemental_kpis; load-kpis; tests/test_supplemental_kpis.py. Manual load; no fetcher (Phase 3) |
-| G277 | AOC-1 subsidiary, associate and JV tree from annual XBRL | DOCUMENTED_PLANNED | arch 15 gaps; X75 (axes inspected, not parsed) |
+| G277 | AOC-1 subsidiary, associate and JV tree from annual XBRL | DONE | group_structure (subsidiary / associate / JV, name, CIN, country, holding fraction, net worth, turnover, PAT, investment per FY) from the Reg. 34 AOC-1 schedule; parsers/aoc1.py, backfill-group-structure; X112; tests/test_batch_h_industry_peers.py |
 | G295 | Review: ISINs change on splits; use a surrogate security_id with dated identifier history *(owner)* | DONE | arch 5.1; P5; tests/test_identity.py |
 | G296 | Review: price table needs exchange and series columns *(owner)* | DONE | ohlcv PK (security_id, exchange, series, trade_date) |
 | G306 | Review: DVR shares get INE ISINs; only partly-paid get IN9 *(owner)* | CONFLICTS_WITH_EVIDENCE | P17, R10: partly-paid are IN9 + series E1 (true); DVRs carry IN9 (JISLDVREQS, FELDVR) or INE (GATECHDVR) ISINs; tests/test_share_class_fixture_facts.py |
@@ -154,7 +154,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G184 | F&O PCR column | DOCUMENTED_PLANNED | F16 |
 | G194 | Ace investor graph across Reg. 31 >1% holders, PIT/SAST and bulk/block deals | DOCUMENTED_PLANNED | SHP12 (shareholding_major_holders); F14. Name normalisation not designed |
 | G198 | Valuation bands: current PE / PB / EV-EBITDA percentile vs own history | DONE | pe_percentile, ev_ebitda_percentile (C20); tests/test_valuation_bands.py. P/B band missing; 5Y/10Y windows NULL under C9 |
-| G199 | Discount / premium to basic-industry median | MISSING | not built. Needs the industry classification |
+| G199 | Discount / premium to basic-industry median | DONE | pe_/pb_premium_to_basic_industry and _to_industry (own / median - 1); NSE classification F30, IC1-IC3, C25; features_peers.py; tests/test_batch_h_industry_peers.py |
 | G200 | Reverse DCF implied growth using the live 10Y G-Sec | DONE | reverse_dcf_implied_g (C20, WACC fixed 12%); tests/test_valuation_bands.py. Live yield needs F25 |
 | G201 | Capital-allocation scorecard (incremental ROIC, buyback yield, 5Y dilution) | DOCUMENTED_PLANNED | components built (batch C, features_bs): incremental_roic_1y/3y/5y, reinvestment_rate, buyback_yield, shareholder_yield, dilution_1y/5y (3Y/5Y forms history-gated, C9); no combined scorecard view yet (arch 10.2: never summed) |
 | G202 | Dividend payout % | DONE | dividend_payout_pct = trailing dividends per share / eps_ttm, NULL if EPS <= 0; arch 10.7; tests/test_owner_items_qoq_dividend_promoter.py. No committed company has both an accepted dividend and a TTM EPS yet |
@@ -339,8 +339,8 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | id | requirement | status | where / next step |
 |---|---|---|---|
 | G89 | A personal website like Screener.in *(owner)* | OUT_OF_SCOPE_BY_DECISION | Decision F (2026-11-15, reversible): no hosted site for now; screens run from the CLI/DSL. Revisit after the ratio catalogue is built |
-| G96 | Industry / basic-industry mapping (NSE 4-tier classification) | DOCUMENTED_PLANNED | arch 5 (entity_classification_history 'not yet built'); raw_index_snapshot.industry. No verified source for the 4-tier classification |
-| G112 | Peer comparison table ranked by market cap, PE, ROCE, quarterly profit growth | MISSING | no peer grouping in features. Needs the industry classification |
+| G96 | Industry / basic-industry mapping (NSE 4-tier classification) | DONE | F30 NSE quote API (macro / sector / industry / basic industry), fetch-classification, raw_quote_classification, entity_classification_history (PIT from the first fetch, IC3); IC1-IC3; tests/test_batch_h_industry_peers.py |
+| G112 | Peer comparison table ranked by market cap, PE, ROCE, quarterly profit growth | DONE | peer_count, peer_rank_market_cap / _pe / _roce / _profit_growth within the NSE basic industry, industry medians (C25); screen by nse_basic_industry for the peer table; features_peers.py; tests/test_batch_h_industry_peers.py |
 | G153 | Screening queries are a must *(owner)* | DONE | dsl.py; arch 14; tests/test_dsl.py; CLI screen |
 | G164 | Concall / presentation / DRHP RAG with citations, separate from XBRL numbers | OUT_OF_SCOPE_BY_DECISION | Decision G (2026-11-15, reversible): no text retrieval over announcement PDFs for now |
 | G165 | Custom Excel / DCF model exporter over the database | MISSING | export-bundle writes Parquet only |
@@ -357,7 +357,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G282 | Post-EOD diff engine and digest (watchlist events, screen entries/exits) | DOCUMENTED_PLANNED | arch 15 Phase 3 (daily diff digest). Delivery channel (Telegram / email) undecided |
 | G283 | Alert: 52-week high on > 2x 20-day median delivery volume | MISSING | not built |
 | G332 | Optional read-only SQLite / D1 export of screener_features for a UI | OUT_OF_SCOPE_BY_DECISION | CLAUDE.md Don'ts (no second database engine) |
-| G334 | entity_master carries macro sector, sector, industry, basic industry | DOCUMENTED_PLANNED | arch 5 (entity_classification_history not yet built) |
+| G334 | entity_master carries macro sector, sector, industry, basic industry | DONE | entity_classification_history (date-bounded per entity, PIT) rather than entity_master columns; screener columns nse_macro_sector, nse_sector, nse_industry, nse_basic_industry; tests/test_batch_h_industry_peers.py |
 
 ## Backtest (6)
 
@@ -374,7 +374,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 
 | id | requirement | status | where / next step |
 |---|---|---|---|
-| G60 | Daily master and lineage sync: symbol master, ISIN changes, new listings, delistings | DONE | arch 5.1, 12 (inactive securities); F28; tests/test_identity.py, tests/test_phase1_fixes_b.py. BSE master not reachable (A1) |
+| G60 | Daily master and lineage sync: symbol master, ISIN changes, new listings, delistings | DONE | arch 5.1, 12 (inactive securities), 13 (daily run scheduled by ops/); F28; tests/test_identity.py, tests/test_phase1_fixes_b.py, tests/test_batch_h_industry_peers.py. Identity sync runs from the daily bhavcopy; EQUITY_L (fetch-equity-master) is not in the daily run. BSE master not reachable (A1) |
 | G144 | Poll RSS every 1-2 minutes for live alerts | OUT_OF_SCOPE_BY_DECISION | CLAUDE.md Fetching (minimal volume); C8; arch 13 |
 | G213 | Three-phase roadmap (core / deep edge / alpha) | DONE | arch 15 (corrected: corporate actions in Phase 1) |
 | G284 | Taxonomy namespace registry: detect unknown namespaces / version bumps | DONE | arch 7.1; docs/tag_registry.yaml; tests/test_indas_corp_parser.py, tests/test_registry_audit.py |
@@ -382,9 +382,9 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G286 | Null-rate circuit breaker (critical columns, 2% spike) | DONE | gate G4 (1.5 pp); tests/test_features.py |
 | G287 | SHA-256 vault for offline replay | DONE | vault.py; invariant 2; tests/test_foundations.py |
 | G288 | Keep the raw vault in Cloudflare R2 | OUT_OF_SCOPE_BY_DECISION | CLAUDE.md Don'ts (no Cloudflare/R2) |
-| G289 | Make the platform self-healing and autonomous from next quarter *(owner)* | DONE | run-day (arch 2); tests/test_phase1_fixes_b.py. Daily run is automatic; auto-healing limited to named rules (invariant 9) |
+| G289 | Make the platform self-healing and autonomous from next quarter *(owner)* | DONE | run-day (arch 2, 13) scheduled daily by ops/ (systemd, cron, Windows Task Scheduler) with materialize --incremental after it; tests/test_phase1_fixes_b.py, tests/test_batch_h_industry_peers.py. Auto-healing limited to named rules (invariant 9) |
 | G291 | Multi-mirror NSE <-> BSE failover | DOCUMENTED_PLANNED | D-4 (not built). BSE unreachable (A1) |
-| G292 | Tables entity_securities, subsidiary_tree, pipeline_audit_log | DONE | schema.sql securities, promotion_log, admin_log. subsidiary tree planned with AOC-1 |
+| G292 | Tables entity_securities, subsidiary_tree, pipeline_audit_log | DONE | schema.sql securities, promotion_log, admin_log; subsidiary tree = group_structure (AOC-1, X112) |
 | G297 | Review: corporate-action adjustment must ship with Phase 1 momentum features *(owner)* | DONE | arch 15 Phase 1 |
 | G298 | Review: quarantine plus review queue, not auto-heal *(owner)* | DONE | invariant 9; D-6; tests/test_quarantine_cli.py |
 | G320 | Review: tables named but missing (raw facts, overrides, staging, shareholding, revisions, custom ratios, snapshots, index history, calendar) *(owner)* | DONE | src/financials/db/schema.sql |
@@ -443,7 +443,7 @@ None open. Decided 2026-11-15: no paid sources at all (G74, by the owner); E-H b
 
 **Phase 2 completion**
 12. G276: organic vs inorganic perimeter flag. Verify: a Reg. 34 fixture with a business-combination cash-flow element and a Reg. 30 acquisition XBRL fixture.
-13. G112, G199: peer comparison and discount to industry median. Verify: a real fixture of NSE's industry classification feeding a point-in-time `entity_classification_history`.
+13. **DONE (2026-11-15, batch H)** ~~G112, G199: peer comparison and discount to industry median. Verify: a real fixture of NSE's industry classification feeding a point-in-time `entity_classification_history`.~~ NSE quote API fixtures (IC1-IC3), `features_peers.py`.
 14. G133: input-cost sensitivity columns (materials, power, freight as % of revenue). Verify: X50 fixtures (AIA, SRF).
 15. G117: Reg. 30 red-flag columns, kept separate (never summed). Verify: E3/E5/E7 fixtures; penalties wait for an E12 content fixture.
 16. G115: order-book-to-sales. Verify first whether any committed Reg. 30 order XBRL (E3) or results XBRL tags an order book; otherwise drop.

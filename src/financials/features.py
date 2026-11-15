@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
-from financials import features_bs, features_gems, features_pl
+from financials import features_bs, features_gems, features_peers, features_pl
 from financials.corp_actions import ACCEPTED_STATUSES
 from financials.db import insert_rows, table_columns, version_key
 from financials.features_price import add_price_columns, refresh_breadth
@@ -66,7 +66,7 @@ from financials.timeutil import ist_to_utc, utc_now
 # Reader version of materialised rows. Bump it whenever features.py, fundamentals.py (or another file pinned by
 # tests/test_incremental_materialize.py) changes any output: `materialize --incremental` refuses days built by another
 # version, because only a full run then reproduces the history.
-FEATURES_VERSION = "2026.11.15-8E"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
+FEATURES_VERSION = "2026.11.15-9"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
 # -3: QoQ sales / profit growth, NPM, interest coverage, OPM same quarter last year, dividend yield / payout,
 #     promoter holding QoQ change (owner_requirements items 1, 3, 4)
 # -4A: period P&L family (features_pl: quarter / fiscal-year lines, quarter YoY growth, result dates, history-gated
@@ -80,6 +80,9 @@ FEATURES_VERSION = "2026.11.15-8E"  # -2: X106 restatement TTM bridge + flag, X1
 #      signals, hats and cross-sectional scores (features_gems.py, docs/hidden_gems.md)
 # -7: batches C and D merged
 # -8E: restatement_suspected also on discontinued operations and a logged merger / demerger (X108, X109)
+# -8H: batch H industry / peers (features_peers.py): NSE 4-level classification (PIT from its first fetch), industry
+#      and basic-industry medians of PE / PB / ROCE / sales growth, premiums, peer ranks; industry_group_* fallback
+# -9: batches E and H merged
 
 CRITICAL_COLUMNS = ("close", "market_cap", "sales_ttm", "pat_ttm", "total_equity")
 G4_MAX_NULL_RISE = 0.015
@@ -544,6 +547,7 @@ def compute_rows(
         features_bs.clear(con, as_of_ts)
     add_price_columns(con, rows, as_of, exchange, factors, frozen, secs)  # batch B (price/technicals)
     features_gems.add_columns(con, rows, as_of, as_of_ts, fundamentals_cache, entities)  # batch D (hidden gems)
+    features_peers.add_columns(con, rows, as_of, as_of_ts, entities)  # batch H (industry / peers)
     return rows
 
 
@@ -907,6 +911,7 @@ def materialize(
         insert_rows(con, "screener_features_history", rows)
         refresh_breadth(con, as_of)  # batch B: market-level breadth from the day's stored rows
         features_gems.refresh_cross_section(con, as_of)  # batch D: ranks / scores / hats over the stored day
+        features_peers.refresh_cross_section(con, as_of)  # batch H: industry medians / peer ranks over the stored day
         latest = con.execute("SELECT max(as_of_date) FROM screener_features_history").fetchone()[0]
         if latest == as_of or entities is None:
             con.execute("DELETE FROM screener_features")

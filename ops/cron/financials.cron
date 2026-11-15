@@ -1,0 +1,4 @@
+# crontab line for the daily run (see docs/architecture.md §13). cronie honours CRON_TZ; on a cron without it,
+# drop the CRON_TZ line and use 45 14 * * * (20:15 IST = 14:45 UTC). Edit the checkout path.
+CRON_TZ=Asia/Kolkata
+15 20 * * * cd "$HOME/Financials" && mkdir -p data/logs && { .venv/bin/python -m financials --data-dir data run-day; .venv/bin/python -m financials --data-dir data materialize --incremental; } >> data/logs/daily.log 2>&1

@@ -386,3 +386,15 @@ parity harness carries only the specific figures it asserts. Hashes:
 | `14163f4d412e18c51d3f45cf169701effd596f7da62dbb7f6df4e06ef086ed05` | `0d5f39c0d92834c4c5f37ed2f9e476fe1b676d289ba198b8b5dd8f482de02b45` | `Tata_Motors_PVeh_1.json` |
 | `d0d6e407f711e50ffdd86f09fc187bf7b62569b62d294534ca5a8c5d136c19a1` | `73184ad11d1033e424440f78839cf5eaa2aba92da8f7b11728c0b590253471c8` | `Tata_Power_Co_2.json` |
 | `aecc51521426e24c5a613f380c1019b7645e630614bc6956416a287f75fb20ff` | `74308e0ad3d60a4d396e799547024ccb6ae569f15d5e81cf5bdd3fd122849b9d` | `United_Spirits.json` |
+
+## Industry classification (batch H, NSE quote API)
+
+Fetched 2026-11-15 17:58 UTC from a cloud container with the project's `PoliteFetcher` (project User-Agent, no
+warm-up, 1.5 s apart). URL: `https://www.nseindia.com/api/NextApi/apiClient/GetQuoteApi?functionName=getSymbolData&marketType=N&series=EQ&symbol=<SYM>`
+(`M&M` sent as `M%26M`). Saved byte-for-byte; the price fields are the 13-Nov-2026 close (`lastUpdateTime`).
+
+| File | Symbol / ISIN | Classification (macro / sector / industry / basic industry) | SHA-256 |
+|---|---|---|---|
+| `classification/GetQuoteApi_getSymbolData_TCS.json` | TCS, INE467B01029 | Information Technology / Information Technology / IT - Software / Computers - Software & Consulting | `b41b0ebba524f5534a267243d8f91e4aaa7bc9a40fcdbe8e7337a8a2109a81df` |
+| `classification/GetQuoteApi_getSymbolData_HDFCBANK.json` | HDFCBANK, INE040A01034 | Financial Services / Financial Services / Banks / Private Sector Bank | `aba013aa625e0dc3776a753946b9587efb9e4dcf971567af5830cd934b4e72e9` |
+| `classification/GetQuoteApi_getSymbolData_M_M.json` | M&M, INE101A01026 | Consumer Discretionary / Automobile and Auto Components / Automobiles / Passenger Cars & Utility Vehicles | `9ad18793098f4a29b454ff8a7e08337c505ef32a427298841526ef5ab1e293bf` |

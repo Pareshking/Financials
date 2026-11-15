@@ -53,6 +53,13 @@ CREATE TABLE stg_segments (
     period_start DATE NOT NULL, period_end DATE NOT NULL, period_months INTEGER, value_inr DECIMAL(20,2) NOT NULL,
     PRIMARY KEY (filing_id, axis, member, element, period_start, period_end)
 );
+CREATE TABLE stg_group_structure (
+    filing_id VARCHAR NOT NULL, parser_version VARCHAR NOT NULL, scope VARCHAR NOT NULL, relation VARCHAR NOT NULL,
+    row_member VARCHAR NOT NULL, period_end DATE NOT NULL, name VARCHAR NOT NULL, cin VARCHAR, country VARCHAR,
+    holding_as_filed VARCHAR, holding_fraction DECIMAL(9,6), net_worth_inr DECIMAL(20,2), turnover_inr DECIMAL(20,2),
+    pat_inr DECIMAL(20,2), investment_inr DECIMAL(20,2),
+    PRIMARY KEY (filing_id, relation, row_member, period_end)
+);
 CREATE TABLE stg_corp_actions (
     filing_id VARCHAR NOT NULL, seq INTEGER NOT NULL, component INTEGER NOT NULL, exchange VARCHAR NOT NULL,
     symbol VARCHAR NOT NULL, series VARCHAR NOT NULL, isin VARCHAR NOT NULL, ex_date DATE NOT NULL,
@@ -114,6 +121,7 @@ TABLE_ORDER = (
     "index_ohlcv",
     "raw_equity_master",
     "raw_results_listing",
+    "raw_quote_classification",
     "stg_holidays",
     "stg_shp_meta",
     "stg_shp_categories",
@@ -122,6 +130,7 @@ TABLE_ORDER = (
     "stg_xbrl_filing",
     "stg_xbrl_facts",
     "stg_segments",
+    "stg_group_structure",
     "stg_corp_actions",
     "stg_events",
     "stg_kpis",
@@ -389,7 +398,21 @@ def stage_results_xbrl(
     ]
     _assert_exact(tables["stg_xbrl_facts"], parsed)
     _stage_segments(tables, fid, inst, parsed)
+    if parsed.profile == "REG34_ANNUAL":
+        tables["stg_group_structure"] = group_structure_rows(fid, inst, parsed)
     return write_stage(stage_root, "results_xbrl", run_id, tables)
+
+
+def group_structure_rows(fid: str, inst, parsed) -> list[dict[str, Any]]:
+    """AOC-1 subsidiary / associate / JV rows of a parsed Reg. 34 annual filing, in-scope FY ends only [X112]."""
+    from financials.parsers.aoc1 import AOC1_PARSER_VERSION, parse_group_structure
+
+    m = parsed.meta
+    return [
+        {"filing_id": fid, "parser_version": AOC1_PARSER_VERSION, "scope": m["scope"], **asdict(g),
+         **{k: to_inr(getattr(g, k)) for k in ("net_worth_inr", "turnover_inr", "pat_inr", "investment_inr")}}
+        for g in parse_group_structure(inst, set(m["in_scope_instants"]))
+    ]  # fmt: skip
 
 
 def _stage_segments(tables: dict[str, list[dict[str, Any]]], fid: str, inst, parsed) -> None:
@@ -827,6 +850,28 @@ def stage_raw_only(
     return write_stage(
         stage_root, "raw_only", filing.filing_id, {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)]}
     )
+
+
+def stage_classification(vault: Vault, stage_root: Path, *, data: bytes, source_url: str, fetched_at: datetime) -> Path:
+    """Vault + parse one NSE quote answer: the 4-level industry classification [IC1]. Observed on the IST date of
+    the fetch (the answer has no effective date [IC3])."""
+    from financials.parsers.classification import parse_quote_classification
+    from financials.timeutil import utc_to_ist_date
+
+    c = parse_quote_classification(data)
+    blob = vault.put(data, ext="json", media_type="application/json", fetched_at=fetched_at)
+    filing = make_filing(blob, exchange="NSE", category="QUOTE_CLASSIFICATION", source_url=source_url,
+                         fetched_at=fetched_at, stated_symbol=c.symbol, stated_isin=c.isin)  # fmt: skip
+    observed = utc_to_ist_date(fetched_at)
+    row = {"filing_id": filing.filing_id, "symbol": c.symbol, "series": c.series, "isin": c.isin,
+           "company_name": c.company_name, "macro": c.macro, "sector": c.sector, "industry": c.industry,
+           "basic_industry": c.basic_industry, "quote_update_ts": _utc(c.last_update_ist),
+           "observed_date": observed}  # fmt: skip
+    return write_stage(
+        stage_root, "classification", f"{c.symbol.replace('&', '_')}-{observed:%Y%m%d}-{blob.sha256[:12]}",
+        {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)], "raw_quote_classification": [row]},
+        extra={"snapshot_date": observed.isoformat(), "symbol": c.symbol},
+    )  # fmt: skip
 
 
 def _utc(ts: datetime | None) -> datetime | None:

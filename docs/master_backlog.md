@@ -24,16 +24,16 @@ catalogue as IN PROGRESS. They are counted as BUILT here.
 
 | Area | BUILT | CATALOGUE | DIGEST | MISSED | OOS | Total |
 |---|---|---|---|---|---|---|
-| A. Ratios / metrics | 65 | 46 | 2 | 4 | 1 | 118 |
+| A. Ratios / metrics | 72 | 39 | 2 | 4 | 1 | 118 |
 | B. Data sources | 14 | 22 | 15 | 2 | 3 | 56 |
 | C. Corporate structure / identity | 9 | 1 | 8 | 0 | 2 | 20 |
 | D. Events, flows, corporate actions | 16 | 1 | 7 | 0 | 4 | 28 |
 | E. Data quality / rules / assistant claims | 62 | 0 | 14 | 0 | 8 | 84 |
 | F. Backtest | 6 | 0 | 2 | 0 | 0 | 8 |
 | G. Alerts / UI / tools / ops | 8 | 1 | 11 | 2 | 2 | 24 |
-| **Total** | **180** | **71** | **59** | **8** | **20** | **338** |
+| **Total** | **187** | **64** | **59** | **8** | **20** | **338** |
 
-Counts are tallied from the Class column of section 3 (last bold token per row). Of the 180 BUILT rows, 14 are only
+Counts are tallied from the Class column of section 3 (last bold token per row). Of the 187 BUILT rows, 13 are only
 partly built, 1 is built with a different definition (`opm_last_year_pct`), and 12 are rows where the PDF's claim was
 wrong and the corrected behaviour is built (marked "corrected").
 
@@ -73,7 +73,7 @@ M2 = A113, M3 = A94, M4 = A112, M5 = A114, M6 = B31, M7 = B51, M8 = G23.
 | G | Digest claim | What the code has | Finding |
 |---|---|---|---|
 | G292 | "Tables entity_securities, subsidiary_tree, pipeline_audit_log": DONE | `securities`, `promotion_log`, `admin_log` exist; **no `subsidiary_tree`** (schema.sql has none; G277 AOC-1 is DOCUMENTED_PLANNED) | DIGEST SAYS DONE, NOT FOUND (subsidiary_tree) |
-| G94 | "Bhavcopy close, 52-week high/low": DONE | `close`, `dist_52w_high` only (`features._momentum` line ~221). **No 52-week low, no 52W high/low levels** | DIGEST SAYS DONE, PARTLY NOT FOUND (catalogue A8.7, B6.5) |
+| G94 | "Bhavcopy close, 52-week high/low": DONE | `close`, `dist_52w_high` only (`features._momentum` line ~221). **No 52-week low, no 52W high/low levels** | FIXED 2026-11-15 (batch B): `high_52w`, `low_52w`, `dist_52w_low` |
 | G40, G60, G289 | evening job / daily master sync / "Daily run is automatic" | `run-day` CLI exists (arch §2, schedule documented in arch §13), but **nothing schedules it**: no cron / systemd / Task Scheduler file or install step in the repo | DONE as a command; "automatic" NOT FOUND |
 | G224 | FCF-to-net-income conversion (3Y) | `fcf_to_pat` is TTM; no 3Y-sum column returning NULL until history | PARTLY NOT FOUND (owner decision: history-gated ratios are built and return NULL) |
 | G233 | Net debt / 3Y average FCF | `net_debt_to_fcf` uses TTM FCF; no 3Y-average form | PARTLY NOT FOUND |
@@ -107,8 +107,8 @@ exists (file / column); Class.
 | # | Lines | Item (PDF wording, brief) | G (digest status) | Cat | Code | Class |
 |---|---|---|---|---|---|---|
 | A01 | 831 | daily close | G94 DONE | A1.1 BUILT | `close` | **BUILT** |
-| A02 | 831 | VWAP from full bhavcopy | G95 MISSING | B6.6 BUILDABLE NOW | none | **CATALOGUE** |
-| A03 | 831 | 52-week high / low | G94 DONE | A8.7, B6.5 BUILDABLE NOW | `dist_52w_high` only | **BUILT** (partial: low and levels missing) |
+| A02 | 831 | VWAP from full bhavcopy | G95 DONE | B6.6 BUILT | `vwap`, `vwap_20d` (P16) | **BUILT** |
+| A03 | 831 | 52-week high / low | G94 DONE | A8.7, B6.5 BUILT | `high_52w`, `low_52w`, `dist_52w_high`, `dist_52w_low` | **BUILT** |
 | A04 | 904, 1262 | market cap, current price, PE, PB, EV/EBITDA | G110, G167 DONE | A1.1-A1.6 BUILT | `market_cap`, `pe`, `pb`, `ev_ebitda`, `enterprise_value` | **BUILT** |
 | A05 | 904-906 | EV adds net debt from latest H1/FY balance sheet; TTM from Reg. 33 | G110 DONE | A1.3 | `net_debt`, `bs_as_of` | **BUILT** |
 | A06 | 908-909 | ROCE, ROE, working-capital days, ROIC | G111 DONE | A2.5, A2.1, A2.29, A2.11 | `roce`, `roe`, `working_capital_days`, `roic` | **BUILT** |
@@ -122,10 +122,10 @@ exists (file / column); Class.
 | A14 | 1039-1041 | cost-structure shares (materials, power & fuel, freight, subcontracting, employee); crude / power / freight sensitivity screens | G132 DONE (tags), G133 MISSING (screens) | B3.4, B3.5 BUILDABLE NOW | label rules POWER_AND_FUEL, FREIGHT; no share columns | **CATALOGUE** |
 | A15 | 1043-1045 | capex, CWIP -> FCF, CFO/EBITDA, CWIP / gross block | G134 DONE | B2.10 BUILT | `fcf_ttm`, `cfo_to_ebitda`, `cwip_to_gross_block` | **BUILT** |
 | A16 | 1216, 1273 | 50 / 200 DMA, price to 50 / 200 DMA | G155 DONE | A8.9 (levels BUILDABLE), ratio BUILT | `price_to_dma50/200` | **BUILT** |
-| A17 | 1216, 1274 | RSI(14) | G156 MISSING | A8.11 BUILDABLE NOW | none | **CATALOGUE** |
-| A18 | 1216 | ATR% | G157 MISSING | B6.1 BUILDABLE NOW | none | **CATALOGUE** |
+| A17 | 1216, 1274 | RSI(14) | G156 DONE | A8.11 BUILT | `rsi_14`, `rsi_14_prev` | **BUILT** |
+| A18 | 1216 | ATR% | G157 DONE | B6.1 BUILT | `atr_14_pct` | **BUILT** |
 | A19 | 1216-1218, 1273 | 52W high proximity / distance from 52W high | G182 DONE | A8.7 | `dist_52w_high` | **BUILT** |
-| A20 | 1218, 2209 | relative strength vs Nifty 500 | G158 MISSING | B6.2 BUILDABLE NOW | `index_ohlcv` loaded, no column | **CATALOGUE** |
+| A20 | 1218, 2209 | relative strength vs Nifty 500 | G158 DONE | B6.2 BUILT | `rs_nifty500_3m/6m/12m`, `beta_1y_nifty500` | **BUILT** |
 | A21 | 1220 | 5D / 20D delivery spikes | G159 DONE | B6.8 BUILT | `deliv_avg_5d/20d`, `delivery_velocity` | **BUILT** |
 | A22 | 1224 | Piotroski F-score | G160 DONE | A2.15 BUILT | `piotroski_f` | **BUILT** |
 | A23 | 1224-1226 | Beneish M-score | G161 DONE | B1.1 BUILT | `beneish_m` | **BUILT** |
@@ -148,7 +148,7 @@ exists (file / column); Class.
 | A40 | 1271 | insider net buy 3M (PIT / SDD) | G180 DOC_PLANNED | B7.8 NEW FREE SOURCE | none | **CATALOGUE** |
 | A41 | 1271 | Reg. 30 red-flag count | G181 DONE | B8.1 BUILT, B8.7 | five 90-day counts, no single count | **BUILT** (partial) |
 | A42 | 1273 | returns 1M / 3M / 6M / 12M | G182 DONE | A8.2 BUILT | `return_1m..12m` | **BUILT** |
-| A43 | 1274 | average delivery % 20D | G183 MISSING | B6.7 BUILDABLE NOW | `deliv_avg_20d` is a quantity | **CATALOGUE** |
+| A43 | 1274 | average delivery % 20D | G183 DONE | B6.7 BUILT | `deliv_pct_avg_20d`, `deliv_pct` | **BUILT** |
 | A44 | 1274 | F&O PCR | G184 DOC_PLANNED | B6.15 NEW FREE SOURCE | none | **CATALOGUE** |
 | A45 | 1284-1285 | Net Cash to MCap = (cash + investments - total debt) / mcap (custom-ratio example) | none | B2.17 BUILDABLE NOW | no `debt` column / alias | **CATALOGUE** |
 | A46 | 1353-1355, 1742-1746 | valuation bands: PE, PB, EV/EBITDA vs own 3/5/10Y median and percentile | G198 DONE (partial), G240 DONE | B5.1 BUILT, B5.2-B5.4, A1.20-A1.21 | `pe_percentile`, `ev_ebitda_percentile` | **BUILT** (partial) |
@@ -163,10 +163,10 @@ exists (file / column); Class.
 | A55 | 1173-1174 | revision velocity / QoQ operating-margin acceleration | G152 MISSING | B4.4 BUILDABLE NOW | none | **CATALOGUE** |
 | A56 | 1173, 1371-1372 | PEAD: abnormal return vs Nifty 500 and relative volume at T+0/1/5/20 after broadcast | G151 MISSING | B6.14 BUILDABLE NOW, B6.10 | none | **CATALOGUE** |
 | A57 | 1374-1375 | sector earnings breadth in results season | G205 MISSING | B4.9 BUILDABLE NOW | none | **CATALOGUE** |
-| A58 | 1390 | 20-day median daily traded value | G207 MISSING | B6.9 BUILDABLE NOW | `ohlcv.turnover_inr` unused | **CATALOGUE** |
+| A58 | 1390 | 20-day median daily traded value | G207 MISSING (bid-ask, circuit days) | B6.9 BUILT | `turnover_median_20d` | **BUILT** |
 | A59 | 1390 | average bid-ask | G207 MISSING | none | none (no bid-ask in any ingested EOD file) | **DIGEST** |
 | A60 | 1390-1391 | circuit-lock days | G207, G140 | B6.12 NEW FREE SOURCE | none | **CATALOGUE** |
-| A61 | 1393-1394 | breadth: % Nifty 500 above 50/200 DMA, 52W high/low ratio, advance-decline | G208 MISSING | B6.13 BUILDABLE NOW | `index_constituents_history` exists | **CATALOGUE** |
+| A61 | 1393-1394 | breadth: % Nifty 500 above 50/200 DMA, 52W high/low ratio, advance-decline | G208 DONE | B6.13 BUILT | `market_breadth` table | **BUILT** |
 | A62 | 1470-1474 | reinvestment rate | G216 DOC_PLANNED | B2.6 BUILDABLE NOW | none | **CATALOGUE** |
 | A63 | 1476-1477 | cash ROIC (CROIC) | G217 DONE | B2.13 BUILT | `croic` | **BUILT** |
 | A64 | 1483-1485, 2775-2776 | total shareholder yield (corrected: dividends + gross buybacks - gross issuance) | G218, G316 DOC_PLANNED | B2.2 BUILDABLE NOW | none | **CATALOGUE** |
@@ -484,7 +484,7 @@ exists (file / column); Class.
 |---|---|---|
 | 0. DSL / CLI | M1 (output columns + `save-ratio` CLI), M6 (T2T alias) | G187 CLI gap; aliases for `shares`, `restatement_suspected`, `book value` per share (catalogue C2) |
 | 1-3. FactBook period lines, BS, CF | — | A4/A5/A6/A7 families; fix `opm_last_year_pct` naming and add FY OPM last year; 3Y forms of G224 / G233 and 20Q of G240 returning NULL (history-gated) |
-| 4. Price / technicals | (M6 if not in 0) | G95, G156-G158, G183, G207, G208, 52W low (G94 gap), G283 flag |
+| 4. Price / technicals | (M6 if not in 0) | DONE 2026-11-15 (batch B): G95, G156-G158, G183, G207 median, G208, 52W low (G94 gap). Open: G283 flag, RS rank, volatility / drawdown, volume spike |
 | 5. Ownership, events, KPIs | M4 (CASA KPI) | G241, G119 dilution column, B7.x, single Reg. 30 red-flag count (G181 gap) |
 | 6. Valuation / cross-section | M3 (Rule of 40 FCF form), M5 (size bucket proxy) | G112, G199, G205, G265, G270, G278 |
 | Docs | M8 (competitor inventory) | update digest statuses (§2 stale list) |

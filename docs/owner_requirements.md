@@ -10,10 +10,10 @@ Every concrete item in the chat is mapped to the repository as of 2026-11-14. Th
 
 | Status | Meaning | Count |
 |---|---|---|
-| DONE | implemented and tested (file and test cited) | 171 |
+| DONE | implemented and tested (file and test cited) | 177 |
 | DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 72 |
 | IN_PROGRESS | being built now | 4 |
-| MISSING | not anywhere in docs or code | 46 |
+| MISSING | not anywhere in docs or code | 40 |
 | CONFLICTS_WITH_EVIDENCE | contradicted by our verified fixtures or tests | 17 |
 | OUT_OF_SCOPE_BY_DECISION | excluded by a recorded decision (C2, C7, C9, invariants, CLAUDE.md Don'ts) | 33 |
 | NEEDS_OWNER_DECISION | the docs do not settle it | 0 |
@@ -117,8 +117,8 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 
 | id | requirement | status | where / next step |
 |---|---|---|---|
-| G94 | Bhavcopy close, 52-week high/low | DONE | close, dist_52w_high; tests/test_features.py |
-| G95 | VWAP from the full bhavcopy | MISSING | not computed. Average-price column not in P10 claims; check the fixture |
+| G94 | Bhavcopy close, 52-week high/low | DONE | close, high_52w, low_52w, dist_52w_high, dist_52w_low (252 adjusted closes); high/low since data start (not all-time, C9); tests/test_features.py, tests/test_features_price.py |
+| G95 | VWAP from the full bhavcopy | DONE | vwap = turnover_inr / volume, equal to the full bhavcopy's AVG_PRICE on every row of both committed files (P16); vwap_20d on today's share basis; tests/test_features_price.py |
 | G110 | Live PE, PB, EV/EBITDA from close x shares + net debt + TTM | DONE | arch 8, 10.1; tests/test_features.py |
 | G111 | ROCE, ROE, working-capital days, ROIC | DONE | roce, roe, roic, working_capital_days; tests/test_features.py, tests/test_batch9_annual.py |
 | G115 | Order-book-to-sales ratio | MISSING | not built. Needs an order-book field (E3) |
@@ -126,10 +126,10 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G133 | Screens for sensitivity to crude, power or freight inflation | MISSING | no cost-share columns |
 | G134 | Capex, CWIP -> FCF, CFO/EBITDA, CWIP / gross block | DONE | arch 8; C19; X71; tests/test_cash_conversion.py, tests/test_batch9_annual.py |
 | G152 | Revision velocity / QoQ operating-margin acceleration | MISSING | not built |
-| G155 | 50 / 200 DMA | DONE | price_to_dma50/200; tests/test_features.py |
-| G156 | RSI(14) | MISSING | not built |
-| G157 | ATR% | MISSING | not built |
-| G158 | Relative strength vs Nifty 500 | MISSING | not built. Index closes available (F27, index_ohlcv) |
+| G155 | 50 / 200 DMA | DONE | dma50, dma200 and previous-day values, price_to_dma50/200; tests/test_features.py, tests/test_features_price.py |
+| G156 | RSI(14) | DONE | rsi_14, rsi_14_prev (Wilder, adjusted closes); tests/test_features_price.py |
+| G157 | ATR% | DONE | atr_14_pct (Wilder ATR(14) on adjusted H/L/C / close); tests/test_features_price.py |
+| G158 | Relative strength vs Nifty 500 | DONE | rs_nifty500_3m/6m/12m and beta_1y_nifty500 on index_ohlcv (IDX9); NULL until the index closes for the window are loaded; tests/test_features_price.py |
 | G159 | 5D / 20D delivery spikes | DONE | deliv_avg_5d/20d, delivery_velocity; tests/test_features.py |
 | G160 | Piotroski F-score | DONE | C23; tests/test_batch9_annual.py |
 | G161 | Beneish M-score | DONE | C23; tests/test_batch9_annual.py |
@@ -149,8 +149,8 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G179 | MF holding change 1M (AMFI) | DOCUMENTED_PLANNED | F26 |
 | G180 | Insider net buy 3M (PIT / SDD) | DOCUMENTED_PLANNED | F11, F13 |
 | G181 | Reg. 30 red-flag count | DONE | order/kmp/auditor/fraud 90-day counts; tests/test_batch10_events.py |
-| G182 | Returns 1M/3M/6M/12M, price to 50/200 DMA, distance from 52W high | DONE | arch 10.7; tests/test_features.py |
-| G183 | Average delivery % over 20 days | MISSING | deliv_avg_20d is a quantity. DELIV_PER is in the delivery file (P10) |
+| G182 | Returns 1M/3M/6M/12M, price to 50/200 DMA, distance from 52W high | DONE | arch 10.7; also return_1d/1w and return_3y/5y/7y/10y (NULL until the bars exist, C9); tests/test_features.py, tests/test_features_price.py |
+| G183 | Average delivery % over 20 days | DONE | deliv_pct_avg_20d (mean of deliv_qty / volume, = DELIV_PER / 100, P16), deliv_pct; tests/test_features_price.py |
 | G184 | F&O PCR column | DOCUMENTED_PLANNED | F16 |
 | G194 | Ace investor graph across Reg. 31 >1% holders, PIT/SAST and bulk/block deals | DOCUMENTED_PLANNED | SHP12 (shareholding_major_holders); F14. Name normalisation not designed |
 | G198 | Valuation bands: current PE / PB / EV-EBITDA percentile vs own history | DONE | pe_percentile, ev_ebitda_percentile (C20); tests/test_valuation_bands.py. P/B band missing; 5Y/10Y windows NULL under C9 |
@@ -161,8 +161,8 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G203 | YoY sales-growth acceleration (current YoY - prior-quarter YoY) | MISSING | not built |
 | G204 | Operating-margin expansion vs the same quarter last year | MISSING | not built |
 | G205 | Sector earnings breadth during results season | MISSING | not built |
-| G207 | Liquidity: 20D median traded value; bid-ask / circuit-lock days | MISSING | ohlcv.turnover_inr stored, not used |
-| G208 | Market regime / breadth: % of Nifty 500 above 50/200 DMA, 52W high/low ratio, advance-decline | MISSING | not built |
+| G207 | Liquidity: 20D median traded value; bid-ask / circuit-lock days | MISSING | 20D median traded value built (turnover_median_20d; tests/test_features_price.py); bid-ask is in no ingested EOD file; circuit-lock days wait for an F20 price-band fixture |
+| G208 | Market regime / breadth: % of Nifty 500 above 50/200 DMA, 52W high/low ratio, advance-decline | DONE | market_breadth table, one row per materialised day from the in_nifty500 rows (arch 10.7); tests/test_features_price.py |
 | G214 | 20-30 distinctive ratios for all companies *(owner)* | DOCUMENTED_PLANNED | arch 10 catalogue. Most built; rest Phase 2 |
 | G215 | Incremental ROIC (3Y/5Y) | DOCUMENTED_PLANNED | arch 10.1 (Phase 2); C9 |
 | G216 | Reinvestment rate | DOCUMENTED_PLANNED | arch 10.1 (Phase 2) |
@@ -430,8 +430,8 @@ None open. Decided 2026-11-15: no paid sources at all (G74, by the owner); E-H b
 2. G203, G204, G152: YoY sales-growth acceleration, OPM expansion vs same quarter last year, margin acceleration. Verify: FactBook unit test over committed quarters; NULL until 9 same-scope quarters exist (C9).
 3. **DONE (2026-11-15)** ~~G178: change in promoter holding QoQ. Verify: the two-quarter Reg. 31 fixtures (SHP14: ADANIENT, JSWSTEEL).~~
 4. **DONE (2026-11-15)** ~~G169, G202: dividend yield and dividend payout %. Verify: dividend records in the committed corporate-actions fixture (CA9) and the dividends-paid element in a committed Reg. 34 fixture.~~
-5. G183, G95: 20-day average delivery % and VWAP. Verify: `DELIV_PER` (P10) and confirm an average-price column exists in the committed `sec_bhavdata_full` fixture; add a P-row.
-6. G156, G157, G158, G207, G208: RSI(14), ATR%, relative strength vs Nifty 500, 20-day median traded value, market breadth. Verify: index closes fixture (IDX9 / `index_ohlcv`) and `TtlTrfVal` (P1); circuit-lock days wait for an F20 price-band fixture.
+5. **DONE (2026-11-15)** ~~G183, G95: 20-day average delivery % and VWAP. Verify: `DELIV_PER` (P10) and confirm an average-price column exists in the committed `sec_bhavdata_full` fixture; add a P-row.~~ `AVG_PRICE` = turnover / volume on every row (P16); `deliv_pct_avg_20d`, `vwap`, `vwap_20d`.
+6. **DONE (2026-11-15) except G207 bid-ask / circuit-lock** ~~G156, G157, G158, G207, G208: RSI(14), ATR%, relative strength vs Nifty 500, 20-day median traded value, market breadth. Verify: index closes fixture (IDX9 / `index_ohlcv`) and `TtlTrfVal` (P1); circuit-lock days wait for an F20 price-band fixture.~~ Batch B (`features_price.py`, arch 10.7): RSI, MACD, ATR%, RS and beta vs Nifty 500, 20D median traded value, `market_breadth`; RS / beta switch on once the daily `ind_close_all` closes (IDX9, fetched with each market day) cover the window.
 7. G256, G257, G258: A&P intensity, gross-margin expansion, marketing-efficiency proxy. Verify: the `ADVERTISING` label rule on the Batch 7 fixtures (X68).
 8. G265, G266, G270: EV/GOV, ARPU/MTU growth, P/EV. Verify: a sample KPI CSV fixture for `load-kpis` with the new KPI names; P/EV reads `embedded_value`.
 9. G278: standalone-to-consolidated profit leakage. Verify: a company with both scopes committed for the same quarter.

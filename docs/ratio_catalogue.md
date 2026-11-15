@@ -270,18 +270,18 @@ GAP-frozen securities return NULL (existing `_momentum` rule).
 
 | ID | Name (Screener variants) | Family | Definition (our tags) | Status | Data / notes |
 |---|---|---|---|---|---|
-| A8.1 | Return over 1day / 1week | returns | adj close / close 1 / 5 bars back − 1 | BUILDABLE NOW | |
+| A8.1 | Return over 1day / 1week | returns | adj close / close 1 / 5 bars back − 1 | BUILT | `return_1d`, `return_1w` (batch B) |
 | A8.2 | Return over 1month / ★3months / ★6months / ★1year | returns | 21 / 63 / 126 / 252 bars | BUILT | `return_1m/3m/6m/12m` |
-| A8.3 | ★ Return over 3years | returns | 756 bars (annualise or not: name it) | WHEN HISTORY | ~Oct 2027 |
-| A8.4 | ★ Return over 5years; 7years; 10years | returns | | WHEN HISTORY | ~Oct 2029 / ~Oct 2031 / ~Oct 2034 |
-| A8.5 | Volume | volume | latest `ohlcv.volume`, adjusted ÷ factor | BUILDABLE NOW | |
-| A8.6 | Volume 1week / 1month / 1year average | volume | mean adjusted volume over 5 / 21 / 252 bars | BUILDABLE NOW | |
-| A8.7 | High price; Low price | price | 52-week high / low of adjusted closes (Screener meaning assumed; day high/low also available) | BUILDABLE NOW | `dist_52w_high` BUILT; the levels and 52W low are not |
-| A8.8 | High price all time; Low price all time | price | — | NOT POSSIBLE | no bars before 2024-10-01 by decision (C9). Proxy "high/low since 2024-10-01" is buildable but must not be labelled all-time |
-| A8.9 | DMA 50; DMA 200 | technical | mean adj close over 50 / 200 bars | BUILDABLE NOW | ratio form BUILT: `price_to_dma50/200` |
-| A8.10 | DMA 50 / DMA 200 previous day | technical | same, one bar earlier | BUILDABLE NOW | enables golden-cross screens |
-| A8.11 | RSI (G156) | technical | Wilder RSI(14) on adj closes | BUILDABLE NOW | |
-| A8.12 | MACD; MACD Signal; MACD previous day; MACD Signal previous day | technical | EMA12 − EMA26; EMA9 of MACD (needs ≥ 35 bars warm-up; EMA seeded from 2024-10-01) | BUILDABLE NOW | |
+| A8.3 | ★ Return over 3years | returns | 756 bars, cumulative (not annualised) | WHEN HISTORY | ~Oct 2027; column `return_3y` built (batch B), NULL until then |
+| A8.4 | ★ Return over 5years; 7years; 10years | returns | 1,260 / 1,764 / 2,520 bars, cumulative | WHEN HISTORY | ~Oct 2029 / ~Oct 2031 / ~Oct 2034; columns `return_5y/7y/10y` built, NULL until then |
+| A8.5 | Volume | volume | latest `ohlcv.volume` (no later factor, so as filed) | BUILT | `volume` |
+| A8.6 | Volume 1week / 1month / 1year average | volume | mean adjusted volume over 5 / 21 / 252 bars | BUILT | `volume_1w_avg/1m_avg/1y_avg` |
+| A8.7 | High price; Low price | price | 52-week high / low of adjusted closes (Screener meaning assumed; day high/low also available) | BUILT | `high_52w`, `low_52w` (DSL `high price` / `low price`), `dist_52w_high`, `dist_52w_low` |
+| A8.8 | High price all time; Low price all time | price | — | NOT POSSIBLE | no bars before 2024-10-01 by decision (C9). Proxy built as `high_since_data_start` / `low_since_data_start` (DSL `high since data start`), never labelled all-time |
+| A8.9 | DMA 50; DMA 200 | technical | mean adj close over 50 / 200 bars | BUILT | `dma50`, `dma200`; ratio form `price_to_dma50/200` |
+| A8.10 | DMA 50 / DMA 200 previous day | technical | same, one bar earlier | BUILT | `dma50_prev`, `dma200_prev`; golden cross: `dma 50 > dma 200 AND dma 50 previous day < dma 200 previous day` |
+| A8.11 | RSI (G156) | technical | Wilder RSI(14) on adj closes | BUILT | `rsi_14`, `rsi_14_prev` (15 / 16 bars) |
+| A8.12 | MACD; MACD Signal; MACD previous day; MACD Signal previous day | technical | EMA12 − EMA26; EMA9 of MACD (EMAs seeded by an SMA at the first bar; signal from bar 34, previous-day signal from bar 35) | BUILT | `macd`, `macd_signal`, `macd_prev`, `macd_signal_prev` |
 
 ---
 
@@ -390,19 +390,19 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 
 | ID | Name | Family | Definition (our tags) | Status | Data / notes |
 |---|---|---|---|---|---|
-| B6.1 | ATR% (G157) | volatility | Wilder ATR(14) on adjusted OHLC / close | BUILDABLE NOW | high/low adjusted by the same factors |
-| B6.2 | Relative strength vs Nifty 500, 3M / 6M / 12M (G158) | momentum | stock return − Nifty 500 return | BUILDABLE NOW | `index_ohlcv` (F27, IDX9) price index |
+| B6.1 | ATR% (G157) | volatility | Wilder ATR(14) on adjusted OHLC / close | BUILT | `atr_14_pct`; high/low adjusted by the same factors |
+| B6.2 | Relative strength vs Nifty 500, 3M / 6M / 12M (G158) | momentum | stock return − Nifty 500 return | BUILT | `rs_nifty500_3m/6m/12m` on `index_ohlcv` (F27, IDX9) price index; NULL until the index closes on both dates are loaded |
 | B6.3 | Cross-sectional RS rank (percentile of 12M−1M momentum) | momentum | | BUILDABLE NOW | universe-level ranking at as-of |
-| B6.4 | Beta 1Y vs Nifty 500; volatility 1Y; max drawdown 1Y | risk | daily log returns, 252 bars | BUILDABLE NOW | |
-| B6.5 | Distance from 52W low; new-52W-high flag | momentum | | BUILDABLE NOW | |
-| B6.6 | VWAP (daily) and 20D VWAP (G95) | price | `turnover_inr` / `volume` | BUILDABLE NOW | UDiFF `TtlTrfVal` / `TtlTradgVol` (P1) |
-| B6.7 | Delivery % (daily, 20D average) (G183) | delivery | `deliv_qty` / `volume` | BUILDABLE NOW | `deliv_avg_5d/20d` BUILT are quantities |
+| B6.4 | Beta 1Y vs Nifty 500; volatility 1Y; max drawdown 1Y | risk | daily log returns, 252 bars | BUILDABLE NOW | beta BUILT: `beta_1y_nifty500`; volatility and drawdown not yet |
+| B6.5 | Distance from 52W low; new-52W-high flag | momentum | | BUILT | `dist_52w_low`; new high = `distance from 52w high = 0` |
+| B6.6 | VWAP (daily) and 20D VWAP (G95) | price | `turnover_inr` / `volume` | BUILT | `vwap`, `vwap_20d`; = `AVG_PRICE` of the full bhavcopy (P16) |
+| B6.7 | Delivery % (daily, 20D average) (G183) | delivery | `deliv_qty` / `volume` | BUILT | `deliv_pct`, `deliv_pct_avg_20d` (P16); `deliv_avg_5d/20d` are quantities |
 | B6.8 | Delivery velocity; float turnover (G159, G242) | delivery | | BUILT | `delivery_velocity`, `float_turnover_pct` |
-| B6.9 | 20D median traded value (G207) | liquidity | median `turnover_inr` over 20 bars | BUILDABLE NOW | |
+| B6.9 | 20D median traded value (G207) | liquidity | median `turnover_inr` over 20 bars | BUILT | `turnover_median_20d` |
 | B6.10 | Volume spike | volume | volume / 20D average volume | BUILDABLE NOW | |
 | B6.11 | 52W high on > 2× 20D median delivery (G283) | alert | flag | BUILDABLE NOW | screenable flag now; the alert digest itself waits on owner decision 2 |
 | B6.12 | Circuit-lock days; price band (G140, G207) | liquidity | | NEW FREE SOURCE | F20 OBSERVED (no fixture) |
-| B6.13 | Market breadth: % Nifty 500 above 50/200 DMA, 52W high/low ratio, A/D (G208) | regime | market-level daily table | BUILDABLE NOW | `ohlcv` + `index_constituents_history` |
+| B6.13 | Market breadth: % Nifty 500 above 50/200 DMA, 52W high/low ratio, A/D (G208) | regime | market-level daily table | BUILT | `market_breadth` (from each materialised day's `in_nifty500` rows) |
 | B6.14 | PEAD tracker: abnormal return vs Nifty 500 and relative volume at T+0/1/5/20 after broadcast (G151) | event study | | BUILDABLE NOW | `visible_from_ts` + `index_ohlcv`; backtest claims still need TRI (F29 UNVERIFIED) |
 | B6.15 | F&O PCR, OI change, max pain (G184, G125) | derivatives | | NEW FREE SOURCE | F16 OBSERVED |
 | B6.16 | Short selling, SLBM fee (G103, G128) | derivatives | | NEW FREE SOURCE | F15, F19 OBSERVED |
@@ -466,9 +466,9 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 
 | Status | Part A (Screener gallery) | Part B (beyond Screener) | Total |
 |---|---|---|---|
-| BUILT | 29 | 21 | 50 |
+| BUILT | 37 | 28 | 65 |
 | IN PROGRESS | 6 | 1 | 7 |
-| BUILDABLE NOW | 100 | 70 | 170 |
+| BUILDABLE NOW | 92 | 63 | 155 |
 | WHEN HISTORY | 33 | 6 | 39 |
 | NEEDS PARSER | 2 | 2 | 4 |
 | NEW FREE SOURCE | 1 | 15 | 16 |
@@ -493,7 +493,7 @@ tests. Batch 0 is trivial: DSL aliases for built columns that have none (`shares
 | 1. Period P&L family | quarter lines × 5 offsets (A5.1-A5.17), FY lines last/preceding year (A4.4-A4.19, A4.21, A4.23-A4.24), quarter YoY growth (A5.18, A5.20), FY YoY (A4.28), result dates (A4.25, A5.21), accelerations and margin deltas (B4.1, B4.3-B4.6, B4.8), cost shares (B3.4-B3.7), exceptional share (B1.14), price to quarterly earnings (A1.12) | ~35 | new `fundamentals.period_lines(book, end)` on `FactBook.quarter` / FY periods; features; schema or `period_values`; dsl |
 | 2. Balance sheet, working capital and annual notes | Debt, current / quick ratio, book value per share, face value, equity capital, reserves, BS lines and preceding-year values (A1.13, A1.16, A1.18, A1.25, A2.17, A2.18, A2.21, A2.22, A6.1-A6.23 buildable), ROA / ROE / ROCE preceding year and Earning Power (A2.2, A2.6, A2.8, A2.9, A2.13), Graham number (A2.14), exports % (A2.32), Δ CCC and H1 days (B3.2, B3.3), Reg. 34 notes ratios (B1.20, B1.22, B1.23, B1.24, B2.12) | ~40 | `building_blocks` (expose stocks), `screener_convention_ratios` / `annual_ratios` (prior FY), features |
 | 3. Cash flow and capital allocation | FY CF lines (A7.1-A7.8), P/FCF, equity FCF yield (A1.8, B5.11), CFO/PAT, cash tax rate, ETR (B1.8, B1.11, B1.12), shareholder and buyback yield (B2.2, B2.3), 1Y dilution (B2.4), reinvestment rate and 1Y incremental ROIC (B2.6, B2.7), capex intensity (B2.11), net debt / EBITDA (B2.15), net cash / mcap (B2.17), balance-sheet accruals (B1.7) | ~20 | `cash_conversion_blocks`, `ttm_from_ytd` users, features |
-| 4. Price, volume and technicals | 1D/1W returns, volume and averages, 52W high/low levels, DMA levels and previous day, RSI, MACD (A8.1, A8.5-A8.7, A8.9-A8.12), ATR, RS vs Nifty 500 and RS rank, beta / volatility / drawdown, 52W-low distance, VWAP, delivery %, median traded value, volume spike, 52W-high-on-delivery flag (B6.1-B6.7, B6.9-B6.11), Is SME (A1.24); then market breadth and PEAD as separate market-level tables (B6.13, B6.14) | ~25 | `features._momentum` / `_delivery` (one pass over adjusted bars), `index_ohlcv` preload; new market-level table for breadth |
+| 4. Price, volume and technicals | **Done 2026-11-15 (batch B, `features_price.py`) except** RS rank (B6.3), volatility / drawdown (B6.4), volume spike (B6.10), 52W-high-on-delivery flag (B6.11), Is SME (A1.24: always false, C7), PEAD (B6.14). Scope: 1D/1W returns, volume and averages, 52W high/low levels, DMA levels and previous day, RSI, MACD (A8.1, A8.5-A8.7, A8.9-A8.12), ATR, RS vs Nifty 500 and RS rank, beta / volatility / drawdown, 52W-low distance, VWAP, delivery %, median traded value, volume spike, 52W-high-on-delivery flag (B6.1-B6.7, B6.9-B6.11), Is SME (A1.24); then market breadth and PEAD as separate market-level tables (B6.13, B6.14) | ~25 | `features._momentum` / `_delivery` (one pass over adjusted bars), `index_ohlcv` preload; new market-level table for breadth |
 | 5. Ownership and event flags | FII and DII QoQ separately, unpledged promoter, shareholder counts and changes (A3.5, A3.8, A3.10, A3.11), MF / insurance / retail holdings, pledge change, absorption, >1% holder count (B7.1-B7.6), audit-qualified flag (B1.16), allotment / litigation / fund-raising counts, index inclusion, ex-date and result-date flags (B8.2-B8.7) | ~15 | `shareholding_columns`, `_event_counts`, `_preload` (filing_meta, corp_actions, index history) |
 | 6. Valuation, cross-section and composites | P/S, earnings yield, EV/Sales (A1.7, A1.9, B5.6), PB / P/S percentiles (B5.2, B5.3), coarse industry PE / PBV, discount to industry median, peer rank, sector breadth (A1.19, B5.7, B5.8, B4.9), EV/GOV and P/EV (B5.10), Beneish and Piotroski components, original Altman Z (B1.2, B1.3, B1.5), standalone-vs-consolidated leakage (B1.18), RPT intensity (B1.19), segment mix (B9.1, B9.2) | ~20 | features `_rows` (needs mcap / EV), a cross-sectional pass after rows are built (industry medians, ranks), `raw_index_snapshot` industry PIT lookup, second-scope FactBook prefetch |
 

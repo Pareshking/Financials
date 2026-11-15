@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
 
-from financials.parsers import ParseError
+from financials.parsers import ParseError, canonical_archive_url
 from financials.parsers.xbrl import Instance, parse_instance
 from financials.timeutil import IST
 
@@ -362,7 +362,7 @@ def parse_shp_master(data: bytes) -> list[ShpMasterEntry]:
                     isin=r["isin"],
                     as_of_date=datetime.strptime(r["date"], "%d-%b-%Y").date(),
                     broadcast_ts_ist=datetime.strptime(r["broadcastDate"], "%d-%b-%Y %H:%M:%S").replace(tzinfo=IST),
-                    xbrl_url=r["xbrl"],
+                    xbrl_url=canonical_archive_url(r["xbrl"]),
                     revised=(r.get("revisedData") or "N").upper() == "Y",
                 )
             )

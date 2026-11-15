@@ -210,3 +210,16 @@ def test_symbols_with_ampersand_are_url_encoded():
     assert annual_listing_url("ARE&M").endswith("symbol=ARE%26M")
     assert shp_master_url("GVT&D").endswith("symbol=GVT%26D")
     assert results_listing_url("TCS").endswith("symbol=TCS")
+
+
+def test_archive_host_alias_is_canonicalised_in_listings():
+    """A13: the 15-Nov-2026 Coal India listing returns .in links; filing ids and the fetch ledger key on the URL."""
+    from _fixture_helpers import FIXTURES
+    from financials.parsers import canonical_archive_url
+    from financials.parsers.discovery import parse_integrated_filing_listing
+
+    raw = (FIXTURES / "discovery" / "nse_integrated-filing-results_equities_COALINDIA_20261115.json").read_bytes()
+    assert b"https://nsearchives.nseindia.in/corporate/xbrl/" in raw
+    entries = parse_integrated_filing_listing(raw)
+    assert entries and all(e.xbrl_url.startswith("https://nsearchives.nseindia.com/corporate/xbrl/") for e in entries)
+    assert canonical_archive_url("https://www.nseindia.com/api/x") == "https://www.nseindia.com/api/x"

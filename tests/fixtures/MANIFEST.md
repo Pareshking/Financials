@@ -286,6 +286,7 @@ Inspected for Batch 10 but not committed: the other Reg. 30 files listed in docs
 | `discovery/nse_integrated-filing-results_equities_TCS_20261113.json` | Results discovery (A7): newest 20 Integrated Filing rows (Financials + Governance) | `https://www.nseindia.com/api/integrated-filing-results?index=equities&symbol=TCS` | `2389cbc7d508c09eea436404e293862c96beb92ff902033c2ec24218fd6d6219` |
 | `discovery/nse_integrated-filing-results_equities_TCS_page2_20261114.json` | A7 pagination (fetched 2026-11-14): `page=2` returns rows 21-22 of `totalCount` 22 (Mar 2025 standalone, Dec 2024 Governance); no overlap with page 1 | `https://www.nseindia.com/api/integrated-filing-results?index=equities&symbol=TCS&page=2` | `38bb3a80b3052f51e813ad73588c537f74dea5e4996054e52be7a90639b54a89` |
 | `discovery/nse_integrated-filing-results_equities_ADANIGREEN_20261114.json` | A7: 10 of 20 rows have `broadcast_Date: null` (totalCount 36: two pages) | `https://www.nseindia.com/api/integrated-filing-results?index=equities&symbol=ADANIGREEN` | `128f7abe359a2ece747b37a36c2245c808b82b255ddfc6747e059d86a2ae65e9` |
+| `discovery/nse_integrated-filing-results_equities_COALINDIA_20261115.json` | A7 / A13 (fetched 2026-11-15): every `xbrl`, `ixbrl` and `pdf_attach` link is on `nsearchives.nseindia.in` (was .com); the files are byte-identical to the .com host | `https://www.nseindia.com/api/integrated-filing-results?index=equities&symbol=COALINDIA` | `b188ee32413786f5fccab423d1ab838b07829dd7e4b0db83ce21bbf05448763e` |
 
 ## Live-backfill parser regressions (fetched 2026-11-14)
 

@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
 
-from financials.parsers import ParseError
+from financials.parsers import ParseError, canonical_archive_url
 
 RESULTS_TYPE = "Integrated Filing- Financials"
 
@@ -92,7 +92,7 @@ def parse_integrated_filing_listing(data: bytes, *, results_only: bool = True) -
                     filing_type=r["type"],
                     type_sub=r.get("type_Sub"),
                     broadcast_ts_ist=_listing_ts(r.get("broadcast_Date")),
-                    xbrl_url=r["xbrl"].strip(),
+                    xbrl_url=canonical_archive_url(r["xbrl"].strip()),
                     creation_ts_ist=_listing_ts(r.get("creation_Date")),
                     revised_ts_ist=_listing_ts(r.get("revised_Date")),
                     revision_remark=(r.get("revision_Remark") or None),

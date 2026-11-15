@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 
-from financials.parsers import ParseError
+from financials.parsers import ParseError, canonical_archive_url
 from financials.parsers.indas_corp import (
     DURATION_TAGS,
     INSTANT_TAGS,
@@ -522,7 +522,7 @@ def parse_annual_listing(data: bytes) -> list[AnnualListingEntry]:
                     to_year=int(r["toYr"]),
                     submission_type=r["submission_type"],
                     broadcast_ts_ist=datetime.strptime(r["broadcast_dttm"], "%d-%b-%Y %H:%M:%S").replace(tzinfo=IST),
-                    xbrl_url=r["fileName"],
+                    xbrl_url=canonical_archive_url(r["fileName"]),
                 )
             )
         return out

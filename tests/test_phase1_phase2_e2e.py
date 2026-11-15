@@ -274,3 +274,11 @@ def test_restage_all_selects_every_parsed_or_open_results_filing(unified):
     assert parsed <= every and default <= every
     assert len(every) == len(parsed | default)
     assert len(every) > len(default)
+
+
+def test_restatement_flag_reaches_the_screener_rows(unified):
+    """X106: rows whose TTM window holds a restated quarter carry restatement_suspected; TTM is still published."""
+    rows = unified.con.execute(
+        "SELECT symbol, sales_ttm FROM screener_features_history WHERE restatement_suspected"
+    ).fetchall()
+    assert rows and all(sales is not None for _, sales in rows)

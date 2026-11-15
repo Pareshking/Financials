@@ -1075,7 +1075,7 @@ def _declared_period_end(con, stage_dir: Path) -> date | None:
 def audit_ytd_identity(con, pairs: Iterable[tuple[str, str]]) -> list[str]:
     """X80 / blueprint §3.2: for each (entity, scope), every filed YTD whose quarters were all filed directly must
     equal their sum. Each break is a CONSISTENCY/YTD_QUARTER_MISMATCH finding (deterministic id, so a re-run raises
-    nothing new); TTM over that year is withheld by FactBook whatever the finding's status. A corrected or revised
+    nothing new); TTM over that year comes from the YTD bridge and the row is flagged (X106). A corrected or revised
     filing that restores the identity is the only fix."""
     from financials.fundamentals import YTD_GUARDED_TAGS, load_factbook
 

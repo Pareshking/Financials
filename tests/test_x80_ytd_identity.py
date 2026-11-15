@@ -1,7 +1,8 @@
 """X80 / blueprint §3.2: a filed YTD must equal the sum of its directly filed quarters. Tata Motors FY26 standalone
 (four real Integrated Filings) re-presents Q1 on a continuing-operations basis after the commercial-vehicle demerger:
 the H1, 9M and FY revenue YTDs are each 4,644 crore below the quarters as first filed. Summing the original quarters
-into TTM would mix bases, so TTM is withheld; profit (which carries the demerger gain) still ties."""
+into TTM would mix bases, so TTM comes from the YTD bridge (X106: the company's latest, restated YTD); profit (which
+carries the demerger gain) still ties."""
 
 from __future__ import annotations
 
@@ -47,8 +48,9 @@ def test_continuing_pbt_is_restated_by_the_same_quarter():
     assert [(Decimal(b["quarters_sum"]) - Decimal(b["ytd"])) / CR for b in breaks] == [Decimal("1727")] * 3
 
 
-def test_ttm_is_withheld_across_a_break_and_kept_where_the_identity_holds():
+def test_ttm_across_a_break_uses_the_restated_ytd_and_sums_quarters_where_the_identity_holds():
     book = _book()
-    assert book.ttm("revenue_from_operations", date(2026, 3, 31)) is None
+    assert book.restatement_suspected(date(2026, 3, 31))
+    assert book.ttm("revenue_from_operations", date(2026, 3, 31)) / CR == Decimal("57859")  # FY as restated [X106]
     assert book.ytd_breaks("pat") == []  # 873,470 vs 535 + 82,081 crore: inside half a crore per term / 0.5%
     assert book.ttm("pat", date(2026, 3, 31)) == Decimal("876530000000")  # 5,350 + 82,081 - 233 + 455 crore

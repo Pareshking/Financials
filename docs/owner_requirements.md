@@ -465,3 +465,13 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 26. G123, G124: NSDL/CDSL fortnightly FPI and FPI limit reports. Verify: reachability probe and a fixture.
 27. G136: corporate bond / CP trade yields. Verify: a real debt-segment trade report fixture.
 28. G62: cost-of-acquisition / swap-ratio watcher. Blocked by decision 1; verify on a real COA announcement.
+
+
+## Decisions taken on the owner's behalf (2026-11-15)
+
+The owner asked the assistant to take these with its recommendation. Each is reversible.
+
+- **A. TTM after restatements:** use the company's latest (restated) YTD via the YTD bridge and flag the row `restatement_suspected` (X106). The open YTD_QUARTER_MISMATCH findings stay as the record of each restatement.
+- **B. Company filing errors:** correct from the signed statutory results PDF through an audited correction path. Raw XBRL is never edited; each correction stores the PDF link, page and printed line, needs two independent reads that agree, and can be reversed. (In progress.)
+- **C. Share count:** the Reg. 31 total is the source of truth for market cap (already so in `market_cap_shares`). Cross-check findings that differ by an exact factor (2, 5, 10, 100, 1000), or by the same gap in 3+ quarters (trust-held treasury shares or rounded paid-up), are closed ACCEPTED with the reason; 92 closed, 12 left open.
+- **D. Non-blocking notes:** segment / geography findings (the filer's own totals not adding up) are ACCEPTED (41). A price gap is ACCEPTED as a market move only when it is not near a split / bonus / consolidation ratio and the next closes hold (114); the other 105, including ratio-like gaps such as Infibeam x10 and Vertoz x10, stay open as candidate missing corporate actions.

@@ -112,6 +112,10 @@ class FactBook:
                             "quarters": len(qs), "tolerance": str(tol)})  # fmt: skip
         return out
 
+    def restatement_suspected(self, end: date) -> bool:
+        """X106: some guarded tag breaks the YTD identity inside the 4 quarters to `end` (a restatement)."""
+        return any(not self._ytd_consistent(t, end) for t in YTD_GUARDED_TAGS)
+
     def _ytd_consistent(self, tag: str, end: date) -> bool:
         """False when any YTD ending inside the 4 quarters to `end` breaks the identity (guarded tags only)."""
         if tag not in YTD_GUARDED_TAGS:
@@ -135,7 +139,10 @@ class FactBook:
     def ttm(self, tag: str, end: date) -> Decimal | None:
         """Sum of the 4 quarters ending `end`; falls back to the YTD bridge for H1/FY-only flows."""
         if not self._ytd_consistent(tag, end):
-            return None  # X80: a restated / mis-filed quarter inside the window; never sum inconsistent quarters
+            # X106 (owner decision A, 2026-11-15): a restated quarter inside the window. Never sum mixed-basis
+            # quarters; use the company's latest YTD for the current year plus the prior year's FY - YTD as filed
+            # (Tata Motors FY26 standalone after the CV demerger: FY revenue 57,859 Cr as restated).
+            return self.ttm_from_ytd(tag, end)
         qs = [self.quarter(tag, _add_months(end, -3 * i)) for i in range(4)]
         if None not in qs:
             return sum(qs, Decimal(0))

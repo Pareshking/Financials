@@ -520,8 +520,9 @@ _EMPTY_FUNDAMENTALS: dict = {
     "sales_ttm": None, "ebitda_ttm": None, "pat_ttm": None, "fcf_ttm": None, "net_debt": None,
     "total_equity": None, "opm": None, "sales_growth_yoy": None, "profit_growth_yoy": None, "roe": None,
     "roce": None, "roic": None, "croic": None, "debt_to_equity": None, "other_income_to_pbt": None,
-    "altman_z_dd": None, "scope_used": None, "scope_reason": None, "default_quarterly_scope": None,
-    "default_annual_scope": None, "fundamentals_end": None, "bs_as_of": None, "cf_as_of": None,
+    "altman_z_dd": None, "scope_used": None, "scope_reason": None, "restatement_suspected": None,
+    "default_quarterly_scope": None, "default_annual_scope": None, "fundamentals_end": None, "bs_as_of": None,
+    "cf_as_of": None,
     "_net_debt": None, "_fcff": None, "_pat_owners": None, "_pe_earnings": None, "_equity_owners": None,
     "_minority": None, "roe_continuing": None, "core_profit_ttm": None, "_pat_owners_total": None,
     **dict.fromkeys(NBFC_COLUMNS + BANK_COLUMNS + INSURER_COLUMNS + CASH_CONVERSION_COLUMNS + ANNUAL_COLUMNS
@@ -578,6 +579,7 @@ def _fundamentals(con, entity_id: str, as_of_ts: datetime, end: date) -> dict:
     scope, book = decision.scope, decision.book
     scope_cols = {
         "scope_reason": decision.reason,
+        "restatement_suspected": decision.book.restatement_suspected(end),
         "default_quarterly_scope": decision.policy.default_quarterly_scope,
         "default_annual_scope": decision.policy.default_annual_scope,
     }

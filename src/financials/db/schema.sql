@@ -517,6 +517,7 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     persistency_13m     DOUBLE,              -- life insurers, filed in XBRL [X62]
     persistency_61m     DOUBLE,
     scope_reason        VARCHAR,             -- DEFAULT | FALLBACK_DEFAULT_INCOMPLETE | OVERRIDE | YTD_BRIDGE | BALANCE_SHEET_ONLY
+    restatement_suspected BOOLEAN,           -- X106: a restated quarter inside the TTM window; TTM uses the YTD bridge
     default_quarterly_scope VARCHAR,         -- company default for quarterly / TTM figures [C18]
     default_annual_scope    VARCHAR,         -- company default for annual statements [C18]
     sloan_accrual       DOUBLE,              -- (TTM PAT - CFO - CFI) / avg total assets [C19]
@@ -673,6 +674,7 @@ CREATE TABLE IF NOT EXISTS screener_features (
     persistency_13m     DOUBLE,              -- life insurers, filed in XBRL [X62]
     persistency_61m     DOUBLE,
     scope_reason        VARCHAR,             -- DEFAULT | FALLBACK_DEFAULT_INCOMPLETE | OVERRIDE | YTD_BRIDGE | BALANCE_SHEET_ONLY
+    restatement_suspected BOOLEAN,           -- X106: a restated quarter inside the TTM window; TTM uses the YTD bridge
     default_quarterly_scope VARCHAR,         -- company default for quarterly / TTM figures [C18]
     default_annual_scope    VARCHAR,         -- company default for annual statements [C18]
     sloan_accrual       DOUBLE,              -- (TTM PAT - CFO - CFI) / avg total assets [C19]

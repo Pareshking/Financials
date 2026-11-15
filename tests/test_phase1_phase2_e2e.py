@@ -282,3 +282,43 @@ def test_restatement_flag_reaches_the_screener_rows(unified):
         "SELECT symbol, sales_ttm FROM screener_features_history WHERE restatement_suspected"
     ).fetchall()
     assert rows and all(sales is not None for _, sales in rows)
+
+
+def test_owner_items_qoq_npm_coverage_dividends_promoter_change(unified):
+    """Owner items 1, 3, 4 end to end on 13 Nov 2026. Expected values come from the fixtures' own facts."""
+
+    from _fixture_helpers import load_instance
+
+    con = unified.con
+    cur = con.execute(
+        "SELECT symbol, valuation_archetype, sales_growth_qoq_pct, profit_growth_qoq_pct, npm_pct, interest_coverage,"
+        " opm_last_year_pct, dividend_yield_pct, dividend_payout_pct, promoter_holding_change_qoq_pp, close "
+        "FROM screener_features"
+    )
+    names = [d[0] for d in cur.description]
+    rows = {r[0]: dict(zip(names, r, strict=True)) for r in cur.fetchall()}
+    # Finolex Cables: Q2 FY26 vs Q1 FY26, consolidated (revenue 1,375.79 vs 1,395.52 Cr; owners 162.64 vs 162.62 Cr)
+    fin = rows["FINCABLES"]
+    assert fin["sales_growth_qoq_pct"] == pytest.approx(13757.9 / 13955.2 - 1)
+    assert fin["profit_growth_qoq_pct"] == pytest.approx(1626.4 / 1626.2 - 1)
+    # Glenmark FY26 consolidated (the Q4 filing's 12-month context is the TTM): coverage from PBT and finance costs
+    # as filed; NPM on owners' profit after the X95 owners / NCI swap (owners = PAT - 1.01 Cr NCI).
+    inst = load_instance(next(XBRL_DIR.glob("INTEGRATED_FILING_INDAS_1677062_*.xml")))
+    fy = {n: v for (n, c), v in inst.numeric.items() if not inst.contexts[c].has_dimensions
+          and inst.contexts[c].start == "2025-04-01"}  # fmt: skip
+    glen = rows["GLENMARK"]
+    pbt, fc = fy["ProfitBeforeTax"], fy["FinanceCosts"]
+    assert glen["interest_coverage"] == pytest.approx(float((pbt + fc) / fc))
+    owners = fy["ProfitLossForPeriod"] - fy["ProfitOrLossAttributableToOwnersOfParent"]
+    assert glen["npm_pct"] == pytest.approx(float(owners / fy["RevenueFromOperations"]))
+    # Lenders and insurers: no interest coverage (finance costs are their cost of funds), whatever their data.
+    assert all(r["interest_coverage"] is None for r in rows.values()
+               if r["valuation_archetype"] in ("FINANCIAL_LENDING", "INSURANCE"))  # fmt: skip
+    # No committed company has the same quarter a year apart in a non-lender book yet: OPM last year is NULL [C9].
+    assert all(r["opm_last_year_pct"] is None for r in rows.values())
+    # Reliance Reg. 31: 50.11% (2025-03-31) -> 50.07% (2025-06-30), the two latest visible, adjacent quarters.
+    assert rows["RELIANCE"]["promoter_holding_change_qoq_pp"] == pytest.approx(-0.04)
+    assert rows["HDFCBANK"]["promoter_holding_change_qoq_pp"] == 0.0  # no promoter in either quarter [SHP14]
+    # The committed corporate actions go ex in Sep-Oct 2025, outside the 365 days to 13 Nov 2026: yields are 0.
+    assert {r["dividend_yield_pct"] for r in rows.values()} <= {0.0, None}
+    assert sum(r["dividend_yield_pct"] == 0.0 for r in rows.values()) > 1000

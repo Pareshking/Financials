@@ -609,6 +609,14 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     contribution_margin DOUBLE,              -- supplemental_kpis
     nrr                 DOUBLE,              -- supplemental_kpis: net revenue retention
     cac_payback         DOUBLE,              -- supplemental_kpis: months
+    sales_growth_qoq_pct DOUBLE,             -- latest quarter's sales / previous quarter's - 1, same scope book
+    profit_growth_qoq_pct DOUBLE,            -- same for COALESCE(owners, PAT) per filing; NULL if the base <= 0
+    npm_pct             DOUBLE,              -- TTM owners' profit / sales_ttm (fraction)
+    interest_coverage   DOUBLE,              -- TTM (PBT + finance costs) / finance costs; NULL for lenders, insurers
+    opm_last_year_pct   DOUBLE,              -- EBITDA / revenue of the same quarter one year earlier (fraction)
+    dividend_yield_pct  DOUBLE,              -- trailing-365-day accepted cash dividends (today's share basis) / close
+    dividend_payout_pct DOUBLE,              -- the same dividends per share / eps_ttm; NULL if EPS <= 0
+    promoter_holding_change_qoq_pp DOUBLE,   -- Reg. 31 promoter % now minus the previous quarter end, in pp
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -766,6 +774,14 @@ CREATE TABLE IF NOT EXISTS screener_features (
     contribution_margin DOUBLE,              -- supplemental_kpis
     nrr                 DOUBLE,              -- supplemental_kpis: net revenue retention
     cac_payback         DOUBLE,              -- supplemental_kpis: months
+    sales_growth_qoq_pct DOUBLE,             -- latest quarter's sales / previous quarter's - 1, same scope book
+    profit_growth_qoq_pct DOUBLE,            -- same for COALESCE(owners, PAT) per filing; NULL if the base <= 0
+    npm_pct             DOUBLE,              -- TTM owners' profit / sales_ttm (fraction)
+    interest_coverage   DOUBLE,              -- TTM (PBT + finance costs) / finance costs; NULL for lenders, insurers
+    opm_last_year_pct   DOUBLE,              -- EBITDA / revenue of the same quarter one year earlier (fraction)
+    dividend_yield_pct  DOUBLE,              -- trailing-365-day accepted cash dividends (today's share basis) / close
+    dividend_payout_pct DOUBLE,              -- the same dividends per share / eps_ttm; NULL if EPS <= 0
+    promoter_holding_change_qoq_pp DOUBLE,   -- Reg. 31 promoter % now minus the previous quarter end, in pp
     PRIMARY KEY (as_of_date, security_id)
 );
 

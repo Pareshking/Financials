@@ -163,6 +163,19 @@ ALIASES: dict[str, tuple[str, str]] = {
     "cash runway": ("cash_runway_months", "months (cash burners)"),
     "esop adjusted fcf": ("(esop_adj_fcf / 10000000)", "INR crore"),
     "liquid cash": ("(liquid_cash / 10000000)", "INR crore"),
+    "qoq sales": ("(sales_growth_qoq_pct * 100)", "% latest quarter vs previous quarter"),
+    "sales growth qoq": ("(sales_growth_qoq_pct * 100)", "% latest quarter vs previous quarter"),
+    "qoq profits": ("(profit_growth_qoq_pct * 100)", "% owners' profit, latest quarter vs previous (base > 0)"),
+    "profit growth qoq": ("(profit_growth_qoq_pct * 100)", "% owners' profit, latest quarter vs previous (base > 0)"),
+    "npm": ("(npm_pct * 100)", "% TTM owners' profit / TTM sales"),
+    "net profit margin": ("(npm_pct * 100)", "% TTM owners' profit / TTM sales"),
+    "interest coverage": ("interest_coverage", "x TTM (PBT + finance costs) / finance costs (not for lenders)"),
+    "interest coverage ratio": ("interest_coverage", "x TTM (PBT + finance costs) / finance costs (not for lenders)"),
+    "opm last year": ("(opm_last_year_pct * 100)", "% same quarter one year earlier"),
+    "dividend yield": ("(dividend_yield_pct * 100)", "% trailing 365 days of ex-dates / close"),
+    "dividend payout": ("(dividend_payout_pct * 100)", "% trailing dividends per share / EPS TTM"),
+    "change in promoter holding": ("promoter_holding_change_qoq_pp", "percentage points, QoQ"),
+    "promoter holding qoq change": ("promoter_holding_change_qoq_pp", "percentage points, QoQ"),
 }
 
 KEYWORDS = {"and", "or", "not"}

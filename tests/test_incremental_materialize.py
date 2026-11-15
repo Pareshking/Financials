@@ -146,14 +146,15 @@ def _scope_override(m: Market) -> set[str]:
     return {ent}
 
 
-# (change, first dirty date of its entity, whether stored rows change). Price factors and gap freezes reach only
-# momentum (needs >= 21 bars; the fixtures hold 6 days) and the share count of an issuer with a filed count: no
-# committed fixture has both, so those two scenarios prove the marking and the equivalence, not a visible change.
+# (change, first dirty date of its entity, whether stored rows change). Price factors and gap freezes reach
+# momentum (needs >= 21 bars; the fixtures hold 6 days), the share count of an issuer with a filed count and, since
+# features 2026.11.15-3, dividend_yield_pct: the corporate-actions batch brings accepted dividends (0 -> a yield) and
+# an accepted gap unfreezes the yield (NULL -> 0), so both scenarios now change stored rows, only in that column.
 SCENARIOS = {
     "results": (_results, date(2025, 9, 20), True),
     "shareholding": (_shareholding, date(2025, 9, 21), True),
-    "corp_action": (_corp_actions, date(2025, 9, 22), False),
-    "gap_resolution": (_gap_accepted, date(2025, 9, 23), False),
+    "corp_action": (_corp_actions, date(2025, 9, 22), True),
+    "gap_resolution": (_gap_accepted, date(2025, 9, 23), True),
     "scope_override": (_scope_override, date(2024, 10, 1), True),
 }
 
@@ -317,7 +318,7 @@ PINNED_SOURCES = (
     "src/financials/money.py",
     "reference/valuation_archetypes.csv",
 )
-PINNED = ("2026.11.15-2", "0c076f6db9d8d5ba3a3eee8bbc46c1fb21858f0ff85c9f82270465d47d7f731c")
+PINNED = ("2026.11.15-3", "1fe2b6b6853b77c405a3701cb2b6ce44737f3b3411a62856594cc2382003be35")
 
 
 def sources_sha256() -> str:

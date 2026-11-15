@@ -10,10 +10,10 @@ Every concrete item in the chat is mapped to the repository as of 2026-11-14. Th
 
 | Status | Meaning | Count |
 |---|---|---|
-| DONE | implemented and tested (file and test cited) | 165 |
+| DONE | implemented and tested (file and test cited) | 170 |
 | DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 72 |
 | IN_PROGRESS | being built now | 4 |
-| MISSING | not anywhere in docs or code | 52 |
+| MISSING | not anywhere in docs or code | 47 |
 | CONFLICTS_WITH_EVIDENCE | contradicted by our verified fixtures or tests | 17 |
 | OUT_OF_SCOPE_BY_DECISION | excluded by a recorded decision (C2, C7, C9, invariants, CLAUDE.md Don'ts) | 26 |
 | NEEDS_OWNER_DECISION | the docs do not settle it | 7 |
@@ -136,16 +136,16 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G162 | Altman Z-score | DONE | altman_z_dd (Z''); tests/test_fundamentals.py. NULL for financials |
 | G167 | Valuation: market cap, price, PE, PB, EV/EBITDA | DONE | tests/test_features.py |
 | G168 | PEG ratio | MISSING | not built. Needs multi-year EPS growth (C9 limits) |
-| G169 | Dividend yield | MISSING | not built. Dividends are in corp_actions.cash_per_share |
+| G169 | Dividend yield | DONE | dividend_yield_pct: trailing-365-day accepted dividends (the TR ledger, C2) restated to today's share basis / close; NULL before a full window (C9) or while a gap freezes prices; tests/test_owner_items_qoq_dividend_promoter.py |
 | G170 | FCF yield | DONE | fcff_yield (unlevered); tests/test_phase1_fixes_b.py. Equity FCF yield not built |
 | G171 | Sales growth and profit growth YoY | DONE | sales_growth_yoy, profit_growth_yoy; tests/test_features.py. 8 quarters |
 | G172 | Sales / profit growth 3Y and 5Y, EPS growth 3Y | OUT_OF_SCOPE_BY_DECISION | C9; fundamentals.cagr(min_periods_required); tests/test_scope.py. NULL until history exists |
-| G173 | QoQ sales % and QoQ profit % | MISSING | not built |
+| G173 | QoQ sales % and QoQ profit % | DONE | sales_growth_qoq_pct, profit_growth_qoq_pct (owners' profit, NULL on a base <= 0); same scope book; tests/test_owner_items_qoq_dividend_promoter.py, tests/test_phase1_phase2_e2e.py |
 | G174 | ROCE, ROE, ROIC, OPM, debt/equity, working-capital days, CFO/EBITDA | DONE | tests/test_features.py, tests/test_cash_conversion.py |
-| G175 | OPM last year, NPM, interest coverage | MISSING | not built. Filed DSCR / ISCR seen in 5/10 filings (X41) |
+| G175 | OPM last year, NPM, interest coverage | DONE | opm_last_year_pct (same quarter a year earlier), npm_pct (TTM owners' profit / sales_ttm), interest_coverage (TTM (PBT + finance costs) / finance costs; NULL for lenders, insurers); tests/test_owner_items_qoq_dividend_promoter.py. Filed DSCR / ISCR (X41) not exposed; OPM last year NULL on every committed company until a same-quarter pair exists |
 | G176 | OPM 5Y | OUT_OF_SCOPE_BY_DECISION | C9 |
 | G177 | Promoter holding, pledge %, FII, DII holding | DONE | arch 10.7; tests/test_batch8_shareholding.py |
-| G178 | Change in promoter holding | MISSING | fii_dii_qoq_change_pct exists; promoter change not |
+| G178 | Change in promoter holding | DONE | promoter_holding_change_qoq_pp (adjacent Reg. 31 quarters, percentage points); RELIANCE 2025-03-31 -> 2025-06-30 = -0.04 pp; tests/test_owner_items_qoq_dividend_promoter.py |
 | G179 | MF holding change 1M (AMFI) | DOCUMENTED_PLANNED | F26 |
 | G180 | Insider net buy 3M (PIT / SDD) | DOCUMENTED_PLANNED | F11, F13 |
 | G181 | Reg. 30 red-flag count | DONE | order/kmp/auditor/fraud 90-day counts; tests/test_batch10_events.py |
@@ -157,7 +157,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G199 | Discount / premium to basic-industry median | MISSING | not built. Needs the industry classification |
 | G200 | Reverse DCF implied growth using the live 10Y G-Sec | DONE | reverse_dcf_implied_g (C20, WACC fixed 12%); tests/test_valuation_bands.py. Live yield needs F25 |
 | G201 | Capital-allocation scorecard (incremental ROIC, buyback yield, 5Y dilution) | DOCUMENTED_PLANNED | arch 10.1 (Phase 2); C9 |
-| G202 | Dividend payout % | MISSING | not listed in arch 10 |
+| G202 | Dividend payout % | DONE | dividend_payout_pct = trailing dividends per share / eps_ttm, NULL if EPS <= 0; arch 10.7; tests/test_owner_items_qoq_dividend_promoter.py. No committed company has both an accepted dividend and a TTM EPS yet |
 | G203 | YoY sales-growth acceleration (current YoY - prior-quarter YoY) | MISSING | not built |
 | G204 | Operating-margin expansion vs the same quarter last year | MISSING | not built |
 | G205 | Sector earnings breadth during results season | MISSING | not built |
@@ -430,10 +430,10 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 ## Missing: proposed to-do (priority order)
 
 **Phase 1-2 clean-up (inputs already promoted)**
-1. G173, G175: QoQ sales %, QoQ profit %, OPM last year, NPM, interest coverage. Verify: pin values on committed Q2 FY27 fixtures against the Screener export goldens; pin filed `InterestServiceCoverageRatio` / `DebtServiceCoverageRatio` (X41) on a committed fixture before exposing them.
+1. **DONE (2026-11-15)** ~~G173, G175: QoQ sales %, QoQ profit %, OPM last year, NPM, interest coverage. Verify: pin values on committed Q2 FY27 fixtures against the Screener export goldens; pin filed `InterestServiceCoverageRatio` / `DebtServiceCoverageRatio` (X41) on a committed fixture before exposing them.~~ Built as specified in arch 10.7, pinned on the facts of Finolex Cables Q4 FY25-Q2 FY26 and Glenmark FY26 (the Screener goldens hold one quarter only, so no QoQ golden exists); filed ISCR / DSCR still not exposed.
 2. G203, G204, G152: YoY sales-growth acceleration, OPM expansion vs same quarter last year, margin acceleration. Verify: FactBook unit test over committed quarters; NULL until 9 same-scope quarters exist (C9).
-3. G178: change in promoter holding QoQ. Verify: the two-quarter Reg. 31 fixtures (SHP14: ADANIENT, JSWSTEEL).
-4. G169, G202: dividend yield and dividend payout %. Verify: dividend records in the committed corporate-actions fixture (CA9) and the dividends-paid element in a committed Reg. 34 fixture.
+3. **DONE (2026-11-15)** ~~G178: change in promoter holding QoQ. Verify: the two-quarter Reg. 31 fixtures (SHP14: ADANIENT, JSWSTEEL).~~
+4. **DONE (2026-11-15)** ~~G169, G202: dividend yield and dividend payout %. Verify: dividend records in the committed corporate-actions fixture (CA9) and the dividends-paid element in a committed Reg. 34 fixture.~~
 5. G183, G95: 20-day average delivery % and VWAP. Verify: `DELIV_PER` (P10) and confirm an average-price column exists in the committed `sec_bhavdata_full` fixture; add a P-row.
 6. G156, G157, G158, G207, G208: RSI(14), ATR%, relative strength vs Nifty 500, 20-day median traded value, market breadth. Verify: index closes fixture (IDX9 / `index_ohlcv`) and `TtlTrfVal` (P1); circuit-lock days wait for an F20 price-band fixture.
 7. G256, G257, G258: A&P intensity, gross-margin expansion, marketing-efficiency proxy. Verify: the `ADVERTISING` label rule on the Batch 7 fixtures (X68).

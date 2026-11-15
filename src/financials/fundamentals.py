@@ -674,6 +674,7 @@ def building_blocks(book: FactBook, end: date) -> dict[str, Decimal | date | Non
         "core_continuing_profit": _core(t(book.continuing_owners()), t(book.coalesced("exceptional_items", None)), etr),
         "other_income": oth,
         "pbt": pbt,
+        "finance_costs": fin,
         "etr": etr,
         "nopat": nopat,
         "total_debt": debt,
@@ -1095,6 +1096,39 @@ def yoy_growth(book: FactBook, tag: str, end: date) -> Decimal | None:
     if cur is None or prev is None or prev <= 0:
         return None
     return cur / prev - 1
+
+
+def quarter_rev_ops(book: FactBook, end: date) -> Decimal | None:
+    """Revenue from operations of the quarter ending `end`, net of labelled excise [X40] (as `rev_ops` in §8)."""
+    gross = book.quarter("revenue_from_operations", end)
+    excise = book.quarter(book.coalesced("excise_duty", None), end)
+    return None if gross is None or excise is None else gross - excise
+
+
+def quarter_opm(book: FactBook, end: date) -> Decimal | None:
+    """EBITDA / revenue of the single quarter ending `end`, with the TTM definitions of §8 applied to one quarter:
+    (profit before exceptional items and tax + finance costs + D&A - other income) / revenue net of excise."""
+    q = lambda tag: book.quarter(tag, end)  # noqa: E731
+    parts = (q("profit_before_exceptional_and_tax"), q("finance_costs"), q("depreciation_amortisation"),
+             q("other_income"))  # fmt: skip
+    if None in parts:
+        return None
+    pbeit, fin, dep, oth = parts
+    return safe_div(pbeit + fin + dep - oth, quarter_rev_ops(book, end))
+
+
+def qoq_growth(current: Decimal | None, previous: Decimal | None) -> Decimal | None:
+    """current / previous - 1; NULL when either is missing or the base is <= 0 (a loss base has no growth)."""
+    if current is None or previous is None or previous <= 0:
+        return None
+    return current / previous - 1
+
+
+def interest_coverage(pbt: Decimal | None, finance_costs: Decimal | None) -> Decimal | None:
+    """(PBT + finance costs) / finance costs over the same TTM window; NULL when finance costs <= 0."""
+    if pbt is None or finance_costs is None or finance_costs <= 0:
+        return None
+    return (pbt + finance_costs) / finance_costs
 
 
 def altman_z_double_prime(blocks: dict) -> Decimal | None:

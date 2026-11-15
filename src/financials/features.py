@@ -43,24 +43,30 @@ from financials.fundamentals import (
     in_list,
     insurer_basis,
     insurer_blocks,
+    interest_coverage,
     load_factbook,
     nbfc_blocks,
     newgen_inputs,
     percentile_rank,
     prefetch_fundamentals,
+    qoq_growth,
+    quarter_opm,
+    quarter_rev_ops,
     resolve_scope,
     reverse_dcf_implied_growth,
     safe_div,
     screener_convention_ratios,
     yoy_growth,
 )
-from financials.scope import MIN_PERIOD_END_DATE
+from financials.scope import MIN_PERIOD_END_DATE, MIN_TRADE_DATE
 from financials.timeutil import ist_to_utc, utc_now
 
 # Reader version of materialised rows. Bump it whenever features.py, fundamentals.py (or another file pinned by
 # tests/test_incremental_materialize.py) changes any output: `materialize --incremental` refuses days built by another
 # version, because only a full run then reproduces the history.
-FEATURES_VERSION = "2026.11.15-2"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
+FEATURES_VERSION = "2026.11.15-3"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
+# -3: QoQ sales / profit growth, NPM, interest coverage, OPM same quarter last year, dividend yield / payout,
+#     promoter holding QoQ change (owner_requirements items 1, 3, 4)
 
 CRITICAL_COLUMNS = ("close", "market_cap", "sales_ttm", "pat_ttm", "total_equity")
 G4_MAX_NULL_RISE = 0.015
@@ -238,10 +244,52 @@ def _delivery(bars) -> dict[str, float | None]:
     }
 
 
+DIVIDEND_WINDOW_DAYS = 365
+
+
+def _dividends(con, as_of: date, knowledge: str = "valid", as_of_ts: datetime | None = None, securities=None):
+    """Cash dividends per share with ex-date in (as_of - 365 days, as_of]: exactly the ledger rows the total-return
+    index adds (accepted DIVIDEND actions, `returns.total_return_index`), one batched query. knowledge="system" also
+    needs the decision by `as_of_ts`, as for price factors (`_price_inputs`)."""
+    system = knowledge == "system"
+    only, only_p = entity_filter("security_id", securities)
+    rows = con.execute(
+        "SELECT security_id, ex_date, cash_per_share, status FROM corp_actions WHERE action_type = 'DIVIDEND' "
+        "AND ex_date > ? AND ex_date <= ? AND cash_per_share IS NOT NULL"
+        + (" AND decided_at <= ?" if system else "")
+        + only,
+        [as_of - timedelta(days=DIVIDEND_WINDOW_DAYS), as_of, *([as_of_ts] if system else []), *only_p],
+    ).fetchall()
+    out: dict[str, list[tuple[date, Decimal]]] = defaultdict(list)
+    for sec, ex, cash, status in rows:
+        if status in ACCEPTED_STATUSES:
+            out[sec].append((ex, Decimal(cash)))
+    return out
+
+
+def trailing_dividend_per_share(
+    dividends: list[tuple[date, Decimal]], factors: list[tuple[date, Decimal, Decimal]], as_of: date
+) -> Decimal | None:
+    """Sum of the trailing-365-day cash dividends per share, each restated to today's share basis: multiplied by the
+    EPS (share-count) factor of every accepted action with ex-date in (dividend ex-date, as_of] (Rs 1 before a 1:1
+    bonus is Rs 0.50 per share held today). NULL when the window starts before MIN_TRADE_DATE: no corporate actions
+    are held before it, so the sum would be a partial window [C9]. 0 when no dividend went ex in the window."""
+    if as_of - timedelta(days=DIVIDEND_WINDOW_DAYS - 1) < MIN_TRADE_DATE:
+        return None
+    total = Decimal(0)
+    for ex, cash in dividends:
+        f = Decimal(1)
+        for fx, _, eps_factor in factors:
+            if ex < fx <= as_of:
+                f *= eps_factor
+        total += cash * f
+    return total
+
+
 SHAREHOLDING_COLUMNS = (
     "promoter_holding_pct", "promoter_pledge_pct", "promoter_encumbered_pct", "fii_holding_pct",
     "fpi_holding_pct", "dii_holding_pct", "public_holding_pct", "non_promoter_non_public_pct",
-    "fii_dii_qoq_change_pct",
+    "fii_dii_qoq_change_pct", "promoter_holding_change_qoq_pp",
 )  # fmt: skip
 
 
@@ -284,14 +332,16 @@ def shareholding_columns(shp: dict) -> dict:
         non_promoter_non_public_pct=float(Decimal(npnp) / Decimal(total)) if total else None,
     )
     prev = shp.get("_prev", {})
+    adjacent = shp.get("_prev_as_of") is not None and shp["_prev_as_of"] == _quarter_before(shp["_as_of"])
     now_inst = [_stated(shp, "FII"), _stated(shp, "DII")]
     prev_inst = [_stated(prev, "FII"), _stated(prev, "DII")]
-    if (
-        shp.get("_prev_as_of") is not None
-        and shp["_prev_as_of"] == _quarter_before(shp["_as_of"])
-        and None not in now_inst + prev_inst
-    ):
+    if adjacent and None not in now_inst + prev_inst:
         out["fii_dii_qoq_change_pct"] = round(sum(now_inst) - sum(prev_inst), 6)
+    # Promoter & promoter group: filed fractions of the two latest visible quarters, immediately adjacent (as for
+    # FII + DII); stored in percentage points (0.5011 -> 0.5007 is -0.04). Exact in Decimal, then one float.
+    now_p, prev_p = shp.get("PROMOTER", (None, None))[0], prev.get("PROMOTER", (None, None))[0]
+    if adjacent and now_p is not None and prev_p is not None:
+        out["promoter_holding_change_qoq_pp"] = float((Decimal(str(now_p)) - Decimal(str(prev_p))) * 100)
     return out
 
 
@@ -459,6 +509,7 @@ def compute_rows(
         ).fetchall()
     }
     shp_all, paid_up, quarter_end = _preload(con, as_of_ts, entities)
+    dividends = _dividends(con, as_of, knowledge, as_of_ts, secs)
     events = _event_counts(con, as_of, as_of_ts, entities)
     kpis = supplemental_kpi_columns(con, as_of_ts, entities)
     history = _valuation_history(con, as_of, secs)
@@ -469,14 +520,14 @@ def compute_rows(
     prefetch_fundamentals(con, as_of_ts, entities)  # one pass instead of a per-entity scan [benchmarks]
     try:
         rows = _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all, paid_up, quarter_end,
-                     events, kpis, history, curated, arch_override, fundamentals_cache)  # fmt: skip
+                     events, kpis, history, curated, arch_override, fundamentals_cache, dividends)  # fmt: skip
     finally:
         clear_prefetch(con, as_of_ts)
     return rows
 
 
 def _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all, paid_up, quarter_end, events, kpis,
-          history, curated, arch_override, fundamentals_cache) -> list[dict]:  # fmt: skip
+          history, curated, arch_override, fundamentals_cache, dividends=None) -> list[dict]:  # fmt: skip
     rows = []
     for sec, ent, symbol, series in universe:
         b = bars.get(sec, [])
@@ -533,6 +584,10 @@ def _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all,
             curated.get(symbol) if fund.get("_archetype") == "INDUSTRIAL_SERVICES" and symbol in curated else None
         ) or fund.get("_archetype")  # fmt: skip
         row["valuation_archetype"] = archetype
+        if archetype in ("FINANCIAL_LENDING", "INSURANCE"):
+            row["interest_coverage"] = None  # finance costs are the lender's cost of goods, not a solvency charge
+        row.update(_dividend_columns((dividends or {}).get(sec, []), factors.get(sec, []), as_of, b,
+                                     frozen.get(sec), row["eps_ttm"]))  # fmt: skip
         row.update(_newgen_columns(fund.get("_newgen"), mcap, ev, fund))
         hist = history.get(sec, {"pe": [], "ev_ebitda": []})
         fcff = _f(fund["_fcff"]) if fund["_fcff"] is not None else None
@@ -562,6 +617,8 @@ _EMPTY_FUNDAMENTALS: dict = {
     "cf_as_of": None,
     "_net_debt": None, "_fcff": None, "_pat_owners": None, "_pe_earnings": None, "_equity_owners": None,
     "_minority": None, "roe_continuing": None, "core_profit_ttm": None, "_pat_owners_total": None,
+    "sales_growth_qoq_pct": None, "profit_growth_qoq_pct": None, "npm_pct": None, "interest_coverage": None,
+    "opm_last_year_pct": None,
     **dict.fromkeys(NBFC_COLUMNS + BANK_COLUMNS + INSURER_COLUMNS + CASH_CONVERSION_COLUMNS + ANNUAL_COLUMNS
                   + SCREENER_CONVENTION_COLUMNS),
 }  # fmt: skip
@@ -569,6 +626,7 @@ _EMPTY_FUNDAMENTALS: dict = {
 # Industrial ratios that do not apply to lenders (architecture §10): NULL for INDAS_NBFC books.
 _NOT_FOR_LENDERS = (
     "ebitda_ttm", "opm", "roce", "roic", "croic", "debt_to_equity", "altman_z_dd", "fcf_ttm", *CASH_CONVERSION_COLUMNS,
+    "interest_coverage", "opm_last_year_pct",
 )  # fmt: skip
 
 
@@ -577,6 +635,21 @@ NEWGEN_COLUMNS = (
     "billings_growth_pct", "neg_working_capital_float_pct", "net_burn_multiple", "cash_runway_months", "esop_adj_fcf",
     "liquid_cash",
 )  # fmt: skip
+
+
+def _dividend_columns(divs, factors, as_of: date, bars, frozen_from: date | None, eps) -> dict:
+    """dividend_yield_pct = trailing dividends per share (today's share basis) / today's raw close; NULL while an
+    unexplained gap freezes the series (a missed split would mis-state both). dividend_payout_pct = the same
+    dividends / eps_ttm (owners' TTM profit per current share); NULL when EPS <= 0. Fractions, like OPM."""
+    out = {"dividend_yield_pct": None, "dividend_payout_pct": None}
+    if not bars or (frozen_from is not None and bars[-1][0] >= frozen_from):
+        return out
+    dps = trailing_dividend_per_share(divs, factors, as_of)
+    if dps is None:
+        return out
+    out["dividend_yield_pct"] = _pos_div(dps, bars[-1][1])
+    out["dividend_payout_pct"] = _pos_div(dps, eps)
+    return out
 
 
 def _pos_div(a, b):
@@ -638,7 +711,7 @@ def _fundamentals(con, entity_id: str, as_of_ts: datetime, end: date) -> dict:
     scope_cols["_newgen"] = newgen_inputs(book, end, b)
     scope_cols["_gross_profit"] = b["gross_profit"]
     scope_cols["_cfo"] = b["cfo"]
-    return scope_cols | cash | _lender_columns(book, end, regulatory) | _insurer_columns(book, end) | {
+    out = scope_cols | cash | _lender_columns(book, end, regulatory) | _insurer_columns(book, end) | {
         "sales_ttm": b["rev_ops"], "ebitda_ttm": b["ebitda"], "pat_ttm": b["pat"], "fcf_ttm": b["fcf"],
         "net_debt": b["net_debt"], "total_equity": eq,
         "opm": _f(safe_div(b["ebitda"], b["rev_ops"])),
@@ -657,7 +730,37 @@ def _fundamentals(con, entity_id: str, as_of_ts: datetime, end: date) -> dict:
         "roe_continuing": _f(safe_div(b["pat_owners_continuing"], b["equity_owners"])),
         "core_profit_ttm": b["core_continuing_profit"],
         "_equity_owners": b["equity_owners"], "_minority": b["minority_interest"],
+        **_quarterly_columns(book, end),
+        "interest_coverage": _f(interest_coverage(b["pbt"], b["finance_costs"])),
     } | _lender_overrides(book, end)  # fmt: skip
+    # NPM on the row's own sales (interest earned for banks, premium for insurers) and owners' TTM profit [X42]
+    out["npm_pct"] = _f(safe_div(b["pat_owners"], out["sales_ttm"]))
+    return out
+
+
+def _sales_quarter(book, end: date) -> Decimal | None:
+    """One quarter of the row's `sales_ttm` line: premium / insurance revenue for insurers, interest earned for banks
+    (`_lender_overrides`), revenue from operations net of excise otherwise."""
+    basis = insurer_basis(book)
+    if basis is not None:
+        return book.quarter("insurance_revenue" if basis == "INDAS117" else
+                            "net_premium_earned" if basis == "IRDAI_GENERAL" else "net_premium", end)  # fmt: skip
+    if "interest_expended" in book.durations:
+        return book.quarter("interest_earned", end)
+    return quarter_rev_ops(book, end)
+
+
+def _quarterly_columns(book, end: date) -> dict:
+    """Latest quarter vs the one before, same scope book (§6.4): sales and owners' profit (COALESCE(owners, PAT) per
+    filing, as for PE [X42]); OPM of the same quarter a year earlier. NULL when a quarter is missing (never a
+    longer-gap change) or the base is <= 0."""
+    prev = _add_months(end, -3)
+    owners = book.coalesced("pat_owners", "pat")
+    return {
+        "sales_growth_qoq_pct": _f(qoq_growth(_sales_quarter(book, end), _sales_quarter(book, prev))),
+        "profit_growth_qoq_pct": _f(qoq_growth(book.quarter(owners, end), book.quarter(owners, prev))),
+        "opm_last_year_pct": _f(quarter_opm(book, _add_months(end, -12))),
+    }
 
 
 _AMOUNTS = ("nii_ttm", "ppop_ttm", "loans", "net_premium_earned_ttm", "insurance_revenue_ttm", "investment_income_ttm")

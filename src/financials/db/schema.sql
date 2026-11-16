@@ -1135,6 +1135,13 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     rs_rank_12m_1m                           DOUBLE,          -- cross-section (refresh step): 1 = strongest
     industry_earnings_breadth                DOUBLE,          -- B4.9 / G205 share of NSE industry with core profit YoY > 0
     industry_earnings_breadth_n              INTEGER,         -- companies measured (latest quarter of the industry)
+    -- batch J (related-party leak, G236): features_rpt.py; last FY related-party schedule (Reg. 34) [X113]
+    rpt_fy_end                               DATE,            -- FY end of the schedule used (row scope, else the other)
+    rpt_counterparties                       INTEGER,         -- outside the group, non-zero FY transactions
+    rpt_leak_pct                             DOUBLE,          -- (purchases + loans given + royalties paid) / revenue
+    rpt_purchases_to_sales                   DOUBLE,
+    rpt_royalty_to_sales                     DOUBLE,
+    rpt_loans_given_to_net_worth             DOUBLE,          -- loans given / total equity at the FY end
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -1791,6 +1798,13 @@ CREATE TABLE IF NOT EXISTS screener_features (
     rs_rank_12m_1m                           DOUBLE,          -- cross-section (refresh step): 1 = strongest
     industry_earnings_breadth                DOUBLE,          -- B4.9 / G205 share of NSE industry with core profit YoY > 0
     industry_earnings_breadth_n              INTEGER,         -- companies measured (latest quarter of the industry)
+    -- batch J (related-party leak, G236): features_rpt.py; last FY related-party schedule (Reg. 34) [X113]
+    rpt_fy_end                               DATE,            -- FY end of the schedule used (row scope, else the other)
+    rpt_counterparties                       INTEGER,         -- outside the group, non-zero FY transactions
+    rpt_leak_pct                             DOUBLE,          -- (purchases + loans given + royalties paid) / revenue
+    rpt_purchases_to_sales                   DOUBLE,
+    rpt_royalty_to_sales                     DOUBLE,
+    rpt_loans_given_to_net_worth             DOUBLE,          -- loans given / total equity at the FY end
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -1967,6 +1981,34 @@ CREATE TABLE IF NOT EXISTS group_structure (
     PRIMARY KEY (filing_id, parser_version, relation, row_member, period_end),
     CHECK (relation IN ('SUBSIDIARY', 'ASSOCIATE', 'JOINT_VENTURE')),
     CHECK (holding_fraction IS NULL OR (holding_fraction >= 0 AND holding_fraction <= 1))
+);
+-- Reg. 34 related-party schedule (parsers/rpt.py) [X113]: one row per related party x category x transaction element
+-- x in-scope period of an annual filing, promoted with its filing (same entity, scope, visibility). row_member is a
+-- row position inside the filing, not an identity. Feeds only the batch J RPT columns (features_rpt.py).
+CREATE TABLE IF NOT EXISTS related_party_transactions (
+    filing_id         VARCHAR NOT NULL REFERENCES filings(filing_id),
+    parser_version    VARCHAR NOT NULL,          -- parsers.rpt.RPT_PARSER_VERSION
+    entity_id         VARCHAR NOT NULL REFERENCES entity_master(entity_id),   -- the filer
+    scope             VARCHAR NOT NULL,
+    row_member        VARCHAR NOT NULL,          -- typed RelatedPartyAxis member as filed
+    category_member   VARCHAR NOT NULL,          -- CategoriesOfRelatedPartiesAxis member as filed (local name)
+    category          VARCHAR NOT NULL,          -- SUBSIDIARY | ASSOCIATE | JOINT_VENTURE | KMP | PROMOTER_GROUP | OTHER
+    period_type       VARCHAR NOT NULL,          -- DURATION (transactions) | INSTANT (year-end balances)
+    period_start      DATE NOT NULL,
+    period_end        DATE NOT NULL,
+    counterparty_name VARCHAR NOT NULL,
+    pan               VARCHAR,
+    cin               VARCHAR,
+    country           VARCHAR,
+    relationship      VARCHAR,                   -- DescriptionOfNatureOfRelatedPartyRelationship as filed
+    nature            VARCHAR,                   -- DescriptionOfNatureOfTransactionsWithRelatedParty as filed
+    txn_type          VARCHAR NOT NULL,          -- parsers.rpt.TXN_TYPES | balance_payable | balance_receivable
+    source_element    VARCHAR NOT NULL,
+    amount_inr        DECIMAL(20,2) NOT NULL,
+    visible_from_ts   TIMESTAMP NOT NULL,
+    PRIMARY KEY (filing_id, parser_version, row_member, category_member, source_element, period_start, period_end),
+    CHECK (category IN ('SUBSIDIARY', 'ASSOCIATE', 'JOINT_VENTURE', 'KMP', 'PROMOTER_GROUP', 'OTHER')),
+    CHECK (period_type IN ('DURATION', 'INSTANT'))
 );
 -- ── Views ──────────────────────────────────────────────────────────────
 -- Everything below VIEWS_MARKER runs after the column upgrade (db.apply_schema), so a view may name columns that an

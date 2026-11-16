@@ -320,13 +320,14 @@ PINNED_SOURCES = (
     "src/financials/features_peers.py",
     "src/financials/features_extra.py",
     "src/financials/features_more.py",
+    "src/financials/features_rpt.py",
     "src/financials/fundamentals.py",
     "src/financials/scope.py",
     "src/financials/money.py",
     "reference/valuation_archetypes.csv",
     "reference/cyclical_symbols.csv",
 )
-PINNED = ("2026.11.15-11I", "008ec14bef5dd63dbbf6abe2d727e3b3b266a1beba7ada890aee3c70568fc198")
+PINNED = ("2026.11.15-12J", "ac86e82fb11c4efda07e5268ae0c1589d30add3e8861066f926e96eeb8034f4e")
 
 
 def sources_sha256() -> str:

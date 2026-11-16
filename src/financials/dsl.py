@@ -443,6 +443,16 @@ def _more_aliases() -> dict[str, tuple[str, str]]:
 
 ALIASES.update(_more_aliases())
 
+
+def _rpt_aliases() -> dict[str, tuple[str, str]]:
+    """Batch J (related-party leak): features_rpt.dsl_aliases."""
+    from financials.features_rpt import dsl_aliases
+
+    return dsl_aliases()
+
+
+ALIASES.update(_rpt_aliases())
+
 KEYWORDS = {"and", "or", "not"}
 COMPARATORS = {"<", "<=", ">", ">=", "=", "!="}
 NAME_RE = re.compile(r"^[a-z][a-z0-9 ]{0,62}$")

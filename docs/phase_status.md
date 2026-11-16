@@ -40,7 +40,8 @@ the full line-by-line audit of the PDF is `docs/master_backlog.md`; ratios are i
 | Reg. 34 annual XBRL: notes, segments, CWIP | DONE | reg34_annual.py; segment_observations (X97-X99) |
 | Reg. 34 annual XBRL: AOC-1 subsidiary/associate/JV tree | DONE (batch H) | `group_structure` from the schedule already in committed annual fixtures (X112); `backfill-group-structure` for filings promoted earlier |
 | Reg. 31 shareholding (full) | DONE | incl. pledge, FII/DII/MF/insurance/retail, shareholder count |
-| Reg. 76 share capital reconciliation | **BLOCKED** (G93) | no machine-readable NSE source found (probes A15, 2026-11-15); F09 UNVERIFIED; Reg. 31 x paid-up cross-check stands in |
+| Reg. 76 share capital reconciliation | **BLOCKED** (G93) | no machine-readable NSE source found (probes A15, 2026-11-15); F09 UNVERIFIED; Reg. 31 x paid-up cross-check stands in, plus (batch J) the Reg. 34 year-end share counts cross-checked against both (X114, ANNUAL_SHARE_COUNT_DIFFERS; annual only, no listed / demat split) |
+| Reg. 34 annual XBRL: related parties per counterparty | DONE (batch J) | `related_party_transactions` from the Ind AS 24 schedule (X113, `parsers/rpt.py`); `backfill-rpt` for filings promoted earlier; Reg. 23(9) half-yearly rows (X19) not parsed yet |
 | Materialized screener_features + DSL-to-SQL compiler | DONE | ~490 columns, saved screens, custom ratios |
 | §7 adds: corporate-action auto-adjuster | DONE | prices adjusted for splits/bonus/rights/demergers |
 | §7 adds: AMFI monthly MF holdings | Moved to Phase 3 by the PDF's own review (per-AMC files, R8) | quarterly MF % from Reg. 31 is built |
@@ -90,8 +91,9 @@ exclusion in 90 days, ex-date recency and days to the next ex-date, segment mix 
 ranks and premiums (A1.19, B5.7, B5.8) were built by batch H.
 
 **Phase 2 pending: ratios**
-1. RPT leak % per counterparty type (G236): BLOCKED on a parser. RPT is stored as a total (`rpt_to_sales` is built on
-   it); the purchases / loans / royalties split sits in `RelatedPartyTransactionAxis` rows in raw_xbrl_facts (G99).
+1. ~~RPT leak % per counterparty type (G236)~~ **Built 2026-11-16 (batch J, features `2026.11.15-12J`)**: `rpt_leak_pct`,
+   `rpt_purchases_to_sales`, `rpt_royalty_to_sales`, `rpt_loans_given_to_net_worth` from the annual related-party
+   schedule (X113, C27). Open: the Reg. 23(9) half-yearly per-counterparty rows (X19) for a fresher H1 view.
 2. Order book to sales (G115) only if a filing tags an order book; otherwise drop.
 3. Penalty amounts (G118, needs an E12 content fixture); Reg. 30 acquisition events for G276 (no event type parsed).
 4. Filed ISCR / DSCR (catalogue B1.24): filed values are implausible (C26); needs an evidence row first.

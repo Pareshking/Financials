@@ -1264,6 +1264,10 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     group = read_table(con, stage_dir, "stg_group_structure")
     insert_rows(con, "group_structure", [{**r, "entity_id": entity_id, "visible_from_ts": visible} for r in group],
                 or_ignore=True)  # fmt: skip
+    # Related-party schedule [X113]: same entity, scope and visibility; feeds only the batch J RPT columns.
+    rpt = read_table(con, stage_dir, "stg_related_parties")
+    insert_rows(con, "related_party_transactions", [{**r, "entity_id": entity_id, "visible_from_ts": visible}
+                                                    for r in rpt], or_ignore=True)  # fmt: skip
     # Non-blocking parse findings (X86 ATTRIBUTION_WITHHELD): the filing is promoted, the finding stays open.
     finding_rows = [
         _quarantine_row(stage=i["stage"], reason_code=i["reason_code"], filing_id=fid, entity_id=entity_id,
@@ -1277,7 +1281,8 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
         con, [(entity_id, meta["scope"])]
     )
     q = cross_check_shares(con, entity_id, meta["period_end"])
-    return PromotionResult("PROMOTED", "results_xbrl", message=fid, quarantined=qs + ([q] if q else []))
+    qa = annual_share_check(con, fid, entity_id, meta) if meta["accounting_profile"] == "REG34_ANNUAL" else None  # G93
+    return PromotionResult("PROMOTED", "results_xbrl", message=fid, quarantined=qs + [x for x in (q, qa) if x])
 
 
 def _filing_check_rows(con, fid: str, exchange: str, entity_id: str, meta: dict, visible: datetime) -> list[dict]:
@@ -1554,6 +1559,18 @@ def cross_check_shares(con, entity_id: str, as_of: date) -> str | None:
     if details is None:
         return None
     return _quarantine(con, stage="SHARES", reason_code="CROSS_CHECK_FAILED", entity_id=entity_id, details=details)
+
+
+def annual_share_check(con, filing_id: str, entity_id: str, meta: dict) -> str | None:
+    """G93 [X114]: non-blocking ANNUAL_SHARE_COUNT_DIFFERS finding when a Reg. 34 filing's year-end share counts
+    disagree with the Reg. 31 total or paid-up / face value of the same date (share_capital.py)."""
+    from financials.share_capital import REASON, annual_share_disagreement
+
+    details = annual_share_disagreement(con, filing_id, entity_id, meta["fy_end"])
+    if details is None:
+        return None
+    return _quarantine(con, stage="SHARES", reason_code=REASON, entity_id=entity_id, filing_id=filing_id,
+                       details=details)  # fmt: skip
 
 
 def close_resolved_share_findings(con) -> int:

@@ -10,8 +10,8 @@ Every concrete item in the chat is mapped to the repository as of 2026-11-14. Th
 
 | Status | Meaning | Count |
 |---|---|---|
-| DONE | implemented and tested (file and test cited) | 219 |
-| DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 51 |
+| DONE | implemented and tested (file and test cited) | 220 |
+| DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 50 |
 | IN_PROGRESS | being built now | 3 |
 | MISSING | not anywhere in docs or code | 22 |
 | CONFLICTS_WITH_EVIDENCE | contradicted by our verified fixtures or tests | 18 |
@@ -36,8 +36,8 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G90 | Quarterly + annual XBRL: statements, notes (borrowings, leases, fixed assets) | DONE | F06, F07; parsers/integrated.py, parsers/reg34_annual.py; X71-X73. Segments tracked separately |
 | G91 | Shareholding XBRL: promoter, FII, DII (MF, insurance, banks), public, pledged shares | DONE | F08; SHP7-SHP15; tests/test_batch8_shareholding.py |
 | G92 | SAST Reg. 31(1)/31(2) encumbrance events with lender details | DOCUMENTED_PLANNED | F12 (Phase 3, OBSERVED) |
-| G93 | Reg. 76 reconciliation of share capital audit (exact issued / listed shares) | DOCUMENTED_PLANNED | F09 UNVERIFIED, BLOCKED: probed 2026-11-15 (vault ledger, announcements RSS, TCS announcements API Jul-Nov 2026; BSE 403), no Reg. 76 file found (A15); Reg. 31 x paid-up cross-check (X103) stands in |
-| G99 | Related-party transactions from Reg. 23(9) half-yearly Integrated Filing | DONE | X19; RPT contexts land in raw_xbrl_facts. RPT ratio planned |
+| G93 | Reg. 76 reconciliation of share capital audit (exact issued / listed shares) | DOCUMENTED_PLANNED | F09 UNVERIFIED, BLOCKED: probed 2026-11-15 (vault ledger, announcements RSS, TCS announcements API Jul-Nov 2026; BSE 403), no Reg. 76 file found (A15); Reg. 31 x paid-up cross-check (X103) stands in; batch J adds the annual stand-in: Reg. 34 year-end issued / subscribed / paid-up counts vs Reg. 31 and paid-up / face (X114, ANNUAL_SHARE_COUNT_DIFFERS) |
+| G99 | Related-party transactions from Reg. 23(9) half-yearly Integrated Filing | DONE | X19; RPT contexts land in raw_xbrl_facts. Batch J: per counterparty from the Reg. 34 annual schedule (X113, `related_party_transactions`, `backfill-rpt`); the Reg. 23(9) half-yearly rows stay raw |
 | G101 | Daily delivery % | DONE | F02; P10; tests/test_market_parsers.py |
 | G105 | Audit qualification / modified opinion flag | DONE | E8; X75 filing_meta.auditor_qualified; tests/test_batch9_annual.py, tests/test_batch10_edge_cases.py. Screener column `rf_audit_qualified` (batch G) |
 | G106 | Reg. 30 director / auditor / KMP change alerts | DONE | E5; kmp_resignations_90d, auditor_resignations_90d; tests/test_batch10_events.py |
@@ -185,7 +185,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G233 | Net debt (incl. leases) / 3Y average FCF | DONE | net_debt_to_fcf (TTM FCF); tests/test_cash_conversion.py. 3Y form net_debt_to_fcf_3y (history-gated, FY27 ~May 2027); features_bs; tests/test_balance_sheet_cash_flow_family.py |
 | G234 | Effective cost of debt | DONE | cost_of_debt; tests/test_cash_conversion.py |
 | G235 | Contingent liabilities / net worth | DONE | contingent_liabilities_to_net_worth (X73); tests/test_batch9_annual.py |
-| G236 | RPT leak % (purchases + loans + royalties / revenue) | DOCUMENTED_PLANNED | BLOCKED on a parser: only the RPT total is a fact; the per-counterparty rows (RelatedPartyTransactionAxis, X19) stay in raw_xbrl_facts. Partial: rpt_to_sales (total / same-period sales, batch G) |
+| G236 | RPT leak % (purchases + loans + royalties / revenue) | DONE | batch J: X113, C27; parsers/rpt.py -> `related_party_transactions` (per counterparty, Reg. 34 annual schedule), features_rpt.py `rpt_leak_pct`, `rpt_purchases_to_sales`, `rpt_royalty_to_sales`, `rpt_loans_given_to_net_worth`; tests/test_batch_j_rpt_share_capital.py. Royalties in a catch-all expense with a "refer below" nature are not counted (floor) |
 | G237 | Composite forensic score combining Piotroski, Beneish and Altman | OUT_OF_SCOPE_BY_DECISION | arch 10.2 (separate columns, never summed) |
 | G238 | Unlevered FCF yield (adds back interest x (1 - t)) | DONE | fcff_yield, per-filing interest classification (X14); tests/test_phase1_fixes_b.py |
 | G239 | Reverse-DCF implied 5Y growth | DONE | C20; tests/test_valuation_bands.py |

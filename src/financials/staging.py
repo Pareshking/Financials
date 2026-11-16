@@ -60,6 +60,14 @@ CREATE TABLE stg_group_structure (
     pat_inr DECIMAL(20,2), investment_inr DECIMAL(20,2),
     PRIMARY KEY (filing_id, relation, row_member, period_end)
 );
+CREATE TABLE stg_related_parties (
+    filing_id VARCHAR NOT NULL, parser_version VARCHAR NOT NULL, scope VARCHAR NOT NULL, row_member VARCHAR NOT NULL,
+    category_member VARCHAR NOT NULL, category VARCHAR NOT NULL, period_type VARCHAR NOT NULL,
+    period_start DATE NOT NULL, period_end DATE NOT NULL, counterparty_name VARCHAR NOT NULL, pan VARCHAR,
+    cin VARCHAR, country VARCHAR, relationship VARCHAR, nature VARCHAR, txn_type VARCHAR NOT NULL,
+    source_element VARCHAR NOT NULL, amount_inr DECIMAL(20,2) NOT NULL,
+    PRIMARY KEY (filing_id, row_member, category_member, source_element, period_start, period_end)
+);
 CREATE TABLE stg_corp_actions (
     filing_id VARCHAR NOT NULL, seq INTEGER NOT NULL, component INTEGER NOT NULL, exchange VARCHAR NOT NULL,
     symbol VARCHAR NOT NULL, series VARCHAR NOT NULL, isin VARCHAR NOT NULL, ex_date DATE NOT NULL,
@@ -131,6 +139,7 @@ TABLE_ORDER = (
     "stg_xbrl_facts",
     "stg_segments",
     "stg_group_structure",
+    "stg_related_parties",
     "stg_corp_actions",
     "stg_events",
     "stg_kpis",
@@ -400,6 +409,7 @@ def stage_results_xbrl(
     _stage_segments(tables, fid, inst, parsed)
     if parsed.profile == "REG34_ANNUAL":
         tables["stg_group_structure"] = group_structure_rows(fid, inst, parsed)
+        tables["stg_related_parties"] = related_party_rows(fid, inst, parsed)  # X113
     return write_stage(stage_root, "results_xbrl", run_id, tables)
 
 
@@ -412,6 +422,18 @@ def group_structure_rows(fid: str, inst, parsed) -> list[dict[str, Any]]:
         {"filing_id": fid, "parser_version": AOC1_PARSER_VERSION, "scope": m["scope"], **asdict(g),
          **{k: to_inr(getattr(g, k)) for k in ("net_worth_inr", "turnover_inr", "pat_inr", "investment_inr")}}
         for g in parse_group_structure(inst, set(m["in_scope_instants"]))
+    ]  # fmt: skip
+
+
+def related_party_rows(fid: str, inst, parsed) -> list[dict[str, Any]]:
+    """Related-party schedule rows of a parsed Reg. 34 annual filing, in-scope periods only [X113]."""
+    from financials.parsers.rpt import RPT_PARSER_VERSION, parse_related_parties
+
+    m = parsed.meta
+    return [
+        {"filing_id": fid, "parser_version": RPT_PARSER_VERSION, "scope": m["scope"],
+         **{k: v for k, v in asdict(r).items() if k != "amount"}, "amount_inr": to_inr(r.amount)}
+        for r in parse_related_parties(inst, set(m["in_scope_periods"]), set(m["in_scope_instants"]))
     ]  # fmt: skip
 
 

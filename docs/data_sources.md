@@ -12,7 +12,7 @@
 | F04 | NSE trading holiday calendar | 1 | VERIFIED | CONTAINER_DIRECT | CAL1 |
 | F05 | Index constituents and rebalance notices | 1 | VERIFIED | CONTAINER_DIRECT | IDX1, IDX2, IDX4, IDX5, IDX6 |
 | F06 | Integrated Filing - Financials (Reg. 33 quarterly XBRL) | 1 | VERIFIED | CONTAINER_DIRECT | X1, X2, X4, X6, X32, X33, X34, X35, X38, A7, A9 |
-| F07 | Reg. 34(1) annual report XBRL (MCA Ind AS taxonomy) | 2 | VERIFIED | CONTAINER_DIRECT | X36, X37, A8, X69, X70, X71, X72, X73, X74, X75, X76, X112 |
+| F07 | Reg. 34(1) annual report XBRL (MCA Ind AS taxonomy) | 2 | VERIFIED | CONTAINER_DIRECT | X36, X37, A8, X69, X70, X71, X72, X73, X74, X75, X76, X112, X113, X114 |
 | F08 | Reg. 31 shareholding pattern XBRL | 1 | VERIFIED | CONTAINER_DIRECT | SHP1, SHP2, SHP3, SHP4, SHP6, SHP7, SHP8, SHP9, SHP10, SHP11, SHP12, SHP13, SHP14, SHP15 |
 | F09 | Reg. 76 reconciliation of share capital audit XBRL | 2 | UNVERIFIED | UNKNOWN | — |
 | F10 | Reg. 23(9) related party transactions | 2 | VERIFIED | CONTAINER_DIRECT | X19 |
@@ -149,12 +149,12 @@
 | cadence | Annual (post-AGM) |
 | fetch_runtime | CONTAINER_DIRECT |
 | join_keys | symbol in the NSE file name (resolved on broadcast date), CIN, FY end |
-| target_tables | raw_xbrl_facts, filing_meta, fact_observations, group_structure |
-| unlocked_metrics | lease liabilities, gross block by class, CWIP, contingent liabilities, audit fees, R&D, royalty, geographic revenue, restated comparatives, Piotroski, Beneish, capex/depreciation, ROTE |
+| target_tables | raw_xbrl_facts, filing_meta, fact_observations, group_structure, related_party_transactions |
+| unlocked_metrics | lease liabilities, gross block by class, CWIP, contingent liabilities, audit fees, R&D, royalty, geographic revenue, restated comparatives, Piotroski, Beneish, capex/depreciation, ROTE, RPT leak % per counterparty, year-end share counts |
 | phase | 2 |
 | verification_status | VERIFIED |
-| evidence | X36, X37, A8, X69, X70, X71, X72, X73, X74, X75, X76, X112 |
-| notes | Parsed by REG34_ANNUAL (fetch-annual). No ISIN in the instance (X70). PPE schedule dimensional (X71). R&D 1/13, royalty 4/13 filings (X73). AOC-1 subsidiary / associate / JV schedule parsed into group_structure (X112; backfill-group-structure for filings promoted earlier). |
+| evidence | X36, X37, A8, X69, X70, X71, X72, X73, X74, X75, X76, X112, X113, X114 |
+| notes | Parsed by REG34_ANNUAL (fetch-annual). No ISIN in the instance (X70). PPE schedule dimensional (X71). R&D 1/13, royalty 4/13 filings (X73). AOC-1 subsidiary / associate / JV schedule parsed into group_structure (X112; backfill-group-structure for filings promoted earlier). Ind AS 24 related-party schedule parsed per counterparty into related_party_transactions (X113; backfill-rpt for filings promoted earlier). Year-end share counts are facts, cross-checked against Reg. 31 (X114, ANNUAL_SHARE_COUNT_DIFFERS). |
 
 ## F08 — Reg. 31 shareholding pattern XBRL
 
@@ -188,7 +188,7 @@
 | phase | 2 |
 | verification_status | UNVERIFIED |
 | evidence | — |
-| notes | BLOCKED 2026-11-15 (references A15): no Reg. 76 file in the vault ledger, the announcements RSS or TCS's announcements API for Jul-Nov 2026; BSE answers 403. The Reg. 31 total x paid-up capital cross-check (X103) stands in. |
+| notes | BLOCKED 2026-11-15 (references A15): no Reg. 76 file in the vault ledger, the announcements RSS or TCS's announcements API for Jul-Nov 2026; BSE answers 403. The Reg. 31 total x paid-up capital cross-check (X103) and the Reg. 34 year-end share counts cross-check (X114, annual stand-in; issued / subscribed / paid-up, not listed or demat) stand in. |
 
 ## F10 — Reg. 23(9) related party transactions
 
@@ -205,7 +205,7 @@
 | phase | 2 |
 | verification_status | VERIFIED |
 | evidence | X19 |
-| notes | Present in the corp and NBFC fixtures; per-counterparty tags not yet mapped. |
+| notes | Present in the corp and NBFC fixtures; the Reg. 23(9) per-counterparty rows (NameOfCounterParty, PANOfCounterParty, TypeOfRelatedPartyTransaction, AmountOfRelatedPartyTransactionDuringTheReportingPeriod) are not parsed yet (X113 OBSERVED: 25 committed Integrated Filings carry them). Per-counterparty RPT comes from the Reg. 34 annual schedule (F07, X113) for now. |
 
 ## F11 — SEBI PIT Reg. 7(2) insider trading disclosures
 

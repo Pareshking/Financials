@@ -171,6 +171,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="AOC-1 rows for annual filings promoted before batch H, from the vault (audited) [X112]",
     )
     bg.add_argument("--limit", type=int)
+    br = sub.add_parser(
+        "backfill-rpt",
+        help="related-party schedule rows for annual filings promoted before batch J, from the vault (audited) [X113]",
+    )
+    br.add_argument("--limit", type=int)
     sub.add_parser("audit-ytd", help="raise YTD_QUARTER_MISMATCH findings for every entity and scope [X80]")
     sub.add_parser("promote", help="apply all pending staged batches (single writer)")
     rb = sub.add_parser("rebuild-market", help="roll market-derived state back to a date and replay it (audited)")
@@ -364,6 +369,19 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
             apply_schema(con)
             con.execute("BEGIN")
             r = backfill_group_structure(con, Vault(vault_dir), limit=args.limit)
+            con.execute("COMMIT")
+        finally:
+            con.close()
+        print(json.dumps(r, indent=1), file=out)
+        return 1 if r["error_count"] else 0
+    if args.cmd == "backfill-rpt":
+        from financials.related_parties import backfill_rpt
+
+        con = connect(db_path)
+        try:
+            apply_schema(con)
+            con.execute("BEGIN")
+            r = backfill_rpt(con, Vault(vault_dir), limit=args.limit)
             con.execute("COMMIT")
         finally:
             con.close()

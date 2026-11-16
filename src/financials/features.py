@@ -20,7 +20,15 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
-from financials import features_bs, features_extra, features_gems, features_more, features_peers, features_pl
+from financials import (
+    features_bs,
+    features_extra,
+    features_gems,
+    features_more,
+    features_peers,
+    features_pl,
+    features_rpt,
+)
 from financials.corp_actions import ACCEPTED_STATUSES
 from financials.db import insert_rows, table_columns, version_key
 from financials.features_price import add_price_columns, refresh_breadth
@@ -66,7 +74,7 @@ from financials.timeutil import ist_to_utc, utc_now
 # Reader version of materialised rows. Bump it whenever features.py, fundamentals.py (or another file pinned by
 # tests/test_incremental_materialize.py) changes any output: `materialize --incremental` refuses days built by another
 # version, because only a full run then reproduces the history.
-FEATURES_VERSION = "2026.11.15-11I"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
+FEATURES_VERSION = "2026.11.15-12J"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
 # -3: QoQ sales / profit growth, NPM, interest coverage, OPM same quarter last year, dividend yield / payout,
 #     promoter holding QoQ change (owner_requirements items 1, 3, 4)
 # -4A: period P&L family (features_pl: quarter / fiscal-year lines, quarter YoY growth, result dates, history-gated
@@ -89,6 +97,8 @@ FEATURES_VERSION = "2026.11.15-11I"  # -2: X106 restatement TTM bridge + flag, X
 # -11I: batch I last catalogue rows (features_more.py: Beneish / Piotroski components, original Altman Z, accruals,
 #       depreciation rate, days changes, PB / P/S / EV/S percentiles, RS rank, volatility, drawdown, PEAD, index and
 #       corporate-action recency, segment mix, industry earnings breadth)
+# -12J: batch J related-party leak (features_rpt.py: rpt_leak_pct, purchases / royalty to sales, loans given to net
+#       worth, from the Reg. 34 related-party schedule [X113])
 
 CRITICAL_COLUMNS = ("close", "market_cap", "sales_ttm", "pat_ttm", "total_equity")
 G4_MAX_NULL_RISE = 0.015
@@ -556,6 +566,7 @@ def compute_rows(
     features_peers.add_columns(con, rows, as_of, as_of_ts, entities)  # batch H (industry / peers)
     features_extra.add_columns(con, rows, as_of, as_of_ts, fundamentals_cache, factors, entities)  # batch G
     features_more.add_columns(con, rows, as_of, as_of_ts, fundamentals_cache, factors, frozen, entities)  # batch I
+    features_rpt.add_columns(con, rows, as_of_ts, entities)  # batch J (related-party leak, X113)
     return rows
 
 

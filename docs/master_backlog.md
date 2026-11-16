@@ -86,7 +86,7 @@ M2 = A113, M3 = A94, M4 = A112, M5 = A114, M6 = B31, M7 = B51, M8 = G23.
 | G181 | Reg. 30 red-flag count | five separate 90-day counts; **no single "Reg 30 Red Flag Count" column** (L1271); `penalties_90d` always NULL | PARTLY NOT FOUND |
 | G187 | Saved custom ratios | `dsl.save_custom_ratio()` + `user_custom_ratios`; **no CLI command** to save one; not usable as output columns (M1) | PARTLY NOT FOUND |
 | G119 | Allotments / preferential / QIP / warrants | `corporate_events` ALLOTMENT rows; **no warrant-conversion tracker, no dilution column** (PDF L958-959) | PARTLY NOT FOUND (digest notes it) |
-| G99 | RPT from Reg. 23(9) | `rpt_total_amount` only; per-counterparty purchases / loans / royalties not mapped (`data_sources.yaml` F10 note) | PARTLY NOT FOUND (blocks G236) |
+| G99 | RPT from Reg. 23(9) | `rpt_total_amount`; per counterparty from the Reg. 34 annual schedule since batch J (`related_party_transactions`, X113); Reg. 23(9) half-yearly rows not parsed | **FIXED 2026-11-16 (batch J)** (annual; half-yearly rows open) |
 | G175 (new, e085eb5) | "OPM last year" | `opm_last_year_pct` = OPM of **the same quarter one year earlier**; Screener's "OPM last year" (the PDF's example `OPM > OPM last year`, L1254, L1267) and catalogue A4.20 = **FY** EBITDA / FY sales | BUILT WITH A DIFFERENT DEFINITION: rename to `opm_same_quarter_ly_pct` (it is the base of G204) and add the FY form. **FIXED 2026-11-15 (batch A)**: renamed `opm_preceding_year_quarter_pct` (DSL `opm same quarter last year`); `opm_last_year_pct` is now the FY OPM |
 
 Stale the other way (digest says open, code has it): G130 / G131 IN_PROGRESS, but segment and geography rows are
@@ -188,7 +188,7 @@ exists (file / column); Class.
 | A78 | 1660-1669 | net debt (incl. leases) / 3Y average FCF | G233 DONE | B2.14 BUILT (TTM; 3Y WHEN HISTORY) | `net_debt_to_fcf` (TTM); `net_debt_to_fcf_3y` (history-gated) (batch C, 2026-11-15) | **BUILT** |
 | A79 | 1671-1680 | effective cost of debt | G234 DONE | B2.16 BUILT | `cost_of_debt` | **BUILT** |
 | A80 | 1682-1686 | contingent liabilities / net worth | G235 DONE | B1.21 BUILT | `contingent_liabilities_to_net_worth` | **BUILT** |
-| A81 | 1697-1701 | RPT leak % (purchases + loans given + royalties) / revenue | G236 DOC_PLANNED | B1.19 BUILDABLE NOW (total) / NEEDS PARSER (split) | `rpt_total_amount` only | **CATALOGUE** |
+| A81 | 1697-1701 | RPT leak % (purchases + loans given + royalties) / revenue | G236 DONE | B1.19 BUILDABLE NOW (total) / BUILT (split, batch J) | `rpt_total_amount`; `related_party_transactions` [X113] -> `rpt_leak_pct` (batch J) | **CATALOGUE** |
 | A82 | 1703-1708 | composite forensic risk score (Piotroski + Beneish in one) | G237 OOS | B1.25 NOT POSSIBLE | separate columns (arch 10.2, owner review L2321) | **OOS** |
 | A83 | 1717-1726, 2786-2787 | unlevered FCF yield (interest add-back only when interest is in CFO) | G238, G304 DONE | B5.11 | `fcff_yield`, per-filing `interest_paid_cfo_class` | **BUILT** |
 | A84 | 1754-1763 | institutional absorption rate | G241 DOC_PLANNED | B7.5 BUILDABLE NOW (quarterly) | batch G: `institutional_absorption_90d` | **BUILT** |
@@ -235,12 +235,12 @@ exists (file / column); Class.
 | B01 | 801-805, 1029 | Integrated Filing quarterly XBRL + Reg. 34 annual XBRL (statements, segments, notes) | G90 DONE | — | `parsers/integrated.py`, `parsers/reg34_annual.py` (F06, F07) | **BUILT** |
 | B02 | 819-823 | Reg. 31 shareholding XBRL (promoter, FII, DII incl. MF / insurance / banks, public, pledge) | G91 DONE | — | `parsers/shareholding.py` (F08) | **BUILT** |
 | B03 | 819-823 | SAST 31(1)/31(2) encumbrance events with lender details | G92 DOC_PLANNED | B7.10 NEW FREE SOURCE | F12 | **CATALOGUE** |
-| B04 | 826-829, 904, 1498 | Reg. 76 share-capital audit (issued, listed, demat shares) | G93 DOC_PLANNED | — | F09 UNVERIFIED, BLOCKED: no NSE file found (probes A15, 2026-11-15); Reg. 31 stands in (decision C) | **DIGEST** |
+| B04 | 826-829, 904, 1498 | Reg. 76 share-capital audit (issued, listed, demat shares) | G93 DOC_PLANNED | — | F09 UNVERIFIED, BLOCKED: no NSE file found (probes A15, 2026-11-15); Reg. 31 stands in (decision C); batch J: Reg. 34 year-end share counts cross-checked (X114) | **DIGEST** |
 | B05 | 831-835 | full bhavcopy (`sec_bhavdata_full`) | G94, G101 DONE | — | F01, F02 | **BUILT** |
 | B06 | 832-835, 911-913, 1156 | NSE 4-tier industry classification ("in the exchange equity master CSV") | G96 DONE, G334 | A1.19 note | not in EQUITY_L (IDX10); from the NSE quote API (F30, IC1-IC3): `fetch-classification`, `entity_classification_history` (batch H) | **BUILT** |
 | B07 | 837-841 | corporate-actions feed + Reg. 30 board-outcome XBRL | G97 DONE | — | F03; outcome XBRL vaulted raw (E2) | **BUILT** |
 | B08 | 843-847 | credit-rating disclosure XBRL | G98 DOC_PLANNED | A1.23, B8.9 NEW FREE SOURCE | F22 | **CATALOGUE** |
-| B09 | 857-861 | Reg. 23(9) RPT XBRL | G99 DONE | B1.19 | `rpt_total_amount` (total only) | **BUILT** (partial) |
+| B09 | 857-861 | Reg. 23(9) RPT XBRL | G99 DONE | B1.19 | `rpt_total_amount`; per counterparty from the annual schedule (X113, batch J) | **BUILT** (partial) |
 | B10 | 864-867 | PIT Reg. 7(2) and SAST Reg. 29 XBRL | G100 DOC_PLANNED | B7.8 NEW FREE SOURCE | F11, F12 | **CATALOGUE** |
 | B11 | 869-873 | security-wise deliverable position CSV | G101 DONE | — | `raw_delivery` (F02) | **BUILT** |
 | B12 | 869-873 | bulk and block deals CSV | G102 DOC_PLANNED | B7.9 NEW FREE SOURCE | F14 | **CATALOGUE** |

@@ -311,7 +311,7 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 | B1.16 | Audit qualification flag (G105) | forensic | latest Reg. 34 `auditor_qualified`, Integrated Filing `audit_opinion` | BUILT | `rf_audit_qualified` (batch G) |
 | B1.17 | Restatement suspected (X106) | forensic | | BUILT | `restatement_suspected` (no DSL alias) |
 | B1.18 | Standalone-to-consolidated profit leakage (G278) | forensic | consolidated owners' PAT − standalone PAT, TTM and as % | BUILT | `standalone_pat_ttm`, `profit_leakage_pct`, `profit_leakage_latest_quarter_pct` (batch G; Reliance Q2 FY27 pinned) |
-| B1.19 | RPT intensity (G236, partial) | forensic | `rpt_total_amount` (H1) / H1 revenue | BUILT | `rpt_to_sales` (total / same-period sales, batch G). The per-counterparty split (G236) stays NEEDS PARSER |
+| B1.19 | RPT intensity (G236, partial) | forensic | `rpt_total_amount` (H1) / H1 revenue | BUILT | `rpt_to_sales` (total / same-period sales, batch G). Per-counterparty split (G236) BUILT in batch J from the Reg. 34 annual schedule [X113, C27]: `rpt_leak_pct`, `rpt_purchases_to_sales`, `rpt_royalty_to_sales`, `rpt_loans_given_to_net_worth`, `rpt_counterparties` |
 | B1.20 | Audit fees / revenue; managerial remuneration / PAT | governance | `audit_fees` / revenue; `li_managerial_remuneration` / PAT | BUILT | `audit_fees_to_sales` (a filed 0 → NULL, C26), `managerial_remuneration_to_pat` (batch G) |
 | B1.21 | Contingent liabilities / net worth (G235) | fragility | | BUILT | `contingent_liabilities_to_net_worth` |
 | B1.22 | Capital commitments / net worth | fragility | `li_estimated_amount_of_contracts_remaining_to_be_executed_on_capital_account_and_not_provided_for` / equity | BUILT | `capital_commitments_to_net_worth` (batch G) |

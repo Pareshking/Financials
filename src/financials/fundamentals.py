@@ -253,7 +253,7 @@ _BASIS = (
 SAME_BASIS = (
     "(NOT EXISTS (SELECT 1 FROM filing_meta b WHERE b.filing_id = fact_observations.filing_id) OR "
     "(SELECT any_value(" + _BASIS + ") FROM filing_meta b WHERE b.filing_id = fact_observations.filing_id) = "
-    "coalesce((SELECT arg_max(" + _BASIS + ", visible_from_ts) FROM filing_meta l WHERE l.entity_id = ? "
+    "coalesce((SELECT arg_max(" + _BASIS + ", (visible_from_ts, filing_id)) FROM filing_meta l WHERE l.entity_id = ? "
     "AND l.scope = ? AND l.visible_from_ts <= ? AND l.accounting_profile <> 'REG34_ANNUAL'), 'INDAS'))"
 )
 
@@ -327,7 +327,7 @@ def load_factbook(con, entity_id: str, scope: str, as_of: datetime) -> FactBook:
         + _ANNUAL_LAST
         + """, visible_from_ts DESC, corrected DESC, """
         + version_key()
-        + """ DESC) AS rn
+        + """ DESC, filing_id DESC) AS rn
                  FROM """
         + source
         + """)
@@ -427,7 +427,7 @@ def prefetch_fundamentals(con, as_of: datetime, entities=None) -> None:
         + _ANNUAL_LAST
         + """, visible_from_ts DESC, corrected DESC, """
         + version_key()
-        + """ DESC) AS rn
+        + """ DESC, filing_id DESC) AS rn
                  FROM """
         + source
         + """)

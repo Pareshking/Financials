@@ -78,7 +78,7 @@ from financials.timeutil import ist_to_utc, utc_now
 # Reader version of materialised rows. Bump it whenever features.py, fundamentals.py (or another file pinned by
 # tests/test_incremental_materialize.py) changes any output: `materialize --incremental` refuses days built by another
 # version, because only a full run then reproduces the history.
-FEATURES_VERSION = "2026.11.15-14P"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
+FEATURES_VERSION = "2026.11.15-15P"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
 # -3: QoQ sales / profit growth, NPM, interest coverage, OPM same quarter last year, dividend yield / payout,
 #     promoter holding QoQ change (owner_requirements items 1, 3, 4)
 # -4A: period P&L family (features_pl: quarter / fiscal-year lines, quarter YoY growth, result dates, history-gated
@@ -108,6 +108,9 @@ FEATURES_VERSION = "2026.11.15-14P"  # -2: X106 restatement TTM bridge + flag, X
 # -13: batches J and K merged
 # -14P: run-level materialisation (price_history.py, FundamentalsCache; architecture §11.11): identical rows, version
 #       bumped because the pinned files changed
+# -15P: deterministic reads that depended on DuckDB's scan order (found by scripts/compare_materialize.py on the live
+#       database): paid-up share count (latest period end, STANDALONE first, count > 0), segment members sharing a
+#       label add up, audit-opinion ties broken by filing_id
 
 CRITICAL_COLUMNS = ("close", "market_cap", "sales_ttm", "pat_ttm", "total_equity")
 G4_MAX_NULL_RISE = 0.015
@@ -456,8 +459,13 @@ def _preload(con, as_of_ts: datetime, entities=None):
     paid_up = dict(
         (ent, (Decimal(v), d))
         for ent, v, d in con.execute(
-            """SELECT entity_id, arg_max(value_other, period_end), max(period_end) FROM fact_observations
-               WHERE canonical_tag = 'shares_from_paid_up' AND visible_from_ts <= ?"""
+            # Latest period end; at one end the STANDALONE count (the issuer's own share capital; consolidated and
+            # standalone filings of one quarter can differ in the rounding of the capital), then the latest visible,
+            # then filing_id: a deterministic pick (an unbroken tie took whichever row the scan met). A count <= 0 is
+            # not a share count (a consolidated filing tagged paid-up capital 0): never used.
+            """SELECT entity_id, arg_max(value_other, (period_end, scope = 'STANDALONE', visible_from_ts, filing_id)),
+                      max(period_end) FROM fact_observations
+               WHERE canonical_tag = 'shares_from_paid_up' AND value_other > 0 AND visible_from_ts <= ?"""
             + only
             + " AND "
             + CURRENT_VERSION

@@ -624,6 +624,16 @@ only because the pinned files changed).
   sparse trading), and the materialised tables of the fixture market and of the fixture market extended with long
   synthetic histories (`bench.extend_synthetic`), both paths. `scripts/compare_materialize.py DB --from --to
   [--every N]` runs the same comparison on a copy of a real database.
+- **Determinism** (-15P). The first comparison on the live database found rows that differed between the two
+  paths and between two runs of the same query. They came from reads whose result depended on DuckDB's scan order,
+  shared by both paths: the paid-up share count (`arg_max(value_other, period_end)` tied between the STANDALONE and
+  CONSOLIDATED filings of one quarter, 225.4 vs 225.5 million shares; one consolidated filing tagged 0), two
+  segment members filed under one label ("Others" twice: the last row scanned won) and audit-opinion ties on
+  `visible_from_ts`. Now: the share count of the latest period end, STANDALONE first (the issuer's own capital),
+  then latest visible, then filing_id, counts <= 0 ignored; segment rows in a fixed order, members sharing a label
+  add up, a member reported by two elements counts once; audit ties broken by filing_id
+  (`tests/test_materialize_determinism.py`). Every other read under `_fundamentals` and the period-value stages
+  ranks with a full tie-break (filing_id / parser version) or groups by its key.
 - Not done: parallel day computation. DuckDB lets no other process open the database file while the single writer
   holds it, and the per-day Python work is GIL-bound, so worker processes would need their own copy of every input;
   after the changes above a day of ~3,000 securities is ~1.5-2 s (half per-row Python, half the Arrow insert, the

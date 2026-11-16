@@ -436,12 +436,14 @@ def action_columns(actions: list[tuple], as_of: date) -> dict:
 
 
 def segment_inputs(con, as_of_ts: datetime, entities=None) -> dict[tuple[str, str], list[tuple]]:
-    """(entity, scope) -> [(metric, period, months, key, label, value)] of BUSINESS SEGMENT members, point in time
-    (the `load_segments` rule: per axis / element / period, every member of the latest visible filing)."""
+    """(entity, scope) -> [(metric, period, months, key, label, value, member)] of BUSINESS SEGMENT members, point in
+    time (the `load_segments` rule: per axis / element / period, every member of the latest visible filing), in a
+    fixed order (metric, period, axis, element, member) so `segment_columns` never depends on the scan order."""
     only, only_p = entity_filter("entity_id", entities)
     out: dict[tuple[str, str], list[tuple]] = defaultdict(list)
-    for ent, scope, metric, start, end, months, member, label, value in con.execute(
-        """SELECT entity_id, scope, canonical_metric, period_start, period_end, period_months, member, label, value_inr
+    for ent, scope, metric, start, end, months, member, label, value, axis in con.execute(
+        """SELECT entity_id, scope, canonical_metric, period_start, period_end, period_months, member, label, value_inr,
+                  axis
            FROM segment_observations
            WHERE visible_from_ts <= ? AND axis_kind = 'BUSINESS' AND period_type = 'DURATION'
              AND member_role = 'SEGMENT' AND canonical_metric IN ('REVENUE', 'RESULT') AND """
@@ -449,11 +451,12 @@ def segment_inputs(con, as_of_ts: datetime, entities=None) -> dict[tuple[str, st
         + only
         + """ QUALIFY dense_rank() OVER (
                PARTITION BY entity_id, scope, axis_kind, axis, element, period_start, period_end
-               ORDER BY visible_from_ts DESC, filing_id DESC) = 1""",
+               ORDER BY visible_from_ts DESC, filing_id DESC) = 1
+           ORDER BY entity_id, scope, canonical_metric, period_end, period_start, axis, element, member""",
         [as_of_ts, *only_p],
     ).fetchall():
         out[(ent, scope)].append((metric, (start, end), months, (label or member.split(":")[-1]).strip().lower(),
-                                  label or member.split(":")[-1], Decimal(value)))  # fmt: skip
+                                  label or member.split(":")[-1], Decimal(value), (axis, member)))  # fmt: skip
     return out
 
 
@@ -461,13 +464,21 @@ def segment_columns(rows: list[tuple] | None) -> dict:
     out = dict.fromkeys(SEGMENT_COLUMNS)
     if not rows:
         return out
+    # Segments are matched by filed label. Two members filed under one label (two "Others" lines) are one segment:
+    # their values add up. A member reported twice (by two elements) counts once: the first row, in the fixed order
+    # of `segment_inputs`. [Before: the last row of an unordered scan won, so the value depended on the scan.]
+    members: dict[tuple, dict[tuple, dict]] = defaultdict(lambda: defaultdict(dict))
+    labels: dict[tuple, str] = {}
+    for metric, period, months, key, label, value, *member in rows:
+        per = members[metric][(period, months, key)]
+        per.setdefault(member[0] if member else key, value)
+        labels.setdefault((period, months, key), label)
     rev: dict[tuple, dict[str, tuple[str, Decimal]]] = defaultdict(dict)
     res: dict[tuple, dict[str, Decimal]] = defaultdict(dict)
-    for metric, period, months, key, label, value in rows:
-        if metric == "REVENUE":
-            rev[(period, months)][key] = (label, value)
-        else:
-            res[(period, months)][key] = value
+    for (period, months, key), per in members["REVENUE"].items():
+        rev[(period, months)][key] = (labels[(period, months, key)], sum(per.values(), ZERO))
+    for (period, months, key), per in members["RESULT"].items():
+        res[(period, months)][key] = sum(per.values(), ZERO)
     if not rev:
         return out
     # latest period end; at that end the shortest period (the quarter of a quarterly filing, else the FY)

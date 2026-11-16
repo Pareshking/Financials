@@ -456,9 +456,9 @@ def event_inputs(con, as_of: date, as_of_ts: datetime, entities=None) -> dict[st
         out[ent] |= {"litigations_90d": lit, "allotments_90d": allot, "fund_raising_events_90d": fund}
     for ent, annual, opinion in con.execute(
         """SELECT entity_id,
-                  arg_max(auditor_qualified, visible_from_ts) FILTER (WHERE accounting_profile = 'REG34_ANNUAL'
-                                                                       AND auditor_qualified IS NOT NULL),
-                  arg_max(audit_opinion, visible_from_ts) FILTER (WHERE audit_opinion IS NOT NULL)
+                  arg_max(auditor_qualified, (visible_from_ts, filing_id))
+                      FILTER (WHERE accounting_profile = 'REG34_ANNUAL' AND auditor_qualified IS NOT NULL),
+                  arg_max(audit_opinion, (visible_from_ts, filing_id)) FILTER (WHERE audit_opinion IS NOT NULL)
            FROM filing_meta WHERE visible_from_ts <= ?"""
         + only
         + " GROUP BY entity_id",

@@ -377,3 +377,16 @@ def test_run_day_without_a_date_is_allowed_and_skips_publishing_a_holiday(tmp_pa
     main(["--data-dir", str(tmp_path), "run-day", "--date", "2026-11-14", "--lookback-days", "0"],
          transport=Offline(), out=out)  # fmt: skip
     assert "2026-11-14: not a trading day; nothing to materialise" in out.getvalue()
+
+
+def test_quote_answer_without_metadata_is_a_parse_error_not_a_crash():
+    """STLTECH's quote answer had `metaData: null` (2026-11-16): ParseError, not AttributeError."""
+    import json
+
+    from financials.parsers import ParseError
+    from financials.parsers.classification import parse_quote_classification
+
+    doc = json.loads((FIXTURES / "classification" / "GetQuoteApi_getSymbolData_TCS.json").read_bytes())
+    doc["equityResponse"][0]["metaData"] = None
+    with pytest.raises(ParseError):
+        parse_quote_classification(json.dumps(doc).encode())

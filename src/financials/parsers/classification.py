@@ -53,6 +53,9 @@ def parse_quote_classification(data: bytes) -> Classification:
         meta, sec = item["metaData"], item["secInfo"]
     except (UnicodeDecodeError, json.JSONDecodeError, KeyError, IndexError, TypeError) as exc:
         raise ParseError(f"quote classification: {exc}") from exc
+    if not isinstance(meta, dict) or not isinstance(sec, dict):
+        # STLTECH (2026-11-16): the quote answer carried `metaData: null`; a ParseError keeps the batch going.
+        raise ParseError("quote classification: no metaData / secInfo in the answer")
     symbol, series, isin = _text(meta.get("symbol")), _text(meta.get("series")), _text(meta.get("isinCode"))
     if not symbol or not series or not isin:
         raise ParseError(f"quote classification: missing symbol / series / ISIN in {meta!r:.200}")

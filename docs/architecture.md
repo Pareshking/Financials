@@ -31,7 +31,7 @@ Operator commands (`python -m financials --data-dir data …`):
 | `rebuild-market --from D` | rolls market-derived state back to `D` (bars, bhavcopy/inferred calendar rows, identifier intervals, auto-decided corporate actions, feature history), replays the staged days and re-materialises; raw tables untouched; audited in `admin_log` |
 | `materialize D` / `materialize --from D1 --to D2` | builds features for `D` (or every promoted trading day in the range, ascending) with gates G4/G5; consumes the dirty markers the range covers (§11.10) |
 | `materialize --incremental [--to D]` | recomputes only the rows marked dirty since the last run, on already-materialised days, with G4/G5 on each merged day (§11.10); refuses when a day was built by another `FEATURES_VERSION` |
-| `compact [--keep-old]` | CHECKPOINT, copy every table into a sibling file created from `schema.sql`, verify row counts and views, swap the files atomically (§4.1). Refuses when free disk < 1.1 x the live size. Also runs at the end of a full `materialize --from/--to`, `rebuild-market` and `prune-versions` when there is dead space and room (`--no-compact` skips it) |
+| `compact [--keep-old \| --spill DIR]` | `--spill`: low-disk mode through verified Parquet (§4.1). Otherwise CHECKPOINT, copy every table into a sibling file created from `schema.sql`, verify row counts and views, swap the files atomically (§4.1). Refuses when free disk < 1.1 x the live size. Also runs at the end of a full `materialize --from/--to`, `rebuild-market` and `prune-versions` when there is dead space and room (`--no-compact` skips it) |
 | `prune-versions [--archive DIR] [--dry-run]` | archives (zstd Parquet + manifest + `admin_log`) and then deletes the rows of superseded parser versions no reader can select (decision I, §4.1) |
 | `run-day --date D` | holiday list, market days D−7..D, corporate actions D−7..D+30, discovery for symbols with results in the day's RSS (A9) + Reg. 30 events, promote, `materialize --incremental --to D−1`, materialise D in full; idempotent |
 | `screen "QUERY" [--as-of D]` | runs a DSL screen on the live table or point-in-time on history (read-only connection) |
@@ -114,6 +114,12 @@ deleted and rewrote the history, and every re-parse added a full copy of a filin
   (`ops/cron/financials.cron`) and after full rebuilds; full `materialize --from/--to`, `rebuild-market` and
   `prune-versions` run it themselves when >= 20% (and >= 256 MB) of the file is dead and the disk has room, else
   print the command.
+- **`compact --spill DIR`** (`compact_via_spill`, low disk; added 2026-11-16 when the container had 3.3 GB free for a
+  6 GB live size): every table is exported to zstd Parquet under DIR and each export's content digest (row count,
+  xor and sum of row hashes) is checked against the table; a manifest marks the spill complete; only then is the
+  database deleted, recreated from `schema.sql`, reloaded in schema order and every digest re-checked before the
+  spill is removed. Needs room for the Parquet only. An interruption after the delete is resumed by re-running
+  with the same DIR (the manifest is the checkpoint).
 - **`prune-versions`** (owner decision I, `financials.storage.PRUNE_RULES`): deletes the rows of superseded parser
   versions that no reader can select, after writing them to `DIR/prune-<UTC time>/<table>/parser_version=<v>/
   rows.parquet` (zstd) with `manifest.json` (table, version, rows, sha256), reading each file back, and logging the

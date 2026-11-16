@@ -380,3 +380,48 @@ def test_prune_cli_dry_run_reports_and_changes_nothing(base, tmp_path):
     out = io.StringIO()
     assert main(["--data-dir", str(tmp_path), "prune-versions", "--no-compact"], out=out) == 0, out.getvalue()
     assert "PRUNED" in out.getvalue() and (tmp_path / "archive").is_dir()
+
+
+def test_compact_through_a_parquet_spill_keeps_every_row_and_resumes(base, tmp_path, monkeypatch):
+    path = _copy(base, tmp_path)
+    con = connect(path)
+    days = _days(con)
+    for _ in range(3):
+        assert materialize_dates(con, None, days[0], None, io.StringIO()) == 0
+    con.execute("CHECKPOINT")
+    before = _everything(con)
+    views = storage.user_views(con)
+    con.close()
+    size = os.path.getsize(path)
+    spill = tmp_path / "spill"
+    # an interruption after the verified export and the delete: the rerun loads the spill
+    real = storage.apply_schema
+    calls = {"n": 0}
+
+    def boom(c):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise KeyboardInterrupt
+        return real(c)
+
+    monkeypatch.setattr(storage, "apply_schema", boom)
+    with pytest.raises(KeyboardInterrupt):
+        storage.compact_via_spill(path, spill)
+    assert (spill / storage.SPILL_MANIFEST).exists()
+    monkeypatch.setattr(storage, "apply_schema", real)
+    out = io.StringIO()
+    assert main(["--data-dir", str(tmp_path), "compact", "--spill", str(spill)], out=out) == 0, out.getvalue()
+    assert "COMPACTED" in out.getvalue() and not spill.exists()
+    assert os.path.getsize(path) < size
+    con = connect(path, read_only=True)
+    assert _everything(con) == before
+    assert storage.user_views(con) == views
+    con.close()
+
+
+def test_compact_spill_refuses_without_room_and_changes_nothing(base, tmp_path):
+    path = _copy(base, tmp_path)
+    data = path.read_bytes()
+    r = storage.compact_via_spill(path, tmp_path / "spill", free_bytes=1024)
+    assert r.status == "REFUSED" and "Parquet spill" in r.message
+    assert path.read_bytes() == data and not (tmp_path / "spill").exists()

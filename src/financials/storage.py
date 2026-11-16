@@ -8,6 +8,8 @@ parser versions therefore leave dead space behind. Both commands run inside the 
   every foreign key finds its parent), verify each table's row count and the views, then swap the files
   (`market.duckdb` -> `market.duckdb.bak`, new -> `market.duckdb`; the .bak is deleted unless `keep_old`). Refuses
   when the free disk is below 1.1 x the live size (blocks in use by the tables, `pragma_storage_info`).
+  `compact --spill DIR` (low disk): export every table to verified zstd Parquet, recreate the file, reload and verify
+  (`compact_via_spill`); needs room for the Parquet only.
 - `prune-versions` (owner decision I, 2026-11-16): delete the rows of superseded parser versions that no reader can
   select, after writing them to zstd Parquet under an archive directory with a manifest (table, version, rows,
   sha256) and an `admin_log` entry. The vault blobs stay the source of truth: every version is reproducible by a
@@ -180,6 +182,114 @@ def compact(db_path: Path, *, keep_old: bool = False, free_bytes: int | None = N
     kept = f"; previous file kept as {bak_path.name}" if keep_old else ""
     return CompactResult("COMPACTED", f"{before / 1e9:.2f} GB -> {after / 1e9:.2f} GB{kept}", before, after, live,
                          rows)  # fmt: skip
+
+
+# ── compact through a Parquet spill (low disk) ──────────────────────────────
+
+SPILL_MANIFEST = "manifest.json"
+
+
+def _digest(con, table: str, cols: list[str], catalog: str = "") -> str:
+    """Order-independent content digest of a table: row count and the xor and sum of the row hashes."""
+    src = f"{catalog}.main.{table}" if catalog else table
+    sel = ", ".join(f'"{c}"' for c in cols)
+    n, x, s = con.execute(
+        f"SELECT count(*), bit_xor(h), sum(h::HUGEINT) FROM (SELECT hash(ROW({sel})) AS h FROM {src})"
+    ).fetchone()
+    return f"{n}:{x or 0}:{s or 0}"
+
+
+def compact_via_spill(db_path: Path, spill: Path, *, free_bytes: int | None = None) -> CompactResult:
+    """Compact when the disk cannot hold a second copy of the database: export every table to zstd Parquet under
+    `spill`, verify each export's row count and content digest, delete the database, recreate it from schema.sql,
+    load the Parquet back in schema order and verify every table's digest against the manifest before the spill is
+    deleted. Needs free disk for the Parquet (about a third of the live size) instead of 1.1 x live size.
+
+    The window between deleting the database and the verified load is covered by the manifest: re-running with the
+    same `spill` after an interruption resumes the load from the verified Parquet (the database is then absent or a
+    partial new file). `free_bytes` overrides the measured free disk (tests)."""
+    db_path, spill = Path(db_path), Path(spill)
+    manifest_path = spill / SPILL_MANIFEST
+    manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else None
+    before = os.path.getsize(db_path) if db_path.exists() else 0
+    if manifest is None or not manifest.get("exported"):
+        if not db_path.exists():
+            raise StorageError(f"no database at {db_path} and no verified spill at {spill}")
+        if spill.exists():
+            shutil.rmtree(spill)  # an export that never finished; the database is intact
+        try:
+            con = connect(db_path)
+        except duckdb.IOException as exc:
+            return CompactResult("REFUSED", f"database busy (another process holds {db_path.name}): {exc}")
+        try:
+            live, before = _measure(con)
+            free = shutil.disk_usage(spill.parent if spill.parent.exists() else db_path.parent).free
+            free = free if free_bytes is None else free_bytes
+            need = int(0.5 * live)  # zstd Parquet of the live tables, with margin
+            if free < need:
+                return CompactResult("REFUSED", f"free disk {free / 1e9:.2f} GB < 0.5 x live size "
+                                     f"{live / 1e9:.2f} GB for the Parquet spill", before, 0, live)  # fmt: skip
+            tables = user_tables(con)
+            order = [t for t in _schema_tables() if t in tables]
+            extra = [t for t in tables if t not in order]
+            if extra:
+                return CompactResult("REFUSED", f"tables not declared in schema.sql: {extra}", before, 0, live)
+            here = con.execute("SELECT current_database()").fetchone()[0]
+            spill.mkdir(parents=True)
+            con.execute("SET preserve_insertion_order = false")
+            entries = []
+            for t in order:
+                cols = _columns(con, here, t)
+                digest = _digest(con, t, cols)
+                path = spill / f"{t}.parquet"
+                con.execute(f"COPY {t} TO '{path}' (FORMAT parquet, COMPRESSION zstd)")
+                sel = ", ".join(f'"{c}"' for c in cols)
+                n, x, s = con.execute(
+                    f"SELECT count(*), bit_xor(h), sum(h::HUGEINT) FROM (SELECT hash(ROW({sel})) AS h FROM "
+                    f"read_parquet('{path}'))"
+                ).fetchone()
+                if f"{n}:{x or 0}:{s or 0}" != digest:
+                    raise StorageError(f"{t}: the Parquet export does not match the table ({digest})")
+                entries.append({"table": t, "columns": cols, "digest": digest, "rows": n})
+            manifest = {"exported": True, "db": str(db_path), "live_bytes": live, "before_bytes": before,
+                        "tables": entries}  # fmt: skip
+            tmp = manifest_path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(manifest, indent=1))
+            os.replace(tmp, manifest_path)  # the spill is complete and verified only from here on
+        except BaseException:
+            con.close()
+            if not manifest_path.exists():
+                shutil.rmtree(spill, ignore_errors=True)
+            raise
+        con.close()
+        if Path(str(db_path) + ".wal").exists():
+            raise StorageError(f"{db_path}.wal still exists after closing the database; nothing deleted")
+    # the verified spill holds every row: replace the database with a fresh one loaded from it
+    db_path.unlink(missing_ok=True)
+    Path(str(db_path) + ".wal").unlink(missing_ok=True)
+    con = connect(db_path)
+    try:
+        apply_schema(con)
+        con.execute("SET preserve_insertion_order = false")
+        for e in manifest["tables"]:
+            t, cols = e["table"], e["columns"]
+            if set(_columns(con, con.execute("SELECT current_database()").fetchone()[0], t)) != set(cols):
+                raise StorageError(f"{t}: columns of schema.sql differ from the spill; the spill at {spill} is kept")
+            sel = ", ".join(f'"{c}"' for c in cols)
+            con.execute(f"INSERT INTO {t} ({sel}) SELECT {sel} FROM read_parquet('{spill / (t + '.parquet')}')")
+        for e in manifest["tables"]:
+            got = _digest(con, e["table"], e["columns"])
+            if got != e["digest"]:
+                raise StorageError(f"{e['table']}: loaded {got}, spill {e['digest']}; the spill at {spill} is kept")
+        con.execute("CHECKPOINT")
+    finally:
+        con.close()
+    shutil.rmtree(spill)
+    after = os.path.getsize(db_path)
+    rows = {e["table"]: e["rows"] for e in manifest["tables"]}
+    before = manifest.get("before_bytes", before)
+    return CompactResult("COMPACTED", f"{before / 1e9:.2f} GB -> {after / 1e9:.2f} GB (through a Parquet spill)",
+                         before, after, manifest.get("live_bytes", 0), rows)  # fmt: skip
 
 
 def _columns(con, catalog: str, table: str) -> list[str]:

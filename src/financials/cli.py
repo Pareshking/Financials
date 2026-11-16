@@ -186,6 +186,12 @@ def build_parser() -> argparse.ArgumentParser:
     rb.add_argument("--no-compact", action="store_true", help="do not compact the database file afterwards")
     cp = sub.add_parser("compact", help="rewrite the database file without dead space (verified copy, atomic swap)")
     cp.add_argument("--keep-old", action="store_true", help="keep the previous file as market.duckdb.bak")
+    cp.add_argument(
+        "--spill",
+        type=Path,
+        help="low disk: go through verified Parquet in this directory instead "
+        "of a second database file (resumes an interrupted run)",
+    )
     pv = sub.add_parser(
         "prune-versions", help="archive to Parquet, then delete, superseded parser versions (decision I)"
     )
@@ -448,6 +454,12 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
     if args.cmd == "compact":
         from financials.storage import compact
 
+        if args.spill is not None:
+            from financials.storage import compact_via_spill
+
+            r = compact_via_spill(db_path, args.spill)
+            print(f"compact: {r.status} {r.message}", file=out)
+            return 0 if r.status == "COMPACTED" else 1
         if not db_path.exists():
             print(f"error: no market database at {db_path}", file=out)
             return 2

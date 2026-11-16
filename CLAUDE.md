@@ -36,7 +36,7 @@ python -m financials --data-dir data materialize --incremental                 #
 # features.FEATURES_VERSION and the pinned hash together; --incremental then refuses until a full --from/--to run.
 python -m financials --data-dir data load-kpis kpis.csv                        # supplemental KPIs (then promote)
 python -m financials --data-dir data export-bundle --out data/bundle           # zstd Parquet shards; never commit them
-python -m financials --data-dir data compact [--keep-old]                      # monthly: rewrite the file without dead space
+python -m financials --data-dir data compact [--keep-old | --spill data/spill]  # monthly: rewrite without dead space (--spill: low disk)
 python -m financials --data-dir data prune-versions [--dry-run] [--archive DIR]  # archive + delete superseded parser versions
 python -m financials --data-dir data backfill-index --manifest reference/nifty500_changes.csv
 python -m financials.bench --out docs/benchmarks.md                # after performance-relevant changes

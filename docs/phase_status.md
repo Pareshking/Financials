@@ -46,36 +46,46 @@ the full line-by-line audit of the PDF is `docs/master_backlog.md`; ratios are i
 | Reg. 34 annual XBRL: AOC-1 subsidiary/associate/JV tree | DONE (batch H) | `group_structure` from the schedule already in committed annual fixtures (X112); `backfill-group-structure` for filings promoted earlier |
 | Reg. 31 shareholding (full) | DONE | incl. pledge, FII/DII/MF/insurance/retail, shareholder count |
 | Reg. 76 share capital reconciliation | **BLOCKED** (G93) | no machine-readable NSE source found (probes A15, 2026-11-15); F09 UNVERIFIED; Reg. 31 x paid-up cross-check stands in, plus (batch J) the Reg. 34 year-end share counts cross-checked against both (X114, ANNUAL_SHARE_COUNT_DIFFERS; annual only, no listed / demat split) |
-| Reg. 34 annual XBRL: related parties per counterparty | DONE (batch J) | `related_party_transactions` from the Ind AS 24 schedule (X113, `parsers/rpt.py`); `backfill-rpt` for filings promoted earlier; Reg. 23(9) half-yearly rows (X19) not parsed yet |
+| Reg. 34 annual XBRL: related parties per counterparty | DONE (batch J; Reg. 23(9) rows 2026-11-16) | `related_party_transactions` from the Ind AS 24 schedule (X113, `parsers/rpt.py`); Reg. 23(9) rows of standalone Q2 / Q4 Integrated Filings in `reg23_related_party_transactions` (X115, `parsers/reg23_rpt.py`; data only, R13); `backfill-rpt` fills both for filings promoted earlier |
 | Materialized screener_features + DSL-to-SQL compiler | DONE | ~490 columns, saved screens, custom ratios |
 | §7 adds: corporate-action auto-adjuster | DONE | prices adjusted for splits/bonus/rights/demergers |
 | §7 adds: AMFI monthly MF holdings | Moved to Phase 3 by the PDF's own review (per-AMC files, R8) | quarterly MF % from Reg. 31 is built |
 | §7 adds: PIT/SDD insider, bulk/block deals | Phase 3 in §5 (G100, G102, G138) | sources UNVERIFIED / OBSERVED |
 
-**Phase 2 pending: functionality**
-1. Reg. 76 (G93), above: BLOCKED until a source is found. (AOC-1 group tree G277: done in batch H.)
-2. ~~Merger lineage: target -> acquirer, swap ratio, MERGED status, backtest conversion (G37, G56, G57, G58);
-   demerger cost-of-acquisition split (G51).~~ **Built 2026-11-15 (batch F)**: `entity_lineage`, `lineage
-   add/amend/coa/retire/load/list`, `lineage.convert_position` (architecture §11.7). Still BLOCKED: automatic merger
-   detection (no merger purpose in the corp-action feed, no circular fixture, CA14) and automatic ratios / COA
-   percentages (PDF only; R7 UNVERIFIED): both are admin entries with an evidence URL until a source is verified.
-3. Share classes: DVR / partly-paid ISINs and market cap summed across classes (G275, G336). **BLOCKED** (2026-11-15):
-   the classes exist in the committed bhavcopies (P17: partly-paid = `IN9` + series E1, e.g. OLAPP; DVR in EQ / BZ with
-   `IN9` or `INE` ISINs: JISLDVREQS, FELDVR, GATECHDVR; each shares the issuer code with its ordinary share, so G306 /
-   R10 are corrected). Not built because (a) partly-paid trade only in series E1, outside the v1 universe (needs an
-   owner decision to admit E1), (b) summing market cap needs the share count per class, and whether Reg. 31 counts
-   DVR shares with the ordinary shares is unverified: no DVR issuer is in the Nifty 500 and no such pattern is
-   committed or in the vault, (c) no fixture states a DVR voting-rights ratio or face value.
-4. **DONE (2026-11-15, batch E)** Restatement detector: `restatement_suspected` now also fires on discontinued
-   operations != 0 (X108, G67) and a logged MERGER / DEMERGER (X109, G68) in the last 5 quarters
-   (`FactBook.restatement_triggers`); Reg. 34 prior-year columns are compared with the stored FY figures at promotion,
-   differences are CONSISTENCY / ANNUAL_PRIOR_YEAR_DIFFERS findings (X110, G328; TCS FY26 restates FY25 directors'
-   remuneration and salaries). The YTD trigger is X106. Owner decision E: no PDF recovery of restated quarters.
-5. **DONE (2026-11-15, batch E)** BSE scrip codes from the in-filing ScripCode (X111, G79); a disagreement with a stored
-   code is IDENTIFIER / BSE_SCRIP_CODE_CONFLICT.
-6. **DONE (2026-11-15, batch E)** Mutual-fund holding for the 2022 Reg. 31 taxonomy: `MutualFundsOrUtiMember` and its
-   holder axis map to MUTUAL_FUNDS (SHP20, parser 0.10.4). A `restage` of the Q3-Q4 FY25 shareholding files is needed
-   on the live database for the MF columns of those quarters.
+**Phase 2 built since the PDF (one line each; details in the batch notes below and in architecture.md)**
+- Merger lineage and demerger COA split as audited admin edges (batch F, arch §11.7); restatement detector triggers
+  X106-X110 (batch E; owner decision E: no PDF recovery of restated quarters); BSE scrip codes (X111, G79); 2022 Reg. 31
+  mutual-fund member (SHP20; a `restage` of the Q3-Q4 FY25 shareholding files is needed on the live database).
+- Related parties per counterparty: the Reg. 34 annual schedule (batch J, X113, `rpt_*` columns) and, 2026-11-16, the
+  Reg. 23(9) rows of standalone Q2 / Q4 Integrated Filings (`reg23_related_party_transactions`, X115,
+  `parsers/reg23_rpt.py`, promoted with each results filing and by `backfill-rpt`; data only, see blocked item 4).
+
+**Phase 2 pending (2026-11-16): only blocked items remain, each with its evidence**
+1. **Reg. 76 share-capital reconciliation (G93): BLOCKED.** No machine-readable NSE source: probes A15 (2026-11-15:
+   vault ledger, announcements RSS, TCS announcements API) found none; BSE answers 403 (A1); F09 UNVERIFIED. Stand-ins
+   built: Reg. 31 x paid-up (X103) and the Reg. 34 year-end share counts (X114).
+2. **Automatic merger detection and automatic entitlement / COA ratios: BLOCKED.** No merger purpose in the
+   corp-action feed and no delisting-circular fixture (CA14); ratios and COA percentages are published only in PDFs
+   (R7, R15 UNVERIFIED). Admin entries with an evidence URL until a source is verified.
+3. **Share classes (G275, G336): BLOCKED.** The classes exist in the committed bhavcopies (P17: partly-paid = `IN9` +
+   series E1, e.g. OLAPP; DVR in EQ / BZ with `IN9` or `INE` ISINs: JISLDVREQS, FELDVR, GATECHDVR; each shares the
+   issuer code with its ordinary share, so G306 / R10 are corrected). Not built because (a) partly-paid trade only in
+   series E1, outside the v1 universe (needs an owner decision to admit E1), (b) summing market cap needs the share
+   count per class, and whether Reg. 31 counts DVR shares with the ordinary shares is unverified: no DVR issuer is in
+   the Nifty 500 and no such pattern is committed or in the vault, (c) no fixture states a DVR voting-rights ratio or
+   face value.
+4. **A half-yearly RPT view from the Reg. 23(9) rows: BLOCKED** on R13. The rows sit on the filing's quarter context and
+   NETWEB filed identical amounts under an Oct-Mar and a Jan-Mar context (X115), so whether they are quarter or
+   half-year amounts is unverified. Needs a Reg. 23(9) or results PDF to compare with the XBRL rows.
+5. **Penalty amounts (G118): BLOCKED** on an E12 content fixture (`penalties_90d` stays NULL). Reg. 30 acquisition
+   events as a second G276 input: no acquisition event type is parsed and no such fixture is committed (G276 itself is
+   built from the business-combination cash outflow, C26).
+6. **Filed ISCR / DSCR (catalogue B1.24): BLOCKED** on an evidence row: the filed values are implausible (C26).
+7. **Price to quarterly earnings (catalogue A1.12): BLOCKED** on Screener's definition (UNVERIFIED).
+
+Not built by decision or evidence: order book to sales (G115, CONFLICTS_WITH_EVIDENCE: no order-book element in
+`docs/tag_registry.yaml` or any committed fixture; only per-order Reg. 30 amounts, already `order_value_90d`); "Is
+SME" (A1.24, a constant in an SME-free universe, C7); XBRL anchor locking of PDF columns (G69, decision E).
 
 **Phase 2 ratios: built 2026-11-15 (batch G, features `2026.11.15-8G`, `features_extra.py`, arch §10.7)**
 Margin acceleration (G152), gross / contribution margin expansion (G257), A&P intensity and marketing efficiency (G256,
@@ -94,16 +104,6 @@ depreciation rate and asset-age proxy, Δ debtor days / Δ CCC on FY and half-ye
 spike (G283 flag), PEAD tracker (G151), sector earnings breadth per NSE industry (G205), Nifty 500 inclusion /
 exclusion in 90 days, ex-date recency and days to the next ex-date, segment mix (G130 columns). Industry medians, peer
 ranks and premiums (A1.19, B5.7, B5.8) were built by batch H.
-
-**Phase 2 pending: ratios**
-1. ~~RPT leak % per counterparty type (G236)~~ **Built 2026-11-16 (batch J, features `2026.11.15-12J`)**: `rpt_leak_pct`,
-   `rpt_purchases_to_sales`, `rpt_royalty_to_sales`, `rpt_loans_given_to_net_worth` from the annual related-party
-   schedule (X113, C27). Open: the Reg. 23(9) half-yearly per-counterparty rows (X19) for a fresher H1 view.
-2. Order book to sales (G115) only if a filing tags an order book; otherwise drop.
-3. Penalty amounts (G118, needs an E12 content fixture); Reg. 30 acquisition events for G276 (no event type parsed).
-4. Filed ISCR / DSCR (catalogue B1.24): filed values are implausible (C26); needs an evidence row first.
-5. Price to quarterly earnings (catalogue A1.12) waits on Screener's definition (UNVERIFIED); "Is SME" (A1.24) is a
-   constant in an SME-free universe (C7) and is not built. Every other BUILDABLE NOW catalogue row is built (batch I).
 
 **PDF corrections of per-share facts (batch K, features `2026.11.15-12K`)**: `correct_from_pdf` also takes EPS and face
 value (`fact_corrections.value_other`, rupees per share); the FactBook, the batch prefetch and the EPS result-date

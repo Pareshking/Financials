@@ -94,7 +94,7 @@ This section only records the decisions; it does not duplicate the DDL.
 | L1 | `raw_cm_bhavcopy`, `raw_delivery`, `raw_xbrl_facts`. Keyed by source identifiers plus `filing_id`. No surrogate IDs. |
 | L2 identity | `entity_master`, `securities`, `security_identifier_history` (date-bounded; `valid_to` exclusive), `trading_calendar` |
 | L2 market | `ohlcv` (resolved, unadjusted; delivery joined) |
-| L2 fundamentals | `filing_meta` (per filing × parser_version), `fact_observations` (long format), `segment_observations` (Ind AS 108 segment and geography rows, §14b-1), `group_structure` (AOC-1 subsidiaries / associates / JVs per fiscal year from Reg. 34 [X112]), `related_party_transactions` (Ind AS 24 related-party schedule per counterparty, category and transaction element from Reg. 34 [X113]) |
+| L2 fundamentals | `filing_meta` (per filing × parser_version), `fact_observations` (long format), `segment_observations` (Ind AS 108 segment and geography rows, §14b-1), `group_structure` (AOC-1 subsidiaries / associates / JVs per fiscal year from Reg. 34 [X112]), `related_party_transactions` (Ind AS 24 related-party schedule per counterparty, category and transaction element from Reg. 34 [X113]), `reg23_related_party_transactions` (Reg. 23(9) rows per counterparty from standalone Q2 / Q4 Integrated Filings [X115]; period as tagged, never feeds a ratio, R13) |
 | Control | `corp_actions`, `quarantine_queue`, `company_overrides` |
 | L2 calendar/index | `trading_calendar`, `calendar_coverage`, `raw_index_snapshot`, `index_constituents_history` |
 | L2 shareholding | `shareholding_meta`, `shareholding_observations` |
@@ -872,7 +872,10 @@ Status (2026-11-13): **built and tested end to end** on real fixtures, all liste
   annual filing; `backfill-group-structure` fills filings promoted earlier from the vault. Not yet a screener column.
 - Related parties per counterparty: **built** (batch J): `related_party_transactions` from the Reg. 34 Ind AS 24 schedule
   [X113] (`parsers/rpt.py`), promoted with each annual filing; `backfill-rpt` fills filings promoted earlier. The
-  Reg. 23(9) half-yearly per-counterparty rows of the Integrated Filing (X19) are not parsed yet.
+  Reg. 23(9) per-counterparty rows of the Integrated Filing (X19) are **built** too: `reg23_related_party_transactions`
+  [X115] (`parsers/reg23_rpt.py`), promoted with each results filing and filled by the same `backfill-rpt`. They are a
+  separate table and feed no feature: their context period is the filing's own quarter context, so whether the
+  amounts cover the quarter or the half-year is UNVERIFIED (R13).
 - Merger lineage and the demerger cost-of-acquisition split are **built** as admin-entered, audited edges (§11.7).
   Still open: automatic merger detection (no merger purpose in the corp-action feed, no delisting-circular fixture
   [CA14]) and automatic entitlement ratios / COA percentages (announced only in PDFs; R7 UNVERIFIED).

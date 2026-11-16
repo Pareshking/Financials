@@ -68,6 +68,15 @@ CREATE TABLE stg_related_parties (
     source_element VARCHAR NOT NULL, amount_inr DECIMAL(20,2) NOT NULL,
     PRIMARY KEY (filing_id, row_member, category_member, source_element, period_start, period_end)
 );
+CREATE TABLE stg_reg23_rpt (
+    filing_id VARCHAR NOT NULL, parser_version VARCHAR NOT NULL, scope VARCHAR NOT NULL, row_member VARCHAR NOT NULL,
+    period_start DATE NOT NULL, period_end DATE NOT NULL, period_months INTEGER, listed_party_name VARCHAR,
+    counterparty_name VARCHAR NOT NULL, counterparty_pan VARCHAR, relationship VARCHAR, type_as_filed VARCHAR,
+    txn_type VARCHAR NOT NULL, details VARCHAR, approval_remarks VARCHAR, terms VARCHAR,
+    amount_inr DECIMAL(20,2) NOT NULL, approved_value_inr DECIMAL(20,2), ratified_value_inr DECIMAL(20,2),
+    opening_balance_inr DECIMAL(20,2), closing_balance_inr DECIMAL(20,2),
+    PRIMARY KEY (filing_id, row_member)
+);
 CREATE TABLE stg_corp_actions (
     filing_id VARCHAR NOT NULL, seq INTEGER NOT NULL, component INTEGER NOT NULL, exchange VARCHAR NOT NULL,
     symbol VARCHAR NOT NULL, series VARCHAR NOT NULL, isin VARCHAR NOT NULL, ex_date DATE NOT NULL,
@@ -140,6 +149,7 @@ TABLE_ORDER = (
     "stg_segments",
     "stg_group_structure",
     "stg_related_parties",
+    "stg_reg23_rpt",
     "stg_corp_actions",
     "stg_events",
     "stg_kpis",
@@ -410,6 +420,8 @@ def stage_results_xbrl(
     if parsed.profile == "REG34_ANNUAL":
         tables["stg_group_structure"] = group_structure_rows(fid, inst, parsed)
         tables["stg_related_parties"] = related_party_rows(fid, inst, parsed)  # X113
+    else:
+        tables["stg_reg23_rpt"] = reg23_rpt_rows(fid, inst, parsed)  # X115: standalone Q2 / Q4 Integrated Filings
     return write_stage(stage_root, "results_xbrl", run_id, tables)
 
 
@@ -434,6 +446,22 @@ def related_party_rows(fid: str, inst, parsed) -> list[dict[str, Any]]:
         {"filing_id": fid, "parser_version": RPT_PARSER_VERSION, "scope": m["scope"],
          **{k: v for k, v in asdict(r).items() if k != "amount"}, "amount_inr": to_inr(r.amount)}
         for r in parse_related_parties(inst, set(m["in_scope_periods"]), set(m["in_scope_instants"]))
+    ]  # fmt: skip
+
+
+REG23_MONEY = ("amount", "approved_value", "ratified_value", "opening_balance", "closing_balance")
+
+
+def reg23_rpt_rows(fid: str, inst, parsed) -> list[dict[str, Any]]:
+    """Reg. 23(9) related-party rows of a parsed results filing on its declared period end [X19, X115]."""
+    from financials.parsers.reg23_rpt import REG23_PARSER_VERSION, parse_reg23_rpt
+
+    m = parsed.meta
+    return [
+        {"filing_id": fid, "parser_version": REG23_PARSER_VERSION, "scope": m["scope"],
+         **{k: v for k, v in asdict(r).items() if k not in REG23_MONEY},
+         **{f"{k}_inr": to_inr(getattr(r, k)) for k in REG23_MONEY}}
+        for r in parse_reg23_rpt(inst, m.get("period_end"))
     ]  # fmt: skip
 
 

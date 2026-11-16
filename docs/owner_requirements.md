@@ -8,14 +8,16 @@ Every concrete item in the chat is mapped to the repository as of 2026-11-14. Th
 
 ## Status summary
 
+Recounted from the rows on 2026-11-16.
+
 | Status | Meaning | Count |
 |---|---|---|
-| DONE | implemented and tested (file and test cited) | 220 |
-| DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 50 |
-| IN_PROGRESS | being built now | 3 |
-| MISSING | not anywhere in docs or code | 22 |
-| CONFLICTS_WITH_EVIDENCE | contradicted by our verified fixtures or tests | 18 |
-| OUT_OF_SCOPE_BY_DECISION | excluded by a recorded decision (C2, C7, C9, invariants, CLAUDE.md Don'ts) | 30 |
+| DONE | implemented and tested (file and test cited) | 223 |
+| DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 56 |
+| IN_PROGRESS | being built now | 2 |
+| MISSING | not anywhere in docs or code | 12 |
+| CONFLICTS_WITH_EVIDENCE | contradicted by our verified fixtures or tests | 19 |
+| OUT_OF_SCOPE_BY_DECISION | excluded by a recorded decision (C2, C7, C9, invariants, CLAUDE.md Don'ts, owner decisions A-H) | 31 |
 | NEEDS_OWNER_DECISION | the docs do not settle it | 0 |
 | **Total** | | **343** |
 
@@ -37,7 +39,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G91 | Shareholding XBRL: promoter, FII, DII (MF, insurance, banks), public, pledged shares | DONE | F08; SHP7-SHP15; tests/test_batch8_shareholding.py |
 | G92 | SAST Reg. 31(1)/31(2) encumbrance events with lender details | DOCUMENTED_PLANNED | F12 (Phase 3, OBSERVED) |
 | G93 | Reg. 76 reconciliation of share capital audit (exact issued / listed shares) | DOCUMENTED_PLANNED | F09 UNVERIFIED, BLOCKED: probed 2026-11-15 (vault ledger, announcements RSS, TCS announcements API Jul-Nov 2026; BSE 403), no Reg. 76 file found (A15); Reg. 31 x paid-up cross-check (X103) stands in; batch J adds the annual stand-in: Reg. 34 year-end issued / subscribed / paid-up counts vs Reg. 31 and paid-up / face (X114, ANNUAL_SHARE_COUNT_DIFFERS) |
-| G99 | Related-party transactions from Reg. 23(9) half-yearly Integrated Filing | DONE | X19; RPT contexts land in raw_xbrl_facts. Batch J: per counterparty from the Reg. 34 annual schedule (X113, `related_party_transactions`, `backfill-rpt`); the Reg. 23(9) half-yearly rows stay raw |
+| G99 | Related-party transactions from Reg. 23(9) half-yearly Integrated Filing | DONE | X19; RPT contexts land in raw_xbrl_facts. Batch J: per counterparty from the Reg. 34 annual schedule (X113, `related_party_transactions`, `backfill-rpt`); the Reg. 23(9) rows per counterparty of standalone Q2 / Q4 Integrated Filings are parsed into `reg23_related_party_transactions` (X115, parsers/reg23_rpt.py, promoted with the results filing and by `backfill-rpt`; tests/test_reg23_rpt.py); they feed no feature because their period coverage is UNVERIFIED (R13) |
 | G101 | Daily delivery % | DONE | F02; P10; tests/test_market_parsers.py |
 | G105 | Audit qualification / modified opinion flag | DONE | E8; X75 filing_meta.auditor_qualified; tests/test_batch9_annual.py, tests/test_batch10_edge_cases.py. Screener column `rf_audit_qualified` (batch G) |
 | G106 | Reg. 30 director / auditor / KMP change alerts | DONE | E5; kmp_resignations_90d, auditor_resignations_90d; tests/test_batch10_events.py |
@@ -48,8 +50,8 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G119 | Allotments, preferential issues, QIPs, warrants (price, allottees, dilution) | DONE | E6; corporate_events; tests/test_batch10_events.py. Screener column `allotments_90d` (count, batch G); no warrant tracker yet |
 | G120 | Agreements, JVs, MoUs (counterparty, stake) | DOCUMENTED_PLANNED | E2 (ANN_AGREEMENT vaulted raw); arch 15 Phase 3 |
 | G130 | Segment reporting (Ind AS 108): revenue, result, assets, liabilities per segment | DONE | X49, X97-X99; parsers/segments.py, `segment_observations` (point in time, `fundamentals.load_segments`); screener columns `segment_count`, `largest_segment_revenue_share`, `fastest_growing_segment(_growth_yoy)`, `largest_segment_margin_change_yoy_pp` (batch I, features_more.py); tests/test_segment_observations.py, tests/test_features_more.py |
-| G131 | Geographic revenue split (domestic vs export) | IN_PROGRESS | X75 |
-| G143 | NSE RSS feeds per filing type drive targeted XBRL downloads | DONE | A2, A3, A9, CA6, E1; run-day RSS hint. The list of nine feeds is unverified |
+| G131 | Geographic revenue split (domestic vs export) | DONE | X75, X97; `segment_observations` GEOGRAPHY rows (parsers/segments.py), `exports_pct`, `exports_pct_{3,5}y_back` (features_bs.py, batch C); tests/test_balance_sheet_cash_flow_family.py (test_tcs_annual_notes_at_the_last_fiscal_year_end: TCS FY26 domestic + foreign), tests/test_segment_observations.py (test_annual_geography_*) |
+| G143 | NSE RSS feeds per filing type drive targeted XBRL downloads | DONE | A2, A3, A9, CA6, E1; run-day RSS hint. The list of nine feeds: R22 (UNVERIFIED) |
 | G192 | Analyst / investor meet XBRL (funds, dates) | DOCUMENTED_PLANNED | E2 (SAIIM vaulted raw); Phase 3 |
 | G193 | Forward event calendar: board intimations, AGM/EGM notices | DOCUMENTED_PLANNED | E2 (PRIOR_INTIMATION, NOTICE_OF_SHAREHOLDERS_MEETINGS vaulted raw); CA11 |
 | G264 | Platform KPIs side table (GOV, take rate, contribution margin, NRR, CAC payback) | DONE | supplemental_kpis; load-kpis; tests/test_supplemental_kpis.py. Manual load; no fetcher (Phase 3) |
@@ -91,7 +93,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G8 | Screener uses a 'Financial template' (Financing Profit) for lenders and a corporate template otherwise | CONFLICTS_WITH_EVIDENCE | S5 (NBFC rows have the corporate shape), S4 (banks). True for banks only |
 | G9 | Screener deducts excise duty from sales (net sales) | DONE | X40 EXCISE_DUTY label rule; S1; tests/test_label_rules.py |
 | G10 | Screener strips exceptional items out of core earnings, PE and ROCE | CONFLICTS_WITH_EVIDENCE | S2 (Other Income includes exceptional items); S22 (Screener ROCE uses PBT + interest). We keep exceptional items as a sub-row of Other Income (arch 14b) |
-| G11 | Screener moves director remuneration into employee cost | MISSING | not in references.md. Unverified claim about a competitor; quarterly XBRL has no such split |
+| G11 | Screener moves director remuneration into employee cost | DOCUMENTED_PLANNED | R14 (UNVERIFIED, what would verify it recorded). Quarterly XBRL has no director-remuneration split |
 | G12 | Screener folds current debt maturities and Ind AS 116 lease liabilities into Borrowings | DONE | S10; statements/balance_sheet.py; R5 (current maturities) UNVERIFIED. Borrowings = borrowings + labelled leases (label rules X39, X72) |
 | G14 | Matching Screener digit-for-digit from quarterly XBRL alone is a trap (it uses annual-report notes) | DONE | S13 (annual P&L != sum of quarters); residuals pinned in tests/test_screener_parity.py. Screener's source itself stays UNVERIFIED |
 | G18 | Corporate profile: Sales = revenue - excise; Opex = expenses - finance - D&A - excise; EBITDA excludes other income and exceptional items | DONE | arch 8 (rev_ops, ebitda), 14b; tests/test_fundamentals.py, tests/test_screener_parity.py |
@@ -121,7 +123,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G95 | VWAP from the full bhavcopy | DONE | vwap = turnover_inr / volume, equal to the full bhavcopy's AVG_PRICE on every row of both committed files (P16); vwap_20d on today's share basis; tests/test_features_price.py |
 | G110 | Live PE, PB, EV/EBITDA from close x shares + net debt + TTM | DONE | arch 8, 10.1; tests/test_features.py |
 | G111 | ROCE, ROE, working-capital days, ROIC | DONE | roce, roe, roic, working_capital_days; tests/test_features.py, tests/test_batch9_annual.py |
-| G115 | Order-book-to-sales ratio | MISSING | not built. Needs an order-book field (E3) |
+| G115 | Order-book-to-sales ratio | CONFLICTS_WITH_EVIDENCE | No order-book (backlog) element anywhere: `docs/tag_registry.yaml` and every committed XBRL fixture (results, annual, Reg. 30) were searched 2026-11-16 for order book / backlog / unexecuted order / remaining performance obligation; the only order elements are per-order Reg. 30 fields (`AmountOfTheOrdersOrContracts`, E3), already `order_wins_90d` / `order_value_90d` (G114). Catalogue B8.11 NOT POSSIBLE; dropped |
 | G117 | Automated forensic red-flag score from Reg. 30 events | DONE | batch G (features_extra): rf_auditor_resignation_90d, rf_kmp_resignations_90d, rf_fraud_or_default_90d, rf_litigation_90d, rf_audit_qualified, rf_pledge_increase_qoq + litigations / allotments / fund-raising 90d counts, separate columns never summed (arch 10.2); penalties wait for E12; tests/test_features_extra.py |
 | G133 | Screens for sensitivity to crude, power or freight inflation | DONE | batch G: material / employee / other-expense / power & fuel / freight / A&P shares of sales, latest quarter and last FY (X50, X68, X74); tests/test_features_extra.py |
 | G134 | Capex, CWIP -> FCF, CFO/EBITDA, CWIP / gross block | DONE | arch 8; C19; X71; tests/test_cash_conversion.py, tests/test_batch9_annual.py |
@@ -217,8 +219,8 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G269 | Insurance archetype metrics: P/EV, VNB margin, combined ratio | DONE | combined_ratio (X66), vnb_margin, embedded_value (supplemental); tests/test_batch6_insurers.py. P/EV itself not built |
 | G270 | P/EV for life insurers | DONE | batch G: price_to_embedded_value; tests/test_features_extra.py |
 | G275 | Dual-ISIN securities (partly paid, DVR): sum market cap over all linked ISINs | DOCUMENTED_PLANNED | arch 8 (market_cap over active share classes). BLOCKED (2026-11-15): P17 links DVR / partly-paid ISINs to the ordinary share by issuer code, but the share count per class is unknown (whether Reg. 31 counts DVRs is unverified; no DVR issuer pattern committed or vaulted; none is in the Nifty 500), and partly-paid E1 is outside the universe |
-| G276 | Organic vs inorganic perimeter flag (business-combination outflows, acquisition filings) | MISSING | not in docs |
-| G278 | Standalone-to-consolidated profit leakage | MISSING | not in docs. Both scopes are already parsed |
+| G276 | Organic vs inorganic perimeter flag (business-combination outflows, acquisition filings) | DONE | C26; `inorganic_growth_flag` from the business-combination cash outflow (features_extra.py, batch G); tests/test_features_extra.py (test_business_combination_outflows_and_the_inorganic_flag, test_inorganic_flag_is_three_valued). Reg. 30 acquisition events are not an input (no event type parsed) |
+| G278 | Standalone-to-consolidated profit leakage | DONE | `profit_leakage_pct`, `profit_leakage_latest_quarter_pct`, `standalone_pat_ttm` (features_extra.py, batch G); tests/test_features_extra.py (test_reliance_profit_leakage_latest_quarter, test_ttm_profit_leakage) |
 | G314 | Review: forensic scores have different scales; never sum; Altman not for financials *(owner)* | DONE | arch 10.2 |
 | G315 | Review: delivery velocity must divide by free float, not multiply *(owner)* | DONE | arch 10.3 (float_turnover_pct) |
 | G316 | Review: shareholder yield subtracts issuance twice *(owner)* | DONE | shareholder_yield subtracts gross share issuance once and adds gross buybacks (TTM cash flow / market cap); features_bs; tests/test_balance_sheet_cash_flow_family.py |
@@ -269,7 +271,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G66 | About 95% of filings satisfy the YTD identity | DONE | X80 (94% of 8,081 comparisons tie). Claim verified on live data |
 | G67 | Also flag restatement when ProfitLossFromDiscontinuedOperations != 0 | DONE | X108; FactBook.restatement_triggers (last 5 quarter ends); tests/test_restatement_triggers.py (Reliance Power Q4 FY25) |
 | G68 | Also flag restatement when a demerger / merger effective date is logged | DONE | X109; MERGER / DEMERGER ledger ex-date in the last 5 quarters (issuer or related entity); tests/test_restatement_triggers.py (Tata Motors CV demerger) |
-| G69 | XBRL anchor locking: PDF current columns must match XBRL OneD / FourD before restated columns are trusted | DOCUMENTED_PLANNED | arch 7.6 (deferred; must prove itself against the same filing). Depends on the PDF decision |
+| G69 | XBRL anchor locking: PDF current columns must match XBRL OneD / FourD before restated columns are trusted | OUT_OF_SCOPE_BY_DECISION | Decision E (2026-11-15): no PDF extraction of restated quarters, so there are no PDF columns to anchor; PDFs only for audited corrections (decision B, X107), which already need two agreeing reads. arch 7.6 |
 | G73 | Safe failure: if any check fails, keep the verified XBRL numbers | DONE | invariant 9 |
 | G149 | Bitemporal rows: period end + broadcast timestamp; queries filter broadcast <= as-of | DONE | invariant 4; arch 6.3; tests/test_x83_visibility.py |
 | G150 | Broadcast timestamp is embedded in XBRL / CSV metadata | CONFLICTS_WITH_EVIDENCE | X83, A7, SHP6; arch 6.3. Comes from the listing at fetch time |
@@ -302,7 +304,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G103 | Short-selling CSV | DOCUMENTED_PLANNED | F15 (OBSERVED); Phase 3 |
 | G104 | Reg. 32(1) deviation / variation of issue proceeds | DOCUMENTED_PLANNED | F23 |
 | G108 | Reg. 44(3) voting results (dissent %) | DOCUMENTED_PLANNED | F23 |
-| G109 | BRSR XBRL: headcount, attrition, R&D, energy / water intensity (~893 tags) | DOCUMENTED_PLANNED | F24 (UNVERIFIED, not searched). Tag count unverified |
+| G109 | BRSR XBRL: headcount, attrition, R&D, energy / water intensity (~893 tags) | DOCUMENTED_PLANNED | F24 (UNVERIFIED, not searched). Tag count: R21 (UNVERIFIED) |
 | G121 | Governance XBRL (Reg. 27, 13(3)): board independence, committees, attendance, complaints | DOCUMENTED_PLANNED | F23 (OBSERVED) |
 | G122 | AMFI monthly scheme-wise portfolios (one ISIN file by the 10th); month-on-month MF diff | DOCUMENTED_PLANNED | F26; R8 (UNVERIFIED: no consolidated file; per-AMC adapters). Phase 3 |
 | G123 | NSDL / CDSL fortnightly sector-wise FPI flows and AUC | MISSING | not in data_sources.yaml |
@@ -405,18 +407,18 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | id | requirement | status | where / next step |
 |---|---|---|---|
 | G31 | Annual-report PDF pitfalls: page-spanning tables, unit switches, note numbering, ~10-15% scans | OUT_OF_SCOPE_BY_DECISION | arch 15. Claim moot while PDFs are out of scope |
-| G39 | Tata Motors had an indicative 60:40 ratio before the final 68.85:31.15 COA | MISSING | R7 (final COA only, UNVERIFIED). Unregistered claim |
-| G49 | NSE holds a special pre-open session (9:00-9:45) on demerger ex-dates | MISSING | P7 shows the open price only. Unregistered claim |
-| G59 | Ind AS 103: common-control mergers restate comparatives; third-party acquisitions consolidate prospectively | MISSING | not in references.md. Unregistered claim (appointed-date detail disputed in the review) |
-| G75 | AOC-4 thresholds, 30-day-after-AGM deadline, XML embedded in the PDF | MISSING | not in references.md. Unregistered claim |
-| G77 | BSE circulars LIST/COMP/40/2018-19 and 13/2019-20 adopted the MCA taxonomy | MISSING | not in references.md. Unregistered claim |
+| G39 | Tata Motors had an indicative 60:40 ratio before the final 68.85:31.15 COA | DOCUMENTED_PLANNED | R15 (UNVERIFIED); R7 holds the final COA (UNVERIFIED) |
+| G49 | NSE holds a special pre-open session (9:00-9:45) on demerger ex-dates | DOCUMENTED_PLANNED | R16 (UNVERIFIED); P7 shows the ex-date open price only |
+| G59 | Ind AS 103: common-control mergers restate comparatives; third-party acquisitions consolidate prospectively | DOCUMENTED_PLANNED | R17 (UNVERIFIED; the appointed-date detail was disputed in the review) |
+| G75 | AOC-4 thresholds, 30-day-after-AGM deadline, XML embedded in the PDF | DOCUMENTED_PLANNED | R18 (UNVERIFIED); MCA is paid and login-gated (no paid sources), Reg. 34 XBRL used instead (X36) |
+| G77 | BSE circulars LIST/COMP/40/2018-19 and 13/2019-20 adopted the MCA taxonomy | DOCUMENTED_PLANNED | R19 (UNVERIFIED); consistent with X36, circulars not seen |
 | G78 | Single Filing System for Reg. 34 XBRL (Apr 2026) and BRSR (Mar 2026); NSE/CML/2026/08 or BSE 20260529-28 | DOCUMENTED_PLANNED | R1 (UNVERIFIED). Cited notice is dated after the dates it supports |
-| G87 | Quarterly XBRL is identical on NSE and BSE (SEBI in-capmkt) | MISSING | not in references.md. Unverifiable from the container |
+| G87 | Quarterly XBRL is identical on NSE and BSE (SEBI in-capmkt) | DOCUMENTED_PLANNED | R20 (UNVERIFIED); needs both exchanges' file for one quarter (BSE 403 from the container, A1) |
 | G113 | Beat Screener, Tijori and Trendlyne using machine-readable data only *(owner)* | DOCUMENTED_PLANNED | data_sources F01-F29; arch 15 |
 | G137 | What else is still missing from the platform? *(owner)* | IN_PROGRESS | this digest (docs/owner_requirements.md) |
 | G210 | Siemens and Bosch follow Sep / Dec fiscal years | CONFLICTS_WITH_EVIDENCE | X87 (Siemens moved to a 31-March year via a 15-month period). Bosch retracted in the chat itself; Nestle R6 UNVERIFIED |
 | G271 | Compile the whole discussion into one document, double-checked so nothing is missed *(owner)* | IN_PROGRESS | this digest |
-| G323 | Review: unverified claims (BSE notice, five schemas, Tata Motors dates, 893 BRSR tags, nine RSS feeds, Screener's five rules) *(owner)* | DOCUMENTED_PLANNED | R1, R7, S1-S23 registered; BRSR tag count and RSS list not registered. Partly registered |
+| G323 | Review: unverified claims (BSE notice, five schemas, Tata Motors dates, 893 BRSR tags, nine RSS feeds, Screener's five rules) *(owner)* | DOCUMENTED_PLANNED | R1, R7, S1-S23; BRSR tag count R21, nine-RSS-feed list R22 (all UNVERIFIED rows with what would verify them). Fully registered |
 | G329 | Tata Motors demerger dates and 68.85% / 31.15% COA 'confirmed' | DOCUMENTED_PLANNED | R7 (P7 and X52 VERIFIED; dates and COA UNVERIFIED) |
 
 ## Owner decisions needed first
@@ -436,7 +438,7 @@ None open. Decided 2026-11-15: no paid sources at all (G74, by the owner); E-H b
 8. **DONE (2026-11-15, batch G)** G265, G266, G270: EV/GOV, ARPU/MTU growth, P/EV. Verify: a sample KPI CSV fixture for `load-kpis` with the new KPI names; P/EV reads `embedded_value`.
 9. **DONE (2026-11-15, batch G)** G278: standalone-to-consolidated profit leakage. Verify: a company with both scopes committed for the same quarter.
 10. G79: fill `bse_scrip_code` from the in-filing `ScripCode` (X7). Verify: corporate and bank fixtures; quarantine on disagreement.
-11. G11, G32, G39, G49, G59, G75, G77, G87, G279: record the chat's unverified claims as UNVERIFIED rows in `docs/references.md` (also the BRSR tag count and the nine-RSS-feed list). No code.
+11. **DONE (2026-11-16)** G11, G39, G49, G59, G75, G77, G87 and the BRSR tag count / nine-RSS-feed list (G323) are UNVERIFIED rows R14-R22 in `docs/references.md`, each with what would verify it. G32 is OUT_OF_SCOPE_BY_DECISION (G74); G279 stays MISSING. No code.
 
 11a. **DONE (2026-11-15)** ~~the `restatement_suspected` flag (architecture §7.6).~~ YTD trigger (X106), discontinued operations (X108), logged merger / demerger (X109); Reg. 34 prior-year comparison as a finding (X110).
 11b. Documented but not implemented: market cap summed across share classes (architecture §8; the code creates only COMMON securities). The two-class listing exists (P17: JISLDVREQS / JISLJALEQS, FELDVR / FEL, GATECHDVR / GATECH in the bhavcopy fixtures). **BLOCKED**: needs the share count per class (a DVR issuer's Reg. 31 pattern, none committed or vaulted) and, for partly-paid, an owner decision to admit series E1.
@@ -446,7 +448,7 @@ None open. Decided 2026-11-15: no paid sources at all (G74, by the owner); E-H b
 13. **DONE (2026-11-15, batch H)** ~~G112, G199: peer comparison and discount to industry median. Verify: a real fixture of NSE's industry classification feeding a point-in-time `entity_classification_history`.~~ NSE quote API fixtures (IC1-IC3), `features_peers.py`.
 14. G133: input-cost sensitivity columns (materials, power, freight as % of revenue). Verify: X50 fixtures (AIA, SRF).
 15. G117: Reg. 30 red-flag columns, kept separate (never summed). Verify: E3/E5/E7 fixtures; penalties wait for an E12 content fixture.
-16. G115: order-book-to-sales. Verify first whether any committed Reg. 30 order XBRL (E3) or results XBRL tags an order book; otherwise drop.
+16. **Dropped (2026-11-16)** ~~G115: order-book-to-sales.~~ No committed fixture or registry element tags an order book (CONFLICTS_WITH_EVIDENCE).
 17. **DONE (2026-11-15, batch D)** ~~G168: PEG. Define with `min_periods_required`; NULL until 3 years of in-scope EPS (C9).~~ Built on core profit growth and PE on core profit (docs/hidden_gems.md principle 6): quarter YoY now, TTM-on-TTM once 8 quarters exist.
 
 **Phase 3**

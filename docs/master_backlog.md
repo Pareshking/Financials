@@ -28,12 +28,15 @@ catalogue as IN PROGRESS. They are counted as BUILT here.
 | B. Data sources | 15 | 22 | 14 | 2 | 3 | 56 |
 | C. Corporate structure / identity | 14 | 1 | 3 | 0 | 2 | 20 |
 | D. Events, flows, corporate actions | 18 | 1 | 5 | 0 | 4 | 28 |
-| E. Data quality / rules / assistant claims | 64 | 0 | 12 | 0 | 8 | 84 |
+| E. Data quality / rules / assistant claims | 64 | 0 | 11 | 0 | 9 | 84 |
 | F. Backtest | 7 | 0 | 1 | 0 | 0 | 8 |
 | G. Alerts / UI / tools / ops | 9 | 0 | 11 | 2 | 2 | 24 |
-| **Total** | **227** | **37** | **47** | **7** | **20** | **338** |
+| **Total** | **227** | **37** | **46** | **7** | **21** | **338** |
 
-Counts are tallied from the Class column of section 3 (last bold token per row); recounted after batch I (2026-11-15:
+Counts are tallied from the Class column of section 3 (last bold token per row); recounted 2026-11-16 (E31 / G69 moved
+from DIGEST to OOS by decision E; the PDF claims G11, G39, G49, G59, G75, G77, G87 and G323's BRSR tag count and RSS
+list are registered as UNVERIFIED rows R14-R22 and stay DIGEST until verified; G115 is CONFLICTS; the Reg. 23(9)
+per-counterparty rows are parsed, X115). Earlier recount after batch I (2026-11-15:
 A46 PB band, A56 PEAD, A57 sector breadth, A115 RS rank, G17 52W-high-on-delivery flag; A11 segment mix columns). Of the 202 BUILT rows (7 moved from
 CATALOGUE by batch C, 5 from DIGEST by batch F, 3 by batch E, 2026-11-15), 11 are only
 partly built, 1 is built with a different definition (`opm_last_year_pct`), and 12 are rows where the PDF's claim was
@@ -86,10 +89,10 @@ M2 = A113, M3 = A94, M4 = A112, M5 = A114, M6 = B31, M7 = B51, M8 = G23.
 | G181 | Reg. 30 red-flag count | five separate 90-day counts; **no single "Reg 30 Red Flag Count" column** (L1271); `penalties_90d` always NULL | PARTLY NOT FOUND |
 | G187 | Saved custom ratios | `dsl.save_custom_ratio()` + `user_custom_ratios`; **no CLI command** to save one; not usable as output columns (M1) | PARTLY NOT FOUND |
 | G119 | Allotments / preferential / QIP / warrants | `corporate_events` ALLOTMENT rows; **no warrant-conversion tracker, no dilution column** (PDF L958-959) | PARTLY NOT FOUND (digest notes it) |
-| G99 | RPT from Reg. 23(9) | `rpt_total_amount`; per counterparty from the Reg. 34 annual schedule since batch J (`related_party_transactions`, X113); Reg. 23(9) half-yearly rows not parsed | **FIXED 2026-11-16 (batch J)** (annual; half-yearly rows open) |
+| G99 | RPT from Reg. 23(9) | `rpt_total_amount`; per counterparty from the Reg. 34 annual schedule since batch J (`related_party_transactions`, X113); Reg. 23(9) rows per counterparty in `reg23_related_party_transactions` since 2026-11-16 (X115; data only, period coverage R13) | **FIXED 2026-11-16 (batch J + X115)** |
 | G175 (new, e085eb5) | "OPM last year" | `opm_last_year_pct` = OPM of **the same quarter one year earlier**; Screener's "OPM last year" (the PDF's example `OPM > OPM last year`, L1254, L1267) and catalogue A4.20 = **FY** EBITDA / FY sales | BUILT WITH A DIFFERENT DEFINITION: rename to `opm_same_quarter_ly_pct` (it is the base of G204) and add the FY form. **FIXED 2026-11-15 (batch A)**: renamed `opm_preceding_year_quarter_pct` (DSL `opm same quarter last year`); `opm_last_year_pct` is now the FY OPM |
 
-Stale the other way (digest says open, code has it): G130 / G131 IN_PROGRESS, but segment and geography rows are
+Stale the other way (digest says open, code has it): G130 / G131 IN_PROGRESS (G131 set to DONE in the digest 2026-11-16), but segment and geography rows are
 promoted on this branch (`segment_observations`, `axis_kind` BUSINESS | GEOGRAPHY, `promoter.py:1261`); G67 / G68
 say "restatement_suspected not implemented", but the X106 flag exists (`FactBook.restatement_suspected`, YTD trigger
 only at the time; the discontinued-ops and corporate-action triggers were added by batch E, X108 / X109); G169 / G173 / G175 / G178 / G202 MISSING
@@ -115,11 +118,11 @@ exists (file / column); Class.
 | A05 | 904-906 | EV adds net debt from latest H1/FY balance sheet; TTM from Reg. 33 | G110 DONE | A1.3 | `net_debt`, `bs_as_of` | **BUILT** |
 | A06 | 908-909 | ROCE, ROE, working-capital days, ROIC | G111 DONE | A2.5, A2.1, A2.29, A2.11 | `roce`, `roe`, `working_capital_days`, `roic` | **BUILT** |
 | A07 | 911-913, 835 | peer table ranked by mcap, PE, ROCE, quarterly profit growth | G112 DONE | B5.8 | `peer_rank_market_cap` / `_pe` / `_roce` / `_profit_growth`, `peer_count` within the NSE basic industry (batch H, 2026-11-15, C25) | **BUILT** |
-| A08 | 940-943 | order-book-to-sales ratio | G115 MISSING | B8.11 NOT POSSIBLE | `order_value_90d` only | **CATALOGUE** |
+| A08 | 940-943 | order-book-to-sales ratio | G115 CONFLICTS (no order-book element in the registry or any fixture, 2026-11-16) | B8.11 NOT POSSIBLE | `order_value_90d` only | **CATALOGUE** |
 | A09 | 946-947 | automated forensic red-flag score from Reg. 30 | G117 MISSING | B8.7 BUILDABLE NOW (separate counts) | batch G: `rf_*` red-flag columns + Reg. 30 counts, never summed | **BUILT** |
 | A10 | 949-952 | quantify contingent tax / regulatory liabilities from penalty filings | G118 DOC_PLANNED | B8.8 NEW FREE SOURCE | `penalties_90d` NULL | **CATALOGUE** |
 | A11 | 1032-1034 | segment revenue, results, assets, liabilities (Ind AS 108) | G130 IN_PROGRESS (stale) | B9.1-B9.2 BUILT | `segment_observations` BUSINESS promoted; `segment_count`, `largest_segment_revenue_share`, `fastest_growing_segment(_growth_yoy)`, `largest_segment_margin_change_yoy_pp` (batch I, 2026-11-15) | **BUILT** |
-| A12 | 1036-1037 | geographic revenue split domestic vs export | G131 IN_PROGRESS (stale) | A2.32 BUILDABLE NOW | `segment_observations` GEOGRAPHY; `exports_pct`, `exports_pct_{3,5}y_back` (batch C, 2026-11-15) | **BUILT** |
+| A12 | 1036-1037 | geographic revenue split domestic vs export | G131 DONE | A2.32 BUILDABLE NOW | `segment_observations` GEOGRAPHY; `exports_pct`, `exports_pct_{3,5}y_back` (batch C, 2026-11-15) | **BUILT** |
 | A13 | 1036-1037 | geographic **non-current asset** split | not named (G131 is revenue only) | none | `parsers/segments.py` NON_CURRENT_ASSETS on GEOGRAPHY | **BUILT** (data only) |
 | A14 | 1039-1041 | cost-structure shares (materials, power & fuel, freight, subcontracting, employee); crude / power / freight sensitivity screens | G132 DONE (tags), G133 MISSING (screens) | B3.4, B3.5 BUILDABLE NOW | batch G: cost shares (material, employee, other, power & fuel, freight, A&P) | **BUILT** |
 | A15 | 1043-1045 | capex, CWIP -> FCF, CFO/EBITDA, CWIP / gross block | G134 DONE | B2.10 BUILT | `fcf_ttm`, `cfo_to_ebitda`, `cwip_to_gross_block` | **BUILT** |
@@ -217,8 +220,8 @@ exists (file / column); Class.
 | A107 | 2041, 2663-2665 | insurance archetype: VNB margin, combined ratio, solvency, persistency, EV, APE | G269, G341, G340, G313 | none | `vnb_margin`, `combined_ratio`, `solvency_ratio`, `persistency_13m/61m`, `embedded_value`, `ape_growth` | **BUILT** |
 | A108 | 2041 | P/EV for life insurers | G270 MISSING | B5.10 BUILDABLE NOW | batch G: `price_to_embedded_value` | **BUILT** |
 | A109 | 2045-2048 | cross-sector columns usable in one query (Rule of 40, EV/GP, ex-cash PE) | G268 DONE | — | DSL aliases exist | **BUILT** |
-| A110 | 2176-2180 | organic vs inorganic perimeter flag (`is_inorganic_perimeter`) | G276 MISSING | B8.12 NEEDS PARSER | batch G: `inorganic_growth_flag` (cash-flow element, C25) | **BUILT** |
-| A111 | 2185-2187 | standalone-to-consolidated profit leakage | G278 MISSING | B1.18 BUILDABLE NOW | batch G: `profit_leakage_pct` | **BUILT** |
+| A110 | 2176-2180 | organic vs inorganic perimeter flag (`is_inorganic_perimeter`) | G276 DONE | B8.12 NEEDS PARSER | batch G: `inorganic_growth_flag` (cash-flow element, C25) | **BUILT** |
+| A111 | 2185-2187 | standalone-to-consolidated profit leakage | G278 DONE | B1.18 BUILDABLE NOW | batch G: `profit_leakage_pct` | **BUILT** |
 | A112 | 2651-2652 | bank CASA % | G339 CONFLICTS ("goes to supplemental_kpis") | none | batch G: KPI `casa_pct`, column `casa_pct` | **BUILT** |
 | A113 | 1048-1049, 1671-1673, 1717-1719 | ERP model; FCF yield and cost of debt vs live G-Sec / MCLR | G135 (feed only) | B10.2 (WACC only) | none | **MISSED** (M2) |
 | A114 | 1290, 1018-1020 | market-cap size bucket (smallcap) / Midcap 150, Smallcap 250 membership | none | none | `in_nifty500` only | **MISSED** (M5) |
@@ -240,7 +243,7 @@ exists (file / column); Class.
 | B06 | 832-835, 911-913, 1156 | NSE 4-tier industry classification ("in the exchange equity master CSV") | G96 DONE, G334 | A1.19 note | not in EQUITY_L (IDX10); from the NSE quote API (F30, IC1-IC3): `fetch-classification`, `entity_classification_history` (batch H) | **BUILT** |
 | B07 | 837-841 | corporate-actions feed + Reg. 30 board-outcome XBRL | G97 DONE | — | F03; outcome XBRL vaulted raw (E2) | **BUILT** |
 | B08 | 843-847 | credit-rating disclosure XBRL | G98 DOC_PLANNED | A1.23, B8.9 NEW FREE SOURCE | F22 | **CATALOGUE** |
-| B09 | 857-861 | Reg. 23(9) RPT XBRL | G99 DONE | B1.19 | `rpt_total_amount`; per counterparty from the annual schedule (X113, batch J) | **BUILT** (partial) |
+| B09 | 857-861 | Reg. 23(9) RPT XBRL | G99 DONE | B1.19 | `rpt_total_amount`; per counterparty from the annual schedule (X113, batch J) and the Reg. 23(9) rows (`reg23_related_party_transactions`, X115) | **BUILT** (Reg. 23(9) rows data only, R13) |
 | B10 | 864-867 | PIT Reg. 7(2) and SAST Reg. 29 XBRL | G100 DOC_PLANNED | B7.8 NEW FREE SOURCE | F11, F12 | **CATALOGUE** |
 | B11 | 869-873 | security-wise deliverable position CSV | G101 DONE | — | `raw_delivery` (F02) | **BUILT** |
 | B12 | 869-873 | bulk and block deals CSV | G102 DOC_PLANNED | B7.9 NEW FREE SOURCE | F14 | **CATALOGUE** |
@@ -248,7 +251,7 @@ exists (file / column); Class.
 | B14 | 875-878 | Reg. 32(1) deviation / variation of issue proceeds | G104 DOC_PLANNED | — | F23 | **DIGEST** |
 | B15 | 877-878 | audit qualifications in Integrated Filing | G105 DONE | B1.16 BUILDABLE NOW (column) | `filing_meta.audit_opinion`, `auditor_qualified` | **BUILT** |
 | B16 | 887-891 | Reg. 44(3) voting results (dissent %) | G108 DOC_PLANNED | B10.5 NEW FREE SOURCE | F23 | **CATALOGUE** |
-| B17 | 893-897 | BRSR XBRL (headcount, attrition, R&D, energy / water) | G109 DOC_PLANNED | B10.1 NEW FREE SOURCE | F24 | **CATALOGUE** |
+| B17 | 893-897 | BRSR XBRL (headcount, attrition, R&D, energy / water) | G109 DOC_PLANNED | B10.1 NEW FREE SOURCE | F24; tag count R21 | **CATALOGUE** |
 | B18 | 964-968 | governance XBRL (Reg. 27, 13(3)) | G121 DOC_PLANNED | B10.5 NEW FREE SOURCE | F23 | **CATALOGUE** |
 | B19 | 975-977, 1068 | AMFI monthly scheme-wise portfolios; month-on-month diff | G122, G312 DOC_PLANNED | B7.7 NEW FREE SOURCE | F26 | **CATALOGUE** |
 | B20 | 979-980 | NSDL / CDSL fortnightly sector-wise FPI flows and AUC | G123 MISSING | — | not in data_sources.yaml | **DIGEST** |
@@ -266,7 +269,7 @@ exists (file / column); Class.
 | B32 | 1104-1106 | daily price-band / circuit file | G140 DOC_PLANNED | B6.12 NEW FREE SOURCE | F20 | **CATALOGUE** |
 | B33 | 1108-1110 | VaR / ELM margin files | G141 DOC_PLANNED | B6.17 NEW FREE SOURCE | F20 | **CATALOGUE** |
 | B34 | 1122-1124 | daily buyback / redemption report | G142 MISSING | — | CA10 purpose only | **DIGEST** |
-| B35 | 1127-1132 | NSE XML RSS feeds per filing type | G143 DONE | — | `parsers/discovery.py`, run-day RSS hint | **BUILT** |
+| B35 | 1127-1132 | NSE XML RSS feeds per filing type | G143 DONE | — | `parsers/discovery.py`, run-day RSS hint; nine-feed list R22 (UNVERIFIED) | **BUILT** |
 | B36 | 1141-1143 | Reg. 50 / 52 debt XBRL of debt-listed subsidiaries | G145 DOC_PLANNED | — | F22 | **DIGEST** |
 | B37 | 1145-1146 | REIT / InvIT XBRL (NDCF, distribution yield) | G146 OOS | — | C7 | **OOS** |
 | B38 | 1152-1153 | RBI DBIE sectoral bank-credit deployment | G147 DOC_PLANNED | B10.2 NEW FREE SOURCE | F25 | **CATALOGUE** |
@@ -356,7 +359,7 @@ exists (file / column); Class.
 | E03 | 54-64 | Screener corporate vs financial template | G8 CONFLICTS | S4, S5 | **BUILT** (claim corrected) |
 | E04 | 66-72, 124 | excise duty deducted from sales | G9 DONE | EXCISE_DUTY label rule | **BUILT** |
 | E05 | 74-80 | exceptional items stripped from core earnings | G10 CONFLICTS | `core_profit_ttm` | **BUILT** |
-| E06 | 82-90 | director remuneration moved into employee cost | G11 MISSING (claim) | unverified competitor claim | **DIGEST** |
+| E06 | 82-90 | director remuneration moved into employee cost | G11 DOC_PLANNED (claim) | R14 | **DIGEST** |
 | E07 | 86-88 | current maturities + Ind AS 116 leases into borrowings | G12 DONE | `statements/balance_sheet.py` | **BUILT** |
 | E08 | 92-98 | Screener overwrites history after restatements | G13 OOS | C12, invariant 4 | **OOS** |
 | E09 | 107-108 | digit-for-digit Screener match is a trap | G14 DONE | S13 residuals pinned | **BUILT** |
@@ -376,12 +379,12 @@ exists (file / column); Class.
 | E23 | 220-231 | annual-report PDF pitfalls | G31 OOS | — | **OOS** |
 | E24 | 233-266 | 3-stage PDF pipeline; note tie-out, BS identity, scale checks | G29, G30 OOS | decision B path instead | **OOS** |
 | E25 | 484-491 | Ind AS 105 PDF comparator; carve-out baseline | G54, G55 OOS | X80 withholds TTM | **OOS** |
-| E26 | 504-506 | Ind AS 103 common-control vs acquisitions | G59 MISSING (claim) | not in references.md | **DIGEST** |
+| E26 | 504-506 | Ind AS 103 common-control vs acquisitions | G59 DOC_PLANNED (claim) | R17 | **DIGEST** |
 | E27 | 526-529, 599-619 | restatement checksums (continuing + discontinued, A + B, YTD) | G63 OOS | owner review L2312-2314 | **OOS** |
 | E28 | 538-547 | scanned PDFs must never corrupt the DB | G64 DONE | invariant 9; corrections need two agreeing reads | **BUILT** |
 | E29 | 549-566 | skip PDFs; YTD vs sum-of-quarters identity; ~95% hold | G65, G66 DONE | `audit-ytd`, X80 | **BUILT** |
 | E30 | 567-569 | also flag on discontinued ops != 0 or a logged demerger / merger | G67, G68 DONE | `FactBook.restatement_triggers`: YTD (X106), discontinued ops (X108), merger / demerger (X109); Reg. 34 prior-year comparison as a finding (G328, X110) | **BUILT** |
-| E31 | 573-578 | XBRL anchor locking of PDF columns | G69 DOC_PLANNED | — | **DIGEST** |
+| E31 | 573-578 | XBRL anchor locking of PDF columns | G69 OOS | decision E (no PDF extraction of restated quarters) | **OOS** |
 | E32 | 580-593 | unit detection by ratio; +-0.01% / +-0.02 tolerance | G70, G71 CONFLICTS | G310: rounding-unit tolerance | **BUILT** (corrected) |
 | E33 | 599-601 | vertical P&L identities | G72 DONE | gate G3 | **BUILT** |
 | E34 | 627-628 | safe failure: keep verified XBRL | G73 DONE | invariant 9 | **BUILT** |
@@ -419,7 +422,7 @@ exists (file / column); Class.
 | E67 | 2325-2326, 2780-2781 | gross profit defined (materials + purchases + inventory change; NULL for services) | G317 DONE | C6 | **BUILT** |
 | E68 | 2329-2336 | missing tables; long-format facts with wide view | G320, G321 DONE | schema.sql | **BUILT** |
 | E69 | 2335-2337 | one runtime | G322 DONE | — | **BUILT** |
-| E70 | 2337-2343 | register unverified claims (BSE notice, schemas, Tata, BRSR tags, RSS list, Screener rules) | G323 DOC_PLANNED (partly) | references.md | **DIGEST** |
+| E70 | 2337-2343 | register unverified claims (BSE notice, schemas, Tata, BRSR tags, RSS list, Screener rules) | G323 DOC_PLANNED | R1, R7, R21, R22 | **DIGEST** |
 | E71 | 2343, 2420-2422 | UDiFF names and columns | — (C9) | `parsers/udiff.py` | **BUILT** |
 | E72 | 2343-2346, 2428-2429 | legal / licensing; personal; polite fetching with UA and caching | G324, G330 DONE | C8, PoliteFetcher | **BUILT** |
 | E73 | 2346-2348, 2439-2441 | golden fixtures (~20 companies), thin slice, real XBRL per profile first | G325, G326, G342, G343 DONE | `tests/fixtures` | **BUILT** |
@@ -428,13 +431,13 @@ exists (file / column); Class.
 | E76 | 2348-2351 | short CLAUDE.md; blueprint in architecture.md | G327 DONE | — | **BUILT** |
 | E77 | 2546-2547 | prices / values as REAL | G337 OOS | invariant 7 | **OOS** |
 | E78 | 42-44 | Integrated Filing from Dec 2024 / Mar 2025 | G7 CONFLICTS | C9, X38 | **BUILT** (corrected) |
-| E79 | 305-306, 2390-2396 | Tata Motors 60:40 indicative, final 68.85 / 31.15, dates | G39 MISSING, G329 DOC_PLANNED | R7 | **DIGEST** |
-| E80 | 641-654 | AOC-4 thresholds, deadline, XML in PDF, fees | G75 MISSING (claim) | — | **DIGEST** |
-| E81 | 657-660, 782-784, 2370-2377 | BSE circulars; Single Filing System dates; NSE/CML/2026/08 | G77 MISSING, G78 DOC_PLANNED | R1 | **DIGEST** |
-| E82 | 772-775 | quarterly XBRL identical on NSE and BSE (in-capmkt) | G87 MISSING (claim) | — | **DIGEST** |
+| E79 | 305-306, 2390-2396 | Tata Motors 60:40 indicative, final 68.85 / 31.15, dates | G39 DOC_PLANNED, G329 DOC_PLANNED | R7, R15 | **DIGEST** |
+| E80 | 641-654 | AOC-4 thresholds, deadline, XML in PDF, fees | G75 DOC_PLANNED (claim) | R18 | **DIGEST** |
+| E81 | 657-660, 782-784, 2370-2377 | BSE circulars; Single Filing System dates; NSE/CML/2026/08 | G77 DOC_PLANNED, G78 DOC_PLANNED | R1, R19 | **DIGEST** |
+| E82 | 772-775 | quarterly XBRL identical on NSE and BSE (in-capmkt) | G87 DOC_PLANNED (claim) | R20 | **DIGEST** |
 | E83 | 1396-1398, 2409-2413 | Nestle / ABB / Siemens / Bosch fiscal years | G210 CONFLICTS | X87 | **BUILT** (corrected) |
 | E84 | 744-747 | NSE needs Akamai cookies; BSE JSON cleaner | G84 CONFLICTS | A1, A7 | **BUILT** (corrected) |
-| E85 | 438 | NSE special pre-open session on demerger ex-dates | G49 MISSING (claim) | P7 open price only | **DIGEST** |
+| E85 | 438 | NSE special pre-open session on demerger ex-dates | G49 DOC_PLANNED (claim) | P7 open price only; R16 | **DIGEST** |
 
 ### F. Backtest
 

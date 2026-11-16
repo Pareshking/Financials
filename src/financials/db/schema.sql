@@ -2013,6 +2013,37 @@ CREATE TABLE IF NOT EXISTS related_party_transactions (
     CHECK (category IN ('SUBSIDIARY', 'ASSOCIATE', 'JOINT_VENTURE', 'KMP', 'PROMOTER_GROUP', 'OTHER')),
     CHECK (period_type IN ('DURATION', 'INSTANT'))
 );
+-- Reg. 23(9) related-party transactions per counterparty from the Integrated Filing (Governance) section [X19, X115]:
+-- one row per typed RelatedPartyTransactionAxis member of a standalone Q2 / Q4 results filing, promoted with it and
+-- by `backfill-rpt`. A separate table from the annual schedule on purpose: the period is the filing's reporting-period
+-- context as tagged, and whether the amounts cover that quarter or the Reg. 23(9) half-year is UNVERIFIED (R13), so
+-- these rows never feed a ratio or a feature column (features_rpt reads related_party_transactions only).
+CREATE TABLE IF NOT EXISTS reg23_related_party_transactions (
+    filing_id           VARCHAR NOT NULL REFERENCES filings(filing_id),
+    parser_version      VARCHAR NOT NULL,        -- parsers.reg23_rpt.REG23_PARSER_VERSION
+    entity_id           VARCHAR NOT NULL REFERENCES entity_master(entity_id),   -- the filer
+    scope               VARCHAR NOT NULL,
+    row_member          VARCHAR NOT NULL,        -- typed RelatedPartyTransactionAxis member as filed
+    period_start        DATE NOT NULL,           -- the duration context as tagged (see R13)
+    period_end          DATE NOT NULL,           -- = the filing's declared period end
+    period_months       INTEGER,
+    listed_party_name   VARCHAR,                 -- the listed entity or subsidiary entering into the transaction
+    counterparty_name   VARCHAR NOT NULL,
+    counterparty_pan    VARCHAR,                 -- NULL when masked ("******")
+    relationship        VARCHAR,                 -- as filed (free text)
+    type_as_filed       VARCHAR,                 -- TypeOfRelatedPartyTransaction as filed
+    txn_type            VARCHAR NOT NULL,        -- parsers.reg23_rpt.TYPE_MAP value | unmapped
+    details             VARCHAR,                 -- DetailsOfOtherRelatedPartyTransaction
+    approval_remarks    VARCHAR,
+    terms               VARCHAR,                 -- JSON: loan / ICD / investment / indebtedness terms as filed
+    amount_inr          DECIMAL(20,2) NOT NULL,  -- AmountOfRelatedPartyTransactionDuringTheReportingPeriod
+    approved_value_inr  DECIMAL(20,2),           -- as approved by the audit committee
+    ratified_value_inr  DECIMAL(20,2),
+    opening_balance_inr DECIMAL(20,2),           -- AmountOfRelatedPartyTransaction the day before period_start
+    closing_balance_inr DECIMAL(20,2),           -- AmountOfRelatedPartyTransaction at period_end
+    visible_from_ts     TIMESTAMP NOT NULL,
+    PRIMARY KEY (filing_id, parser_version, row_member)
+);
 -- ── Views ──────────────────────────────────────────────────────────────
 -- Everything below VIEWS_MARKER runs after the column upgrade (db.apply_schema), so a view may name columns that an
 -- existing database gains in the same run. Views hold no data; CREATE OR REPLACE keeps them at this definition.

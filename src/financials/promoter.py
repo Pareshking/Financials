@@ -1268,6 +1268,11 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     rpt = read_table(con, stage_dir, "stg_related_parties")
     insert_rows(con, "related_party_transactions", [{**r, "entity_id": entity_id, "visible_from_ts": visible}
                                                     for r in rpt], or_ignore=True)  # fmt: skip
+    # Reg. 23(9) rows of a standalone Q2 / Q4 Integrated Filing [X115]: same entity, scope and visibility; never feed a
+    # ratio or a feature column (period coverage UNVERIFIED, R13).
+    reg23 = read_table(con, stage_dir, "stg_reg23_rpt")
+    insert_rows(con, "reg23_related_party_transactions", [{**r, "entity_id": entity_id, "visible_from_ts": visible}
+                                                          for r in reg23], or_ignore=True)  # fmt: skip
     # Non-blocking parse findings (X86 ATTRIBUTION_WITHHELD): the filing is promoted, the finding stays open.
     finding_rows = [
         _quarantine_row(stage=i["stage"], reason_code=i["reason_code"], filing_id=fid, entity_id=entity_id,

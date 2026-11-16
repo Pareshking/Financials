@@ -253,7 +253,8 @@ def run_synthetic(db: Path, work: Path, n_secs: int, legacy_days: int = 3) -> di
         res["load_s"] = time.perf_counter() - t0
         for d in days:
             t = time.perf_counter()
-            r = features.materialize(con, d, prices=prices)
+            last = d == days[-1]  # as materialize_days: the live table only on the run's last day
+            r = features.materialize(con, d, prices=prices, snapshot=last, snapshot_due=last)
             res["per_day"].append((d, time.perf_counter() - t, r.rows))
             if r.status != "PROMOTED":
                 raise RuntimeError(f"{d}: {r}")

@@ -2,3 +2,6 @@
 # drop the CRON_TZ line and use 45 14 * * * (20:15 IST = 14:45 UTC). Edit the checkout path.
 CRON_TZ=Asia/Kolkata
 15 20 * * * cd "$HOME/Financials" && mkdir -p data/logs && { .venv/bin/python -m financials --data-dir data run-day; .venv/bin/python -m financials --data-dir data materialize --incremental; } >> data/logs/daily.log 2>&1
+# Monthly on the 1st, 23:40 IST (after the daily run): rewrite market.duckdb without dead space (architecture §4.1).
+# Refuses, changing nothing, when the disk has less than 1.1 x the live size free.
+40 23 1 * * cd "$HOME/Financials" && mkdir -p data/logs && .venv/bin/python -m financials --data-dir data compact >> data/logs/compact.log 2>&1

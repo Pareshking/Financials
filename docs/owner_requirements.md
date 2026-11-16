@@ -476,3 +476,14 @@ The owner asked the assistant to take these with its recommendation. Each is rev
 - **G. Announcement text retrieval (G164):** out of scope for now; numbers come only from XBRL and audited PDF corrections.
 - **H. Portfolio analytics and decision journal (G211, G212):** out of scope for now (architecture §1: research, screening, backtesting).
 - **Paid sources (G74, owner, 2026-11-15):** none at all.
+
+## Owner decisions (2026-11-16)
+
+- **I. Storage (owner: "Fix everything"):** the live `screener_features` table is written once per materialize run
+  (its last day), not every day; `compact` rewrites `market.duckdb` without dead space (monthly, and automatically
+  after full runs when the disk has room); `prune-versions` may delete the rows of superseded parser versions that no
+  reader can select, only after archiving them to zstd Parquet with a manifest (table, version, rows, sha256) and an
+  `admin_log` entry. The vault blobs remain the source of truth, so every version stays reproducible by a re-parse
+  (CLAUDE.md invariant 1, architecture §4.1). The feature universe stays every security with a recent bar (about
+  3,000 EQ / BE / BZ securities, not only the Nifty 500), because the universe will be expanded soon: the history
+  grows by about 1 GB per ~1.3 M rows (~3,000 securities x ~440 days) and with the universe.

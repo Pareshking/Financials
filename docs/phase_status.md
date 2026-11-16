@@ -31,6 +31,11 @@ the full line-by-line audit of the PDF is `docs/master_backlog.md`; ratios are i
    `materialize --incremental`; `nightly-tests.yml` runs the offline suite on a hosted runner. A hosted runner cannot
    run the pipeline (no data, NSE blocks datacenter IPs, no redistribution); registering the runner is the owner's
    step (`ops/README.md`).
+2b. **DONE (storage, 2026-11-16, features `2026.11.16-16S`, decision I)** The 22.4 GiB database held ~6 GB of tables:
+   `screener_features` is now written once per materialize run, `compact` rewrites the file without dead space
+   (monthly cron line; automatic after full runs when the disk has room) and `prune-versions` archives and deletes
+   superseded parser versions (~24 M raw rows, ~2.3 GB). Owner steps: free >= ~4.5 GB next to `data/`, then
+   `prune-versions` (it compacts itself when there is room). Architecture §4.1, ops/README.md.
 3. Credit rating (Screener ratio) needs credit-rating XBRL (G98, F22 UNVERIFIED).
 4. Not possible by design: all-time high/low (data starts 2024-10-01), "Expected quarterly …" (forecasts),
    G Factor (formula unpublished).

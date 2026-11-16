@@ -489,3 +489,14 @@ The owner asked the assistant to take these with its recommendation. Each is rev
   (CLAUDE.md invariant 1, architecture §4.1). The feature universe stays every security with a recent bar (about
   3,000 EQ / BE / BZ securities, not only the Nifty 500), because the universe will be expanded soon: the history
   grows by about 1 GB per ~1.3 M rows (~3,000 securities x ~440 days) and with the universe.
+- **J. Drop `raw_xbrl_facts` (owner, 2026-11-16: "Ok with plan once we have everything covered, go ahead and don't
+  ask for it again. Approved."):** condition: every XBRL element of every vaulted file type reaches a clean table
+  (`disclosure_facts` for everything no other clean table captures), proven by a fixture coverage test for each
+  accounting profile and file type and by a live measurement showing 0 uncaptured elements per profile. Once the
+  condition holds, the raw table is removed from the schema and the code paths that read it (quarantine inspect /
+  reprocess, prune rules, lineage) read the vault blob on demand instead. The vault blobs stay (0.7 GB): they remain
+  the source of truth for every re-parse.
+- **K (proposed, not decided):** R2 for the vault and the nightly database snapshot or Parquet bundle, GitHub
+  Actions as the writer, a private Cloudflare-hosted site behind a login, and a free LLM API that translates
+  questions into the screener DSL. Recorded as a direction only; CLAUDE.md's "no Cloudflare/R2 without an explicit
+  decision" still applies until the owner decides.

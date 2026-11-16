@@ -45,13 +45,14 @@ def test_wrong_template_finding_closes_once_the_ind_as_filing_exists(market, rig
     assert r.status == "QUARANTINED"
     assert _promote(market, WRONG["CONSOLIDATED"], wrong_ts).status == "QUARANTINED"
     if not right_first:
-        assert close_wrong_template_duplicates(market.con) == 0
+        assert close_wrong_template_duplicates(market.con, market.vault) == 0
         assert _promote(market, RIGHT["STANDALONE"], right_ts).status == "PROMOTED"
-    assert close_wrong_template_duplicates(market.con) == 1  # standalone only: no consolidated Ind AS filing yet
+    # standalone only: no consolidated Ind AS filing yet
+    assert close_wrong_template_duplicates(market.con, market.vault) == 1
     assert (_open(market, WRONG["STANDALONE"]), _open(market, WRONG["CONSOLIDATED"])) == (0, 1)
     note = market.con.execute("SELECT resolution_note FROM quarantine_queue WHERE filing_id = ?",
                               [r.message]).fetchone()[0]  # fmt: skip
     assert note.startswith("X89 WRONG_TEMPLATE_DUPLICATE")
     assert _promote(market, RIGHT["CONSOLIDATED"], right_ts).status == "PROMOTED"
-    assert close_wrong_template_duplicates(market.con) == 1
+    assert close_wrong_template_duplicates(market.con, market.vault) == 1
     assert _open(market, WRONG["CONSOLIDATED"]) == 0

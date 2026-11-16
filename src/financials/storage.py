@@ -100,6 +100,11 @@ def _schema_tables() -> list[str]:
     return re.findall(r"CREATE TABLE IF NOT EXISTS (\w+) \(", tables_sql)
 
 
+def _drop_hint(extra: list[str]) -> str:
+    """A database from before decision J still holds raw_xbrl_facts: compact never drops a table silently."""
+    return " (raw_xbrl_facts: run `drop-raw-xbrl`, owner decision J)" if "raw_xbrl_facts" in extra else ""
+
+
 def _measure(con) -> tuple[int, int]:
     con.execute("CHECKPOINT")
     live = sum(live_bytes(con).values())
@@ -140,7 +145,7 @@ def compact(db_path: Path, *, keep_old: bool = False, free_bytes: int | None = N
         extra = [t for t in tables if t not in order]
         if extra:
             return CompactResult("REFUSED", f"tables not declared in schema.sql: {extra}; add them to schema.sql "
-                                 "or drop them first", before, 0, live)  # fmt: skip
+                                 f"or drop them first{_drop_hint(extra)}", before, 0, live)  # fmt: skip
         rows = {t: con.execute(f"SELECT count(*) FROM {t}").fetchone()[0] for t in order}
         here = con.execute("SELECT current_database()").fetchone()[0]
         cols = {t: _columns(con, here, t) for t in order}
@@ -233,7 +238,8 @@ def compact_via_spill(db_path: Path, spill: Path, *, free_bytes: int | None = No
             order = [t for t in _schema_tables() if t in tables]
             extra = [t for t in tables if t not in order]
             if extra:
-                return CompactResult("REFUSED", f"tables not declared in schema.sql: {extra}", before, 0, live)
+                return CompactResult("REFUSED", f"tables not declared in schema.sql: {extra}{_drop_hint(extra)}",
+                                     before, 0, live)  # fmt: skip
             here = con.execute("SELECT current_database()").fetchone()[0]
             spill.mkdir(parents=True)
             con.execute("SET preserve_insertion_order = false")
@@ -384,15 +390,6 @@ PRUNE_RULES: tuple[PruneRule, ...] = (
         "every reader filters SEGMENT_CURRENT_VERSION (latest filing_meta version)",
     ),
     PruneRule(
-        "raw_xbrl_facts",
-        f"""t.parser_version <> coalesce((SELECT c.pv FROM {_CUR} c WHERE c.filing_id = t.filing_id), '')
-            AND {VK("t.parser_version")} < (SELECT max({VK("r.parser_version")}) FROM raw_xbrl_facts r
-                                             WHERE r.filing_id = t.filing_id)""",
-        "readers take the current filing_meta version (statements.segments) or any one version of the filing "
-        "(ScripCode, quarantine checks of unparsed filings); the latest raw version and the filing_meta version "
-        "stay",
-    ),
-    PruneRule(
         "shareholding_observations",
         f"""{_SHP_DOMINATED} AND EXISTS (SELECT 1 FROM shareholding_observations k WHERE k.filing_id = t.filing_id
               AND {VK("k.parser_version")} > {VK("t.parser_version")} AND k.entity_id = t.entity_id
@@ -492,9 +489,9 @@ def prune_versions(con, archive: Path, *, dry_run: bool = False, note: str = "",
     if run.exists():
         raise StorageError(f"{run} exists; refusing to overwrite an archive")
     entries = []
-    # Stream the archive COPYs: with insertion order preserved DuckDB buffers each export (the 24 M superseded
-    # raw_xbrl_facts rows of the live DB spilled > 4 GB of temp files, 2026-11-16). Row order in the archive does not
-    # matter: it is checked by count and sha256, and the deletes go by rowid.
+    # Stream the archive COPYs: with insertion order preserved DuckDB buffers each export (the 24 M superseded raw
+    # XBRL rows of the live DB, before decision J, spilled > 4 GB of temp files, 2026-11-16). Row order in the archive
+    # does not matter: it is checked by count and sha256, and the deletes go by rowid.
     con.execute("SET preserve_insertion_order = false")
     try:
         for p in todo:
@@ -558,9 +555,10 @@ def prune_versions(con, archive: Path, *, dry_run: bool = False, note: str = "",
     return PruneResult("PRUNED", plan, manifest, removed)
 
 
-# Tables whose prune query is split by filing: the per-filing max-version subquery of raw_xbrl_facts makes DuckDB
-# buffer the whole removable side (24 M rows on the live DB spilled > 4 GB of temp files, 2026-11-16).
-BUCKETED = {"raw_xbrl_facts": 32}
+# Tables whose prune query is split by filing hash buckets, for a table whose per-filing max-version subquery would
+# make DuckDB buffer the whole removable side (the raw XBRL table before decision J: 24 M rows spilled > 4 GB of temp
+# files, 2026-11-16). None today.
+BUCKETED: dict[str, int] = {}
 
 
 def _buckets(table: str) -> list[tuple[int, str]]:

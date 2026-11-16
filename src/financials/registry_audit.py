@@ -7,7 +7,8 @@ to profiles ("Premium" is insurer revenue but a share-premium reserve in a corpo
 match wins. An unmapped numeric element that matches no rule is ``UNCLASSIFIED`` and fails test_docs_sync, so a
 new element can never be silently ignored: it must be mapped or given a rule here.
 
-Excluded elements are not lost: every fact is stored verbatim in ``raw_xbrl_facts`` (invariant 3).
+Excluded elements are not lost: every fact is kept verbatim in the vault blob, and in ``disclosure_facts`` when no
+other clean table holds it (X116, owner decision J).
 """
 
 from __future__ import annotations

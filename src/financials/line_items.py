@@ -10,8 +10,8 @@ Structural duplicates (a second element carrying the identical value of a mapped
 are still stored, and annotated with `duplicate_of` in the registry: nothing is dropped.
 
 What is not a line item: per-record dimensional rows (one related party, one shareholder, one segment member
-without a label, one person in a Reg. 30 filing). Those are records; they live verbatim in raw_xbrl_facts and,
-where parsed, in dedicated tables (shareholding_*, corporate_events, segments).
+without a label, one person in a Reg. 30 filing). Those are records; they live verbatim in disclosure_facts and the
+vault blob and, where parsed, in dedicated tables (shareholding_*, corporate_events, segments).
 """
 
 from __future__ import annotations

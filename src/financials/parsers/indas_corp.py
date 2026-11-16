@@ -592,7 +592,7 @@ def map_line_items(inst: Instance, result: ParsedResults, curated: dict, *, dura
     """Zero-drop pass (C24): every numeric line item not already mapped, in the periods the curated pass validated,
     becomes a fact under its deterministic key; amounts on text-labelled members become `oth_` facts. Curated
     facts get their category/parent metadata too. A conflicting duplicate key is skipped with a warning (never a
-    guess); the raw fact stays in raw_xbrl_facts."""
+    guess); the raw fact stays in the vault blob (and in disclosure_facts)."""
     from financials.line_items import describe, describe_key, line_item_key, slug
 
     profile = result.profile or ""

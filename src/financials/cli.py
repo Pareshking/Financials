@@ -53,7 +53,7 @@ def pending_stages(con, stage_root: Path) -> list[Path]:
     return [d for *_, d in sorted(stages)]
 
 
-def promote_pending(con, stage_root: Path, out=sys.stdout) -> int:
+def promote_pending(con, stage_root: Path, out=sys.stdout, vault: Vault | None = None) -> int:
     """Returns the number of batches that aborted or wait (left pending for retry).
 
     Market days are promoted strictly in date order. When one aborts (e.g. G1 on a half-published file), every
@@ -80,7 +80,8 @@ def promote_pending(con, stage_root: Path, out=sys.stdout) -> int:
         con.execute("INSERT OR REPLACE INTO promotion_log VALUES (?, ?, ?, ?, ?)",
                     [rel, r.job, r.status, r.message, utc_now()])  # fmt: skip
         results_seen = results_seen or r.job == "results_xbrl"
-    if results_seen and (n := close_wrong_template_duplicates(con)):
+    # the X89 rule reads quarantined filings from their vault blobs (decision J); the vault sits next to staging
+    if results_seen and (n := close_wrong_template_duplicates(con, vault or Vault(stage_root.parent / "vault"))):
         print(f"{'FIXED_BY_RULE':16s} {'results_xbrl':14s} {n} wrong-template duplicate(s) closed [X89]", file=out)
     if n := close_resolved_share_findings(con):
         print(
@@ -149,7 +150,6 @@ def build_parser() -> argparse.ArgumentParser:
         "export-bundle", help="zstd Parquet shards of the database (local / private storage, never git)"
     )
     eb.add_argument("--out", type=Path, required=True)
-    eb.add_argument("--include-raw", action="store_true")
     eb.add_argument("--max-file-mb", type=float, default=50)
     eb.add_argument("--max-total-mb", type=float, default=250)
     ib = sub.add_parser("import-bundle", help="load a bundle into a new database and verify checksums")
@@ -211,6 +211,14 @@ def build_parser() -> argparse.ArgumentParser:
     pv.add_argument("--dry-run", action="store_true", help="only report the rows per table and version")
     pv.add_argument("--note", default="")
     pv.add_argument("--no-compact", action="store_true", help="do not compact the database file afterwards")
+    dr = sub.add_parser(
+        "drop-raw-xbrl",
+        help="one-shot (owner decision J): drop raw_xbrl_facts once the coverage check finds 0 uncaptured elements",
+    )
+    dr.add_argument("--note", default="")
+    dr.add_argument("--no-compact", action="store_true", help="do not compact the database file afterwards")
+    dr.add_argument("--spill", type=Path, help="compact afterwards through verified Parquet in this directory "
+                    "(low disk: needs ~0.5 x the live size instead of 1.1 x)")  # fmt: skip
     mt = sub.add_parser("materialize", help="one date, or every promoted trading day in --from/--to, in order")
     mt.add_argument("as_of", type=_date, nargs="?")
     mt.add_argument("--from", dest="from_date", type=_date)
@@ -330,7 +338,7 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
                 return 2
             con = connect(db_path, read_only=True)
             try:
-                m = export_bundle(con, args.out, include_raw=args.include_raw, max_file_mb=args.max_file_mb,
+                m = export_bundle(con, args.out, max_file_mb=args.max_file_mb,
                                   max_total_mb=args.max_total_mb)  # fmt: skip
             finally:
                 con.close()
@@ -490,6 +498,17 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
         print(f"compact: {r.status} {r.message}", file=out)
         return 0 if r.status == "COMPACTED" else 1
     rc = write_command(args, db_path, stage_root, out)
+    if args.cmd == "drop-raw-xbrl":
+        if rc == 0 and not args.no_compact:
+            from financials.storage import compact_via_spill, maybe_compact
+
+            if args.spill is not None:
+                r = compact_via_spill(db_path, args.spill)
+                print(f"compact: {r.status} {r.message}", file=out)
+            elif maybe_compact(db_path, out, data_dir_arg=str(args.data_dir)).status == "REFUSED":
+                print(f"compact: low disk? `python -m financials --data-dir {args.data_dir} compact --spill DIR` "
+                      "needs room for the Parquet only", file=out)  # fmt: skip
+        return rc
     full_run = (args.cmd == "materialize" and args.from_date is not None and not args.incremental) or args.cmd in (
         "rebuild-market", "prune-versions", "migrate-sparse-history")  # fmt: skip
     if rc == 0 and full_run and not getattr(args, "no_compact", False) and not getattr(args, "dry_run", False):
@@ -545,6 +564,14 @@ def write_command(args, db_path: Path, stage_root: Path, out) -> int:
             print(f"prune-versions: {r.status} {r.removed} rows" + (f", manifest {r.manifest}" if r.manifest else ""),
                   file=out)  # fmt: skip
             return 0
+        if args.cmd == "drop-raw-xbrl":
+            from financials.raw_xbrl import COLUMNS, drop_raw_xbrl
+
+            r = drop_raw_xbrl(con, note=args.note)
+            for row in r.coverage:
+                print(" | ".join(f"{c} {row[c]}" for c in COLUMNS), file=out)
+            print(f"drop-raw-xbrl: {r.status} {r.message}", file=out)
+            return 1 if r.status == "REFUSED" else 0
         if args.cmd == "materialize":
             if args.incremental:
                 if args.as_of is not None or args.from_date is not None:

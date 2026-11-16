@@ -1070,12 +1070,16 @@ def _visible_from(
     return visible, source
 
 
-def _declared_period_end(con, stage_dir: Path) -> date | None:
-    ends = [
-        r["value_text"].strip()
-        for r in read_table(con, stage_dir, "raw_xbrl_facts")
-        if r["element_name"] == "DateOfEndOfReportingPeriod"
-    ]
+def _declared_period_end(con, stage_dir: Path, manifest: dict[str, Any]) -> date | None:
+    """The latest `DateOfEndOfReportingPeriod` the file states (any context), from the stage manifest. A batch
+    staged before decision J carries the raw facts as Parquet instead: read from there."""
+    if "declared_period_ends" in manifest:
+        ends = list(manifest["declared_period_ends"])
+    else:
+        path = Path(stage_dir) / "raw_xbrl_facts.parquet"
+        ends = [] if not path.exists() else [v.strip() for (v,) in con.execute(
+            "SELECT value_text FROM read_parquet(?) WHERE element_name = 'DateOfEndOfReportingPeriod'",
+            [path.as_posix()]).fetchall()]  # fmt: skip
     try:
         return max(date.fromisoformat(e) for e in ends) if ends else None
     except ValueError:
@@ -1124,10 +1128,10 @@ def _close_stale_ytd_findings(con, pairs: list[tuple[str, str]], current: set[st
 
 
 def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
-    declared_end = _declared_period_end(con, stage_dir)
+    declared_end = _declared_period_end(con, stage_dir, manifest)
     if declared_end is not None and not financials_in_scope(declared_end):
         return _out_of_scope(con, stage_dir, "results_xbrl", f"period end {declared_end} < {MIN_PERIOD_END_DATE}")
-    _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_xbrl_facts"))
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings"))
     filing = read_table(con, stage_dir, "filings")[0]
     fid = filing["filing_id"]
     issues = read_table(con, stage_dir, "stg_issues")
@@ -1622,36 +1626,79 @@ WRONG_TEMPLATE_RULE = "WRONG_TEMPLATE_DUPLICATE"
 WRONG_TEMPLATE_NS = "IntegratedFinance_OtherThanBank"
 
 
-def close_wrong_template_duplicates(con) -> int:
+def wrong_template_keys(data: bytes) -> tuple[str | None, str | None, date | None]:
+    """(ISIN, scope, period end) a wrong-template filing states, read from its vault blob (any context, as the
+    file sends them; no clean row exists for a quarantined filing). Raises ParseError on a file that does not parse."""
+    from financials.parsers.xbrl import parse_instance
+
+    vals: dict[str, set[str]] = {"ISIN": set(), "NatureOfReportStandaloneConsolidated": set(),
+                                 "DateOfEndOfReportingPeriod": set()}  # fmt: skip
+    for f in parse_instance(data).facts:
+        if f.name in vals and f.value_text.strip():
+            vals[f.name].add(f.value_text.strip())
+    isin, scope, pe = (max(vals[k]) if vals[k] else None for k in vals)
+    try:
+        end = date.fromisoformat(pe) if pe else None
+    except ValueError:
+        end = None
+    return isin, scope.upper() if scope else None, end
+
+
+def close_wrong_template_duplicates(con, vault) -> int:
     """Rule WRONG_TEMPLATE_DUPLICATE [X89]: an Ind AS company that first files its results on the non-Ind AS
     template (SEBI `IntegratedFinance_OtherThanBank` taxonomy: ExtraordinaryItems, ...BeforeMinorityInterest) and
     then on the Ind AS template for the same entity, scope and period end. The UNKNOWN_TAXONOMY finding of the
     wrong-template filing is closed once such a promoted filing exists, whichever arrived first (Aarti, Kansai,
-    KIMS, MRPL, Rajesh Exports). Without one (L&T Q4 FY25) it stays open. Run once per promote batch."""
-    rows = con.execute(
-        f"""WITH wt AS (
-              SELECT q.quarantine_id,
-                     max(CASE WHEN r.element_name = 'ISIN' THEN r.value_text END) AS isin,
-                     max(CASE WHEN r.element_name = 'NatureOfReportStandaloneConsolidated'
-                              THEN upper(r.value_text) END) AS scope,
-                     max(CASE WHEN r.element_name = 'DateOfEndOfReportingPeriod' THEN r.value_text END) AS pe
-              FROM quarantine_queue q JOIN raw_xbrl_facts r USING (filing_id)
-              WHERE q.stage = 'PARSE' AND q.reason_code = 'UNKNOWN_TAXONOMY' AND q.resolved_at IS NULL
-                AND json_extract_string(q.details, '$.entity_namespace') LIKE '%{WRONG_TEMPLATE_NS}%'
-                AND r.element_name IN ('ISIN', 'NatureOfReportStandaloneConsolidated', 'DateOfEndOfReportingPeriod')
-              GROUP BY q.quarantine_id)
-            SELECT wt.quarantine_id, min(m.filing_id)
-            FROM wt JOIN security_identifier_history h ON h.isin = wt.isin
-            JOIN securities s ON s.security_id = h.security_id
-            JOIN filing_meta m ON m.entity_id = s.entity_id AND m.scope = wt.scope
-                               AND m.period_end = try_cast(wt.pe AS DATE) AND m.accounting_profile <> 'REG34_ANNUAL'
-            GROUP BY wt.quarantine_id"""
+    KIMS, MRPL, Rajesh Exports). Without one (L&T Q4 FY25) it stays open. Run once per promote batch. The
+    wrong-template filing's ISIN, scope and period end come from its vault blob (decision J: no raw table); a blob
+    that cannot be read leaves its finding open."""
+    from financials.parsers import ParseError
+
+    found = con.execute(
+        f"""SELECT q.quarantine_id, b.storage_path, b.sha256
+            FROM quarantine_queue q JOIN filings f USING (filing_id) JOIN blobs b USING (sha256)
+            WHERE q.stage = 'PARSE' AND q.reason_code = 'UNKNOWN_TAXONOMY' AND q.resolved_at IS NULL
+              AND json_extract_string(q.details, '$.entity_namespace') LIKE '%{WRONG_TEMPLATE_NS}%'
+            ORDER BY 1"""
     ).fetchall()
-    for qid, correct in rows:
+    keys = []
+    for qid, path, sha in found:
+        try:
+            keys.append((qid, *wrong_template_keys(vault.read_path(path, sha))))
+        except (OSError, RuntimeError, ParseError):
+            continue
+    if not keys:
+        return 0
+    import pyarrow as pa
+
+    con.register(
+        "_wt",
+        pa.table(
+            {
+                "quarantine_id": [k[0] for k in keys],
+                "isin": [k[1] for k in keys],
+                "scope": [k[2] for k in keys],
+                "pe": pa.array([k[3] for k in keys], pa.date32()),
+            }
+        ),
+    )
+    try:
+        rows = con.execute(
+            """SELECT wt.quarantine_id, min(m.filing_id)
+               FROM _wt wt JOIN security_identifier_history h ON h.isin = wt.isin
+               JOIN securities s ON s.security_id = h.security_id
+               JOIN filing_meta m ON m.entity_id = s.entity_id AND m.scope = wt.scope
+                                  AND m.period_end = wt.pe AND m.accounting_profile <> 'REG34_ANNUAL'
+               GROUP BY wt.quarantine_id"""
+        ).fetchall()
+    finally:
+        con.unregister("_wt")
+    if rows:
         con.execute(
-            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ? "
-            "WHERE quarantine_id = ?",
-            [utc_now(), f"X89 {WRONG_TEMPLATE_RULE}: Ind AS filing {correct} for the same entity, scope, period", qid],
+            "UPDATE quarantine_queue SET resolved_at = $1, resolution = 'FIXED_BY_RULE', resolution_note = $2 || "
+            "c.correct || ' for the same entity, scope, period' "
+            "FROM (SELECT unnest($3) AS qid, unnest($4) AS correct) c WHERE quarantine_id = c.qid",
+            [utc_now(), f"X89 {WRONG_TEMPLATE_RULE}: Ind AS filing ", [q for q, _ in rows], [c for _, c in rows]],
         )
     return len(rows)
 
@@ -1678,7 +1725,7 @@ def _promote_shareholding(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
         _close_shp_parse_findings(con, staged_meta[0]["filing_id"],
                                   f"parser {staged_meta[0]['parser_version']}: parses, out of scope [C9]")  # fmt: skip
         return res
-    _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_xbrl_facts"))
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings"))
     filing = read_table(con, stage_dir, "filings")[0]
     fid = filing["filing_id"]
     issues = read_table(con, stage_dir, "stg_issues")
@@ -1915,7 +1962,7 @@ def _promote_raw_only(con, stage_dir: Path, manifest: dict[str, Any]) -> Promoti
 
 
 def _promote_reg30_event(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
-    _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_xbrl_facts"))
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings"))
     filing = read_table(con, stage_dir, "filings")[0]
     fid = filing["filing_id"]
     issues = read_table(con, stage_dir, "stg_issues")

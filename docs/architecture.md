@@ -33,10 +33,11 @@ Operator commands (`python -m financials --data-dir data …`):
 | `materialize --incremental [--to D]` | recomputes only the rows marked dirty since the last run, on already-materialised days, with G4/G5 on each merged day (§11.10); refuses when a day was built by another `FEATURES_VERSION` |
 | `compact [--keep-old \| --spill DIR]` | `--spill`: low-disk mode through verified Parquet (§4.1). Otherwise CHECKPOINT, copy every table into a sibling file created from `schema.sql`, verify row counts and views, swap the files atomically (§4.1). Refuses when free disk < 1.1 x the live size. Also runs at the end of a full `materialize --from/--to`, `rebuild-market` and `prune-versions` when there is dead space and room (`--no-compact` skips it) |
 | `prune-versions [--archive DIR] [--dry-run]` | archives (zstd Parquet + manifest + `admin_log`) and then deletes the rows of superseded parser versions no reader can select (decision I, §4.1) |
+| `drop-raw-xbrl [--spill DIR] [--no-compact] [--note N]` | one-shot, owner decision J: refuses unless the coverage check (`scripts/disclosure_coverage.py`) reports 0 uncaptured elements per profile, then drops `raw_xbrl_facts` with an `admin_log` entry in one transaction (idempotent) and compacts (§4.1) |
 | `run-day --date D` | holiday list, market days D−7..D, corporate actions D−7..D+30, discovery for symbols with results in the day's RSS (A9) + Reg. 30 events, promote, `materialize --incremental --to D−1`, materialise D in full; idempotent |
 | `screen "QUERY" [--as-of D]` | runs a DSL screen on the live table or point-in-time on history (read-only connection) |
 | `load-kpis FILE` | stages a supplemental-KPI CSV/JSON (`parsers.kpis`) for `promote` into `supplemental_kpis` |
-| `export-bundle --out DIR [--include-raw --max-file-mb 50 --max-total-mb 250]`, `import-bundle DIR --db PATH` | zstd Parquet shards of every table (raw facts optional) with a manifest of row counts and checksums; import verifies them. Local or private storage only: the data is NSE-derived and the repository is public |
+| `export-bundle --out DIR [--max-file-mb 50 --max-total-mb 250]`, `import-bundle DIR --db PATH` | zstd Parquet shards of every table of schema.sql with a manifest of row counts and checksums; import verifies them (a `raw_xbrl_facts` part of an older `--include-raw` bundle is skipped: decision J). Local or private storage only: the data is NSE-derived and the repository is public |
 | `quarantine list [--stage --reason --entity --security --all]`, `quarantine inspect Q`, `quarantine resolve --id Q --action A --note N [--payload-json J]`, `quarantine reprocess` | audited quarantine resolution (D-6); `list` and `inspect` are read-only |
 | `extract-index-changes TEXT_DIR --out CSV`, `backfill-index --manifest CSV` | index membership before the first snapshot (§11.6) |
 | `lineage list`, `lineage add --parent P --child C --relation R --effective D [--ratio A:B] --evidence-url U --note N`, `lineage amend --id L --ratio A:B …`, `lineage coa --parent P --effective D --parent-pct X --child C=Y …`, `lineage retire --id L`, `lineage load --manifest reference/entity_lineage.csv` | merger / demerger lineage and the demerger COA split, audited (§11.7) |
@@ -80,7 +81,7 @@ Fetch etiquette (implemented in `financials.fetch.http.PoliteFetcher`): ≥1 s b
 | Layer | Contents | Mutability |
 |---|---|---|
 | L0 Vault | `blobs`, `filings`, files under `data/vault/` | Append-only. Never rewritten. |
-| L1 Raw | `raw_xbrl_facts`, `raw_cm_bhavcopy`, `raw_delivery`, `raw_index_snapshot`, all keyed by **source identifiers** (symbol, series, ISIN as the exchange sent them) | Append-only. Re-parse appends new rows keyed by `parser_version`. |
+| L1 Raw | `raw_cm_bhavcopy`, `raw_delivery`, `raw_index_snapshot` (XBRL facts: the vault blob, decision J), all keyed by **source identifiers** (symbol, series, ISIN as the exchange sent them) | Append-only. Re-parse appends new rows keyed by `parser_version`. |
 | L2 Canonical | Identity (`entity_master`, `securities`, `security_identifier_history`), `ohlcv`, `filing_meta`, `fact_observations`, `corp_actions`, `index_constituents_history`, `trading_calendar` | Rebuildable from L0/L1 + `quarantine_queue` resolutions + `company_overrides`. |
 | L3 Derived | Adjustment factors, adjusted prices, total-return index, `screener_features`, snapshots | Fully rebuildable. Swapped atomically. |
 
@@ -91,7 +92,8 @@ Fetch etiquette (implemented in `financials.fetch.http.PoliteFetcher`): ≥1 s b
 | `data/vault/` | every downloaded file, by sha256; the source of truth for every parse | |
 | `data/staging/` | parsed Parquet batches waiting for (or recorded by) `promote` | |
 | `data/market.duckdb` | every table below; one file, one writer | 22.4 GiB file, ~6 GB in use by tables |
-| `raw_xbrl_facts` | every XBRL fact verbatim, once per parser version that parsed the filing | 48.9 M rows, 4.4 GB |
+| `raw_xbrl_facts` | **removed by `drop-raw-xbrl` (owner decision J)**: every XBRL fact verbatim, once per parser version. Every element of every parsed filing reaches a clean table (`disclosure_facts`, X116); the vault blobs (0.7 GB) stay the source of truth | was 48.9 M rows, 4.4 GB (~24.9 M rows, ~2.2 GB after `prune-versions`) |
+| `disclosure_facts` | every fact of an element no other clean table holds (X116), as filed | 4.6 M rows, ~1.7 GB file growth |
 | `screener_features_history` | view: one row per security and materialised day (§11.9) over `features_daily` + `features_events` (below) | 1.33 M rows; was a 1.0 GB table before -17E |
 | `fact_observations`, `shareholding_*`, `segment_observations`, … | canonical facts, per parser version | ~0.4 GB together |
 | `data/archive/` | `prune-versions` output: zstd Parquet per table / version + `manifest.json` | |
@@ -128,9 +130,7 @@ deleted and rewrote the history, and every re-parse added a full copy of a filin
     `filing_meta` version of the filing; a filing without `filing_meta` keeps every version). The scope decision's
     anchor periods (`pat`, 3 / 12 months) group every version, so an old anchor row stays unless the current version
     has the same period visible no later.
-  - `raw_xbrl_facts`: readers take the current `filing_meta` version (`statements.segments`, which now reads one
-    version instead of every version's copy) or any one version (ScripCode, unparsed-filing checks): the latest raw
-    version and the `filing_meta` version stay.
+  - `raw_xbrl_facts`: no rule since decision J; the table is gone (below).
   - `shareholding_observations` / `_line_items` / `_major_holders`: readers join the ranked `shareholding_meta` row
     (latest visible, then highest version), so an old version goes only when a newer version of the same filing,
     entity and as-of date is visible from the same instant (a re-parse that moved visibility leaves it selectable,
@@ -207,6 +207,22 @@ copy into a temporary DuckDB) the whole history converted with `convert_wide` eq
 
 *Migration of an existing database* (single writer, one transaction): `apply_schema` refuses a database whose
 `screener_features_history` is still a table (`SchemaMigrationError`), so nothing writes into the old layout.
+- **`drop-raw-xbrl`** (owner decision J, `financials.raw_xbrl`, one-shot, single writer): refuses unless the
+  coverage check (`raw_xbrl.coverage`, printed by `scripts/disclosure_coverage.py`) reports 0 uncaptured elements
+  for every profile / file type; then `DROP TABLE raw_xbrl_facts` and an `admin_log` entry (`DROP_RAW_XBRL`: rows,
+  coverage, the values that from then on live only in the vault, decision J) in one transaction; idempotent (a
+  database without the table is left alone); then compacts as a full run does (`maybe_compact`, needs ~1.1 x the
+  live size free; `--spill DIR` compacts through Parquet instead, ~0.5 x). `compact` (both modes) refuses a
+  database that still has the table, naming this command, so it is never dropped silently. `apply_schema` never
+  recreates it. What then lives **only in the vault blob, by design**: facts of pre-cutoff contexts of promoted
+  filings (C9; ~2.49 M values on the live database) and every fact of the 64 quarantined / out-of-scope filings
+  (~2.36 M values; invariant 9: quarantine keeps the raw data, which is the blob). Readers that used the table now
+  read clean rows or the blob: the X89 wrong-template rule parses the quarantined filing's blob
+  (`promoter.wrong_template_keys`), the G79 ScripCode comes from `disclosure_facts`, the Reg. 23(9) backfill
+  selection from reg23 rows or `NameOfCounterParty` in `disclosure_facts`, `statements.segments` from
+  `segment_observations`; staging no longer writes raw facts (the scope gate's declared period ends travel in the
+  stage manifest). Expected effect on the live file: the table's blocks (4.4 GB, or ~2.2 GB if `prune-versions` ran
+  first) are freed and given back by the compaction.
 `python -m financials --data-dir data migrate-sparse-history` renames the wide table, creates the two tables and
 the view, fills them (`features_store.convert_wide`: DAILY columns copied, EVENT runs of identical consecutive rows
 found with exact window comparisons, 40 columns per pass), verifies the view against the wide table (counts and
@@ -217,7 +233,8 @@ when the dead space is worth it (the dropped table), as a full run does. Then `m
 Measured read-only on the live database (2026-11-16, `prune-versions --dry-run` rules): prune removes 23.97 M of
 48.9 M `raw_xbrl_facts` rows (~2.16 GB), 2.73 M of 5.78 M `fact_observations` (~0.10 GB), 3.84 M shareholding rows
 (~0.06 GB) and 1,340 segment rows; nothing in `related_party_transactions` / `group_structure` (one version each).
-After prune + compact the file should be ~4-5 GB (≈3.6 GB of table blocks plus primary-key indexes), from 22.4 GiB.
+After prune + compact the file should be ~4-5 GB (≈3.6 GB of table blocks plus primary-key indexes), from 22.4 GiB;
+`drop-raw-xbrl` (decision J) then removes the remaining ~2.2 GB of raw XBRL blocks (the whole 4.4 GB without a prune).
 The owner kept the full feature universe (every security with a recent bar, ~3,000 today, to be expanded): the
 history is ~1 GB for 1.33 M rows and grows with the days and the universe.
 
@@ -230,7 +247,7 @@ This section only records the decisions; it does not duplicate the DDL.
 | Layer | Tables |
 |---|---|
 | L0 | `blobs` (sha256 PK), `filings` (one publication of a blob; `UNIQUE(exchange, source_url, sha256)`) |
-| L1 | `raw_cm_bhavcopy`, `raw_delivery`, `raw_xbrl_facts`. Keyed by source identifiers plus `filing_id`. No surrogate IDs. |
+| L1 | `raw_cm_bhavcopy`, `raw_delivery`, `raw_index_snapshot`. Keyed by source identifiers plus `filing_id`. No surrogate IDs. XBRL facts have no raw table (decision J): the vault blob. |
 | L2 identity | `entity_master`, `securities`, `security_identifier_history` (date-bounded; `valid_to` exclusive), `trading_calendar` |
 | L2 market | `ohlcv` (resolved, unadjusted; delivery joined) |
 | L2 fundamentals | `filing_meta` (per filing × parser_version), `fact_observations` (long format), `segment_observations` (Ind AS 108 segment and geography rows, §14b-1), `group_structure` (AOC-1 subsidiaries / associates / JVs per fiscal year from Reg. 34 [X112]), `related_party_transactions` (Ind AS 24 related-party schedule per counterparty, category and transaction element from Reg. 34 [X113]), `reg23_related_party_transactions` (Reg. 23(9) rows per counterparty from standalone Q2 / Q4 Integrated Filings [X115]; period as tagged, never feeds a ratio, R13), `disclosure_facts` (every fact of an element no other clean table holds per element, as filed: results, annual, Reg. 31 and Reg. 30 filings; typed value columns, `in_window`; [X116, C28]) |
@@ -304,7 +321,7 @@ Balance sheet and cash flow come only from H1/FY filings [X12, X13, X22]. In Q2/
    - A conflict pattern that recurs may get a **named, deterministic known-defect rule**, e.g. `FOURD_DATES_EQUAL_ONED_USE_DECLARED_YTD`. It needs its own fixture and test and is recorded in `quarantine_queue` as `FIXED_BY_RULE`. Rules are code, never inference.
 5. **Scope** from `NatureOfReportStandaloneConsolidated` [X6].
 6. **Comparatives:** quarterly XBRL has none [X2]. Restated prior-year quarters cannot be machine-read [X3]. Restatement handling (§7.6) is therefore flag-based in v1.
-7. **Unknown elements** are kept in `raw_xbrl_facts` and simply not mapped. If a **mapped critical tag** is missing where the profile requires it → quarantine `PARSE/MISSING_CRITICAL`.
+7. **Unknown elements** are kept as filed in `disclosure_facts` (X116; the vault blob holds every fact) and simply not mapped. If a **mapped critical tag** is missing where the profile requires it → quarantine `PARSE/MISSING_CRITICAL`.
 8. **Revisions:** a revised filing for the same (entity, scope, period) is a new filing linked by `supersedes_filing_id`. Both stay. PIT picks by `visible_from_ts`.
 
 ### 7.5 Named label rules
@@ -928,7 +945,7 @@ period_end): no nullable key column.
 - **Sources.** Quarterly results (every profile that files the four `ReportableSegment*Axis` elements: corporate,
   NBFC, bank, life insurer) and Reg. 34 annual (`EntitySReportableSegmentsAxis`, `GeographicalAreasAxis`). The
   Integrated Filing has no geography axis. Elements no committed fixture shows (e.g. segment tax, capex additions,
-  equity-method investments) are not mapped; they stay in `raw_xbrl_facts`.
+  equity-method investments) are not mapped; they reach `disclosure_facts` as filed (X116).
 - **How.** `parsers/segments.py` is pure (bytes -> rows + findings) and keeps only facts in the periods the filing's
   own parser validated (`Windows.from_meta`: declared quarter / YTD and period end, or the Reg. 34 in-scope years);
   a declared pre-cutoff year is skipped (C9), any other context outside the declared periods is a finding.
@@ -1031,9 +1048,10 @@ Status (2026-11-13): **built and tested end to end** on real fixtures, all liste
   `disc-1`) holds every fact of every element that no other clean table holds per element, for results, annual,
   Reg. 31 and Reg. 30 filings, promoted with each filing; `backfill-disclosures` fills filings promoted earlier from
   the vault: a process pool (`--workers`, default the CPU count) parses the blobs to staging Parquet, then the single
-writer inserts them in one statement and commits once (resumable: staged files are reused; no re-parse into
-raw_xbrl_facts, no new results parser version). `scripts/disclosure_coverage.py DB` prints the per-profile coverage
-against raw_xbrl_facts (the check before dropping it, owner decision J). Annual
+writer inserts them in one statement and commits once (resumable: staged files are reused; no new results
+parser version). `scripts/disclosure_coverage.py DB` prints the per-profile coverage against raw_xbrl_facts on a
+database that still has it (the gate of `drop-raw-xbrl`, owner decision J, §4.1); after the drop the same property
+is pinned per profile by `tests/test_disclosures.py`, which parses the fixture blobs directly. Annual
   text blocks dominate its size (C28; ~0.9 MB per annual filing on disk).
 - Merger lineage and the demerger cost-of-acquisition split are **built** as admin-entered, audited edges (§11.7).
   Still open: automatic merger detection (no merger purpose in the corp-action feed, no delisting-circular fixture

@@ -16,7 +16,7 @@ Geography (Reg. 34 annual only; the Integrated Filing has no geography axis): `G
 
 Members, labels, axes and elements are kept exactly as filed; `member_role` is derived from the member name only
 (never from the free-text label) and `canonical_metric` from the element only. Elements no committed fixture shows are
-not mapped: they stay in raw_xbrl_facts and are listed in `unmapped`.
+not mapped: they reach disclosure_facts as filed (X116) and are listed in `unmapped`.
 
 Segment totals are NOT substitutes for P&L lines (Cummins' SegmentRevenueFromOperations differs from
 RevenueFromOperations; its segment PBT includes associates). Nothing here feeds fact_observations or a ratio.

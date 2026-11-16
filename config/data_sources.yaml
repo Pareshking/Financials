@@ -97,7 +97,7 @@ feeds:
     cadence: Quarterly per company (standalone and consolidated filings)
     fetch_runtime: CONTAINER_DIRECT
     join_keys: [ISIN, Symbol, ScripCode, NatureOfReportStandaloneConsolidated, period]
-    target_tables: [raw_xbrl_facts, filing_meta, fact_observations]
+    target_tables: [filing_meta, fact_observations, segment_observations, reg23_related_party_transactions, disclosure_facts]
     unlocked_metrics: [P&L, H1/FY balance sheet and cash flow, TTM, valuation ratios]
     phase: 1
     verification_status: VERIFIED
@@ -112,7 +112,7 @@ feeds:
     cadence: Annual (post-AGM)
     fetch_runtime: CONTAINER_DIRECT
     join_keys: [symbol in the NSE file name (resolved on broadcast date), CIN, FY end]
-    target_tables: [raw_xbrl_facts, filing_meta, fact_observations, group_structure, related_party_transactions]
+    target_tables: [filing_meta, fact_observations, group_structure, related_party_transactions, disclosure_facts]
     unlocked_metrics: [lease liabilities, gross block by class, CWIP, contingent liabilities, audit fees, R&D, royalty, geographic revenue, restated comparatives, Piotroski, Beneish, capex/depreciation, ROTE, RPT leak % per counterparty, year-end share counts]
     phase: 2
     verification_status: VERIFIED
@@ -157,7 +157,7 @@ feeds:
     cadence: Half-yearly (with H1/FY filings)
     fetch_runtime: CONTAINER_DIRECT
     join_keys: [filing_id, RelatedPartyTransactionAxis member]
-    target_tables: [raw_xbrl_facts, (planned) rpt_observations]
+    target_tables: [reg23_related_party_transactions, disclosure_facts]
     unlocked_metrics: [RPT leak %]
     phase: 2
     verification_status: VERIFIED
@@ -322,7 +322,7 @@ feeds:
     cadence: Intraday / event
     fetch_runtime: CONTAINER_DIRECT
     join_keys: [company, broadcast time]
-    target_tables: [raw_xbrl_facts, corporate_events]
+    target_tables: [corporate_events, disclosure_facts]
     unlocked_metrics: [order_wins_90d, order_value_90d, kmp_resignations_90d, auditor_resignations_90d, fraud_or_default_90d]
     phase: 2
     verification_status: VERIFIED

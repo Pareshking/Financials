@@ -39,7 +39,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G91 | Shareholding XBRL: promoter, FII, DII (MF, insurance, banks), public, pledged shares | DONE | F08; SHP7-SHP15; tests/test_batch8_shareholding.py |
 | G92 | SAST Reg. 31(1)/31(2) encumbrance events with lender details | DOCUMENTED_PLANNED | F12 (Phase 3, OBSERVED) |
 | G93 | Reg. 76 reconciliation of share capital audit (exact issued / listed shares) | DOCUMENTED_PLANNED | F09 UNVERIFIED, BLOCKED: probed 2026-11-15 (vault ledger, announcements RSS, TCS announcements API Jul-Nov 2026; BSE 403), no Reg. 76 file found (A15); Reg. 31 x paid-up cross-check (X103) stands in; batch J adds the annual stand-in: Reg. 34 year-end issued / subscribed / paid-up counts vs Reg. 31 and paid-up / face (X114, ANNUAL_SHARE_COUNT_DIFFERS) |
-| G99 | Related-party transactions from Reg. 23(9) half-yearly Integrated Filing | DONE | X19; RPT contexts land in raw_xbrl_facts. Batch J: per counterparty from the Reg. 34 annual schedule (X113, `related_party_transactions`, `backfill-rpt`); the Reg. 23(9) rows per counterparty of standalone Q2 / Q4 Integrated Filings are parsed into `reg23_related_party_transactions` (X115, parsers/reg23_rpt.py, promoted with the results filing and by `backfill-rpt`; tests/test_reg23_rpt.py); they feed no feature because their period coverage is UNVERIFIED (R13) |
+| G99 | Related-party transactions from Reg. 23(9) half-yearly Integrated Filing | DONE | X19; RPT contexts land in `reg23_related_party_transactions` / `disclosure_facts` (raw facts: the vault blob, decision J). Batch J: per counterparty from the Reg. 34 annual schedule (X113, `related_party_transactions`, `backfill-rpt`); the Reg. 23(9) rows per counterparty of standalone Q2 / Q4 Integrated Filings are parsed into `reg23_related_party_transactions` (X115, parsers/reg23_rpt.py, promoted with the results filing and by `backfill-rpt`; tests/test_reg23_rpt.py); they feed no feature because their period coverage is UNVERIFIED (R13) |
 | G101 | Daily delivery % | DONE | F02; P10; tests/test_market_parsers.py |
 | G105 | Audit qualification / modified opinion flag | DONE | E8; X75 filing_meta.auditor_qualified; tests/test_batch9_annual.py, tests/test_batch10_edge_cases.py. Screener column `rf_audit_qualified` (batch G) |
 | G106 | Reg. 30 director / auditor / KMP change alerts | DONE | E5; kmp_resignations_90d, auditor_resignations_90d; tests/test_batch10_events.py |
@@ -495,7 +495,11 @@ The owner asked the assistant to take these with its recommendation. Each is rev
   accounting profile and file type and by a live measurement showing 0 uncaptured elements per profile. Once the
   condition holds, the raw table is removed from the schema and the code paths that read it (quarantine inspect /
   reprocess, prune rules, lineage) read the vault blob on demand instead. The vault blobs stay (0.7 GB): they remain
-  the source of truth for every re-parse.
+  the source of truth for every re-parse. **Implemented (2026-11-16):** `drop-raw-xbrl` (gated on
+  `raw_xbrl.coverage`, audited in `admin_log`, idempotent, then compacts; `--spill DIR` on low disk); the readers
+  moved to clean rows or the blob (architecture §4.1); the fixture proof is `tests/test_disclosures.py` (raw facts
+  parsed from each blob). Pre-cutoff contexts (~2.49 M values) and the 64 quarantined / out-of-scope filings' facts
+  (~2.36 M values) then live only in the vault, by design (C9; invariant 9).
 - **K (proposed, not decided):** R2 for the vault and the nightly database snapshot or Parquet bundle, GitHub
   Actions as the writer, a private Cloudflare-hosted site behind a login, and a free LLM API that translates
   questions into the screener DSL. Recorded as a direction only; CLAUDE.md's "no Cloudflare/R2 without an explicit

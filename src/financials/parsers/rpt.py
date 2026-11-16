@@ -14,7 +14,8 @@ the year-end balances on the instant context (`AmountsPayable/ReceivableRelatedP
 Rules:
 - `FLOW_ELEMENTS` / `BALANCE_ELEMENTS` map each verified element to a canonical type (TXN_TYPES); every other
   element of the schedule (provisions for doubtful debts, outstanding commitments) is not a transaction and stays
-  in raw_xbrl_facts only. Amounts are stored as filed (zeros included: "filed as nil" is not "not filed").
+  in disclosure_facts (as filed) and the vault blob. Amounts are stored as filed (zeros included: "filed as nil" is
+  not "not filed").
 - royalties are the taxonomy's licence transfers: `TransfersUnderLicenseAgreementsToEntity...` (the entity pays,
   `royalty`) and `...FromEntity...` (`royalty_received`); loans are finance transfers (`...FromEntity...` =
   `loans_given`, `...ToEntity...` = `loans_taken`).

@@ -38,6 +38,8 @@ python -m financials --data-dir data load-kpis kpis.csv                        #
 python -m financials --data-dir data backfill-disclosures [--workers N]        # disclosure_facts for promoted filings (resumable)
 python scripts/disclosure_coverage.py data/market.duckdb                       # per-profile check: 0 uncaptured elements
 python -m financials --data-dir data export-bundle --out data/bundle           # zstd Parquet shards; never commit them
+python scripts/disclosure_coverage.py data/market.duckdb                       # decision J gate: 0 uncaptured per profile
+python -m financials --data-dir data drop-raw-xbrl [--spill data/spill]         # once: drop raw_xbrl_facts (gated), compact
 python -m financials --data-dir data migrate-sparse-history                    # once: wide history table -> features_daily + features_events + view
 python -m financials --data-dir data compact [--keep-old | --spill data/spill]  # monthly: rewrite without dead space (--spill: low disk)
 python -m financials --data-dir data prune-versions [--dry-run] [--archive DIR]  # archive + delete superseded parser versions
@@ -71,8 +73,9 @@ data/                  local only, gitignored: vault/, staging/, market.duckdb
 
 ## Data invariants (non-negotiable)
 
-1. **Append-only.** Vault blobs, `filings`, raw tables and `fact_observations` are never updated
-   in place. A revision is a new filing (`supersedes_filing_id`). A re-parse is a new `parser_version`.
+1. **Append-only.** Vault blobs, `filings`, raw tables (`raw_cm_bhavcopy`, `raw_delivery`, `raw_index_snapshot`, …)
+   and `fact_observations` are never updated in place. XBRL facts have no raw table (owner decision J,
+   `drop-raw-xbrl`): the vault blob is their raw record and anything that needs them parses it. A revision is a new filing (`supersedes_filing_id`). A re-parse is a new `parser_version`.
    Rows of superseded parser versions may be pruned only by `prune-versions` after archiving them (owner decision
    2026-11-16, decision I), and only rows no reader can select; vault blobs remain the source of truth, so every
    version is reproducible by a re-parse. Nothing else deletes from these tables.
@@ -94,8 +97,8 @@ data/                  local only, gitignored: vault/, staging/, market.duckdb
    for share-count events. Dividends never adjust prices; they feed the total-return series.
    Absolute financials are never multiplied by any factor.
 9. **Quarantine over auto-heal.** Unknown taxonomy, missing critical tag, failed identity, period
-   conflict, unexplained >10% open gap or ISIN change → `quarantine_queue`; keep raw data, freeze
-   derived data. A recurring defect may only be fixed by a named deterministic rule with its own fixture and test.
+   conflict, unexplained >10% open gap or ISIN change → `quarantine_queue`; keep raw data (the vault blob and
+   its `filings` row; raw market tables), freeze derived data. A recurring defect may only be fixed by a named deterministic rule with its own fixture and test.
 10. **Single writer.** Fetchers and parsers write vault files and staging Parquet only. Only the
     promoter opens `data/market.duckdb` for writing, and promotes atomically after gates G1–G5.
 11. Timestamps are `TIMESTAMP` columns holding UTC; convert to/from IST only at parse and display boundaries.

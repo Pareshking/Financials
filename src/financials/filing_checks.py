@@ -4,7 +4,7 @@
   fiscal year (what a point-in-time reader saw just before the annual report became visible). A difference beyond
   the rounding of the two filings is a non-blocking CONSISTENCY / ANNUAL_PRIOR_YEAR_DIFFERS finding: the restated
   comparative is kept as filed (it is that filing's fact, visible from its broadcast), nothing is corrected.
-- G79 [X111]: the BSE scrip code stated inside a results filing (`ScripCode`, X7) fills
+- G79 [X111]: the BSE scrip code stated inside a results filing (`ScripCode`, X7; from disclosure_facts) fills
   `security_identifier_history.bse_scrip_code` of the NSE identifier rows that match the filing's own ISIN and
   symbol. A different code already on such a row is an IDENTIFIER / BSE_SCRIP_CODE_CONFLICT finding; nothing is
   overwritten.
@@ -68,11 +68,12 @@ def annual_prior_year_differences(
 
 
 def filed_scrip_code(con, filing_id: str) -> str | None:
-    """The filing's non-dimensional `ScripCode` as sent (raw_xbrl_facts), when it is one all-digit value."""
+    """The filing's non-dimensional `ScripCode` as sent, when it is one all-digit value. Read from disclosure_facts
+    (X116: no other clean table holds the element; any version, as the raw table was read before decision J)."""
     vals = {
         (v or "").strip()
         for (v,) in con.execute(
-            "SELECT DISTINCT value_text FROM raw_xbrl_facts WHERE filing_id = ? AND element_name = 'ScripCode' "
+            "SELECT DISTINCT value_text FROM disclosure_facts WHERE filing_id = ? AND element = 'ScripCode' "
             "AND dimensions IS NULL",
             [filing_id],
         ).fetchall()

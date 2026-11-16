@@ -294,7 +294,7 @@ def test_prune_keeps_every_reader_identical_and_the_archive_round_trips(base, tm
     _inject_versions(con, edges=False)
     assert _materialise_all(con) == clean  # superseded versions are invisible to every reader already
     segs = _segments(con)
-    assert segs == clean_segments and segs and segs[0]  # one version read: no duplicate raw rows
+    assert segs == clean_segments and segs and segs[0]  # one version read: no duplicate rows
     ids = _inject_edges(con)
     before = _materialise_all(con)
     plan = storage.prune_plan(con)
@@ -324,7 +324,7 @@ def test_prune_keeps_every_reader_identical_and_the_archive_round_trips(base, tm
         ).fetchone()[0]
         == 0
     )  # same instant as the current version: superseded
-    assert con.execute("SELECT count(*) FROM raw_xbrl_facts WHERE parser_version = ? AND filing_id = ?",
+    assert con.execute("SELECT count(*) FROM fact_observations WHERE parser_version = ? AND filing_id = ?",
                        [OLD, ids["named"]]).fetchone()[0] > 0  # named by a quarantine finding  # fmt: skip
     assert con.execute("SELECT count(*) FROM filing_meta WHERE parser_version = ?", [OLD]).fetchone()[0] > 0
 

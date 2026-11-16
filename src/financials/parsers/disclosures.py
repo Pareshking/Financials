@@ -13,7 +13,7 @@ reg23_related_party_transactions, shareholding_major_holders, the related-party 
 only in normalised filing metadata (scope, rounding, dates, ISIN, audit flags, shareholding flags) are NOT
 captured verbatim, so their elements are kept here too, as filed.
 
-Rows (one per fact of an uncaptured element, document order `seq` = raw_xbrl_facts.seq):
+Rows (one per fact of an uncaptured element, document order `seq` = parsers.xbrl Fact.seq):
 - period: as tagged, after the filing parser's named re-dating rule STALE_CONTEXT_DATES [X87] (segments.Windows);
   `in_window` is true only for a duration / instant the filing's own parser validated (results: the declared quarter
   and YTD, the period-end instant; annual: the in-scope fiscal years and year ends; shareholding: the as-of instant).
@@ -48,7 +48,7 @@ _NUM_QUANTUM = Decimal("0.00000001")
 
 @dataclass(frozen=True)
 class DisclosureFact:
-    seq: int  # document order, = raw_xbrl_facts.seq of the same filing
+    seq: int  # document order, = parsers.xbrl Fact.seq of the filing's instance
     element_ns: str
     element: str  # local name as filed
     context_id: str

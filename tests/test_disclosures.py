@@ -3,6 +3,7 @@ Schedule III subsidiary contribution X119). Every value is read straight from co
 
 from __future__ import annotations
 
+import io
 import json
 from collections import defaultdict
 from datetime import date, datetime, timedelta
@@ -12,6 +13,7 @@ import pytest
 
 from _fixture_helpers import FIXTURES, XBRL_DIR
 from financials import features_disclosures as F
+from financials import raw_xbrl
 from financials.db import fetch_dicts
 from financials.disclosures import STAGE_DIR, _stage_one, backfill_disclosures, pending_filings
 from financials.dsl import ALIASES, compile_screen
@@ -113,9 +115,16 @@ def test_shp16_entity_contexts_are_period_none():
 # ── coverage: every element of every parsed fixture reaches a clean table ─────────────────────────────────────────
 
 
-def _staged_coverage(stage_dir, con) -> tuple[set, set, set]:
+def _blob_facts(data: bytes, kind: str) -> list[tuple[str, object]]:
+    """[(element, context end or None)] of every fact of the file, read by the parser from the blob (decision J: the
+    raw facts are the blob's, not a table's); SHP files through shp_instance, as staging reads them."""
+    inst = shp_instance(data)[0] if kind == "SHP" else parse_instance(data)
+    return [(f.name, inst.contexts[f.context_id].instant or inst.contexts[f.context_id].end) for f in inst.facts]
+
+
+def _staged_coverage(stage_dir, con, data: bytes, kind: str) -> tuple[set, set, set]:
     """(raw elements in scope, elements in the clean staged tables, raw elements only in pre-cutoff contexts)."""
-    raw = read_table(con, stage_dir, "raw_xbrl_facts")
+    raw = _blob_facts(data, kind)
     t = {n: read_table(con, stage_dir, n) for n in ("stg_xbrl_facts", "stg_segments", "stg_related_parties",
                                                      "stg_reg23_rpt", "stg_group_structure", "stg_shp_line_items",
                                                      "stg_shp_holders", "stg_events", "stg_disclosures")}  # fmt: skip
@@ -129,9 +138,8 @@ def _staged_coverage(stage_dir, con) -> tuple[set, set, set]:
         clean |= verbatim_elements(rel)
     for e in t["stg_events"]:
         clean |= set(json.loads(e["details"]).get("numeric", {}))
-    end = lambda r: r["ctx_instant"] or r["ctx_end"]  # noqa: E731
-    kept = {r["element_name"] for r in raw if t["stg_events"] or end(r) is None or end(r) >= MIN_PERIOD_END_DATE}
-    pre = {r["element_name"] for r in raw} - kept
+    kept = {e for e, end in raw if t["stg_events"] or end is None or end >= MIN_PERIOD_END_DATE}
+    pre = {e for e, _ in raw} - kept
     return kept, clean, pre
 
 
@@ -140,8 +148,9 @@ PROFILES = ("INDAS_CORP", "INDAS_NBFC", "IGAAP_BANK", "IRDAI_LIFE", "IRDAI_GENER
 
 
 def test_every_element_of_every_parsed_fixture_reaches_a_clean_table(market):
-    """X116: for each committed XBRL fixture that parses, the staged batch the promoter loads holds every in-scope raw
-    element in at least one clean table; checked per accounting profile, each with at least one real fixture (a
+    """X116, the decision J proof after the drop: for each committed XBRL fixture that parses, the staged batch the
+    promoter loads holds every in-scope element of the file (parsed from the blob, not read from any table) in at
+    least one clean table; checked per accounting profile and file type, each with at least one real fixture (a
     results filing carrying the Reg. 23(9) section counts for REG23_RPT too)."""
     checked = defaultdict(list)
     for path in sorted(XBRL_DIR.glob("*.xml")) + sorted((FIXTURES / "events").glob("*WebXMLFile*.xml")):
@@ -154,7 +163,9 @@ def test_every_element_of_every_parsed_fixture_reaches_a_clean_table(market):
             stage = stage_results_xbrl(market.vault, market.stage_root, data=data, source_url=url, fetched_at=FETCHED)
         if read_table(market.con, stage, "stg_issues") or not read_table(market.con, stage, "stg_disclosures"):
             continue  # not parsed (routed profile, quarantine, raw-only event family): nothing clean is promoted
-        kept, clean, _ = _staged_coverage(stage, market.con)
+        kind = "EVENT" if path.parent.name == "events" else "SHP" if path.name.startswith("SHP") else "RESULTS"
+        kept, clean, _ = _staged_coverage(stage, market.con, data, kind)
+        assert not (stage / "raw_xbrl_facts.parquet").exists()  # no raw copy is staged (decision J)
         assert kept - clean == set(), path.name
         meta = read_table(market.con, stage, "stg_xbrl_filing")
         profile = meta[0]["accounting_profile"] if meta else "REG30_EVENT" if path.parent.name == "events" else (
@@ -310,7 +321,8 @@ def test_rows_are_promoted_with_their_filing_and_backfilled_idempotently(filed):
     ).fetchone()[0]  # fmt: skip
     assert same is True
     assert pending_filings(con) == []
-    before, raw = _counts(con), con.execute("SELECT count(*) FROM raw_xbrl_facts").fetchone()
+    before = _counts(con)
+    assert not raw_xbrl.table_exists(con)  # decision J: no raw table
     snapshot = con.execute("SELECT * FROM disclosure_facts ORDER BY filing_id, seq").fetchall()
     con.execute("DELETE FROM disclosure_facts")  # as if promoted before X116
     con.execute("DELETE FROM materialize_dirty")
@@ -326,7 +338,7 @@ def test_rows_are_promoted_with_their_filing_and_backfilled_idempotently(filed):
     assert {d for (d,) in con.execute("SELECT from_date FROM materialize_dirty WHERE reason = 'DISCLOSURE_BACKFILL'")
             .fetchall()} == {date(2026, 7, 23), date(2026, 9, 4), date(2026, 11, 4)}  # fmt: skip
     assert backfill_disclosures(con, filed.vault, filed.stage_root, workers=1)["filings"] == 0  # idempotent
-    assert con.execute("SELECT count(*) FROM raw_xbrl_facts").fetchone() == raw  # no second raw copy
+    assert not raw_xbrl.table_exists(con)  # the backfill reads blobs, writes no raw copy
     assert con.execute("SELECT count(DISTINCT parser_version) FROM filing_meta").fetchone() == (1,)
 
 
@@ -381,15 +393,160 @@ def test_columns_are_appended_and_split_event_daily():
     assert set(F.SHP_DECLARATION_COLUMNS) <= set(DAILY_COLUMNS)  # shareholding is outside the key
 
 
-def test_coverage_script_finds_every_element_in_a_clean_table(filed):
-    """scripts/disclosure_coverage.py (the check before dropping raw_xbrl_facts) on promoted real filings."""
+# ── decision J: the coverage gate and the one-shot drop of raw_xbrl_facts ─────────────────────────────────────────
+
+# The table as schema.sql declared it before decision J; a pre-J database still holds it.
+LEGACY_RAW_DDL = """CREATE TABLE raw_xbrl_facts (
+    filing_id VARCHAR NOT NULL REFERENCES filings(filing_id), parser_version VARCHAR NOT NULL, seq INTEGER NOT NULL,
+    element_ns VARCHAR NOT NULL, element_name VARCHAR NOT NULL, context_id VARCHAR NOT NULL, ctx_start DATE,
+    ctx_end DATE, ctx_instant DATE, dimensions JSON, unit_ref VARCHAR, decimals VARCHAR, value_text VARCHAR,
+    PRIMARY KEY (filing_id, parser_version, seq))"""
+
+
+def _legacy_raw_table(market) -> int:
+    """Recreate raw_xbrl_facts as the pre-J promoter filled it (every fact of every vaulted XBRL filing, verbatim),
+    from the vault blobs. Returns its row count."""
+    import pyarrow as pa
+
+    from financials import PARSER_VERSION
+
+    con = market.con
+    con.execute(LEGACY_RAW_DDL)
+    rows = []
+    for fid, cat, path, sha in con.execute(
+        "SELECT f.filing_id, f.category, b.storage_path, b.sha256 FROM filings f JOIN blobs b USING (sha256) "
+        "WHERE f.category IN ('RESULTS_XBRL', 'SHP_XBRL', 'REG30_EVENT')"
+    ).fetchall():
+        data = market.vault.read_path(path, sha)
+        inst = shp_instance(data)[0] if cat == "SHP_XBRL" else parse_instance(data)
+        for f in inst.facts:
+            c = inst.contexts[f.context_id]
+            dims = json.dumps(dict(c.dimensions)) if c.dimensions else None
+            rows.append({"filing_id": fid, "parser_version": PARSER_VERSION, "seq": f.seq, "element_ns": f.ns,
+                         "element_name": f.name, "context_id": f.context_id, "ctx_start": c.start, "ctx_end": c.end,
+                         "ctx_instant": c.instant, "dimensions": dims,
+                         "unit_ref": f.unit_ref, "decimals": f.decimals, "value_text": f.value_text})  # fmt: skip
+    con.register("_raw", pa.Table.from_pylist(rows))
+    con.execute("INSERT INTO raw_xbrl_facts BY NAME SELECT * FROM _raw")
+    con.unregister("_raw")
+    return len(rows)
+
+
+def _script():
     import importlib.util
 
     spec = importlib.util.spec_from_file_location("disclosure_coverage", FIXTURES.parents[1] / "scripts" /
                                                   "disclosure_coverage.py")  # fmt: skip
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    rows = {r["profile"]: r for r in mod.coverage(filed.con)}
+    return mod
+
+
+def test_coverage_script_finds_every_element_in_a_clean_table(filed):
+    """scripts/disclosure_coverage.py (financials.raw_xbrl.coverage, the gate of drop-raw-xbrl) on promoted real
+    filings of a database that still holds raw_xbrl_facts."""
+    assert raw_xbrl.coverage(filed.con) is None  # no raw table: nothing to measure
+    assert _legacy_raw_table(filed) > 0
+    rows = {r["profile"]: r for r in raw_xbrl.coverage(filed.con)}
     assert set(rows) >= {"REG34_ANNUAL", "REG31_SHP"} and all(r["uncaptured"] == 0 for r in rows.values()), rows
+    assert _script().coverage is raw_xbrl.coverage
     filed.con.execute("DELETE FROM disclosure_facts")
-    assert mod.coverage(filed.con)[0]["uncaptured"] > 0  # the check fails without disclosure_facts
+    assert raw_xbrl.coverage(filed.con)[0]["uncaptured"] > 0  # the check fails without disclosure_facts
+
+
+def test_drop_raw_xbrl_is_gated_audited_idempotent_and_compacts(filed, monkeypatch):
+    from financials import storage
+    from financials.cli import main
+    from financials.db import apply_schema, connect
+
+    con = filed.con
+    n = _legacy_raw_table(filed)
+    pre = con.execute("SELECT count(*) FROM raw_xbrl_facts WHERE coalesce(ctx_instant, ctx_end) < ?",
+                      [MIN_PERIOD_END_DATE]).fetchone()[0]  # fmt: skip
+    assert pre > 0  # the annual reports' FY24 comparatives: vault only after the drop (C9)
+    # the gate: an element no clean table holds refuses the drop and changes nothing
+    con.execute("CREATE TEMP TABLE keep AS SELECT * FROM disclosure_facts")
+    con.execute("DELETE FROM disclosure_facts")
+    r = raw_xbrl.drop_raw_xbrl(con)
+    assert r.status == "REFUSED" and "uncaptured" in r.message and raw_xbrl.table_exists(con)
+    assert con.execute("SELECT count(*) FROM admin_log WHERE action = 'DROP_RAW_XBRL'").fetchone()[0] == 0
+    con.execute("INSERT INTO disclosure_facts SELECT * FROM keep")
+    # a pre-J database refuses compaction until the table is dropped (never dropped silently)
+    con.close()
+    path = filed.vault.root.parent / "market.duckdb"
+    for res in (storage.compact(path), storage.compact_via_spill(path, path.parent / "spill")):
+        assert res.status == "REFUSED" and "drop-raw-xbrl" in res.message
+    monkeypatch.setattr(storage, "AUTO_COMPACT_MIN_BYTES", 0)
+    monkeypatch.setattr(storage, "AUTO_COMPACT_MIN_DEAD", 0)
+    out = io.StringIO()
+    assert main(["--data-dir", str(path.parent), "drop-raw-xbrl"], out=out) == 0, out.getvalue()
+    text = out.getvalue()
+    assert "drop-raw-xbrl: DROPPED" in text and "compact: COMPACTED" in text, text
+    con = filed.con = connect(path)
+    assert not raw_xbrl.table_exists(con)
+    (params, result, note) = con.execute(
+        "SELECT params, result, note FROM admin_log WHERE action = 'DROP_RAW_XBRL'").fetchone()  # fmt: skip
+    result = json.loads(result)
+    assert json.loads(params)["decision"] == "J" and "decision J" in note
+    assert (result["rows"], result["pre_cutoff_values"]) == (n, pre) and result["unpromoted_values"] == 0
+    assert all(c["uncaptured"] == 0 for c in result["coverage"])
+    assert apply_schema(con) == [] and not raw_xbrl.table_exists(con)  # never recreated
+    assert raw_xbrl.drop_raw_xbrl(con).status == "ALREADY_DROPPED"
+    con.close()
+    out = io.StringIO()
+    assert main(["--data-dir", str(path.parent), "drop-raw-xbrl", "--spill", str(path.parent / "spill")],
+                out=out) == 0  # fmt: skip
+    assert "ALREADY_DROPPED" in out.getvalue() and "compact: COMPACTED" in out.getvalue()  # spill mode, no raw table
+    assert main(["--data-dir", str(path.parent), "compact"], out=io.StringIO()) == 0
+    filed.con = connect(path)
+    assert filed.con.execute("SELECT count(*) FROM admin_log WHERE action = 'DROP_RAW_XBRL'").fetchone()[0] == 1
+
+
+def test_clean_rows_answer_what_the_raw_table_answered():
+    """Decision J: the two readers that queried raw_xbrl_facts by element get the same answer from the clean rows,
+    on every results / annual fixture that parses: the non-dimensional ScripCode (G79, filing_checks.filed_scrip_code:
+    disclosure_facts, never a fact_observations line item) and whether the filing carries a Reg. 23(9) counterparty
+    (related_parties.pending_results_filings: reg23 rows or NameOfCounterParty in disclosure_facts)."""
+    checked = 0
+    for path in sorted(XBRL_DIR.glob("*.xml")):
+        if path.name.startswith("SHP"):
+            continue
+        data = path.read_bytes()
+        inst = parse_instance(data)
+        t = results_tables("fil_x", inst, data, ARCHIVE + path.name)
+        if t.get("stg_issues"):
+            continue
+        raw_code = {f.value_text.strip() for f in inst.facts
+                    if f.name == "ScripCode" and not inst.contexts[f.context_id].dimensions}  # fmt: skip
+        clean_code = {r["value_text"].strip() for r in t["stg_disclosures"]
+                      if r["element"] == "ScripCode" and r["dimensions"] is None}  # fmt: skip
+        assert raw_code == clean_code, path.name
+        assert not any(r["source_element"] == "ScripCode" for r in t.get("stg_xbrl_facts", [])), path.name
+        if t["stg_xbrl_filing"][0]["accounting_profile"] != "REG34_ANNUAL":
+            raw_cp = any(f.name == "NameOfCounterParty" for f in inst.facts)
+            clean_cp = bool(t.get("stg_reg23_rpt")) or any(r["element"] == "NameOfCounterParty"
+                                                            for r in t["stg_disclosures"])  # fmt: skip
+            assert raw_cp == clean_cp, path.name
+        checked += 1
+    assert checked >= 100
+
+
+def test_scope_gate_reads_the_declared_period_end_from_the_manifest_or_a_pre_j_stage(market, tmp_path):
+    """The promoter's C9 gate needs the file's DateOfEndOfReportingPeriod: new stages carry it in the manifest (no raw
+    Parquet is staged since decision J); a batch staged before J still carries raw_xbrl_facts.parquet and is read."""
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    from financials.promoter import _declared_period_end
+    from financials.staging import read_manifest
+
+    stage = stage_results_xbrl(market.vault, market.stage_root, data=(XBRL_DIR / ELECON).read_bytes(),
+                               source_url=ARCHIVE + ELECON, fetched_at=FETCHED)  # fmt: skip
+    m = read_manifest(stage)
+    assert m["declared_period_ends"] and _declared_period_end(market.con, stage, m) == FY26
+    legacy = tmp_path / "legacy"
+    legacy.mkdir()
+    pq.write_table(pa.table({"element_name": ["DateOfEndOfReportingPeriod", "ScripCode"],
+                             "value_text": [" 2025-12-31 ", "500180"]}), legacy / "raw_xbrl_facts.parquet")  # fmt: skip
+    assert _declared_period_end(market.con, legacy, {"job": "results_xbrl"}) == date(2025, 12, 31)
+    assert _declared_period_end(market.con, tmp_path, {"job": "results_xbrl"}) is None  # nothing staged: no gate

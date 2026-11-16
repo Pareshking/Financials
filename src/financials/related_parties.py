@@ -10,9 +10,12 @@ single-writer connection. Each filing that gains rows marks its entity dirty fro
 --incremental`). A filing whose schedule is empty gets no rows and is re-read on the next run (cheap).
 
 Results filings (Integrated Filings) get their Reg. 23(9) rows [X115] the same way into
-`reg23_related_party_transactions`, re-parsed with the integrated results parser. Only filings whose raw facts carry
-`NameOfCounterParty` are read (standalone Q2 / Q4 filings in the evidence), so a filing without the section is never
-re-read. These rows feed no feature, so nothing is marked dirty for them.
+`reg23_related_party_transactions`, re-parsed with the integrated results parser. Only filings known to carry
+`NameOfCounterParty` are read (standalone Q2 / Q4 filings in the evidence), so a filing without the section is
+never re-read. Since decision J (no raw table) a filing is known to carry it from its clean rows: Reg. 23(9) rows
+of any parser version, or the element kept in disclosure_facts (a section whose contexts the parser did not take).
+The drop-raw-xbrl gate (raw_xbrl.coverage) guarantees one of the two for every filing that carried the element.
+These rows feed no feature, so nothing is marked dirty for them.
 """
 
 from __future__ import annotations
@@ -51,16 +54,17 @@ def pending_filings(con) -> list[tuple]:
 
 def pending_results_filings(con) -> list[tuple]:
     """(filing_id, entity_id, scope, visible_from_ts, source_url, storage_path, sha256) of results filings (latest
-    filing_meta version, not REG34_ANNUAL) whose raw facts carry a Reg. 23(9) counterparty and that have no
-    reg23_related_party_transactions rows at the current parser version."""
+    filing_meta version, not REG34_ANNUAL) that carry a Reg. 23(9) counterparty (reg23 rows of any version, or
+    `NameOfCounterParty` in disclosure_facts) and have no reg23_related_party_transactions rows at the current parser
+    version."""
     return con.execute(
         f"""SELECT m.filing_id, m.entity_id, m.scope, m.visible_from_ts, f.source_url, b.storage_path, b.sha256
             FROM filing_meta m JOIN filings f USING (filing_id) JOIN blobs b USING (sha256)
             WHERE m.accounting_profile <> 'REG34_ANNUAL'
               AND {version_key("m.parser_version")} = (SELECT max({version_key("x.parser_version")})
                                                        FROM filing_meta x WHERE x.filing_id = m.filing_id)
-              AND m.filing_id IN (SELECT DISTINCT filing_id FROM raw_xbrl_facts
-                                  WHERE element_name = 'NameOfCounterParty')
+              AND m.filing_id IN (SELECT filing_id FROM reg23_related_party_transactions
+                                  UNION SELECT filing_id FROM disclosure_facts WHERE element = 'NameOfCounterParty')
               AND NOT EXISTS (SELECT 1 FROM reg23_related_party_transactions r WHERE r.filing_id = m.filing_id
                               AND r.parser_version = ?)
             ORDER BY f.source_url""",

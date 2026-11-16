@@ -4,7 +4,7 @@ New filings get their rows from the promoter (staging.disclosure_rows). This bac
 already promoted, like `backfill-rpt`: it reads each vaulted blob (no download), rebuilds the filing's clean staging
 tables in memory with the same staging functions (staging.results_tables / shareholding_tables / reg30_tables: the
 captured element set is computed from them exactly as for a new filing) and stages its disclosure rows. Nothing
-else is written: no raw_xbrl_facts, no new parser version of any other table.
+else is written: no new parser version of any other table.
 
 Two phases (invariant 10): (1) a process pool (`workers`, default os.cpu_count()) parses the pending blobs and writes
 one zstd Parquet file per filing under `<stage_root>/disclosures_backfill/` (atomic rename; the workers never open

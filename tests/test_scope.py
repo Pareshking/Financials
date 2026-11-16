@@ -70,7 +70,7 @@ def test_pre_cutoff_results_filing_is_out_of_scope(market):
     )  # fmt: skip
     r = promote(market.con, stage)
     assert r.status == "OUT_OF_SCOPE" and "2024-09-30" in r.message
-    for t in ("raw_xbrl_facts", "filing_meta", "fact_observations", "quarantine_queue"):
+    for t in ("filing_meta", "fact_observations", "disclosure_facts", "quarantine_queue"):
         assert market.con.execute(f"SELECT count(*) FROM {t}").fetchone()[0] == 0, t
 
 

@@ -153,8 +153,19 @@ def test_rows_are_promoted_with_the_results_filing_and_backfilled(netweb):
     ).fetchone() == (Decimal("630000.00"), Decimal("50000000.00"))
     assert con.execute("SELECT count(*) FROM related_party_transactions").fetchone()[0] == 0  # annual table untouched
     assert pending_results_filings(con) == []
-    con.execute("DELETE FROM reg23_related_party_transactions")  # as if promoted before this parser
+    # as if parsed by an earlier Reg. 23 parser version: the filing is known to carry the section from its clean rows
+    # (decision J: no raw table), so the backfill re-reads its blob
+    con.execute("UPDATE reg23_related_party_transactions SET parser_version = '0.0.1'")
+    fid = con.execute("SELECT filing_id FROM filing_meta").fetchone()[0]
+    assert [r[0] for r in pending_results_filings(con)] == [fid]
     result = backfill_rpt(con, netweb.vault)
     assert (result["filings"], result["reg23_filings"], result["reg23_rows"], result["error_count"]) == (0, 1, 6, 0)
     assert backfill_rpt(con, netweb.vault)["reg23_filings"] == 0  # idempotent
-    assert con.execute("SELECT count(*) FROM reg23_related_party_transactions").fetchone()[0] == 6
+    assert con.execute("SELECT count(*) FROM reg23_related_party_transactions WHERE parser_version = ?",
+                       [REG23_PARSER_VERSION]).fetchone()[0] == 6  # fmt: skip
+    # a section the parser does not take (another period end) is kept in disclosure_facts: still selected
+    con.execute("DELETE FROM reg23_related_party_transactions")
+    assert pending_results_filings(con) == []
+    con.execute("INSERT INTO disclosure_facts SELECT * REPLACE ('NameOfCounterParty' AS element, -1 AS seq) "
+                "FROM disclosure_facts WHERE filing_id = ? LIMIT 1", [fid])  # fmt: skip
+    assert [r[0] for r in pending_results_filings(con)] == [fid]

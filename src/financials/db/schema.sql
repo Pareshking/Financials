@@ -60,22 +60,9 @@ CREATE TABLE IF NOT EXISTS raw_delivery (
     PRIMARY KEY (exchange, trade_date, symbol, series, filing_id)
 );
 
-CREATE TABLE IF NOT EXISTS raw_xbrl_facts (
-    filing_id       VARCHAR NOT NULL REFERENCES filings(filing_id),
-    parser_version  VARCHAR NOT NULL,
-    seq             INTEGER NOT NULL,          -- document order
-    element_ns      VARCHAR NOT NULL,
-    element_name    VARCHAR NOT NULL,
-    context_id      VARCHAR NOT NULL,
-    ctx_start       DATE,
-    ctx_end         DATE,
-    ctx_instant     DATE,
-    dimensions      JSON,
-    unit_ref        VARCHAR,
-    decimals        VARCHAR,
-    value_text      VARCHAR,
-    PRIMARY KEY (filing_id, parser_version, seq)
-);
+-- raw_xbrl_facts (every XBRL fact verbatim) was removed by owner decision J (2026-11-16, `drop-raw-xbrl`): every
+-- element of every parsed filing reaches a clean table (disclosure_facts for whatever no other table holds) and the
+-- vault blob stays the source of truth; anything that needs the raw facts parses the blob (parsers.xbrl).
 
 -- ── L2 Identity ─────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS entity_master (
@@ -2097,7 +2084,7 @@ CREATE TABLE IF NOT EXISTS reg23_related_party_transactions (
 );
 -- Every XBRL fact whose element no other clean table holds per element, as filed (parsers/disclosures.py) [X116]: one
 -- row per fact of a parsed, in-scope results / annual / shareholding / Reg. 30 filing, promoted with it (same entity,
--- scope, visibility) and by `backfill-disclosures`. `seq` is the fact's document order (= raw_xbrl_facts.seq). The
+-- scope, visibility) and by `backfill-disclosures`. `seq` is the fact's document order (= parsers.xbrl Fact.seq). The
 -- captured set is computed per filing from its other clean rows (staging.captured_elements). Money is value_inr
 -- (unit INR, rupees); every other numeric unit (PURE fractions or percent points as filed, SHARES, per-share, foreign
 -- currency, counts) is value_num as filed, never rescaled; true/false/yes/no text also value_bool; value_text always.

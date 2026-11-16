@@ -142,7 +142,6 @@ TABLE_ORDER = (
     "filings",
     "raw_cm_bhavcopy",
     "raw_delivery",
-    "raw_xbrl_facts",
     "raw_index_snapshot",
     "index_ohlcv",
     "raw_equity_master",
@@ -344,9 +343,10 @@ def stage_results_xbrl(
         ]
         return write_stage(stage_root, "results_xbrl", run_id, tables)
 
-    tables["raw_xbrl_facts"] = _raw_fact_rows(fid, inst)
     tables.update(results_tables(fid, inst, data, source_url))
-    return write_stage(stage_root, "results_xbrl", run_id, tables)
+    # the period-end facts as sent (any context): the promoter's scope gate [C9] reads them from the manifest
+    declared = sorted({f.value_text.strip() for f in inst.facts if f.name == "DateOfEndOfReportingPeriod"})
+    return write_stage(stage_root, "results_xbrl", run_id, tables, extra={"declared_period_ends": declared})
 
 
 def results_tables(fid: str, inst, data: bytes, source_url: str) -> dict[str, list[dict[str, Any]]]:
@@ -694,31 +694,6 @@ def stage_index_snapshot(
     )
 
 
-def _raw_fact_rows(fid: str, inst) -> list[dict[str, Any]]:
-    """Every fact of an instance, every context, exactly as sent (invariant 3)."""
-    rows = []
-    for f in inst.facts:
-        c = inst.contexts[f.context_id]
-        rows.append(
-            {
-                "filing_id": fid,
-                "parser_version": PARSER_VERSION,
-                "seq": f.seq,
-                "element_ns": f.ns,
-                "element_name": f.name,
-                "context_id": f.context_id,
-                "ctx_start": c.start,
-                "ctx_end": c.end,
-                "ctx_instant": c.instant,
-                "dimensions": json.dumps(dict(c.dimensions)) if c.dimensions else None,
-                "unit_ref": f.unit_ref,
-                "decimals": f.decimals,
-                "value_text": f.value_text,
-            }
-        )
-    return rows
-
-
 def _int_or_none(v) -> int | None:
     return None if v is None else int(v)
 
@@ -765,7 +740,6 @@ def stage_shareholding(
             }
         ]
         return write_stage(stage_root, "shareholding", run_id, tables)
-    tables["raw_xbrl_facts"] = _raw_fact_rows(fid, inst)
     tables.update(shareholding_tables(fid, inst, data))
     return write_stage(stage_root, "shareholding", run_id, tables)
 
@@ -883,7 +857,6 @@ def stage_reg30_event(
             }
         ]
         return write_stage(stage_root, "reg30_event", fid, tables)
-    tables["raw_xbrl_facts"] = _raw_fact_rows(fid, inst)
     clean, family = reg30_tables(fid, inst, data)
     tables.update(clean)
     extra = None if clean.get("stg_issues") else {"family": family}

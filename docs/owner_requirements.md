@@ -506,3 +506,14 @@ The owner asked the assistant to take these with its recommendation. Each is rev
   decision" still applies until the owner decides.
 - **L. Public repository with real fixtures (owner, 2026-11-16):** the repository stays public with the real NSE
   fixtures in `tests/fixtures/`; not to be raised again. `data/` stays uncommitted as before.
+- **M. `disclosure_facts` slimmed (owner, 2026-11-16, after two independent reviews and a live sample):** "disclosure_facts
+  slimmed: masked values dropped, agreed-junk elements dropped, long text kept as a pointer; the vault blob holds the
+  full text." Parser `disc-2` (`parsers/disclosures.py`, X120): (1) a value that is asterisks only (NSE's `******`
+  masks of PAN etc.; 863,876 live rows) is not stored; (2) the 783 (source kind, element) pairs of
+  `reference/disclosure_exclusions.csv` (both reviewers DROP in every profile; subsidiary registry data, policy
+  boilerplate, placeholders, masked / personal ids, web links; no code reads them) are not stored; (3) a value longer
+  than 1,000 characters is stored as a pointer (value_text NULL; `text_len`, `text_sha256`, `text_snippet`), and
+  `disclosures.full_text` returns it from the vault blob after checking the sha256. Everything else is kept exactly as
+  under `disc-1`, and the elements a reader selects (`READ_ELEMENTS`) are exempt from all three rules. Live sequence:
+  `backfill-disclosures` (re-parses every filing to disc-2), `prune-versions` (archives, then removes the disc-1
+  rows), `compact`. The 18D feature values do not change (FEATURES_VERSION unchanged).

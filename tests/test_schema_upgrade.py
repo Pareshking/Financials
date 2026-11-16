@@ -62,3 +62,23 @@ def test_constrained_new_column_is_refused(monkeypatch):
     )
     with pytest.raises(SchemaMigrationError):
         upgrade_columns(con)
+
+
+def test_disc_1_database_gains_the_pointer_columns_and_a_nullable_value_text(tmp_path):
+    """Owner decision M (X120): a database created before parser disc-2 has disclosure_facts.value_text NOT NULL and
+    no pointer columns; init-db relaxes the one (RELAXED_NOT_NULL, a deliberate migration) and adds the others."""
+    old = re.sub(r"\n    value_text       VARCHAR, .*", "\n    value_text       VARCHAR NOT NULL,", SCHEMA_SQL)
+    old = re.sub(r"\n    text_(len|sha256|snippet) .*", "", old)
+    checks = r",\n    CHECK \(\(value_text IS NULL\).*?\n    CHECK \(\(text_sha256 IS NULL\)[^\n]*"
+    old = re.sub(checks, "", old, flags=re.S)
+    assert old != SCHEMA_SQL and "text_sha256" not in old.split("CREATE TABLE IF NOT EXISTS disclosure_facts")[1][:3000]
+    con = connect(tmp_path / "market.duckdb")
+    con.execute(old.partition("-- views (after column upgrade)\n")[0])
+    assert "text_sha256" not in table_columns(con, "disclosure_facts")
+    executed = apply_schema(con)
+    assert "ALTER TABLE disclosure_facts ALTER COLUMN value_text DROP NOT NULL" in executed
+    assert {"text_len", "text_sha256", "text_snippet"} <= set(table_columns(con, "disclosure_facts"))
+    nullable = con.execute("SELECT is_nullable FROM information_schema.columns WHERE table_name = 'disclosure_facts' "
+                           "AND column_name = 'value_text'").fetchone()  # fmt: skip
+    assert nullable == ("YES",) and apply_schema(con) == []
+    con.close()

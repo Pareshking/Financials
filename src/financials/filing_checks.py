@@ -17,6 +17,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
+from financials.db import version_key
 from financials.money import ROUNDING_UNITS
 
 PRIOR_YEAR_REASON = "ANNUAL_PRIOR_YEAR_DIFFERS"
@@ -69,12 +70,13 @@ def annual_prior_year_differences(
 
 def filed_scrip_code(con, filing_id: str) -> str | None:
     """The filing's non-dimensional `ScripCode` as sent, when it is one all-digit value. Read from disclosure_facts
-    (X116: no other clean table holds the element; any version, as the raw table was read before decision J)."""
+    (X116: no other clean table holds the element; the filing's highest disclosure parser version)."""
     vals = {
         (v or "").strip()
         for (v,) in con.execute(
-            "SELECT DISTINCT value_text FROM disclosure_facts WHERE filing_id = ? AND element = 'ScripCode' "
-            "AND dimensions IS NULL",
+            f"""SELECT value_text FROM disclosure_facts WHERE filing_id = ? AND element = 'ScripCode'
+                AND dimensions IS NULL
+                QUALIFY dense_rank() OVER (ORDER BY {version_key()} DESC) = 1""",
             [filing_id],
         ).fetchall()
     }

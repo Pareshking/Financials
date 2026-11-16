@@ -1,10 +1,13 @@
-"""disclosure_facts rows for filings promoted before parsers/disclosures.py existed (`backfill-disclosures`) [X116].
+"""disclosure_facts rows for filings promoted before parsers/disclosures.py (or its current version) existed
+(`backfill-disclosures`) [X116, X120], and the full text of a pointer row from the vault (`full_text`).
 
-New filings get their rows from the promoter (staging.disclosure_rows). This backfill is the one-off for filings
-already promoted, like `backfill-rpt`: it reads each vaulted blob (no download), rebuilds the filing's clean staging
-tables in memory with the same staging functions (staging.results_tables / shareholding_tables / reg30_tables: the
-captured element set is computed from them exactly as for a new filing) and stages its disclosure rows. Nothing
-else is written: no new parser version of any other table.
+New filings get their rows from the promoter (staging.disclosure_rows). This backfill is for filings already
+promoted, like `backfill-rpt`, and re-parses them when DISCLOSURE_PARSER_VERSION changes (disc-1 -> disc-2, owner
+decision M; then `prune-versions` archives and removes the superseded rows): it reads each vaulted blob (no
+download), rebuilds the filing's clean staging tables in memory with the same staging functions
+(staging.results_tables / shareholding_tables / reg30_tables: the captured element set is computed from them exactly
+as for a new filing) and stages its disclosure rows. Nothing else is written: no new parser version of any other
+table.
 
 Two phases (invariant 10): (1) a process pool (`workers`, default os.cpu_count()) parses the pending blobs and writes
 one zstd Parquet file per filing under `<stage_root>/disclosures_backfill/` (atomic rename; the workers never open
@@ -15,9 +18,11 @@ A file already staged for a still-pending filing is reused (an interrupted run r
 
 Pending = a promoted, in-scope filing with no disclosure_facts row at the current DISCLOSURE_PARSER_VERSION.
 Idempotent (deterministic keys, INSERT OR IGNORE) and audited in `admin_log`. Annual and shareholding filings that
-gain rows mark their entity dirty from their earliest such visibility (they feed features_disclosures); results and
-event rows feed no feature. A filing that re-parses with issues (promoted by an earlier parser version) is reported,
-never written.
+gain their first rows mark their entity dirty from their earliest such visibility (they feed features_disclosures);
+results and event rows feed no feature. A re-parse of a filing that already holds rows of an earlier version marks
+nothing: a new version must leave every READ_ELEMENTS value unchanged (disc-2 does by construction), and one that
+changes what features_disclosures reads is a FEATURES_VERSION bump (full rebuild) instead. A filing that re-parses
+with issues (promoted by an earlier parser version) is reported, never written.
 """
 
 from __future__ import annotations
@@ -92,7 +97,8 @@ def _schema():
                       ("element_ns", s), ("element", s), ("context_id", s), ("period_type", s), ("period_start", d),
                       ("period_end", d), ("period_months", i), ("in_window", pa.bool_()), ("dimensions", s),
                       ("unit_ref", s), ("unit", s), ("value_inr", pa.decimal128(20, 2)),
-                      ("value_num", pa.decimal128(28, 8)), ("value_bool", pa.bool_()), ("value_text", s)])  # fmt: skip
+                      ("value_num", pa.decimal128(28, 8)), ("value_bool", pa.bool_()), ("value_text", s),
+                      ("text_len", i), ("text_sha256", s), ("text_snippet", s)])  # fmt: skip
 
 
 def _stage_one(job: tuple) -> tuple[str, str | None, int]:
@@ -156,8 +162,10 @@ def backfill_disclosures(
             )
             marks = con.execute(
                 f"""SELECT k.entity_id, min(k.visible_from_ts) {src}
-                    WHERE p.source_kind IN ('ANNUAL', 'SHAREHOLDING') GROUP BY 1""",
-                [files],
+                    WHERE p.source_kind IN ('ANNUAL', 'SHAREHOLDING') AND NOT EXISTS (
+                        SELECT 1 FROM disclosure_facts d WHERE d.filing_id = p.filing_id AND d.parser_version <> ?)
+                    GROUP BY 1""",
+                [files, DISCLOSURE_PARSER_VERSION],
             ).fetchall()
             dirty.mark(con, {ent: utc_to_ist_date(ts) for ent, ts in marks}, "DISCLOSURE_BACKFILL", STAGE_DIR)
             con.execute("COMMIT")
@@ -178,3 +186,35 @@ def backfill_disclosures(
          json.dumps(result), utc_now()],
     )  # fmt: skip
     return result
+
+
+class TextMismatch(RuntimeError):
+    pass
+
+
+def full_text(con, vault: Vault, filing_id: str, seq: int, parser_version: str | None = None) -> str | None:
+    """The value of one disclosure_facts row exactly as filed (None when there is no such row). A pointer row
+    (TEXT_POINTER, X120) is read from the filing's vault blob (filing -> blob, the fact at `seq`) and verified against
+    text_len and text_sha256 (TextMismatch otherwise); any other row returns its value_text. Default version: the
+    filing's highest."""
+    from financials.parsers.disclosures import text_sha256
+    from financials.parsers.shareholding import shp_instance
+
+    row = con.execute(
+        f"""SELECT d.source_kind, d.value_text, d.text_len, d.text_sha256, b.storage_path, b.sha256
+            FROM disclosure_facts d JOIN filings f USING (filing_id) JOIN blobs b ON b.sha256 = f.sha256
+            WHERE d.filing_id = ? AND d.seq = ? AND coalesce(d.parser_version = ?, true)
+            ORDER BY {version_key("d.parser_version")} DESC LIMIT 1""",
+        [filing_id, seq, parser_version],
+    ).fetchone()
+    if row is None:
+        return None
+    kind, text, length, digest, path, sha = row
+    if digest is None:
+        return text
+    data = vault.read_path(path, sha)
+    inst = shp_instance(data)[0] if kind == "SHAREHOLDING" else parse_instance(data)
+    fact = next((f for f in inst.facts if f.seq == seq), None)
+    if fact is None or len(fact.value_text) != length or text_sha256(fact.value_text) != digest:
+        raise TextMismatch(f"{filing_id} seq {seq}: the vault blob's fact does not match the stored text_sha256")
+    return fact.value_text

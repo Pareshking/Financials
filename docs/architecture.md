@@ -93,7 +93,7 @@ Fetch etiquette (implemented in `financials.fetch.http.PoliteFetcher`): ≥1 s b
 | `data/staging/` | parsed Parquet batches waiting for (or recorded by) `promote` | |
 | `data/market.duckdb` | every table below; one file, one writer | 22.4 GiB file, ~6 GB in use by tables |
 | `raw_xbrl_facts` | **removed by `drop-raw-xbrl` (owner decision J)**: every XBRL fact verbatim, once per parser version. Every element of every parsed filing reaches a clean table (`disclosure_facts`, X116); the vault blobs (0.7 GB) stay the source of truth | was 48.9 M rows, 4.4 GB (~24.9 M rows, ~2.2 GB after `prune-versions`) |
-| `disclosure_facts` | every fact of an element no other clean table holds (X116), as filed | 4.6 M rows, ~1.7 GB file growth |
+| `disclosure_facts` | every fact of an element no other clean table holds (X116), as filed, slimmed by parser `disc-2` (owner decision M, X120): the 783 (source kind, element) pairs of `reference/disclosure_exclusions.csv` and values that are asterisks only (`******` masks) are not stored, and a value longer than 1,000 characters is a pointer row (`value_text` NULL; `text_len`, `text_sha256`, `text_snippet` of 300 plain-text characters). `disclosures.full_text(con, vault, filing_id, seq)` returns such a text from the vault blob after checking its sha256. Elements a reader selects (`parsers.disclosures.READ_ELEMENTS`) are exempt, so every reader's answer is the same as under `disc-1`. Re-parse: `backfill-disclosures`, then `prune-versions` (archives and removes disc-1), then `compact` | disc-2: 3.01 M rows (28,779 pointers), 0.15 GB of table blocks (disc-1: 4.61 M rows, 1.49 GB); scratch copy 2026-11-16: file 3.87 GB -> 2.47 GB after `backfill-disclosures`, `prune-versions`, `compact` |
 | `screener_features_history` | view: one row per security and materialised day (§11.9) over `features_daily` + `features_events` (below) | 1.33 M rows; was a 1.0 GB table before -17E |
 | `fact_observations`, `shareholding_*`, `segment_observations`, … | canonical facts, per parser version | ~0.4 GB together |
 | `data/archive/` | `prune-versions` output: zstd Parquet per table / version + `manifest.json` | |
@@ -321,7 +321,7 @@ Balance sheet and cash flow come only from H1/FY filings [X12, X13, X22]. In Q2/
    - A conflict pattern that recurs may get a **named, deterministic known-defect rule**, e.g. `FOURD_DATES_EQUAL_ONED_USE_DECLARED_YTD`. It needs its own fixture and test and is recorded in `quarantine_queue` as `FIXED_BY_RULE`. Rules are code, never inference.
 5. **Scope** from `NatureOfReportStandaloneConsolidated` [X6].
 6. **Comparatives:** quarterly XBRL has none [X2]. Restated prior-year quarters cannot be machine-read [X3]. Restatement handling (§7.6) is therefore flag-based in v1.
-7. **Unknown elements** are kept as filed in `disclosure_facts` (X116; the vault blob holds every fact) and simply not mapped. If a **mapped critical tag** is missing where the profile requires it → quarantine `PARSE/MISSING_CRITICAL`.
+7. **Unknown elements** are kept as filed in `disclosure_facts` (X116; the vault blob holds every fact; parser disc-2 leaves excluded elements, masked values and long text in the vault, X120) and simply not mapped. If a **mapped critical tag** is missing where the profile requires it → quarantine `PARSE/MISSING_CRITICAL`.
 8. **Revisions:** a revised filing for the same (entity, scope, period) is a new filing linked by `supersedes_filing_id`. Both stay. PIT picks by `visible_from_ts`.
 
 ### 7.5 Named label rules
@@ -1045,14 +1045,16 @@ Status (2026-11-13): **built and tested end to end** on real fixtures, all liste
   separate table and feed no feature: their context period is the filing's own quarter context, so whether the
   amounts cover the quarter or the half-year is UNVERIFIED (R13).
 - Everything else filed in XBRL: **built** (18D): `disclosure_facts` [X116] (`parsers/disclosures.py`, parser
-  `disc-1`) holds every fact of every element that no other clean table holds per element, for results, annual,
-  Reg. 31 and Reg. 30 filings, promoted with each filing; `backfill-disclosures` fills filings promoted earlier from
+  `disc-2` since owner decision M, X120) holds every fact of every element that no other clean table holds per
+  element, for results, annual, Reg. 31 and Reg. 30 filings, promoted with each filing, except what the named disc-2
+  rules leave in the vault (excluded elements, masked values, the text of long values: §4.1); `backfill-disclosures` fills filings promoted earlier from
   the vault: a process pool (`--workers`, default the CPU count) parses the blobs to staging Parquet, then the single
 writer inserts them in one statement and commits once (resumable: staged files are reused; no new results
 parser version). `scripts/disclosure_coverage.py DB` prints the per-profile coverage against raw_xbrl_facts on a
 database that still has it (the gate of `drop-raw-xbrl`, owner decision J, §4.1); after the drop the same property
-is pinned per profile by `tests/test_disclosures.py`, which parses the fixture blobs directly. Annual
-  text blocks dominate its size (C28; ~0.9 MB per annual filing on disk).
+is pinned per profile by `tests/test_disclosures.py`, which parses the fixture blobs directly. Under
+  disc-1 annual text blocks dominated its size (C28; ~0.9 MB per annual filing); since disc-2 a value over 1,000
+  characters is a pointer row and `disclosures.full_text` reads it from the vault (X120, §4.1).
 - Merger lineage and the demerger cost-of-acquisition split are **built** as admin-entered, audited edges (§11.7).
   Still open: automatic merger detection (no merger purpose in the corp-action feed, no delisting-circular fixture
   [CA14]) and automatic entitlement ratios / COA percentages (announced only in PDFs; R7 UNVERIFIED).

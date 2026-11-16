@@ -5,7 +5,9 @@ reaches a clean table (`disclosure_facts` holds whatever no other clean table ca
 the source of truth: anything that needs a filing's raw facts parses the blob (`parsers.xbrl.parse_instance`).
 
 - `coverage(con)`: per accounting profile / file type, the raw elements of the promoted filings (contexts on or
-  after the C9 cutoff, or with no period) that no clean row of the filing holds. Read-only; needs the table, so it
+  after the C9 cutoff, or with no period) that no clean row of the filing holds, the vault-only rules of parser
+  disc-2 (owner decision M, X120) counted as held: an element of the exclusion list for the filing's source kind, and
+  a value that is asterisks only (masked). Read-only; needs the table, so it
   runs on a database that still has it (`scripts/disclosure_coverage.py` prints it). After the drop the same
   property is pinned per profile by a fixture test that parses the blobs (tests/test_disclosures.py).
 - `drop_raw_xbrl(con)`: refuses unless `coverage` reports 0 uncaptured elements for every profile; then drops the
@@ -41,8 +43,9 @@ QUERY = f"""
 WITH prof AS ({_PROFILES}),
 raw AS (
   SELECT DISTINCT r.filing_id, r.element_name AS element FROM raw_xbrl_facts r JOIN prof p USING (filing_id)
-  WHERE p.profile = 'REG30_EVENT' OR coalesce(r.ctx_instant, r.ctx_end) IS NULL
-     OR coalesce(r.ctx_instant, r.ctx_end) >= ?),
+  WHERE (p.profile = 'REG30_EVENT' OR coalesce(r.ctx_instant, r.ctx_end) IS NULL
+         OR coalesce(r.ctx_instant, r.ctx_end) >= ?)
+    AND NOT regexp_full_match(coalesce(r.value_text, ''), '\\*+')),
 cap AS (
   SELECT DISTINCT filing_id, source_element AS element FROM fact_observations
   UNION SELECT DISTINCT filing_id, element FROM segment_observations
@@ -56,7 +59,10 @@ cap AS (
   UNION SELECT f.filing_id, v.element FROM (SELECT DISTINCT filing_id FROM shareholding_major_holders) f
         JOIN _voc v ON v.kind = 'holders'
   UNION SELECT f.filing_id, v.element FROM (SELECT DISTINCT filing_id, relation FROM group_structure) f
-        JOIN _voc v ON v.kind = 'aoc1_' || f.relation)
+        JOIN _voc v ON v.kind = 'aoc1_' || f.relation
+  UNION SELECT p.filing_id, v.element FROM prof p JOIN _voc v ON v.kind = 'excl_' || CASE p.profile
+        WHEN 'REG34_ANNUAL' THEN 'ANNUAL' WHEN 'REG31_SHP' THEN 'SHAREHOLDING' WHEN 'REG30_EVENT' THEN 'EVENT'
+        ELSE 'RESULTS' END)
 SELECT p.profile, count(DISTINCT r.filing_id) AS filings, count(DISTINCT r.element) AS elements,
        count(DISTINCT r.element) FILTER (WHERE c.element IS NULL) AS uncaptured,
        count(*) FILTER (WHERE c.element IS NULL) AS uncaptured_pairs,
@@ -95,12 +101,14 @@ def coverage(con) -> list[dict] | None:
     import pyarrow as pa
 
     from financials.parsers.aoc1 import SCHEDULES, verbatim_elements
+    from financials.parsers.disclosures import excluded_elements
     from financials.parsers.reg23_rpt import ELEMENTS as REG23
     from financials.parsers.rpt import TEXT_ELEMENTS as RPT_TEXT
     from financials.parsers.shareholding import HOLDER_ELEMENTS
 
     voc = [("reg23", e) for e in REG23] + [("rpt", e) for e in RPT_TEXT] + [("holders", e) for e in HOLDER_ELEMENTS]
     voc += [("aoc1_" + r, e) for r in SCHEDULES for e in verbatim_elements(r)]
+    voc += [("excl_" + k, e) for k, e in sorted(excluded_elements())]
     con.register("_voc", pa.table({"kind": [k for k, _ in voc], "element": [e for _, e in voc]}))
     try:
         return [dict(zip(COLUMNS, r, strict=True)) for r in con.execute(QUERY, [MIN_PERIOD_END_DATE]).fetchall()]

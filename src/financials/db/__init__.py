@@ -79,9 +79,27 @@ def declared_columns(schema_sql: str | None = None) -> dict[str, list[tuple[str,
     return out
 
 
+# Deliberate migrations that relax a NOT NULL column of an existing database to the nullable declaration of schema.sql
+# (DuckDB: catalog-only, no rewrite): disclosure_facts.value_text is NULL for the pointer rows of parser disc-2
+# (owner decision M, X120).
+RELAXED_NOT_NULL = (("disclosure_facts", "value_text"),)
+
+
 def upgrade_columns(con: duckdb.DuckDBPyConnection) -> list[str]:
     executed = []
-    for table, cols in declared_columns().items():
+    declared = declared_columns()
+    for table, column in RELAXED_NOT_NULL:
+        definition = dict(declared[table])[column]
+        nullable = con.execute(
+            "SELECT is_nullable FROM information_schema.columns WHERE table_name = ? AND column_name = ? "
+            "AND table_schema = 'main' AND table_catalog = current_database()",
+            [table, column],
+        ).fetchone()
+        if nullable == ("NO",) and not _CONSTRAINED.search(definition):
+            stmt = f"ALTER TABLE {table} ALTER COLUMN {column} DROP NOT NULL"
+            con.execute(stmt)
+            executed.append(stmt)
+    for table, cols in declared.items():
         existing = set(table_columns(con, table))
         for name, definition in cols:
             if name in existing:

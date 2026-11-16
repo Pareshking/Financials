@@ -3,11 +3,13 @@ Schedule III subsidiary contribution X119). Every value is read straight from co
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
@@ -17,6 +19,7 @@ from financials import raw_xbrl
 from financials.db import fetch_dicts
 from financials.disclosures import STAGE_DIR, _stage_one, backfill_disclosures, pending_filings
 from financials.dsl import ALIASES, compile_screen
+from financials.parsers import disclosures as D
 from financials.parsers.aoc1 import SCHEDULES, verbatim_elements
 from financials.parsers.disclosures import DISCLOSURE_PARSER_VERSION, parse_disclosures, typed_value
 from financials.parsers.reg23_rpt import ELEMENTS as REG23_ELEMENTS
@@ -93,16 +96,84 @@ def test_elecon_insider_elements_are_kept_with_their_dimensions():
     assert {r["source_element"] for r in t["stg_xbrl_facts"]} & {F.DIRECTORS, F.FIRMS} == set()
 
 
-def test_text_blocks_are_stored_as_filed_and_pre_cutoff_facts_are_not():
+def test_text_is_stored_as_filed_or_as_a_pointer_and_pre_cutoff_facts_are_not():
     data = (XBRL_DIR / ELIN).read_bytes()
     inst = parse_instance(data)
     m = parse_reg34_annual(data, ELIN).meta
-    report = parse_disclosures(inst, frozenset(), Windows.from_meta(m), min_period_end=MIN_PERIOD_END_DATE)
+    report = parse_disclosures(inst, frozenset(), Windows.from_meta(m), min_period_end=MIN_PERIOD_END_DATE,
+                               source_kind="ANNUAL")  # fmt: skip
     assert report.skipped_pre_cutoff > 0  # FY24 comparatives (C9)
     assert all(f.period_end is None or f.period_end >= FY25 for f in report.facts)
     by_seq = {f.seq: f for f in inst.facts}
-    assert all(r.value_text == by_seq[r.seq].value_text for r in report.facts)  # exactly as filed, not stripped
-    assert max(len(r.value_text) for r in report.facts) > 50_000  # notes text blocks are kept whole
+    short = [r for r in report.facts if r.value_text is not None]
+    assert all(r.value_text == by_seq[r.seq].value_text for r in short)  # exactly as filed, not stripped
+    assert all(len(r.value_text) <= D.TEXT_POINTER_CHARS and r.text_sha256 is None for r in short)
+    pointers = [r for r in report.facts if r.value_text is None]
+    assert len(pointers) == report.pointers > 0
+    for r in pointers:  # TEXT_POINTER [X120]: length, sha256 of the text as filed, a plain-text snippet
+        text = by_seq[r.seq].value_text
+        assert (r.text_len, r.text_sha256) == (len(text), hashlib.sha256(text.encode()).hexdigest())
+        assert 0 < len(r.text_snippet) <= D.SNIPPET_CHARS and "<" not in r.text_snippet and "  " not in r.text_snippet
+    assert max(r.text_len for r in pointers) > 50_000  # notes text blocks: whole in the vault, a pointer here
+
+
+def test_named_rules_of_disc_2():
+    """X120: EXCLUDED_ELEMENT (per source kind), MASKED_VALUE and TEXT_POINTER, never on an element a reader reads."""
+    data = (XBRL_DIR / ELIN).read_bytes()
+    inst = parse_instance(data)
+    m = parse_reg34_annual(data, ELIN).meta
+    w = Windows.from_meta(m)
+    annual = parse_disclosures(inst, frozenset(), w, min_period_end=None, source_kind="ANNUAL")
+    results = parse_disclosures(inst, frozenset(), w, min_period_end=None, source_kind="RESULTS")
+    excluded = {e for k, e in D.excluded_elements() if k == "ANNUAL"}
+    filed = {f.name for f in inst.facts}
+    assert annual.skipped_excluded == sum(f.name in excluded for f in inst.facts) > 0
+    assert not {r.element for r in annual.facts} & excluded
+    assert {r.element for r in results.facts} & excluded  # the list is per source kind
+    masked = [f for f in inst.facts if D.is_masked(f.value_text) and f.name not in excluded]
+    assert annual.skipped_masked == len(masked)
+    assert not any(r.value_text and D.is_masked(r.value_text) for r in annual.facts)
+    assert filed & D.READ_ELEMENTS  # ELIN files insider receivables and the Schedule III table
+    kept = {r.seq: r for r in annual.facts}
+    for f in inst.facts:  # every fact of an element a reader selects is stored exactly as under disc-1
+        if f.name in D.READ_ELEMENTS:
+            assert kept[f.seq].value_text == f.value_text and kept[f.seq].text_sha256 is None
+
+
+@pytest.mark.parametrize(
+    ("text", "masked"), [("******", True), ("*", True), (" ****** ", False), ("**12**", False), ("", False)]
+)
+def test_masked_values_are_asterisks_only(text, masked):
+    assert D.is_masked(text) is masked
+
+
+def test_snippet_strips_tags_entities_and_whitespace():
+    assert D.snippet("<span /><p>47. INVESTMENTS</p>\n<p>A&amp;B\xa0 Ltd</p>") == "47. INVESTMENTS A&B Ltd"
+    assert D.snippet("&lt;p&gt;Escaped &lt;b&gt;tags&lt;/b&gt;&lt;/p&gt;") == "Escaped tags"
+    assert len(D.snippet("word " * 500)) == D.SNIPPET_CHARS
+
+
+def test_exclusion_list_is_curated_pinned_and_never_names_an_element_a_reader_selects():
+    """reference/disclosure_exclusions.csv (owner decision M): 783 (source_kind, element) pairs with a reason, pinned
+    by EXCLUSIONS_SHA256; READ_ELEMENTS is derived here from the readers' own code, so a reader that starts selecting
+    an element fails this test until the element is protected."""
+    import csv
+    import re
+
+    from financials import filing_checks, related_parties
+
+    with D.EXCLUSIONS_FILE.open(encoding="utf-8", newline="") as fh:
+        rows = list(csv.DictReader(fh))
+    assert list(rows[0]) == ["source_kind", "element", "reason"] and len(rows) == 783
+    assert len({(r["source_kind"], r["element"]) for r in rows}) == 783 and all(r["reason"].strip() for r in rows)
+    assert {r["source_kind"] for r in rows} <= {"RESULTS", "ANNUAL", "SHAREHOLDING", "EVENT"}
+    assert D.exclusions_sha256(D.excluded_elements()) == D.EXCLUSIONS_SHA256
+    read = {*F.INSIDER_ELEMENTS, F.ENTITY_NAME, F.ENTITY_TYPE, F.ENTITY_PROFIT}
+    read |= {e + v for e in F.SHP_DECLARATIONS.values() for v in ("", *F.SHP_VARIANTS)}
+    for mod in (filing_checks, related_parties):
+        read |= set(re.findall(r"element = '(\w+)'", Path(mod.__file__).read_text(encoding="utf-8")))
+    assert {"ScripCode", "NameOfCounterParty"} <= read <= D.READ_ELEMENTS
+    assert not {e for _, e in D.excluded_elements()} & read
 
 
 def test_shp16_entity_contexts_are_period_none():
@@ -122,8 +193,22 @@ def _blob_facts(data: bytes, kind: str) -> list[tuple[str, object]]:
     return [(f.name, inst.contexts[f.context_id].instant or inst.contexts[f.context_id].end) for f in inst.facts]
 
 
+def _blob_values(data: bytes, kind: str) -> list[tuple[str, object, str]]:
+    """[(element, context end or None, value_text)] of every fact of the file."""
+    inst = shp_instance(data)[0] if kind == "SHP" else parse_instance(data)
+    return [(f.name, inst.contexts[f.context_id].instant or inst.contexts[f.context_id].end, f.value_text)
+            for f in inst.facts]  # fmt: skip
+
+
+def _seq_texts(data: bytes, kind: str) -> list[tuple[int, str]]:
+    inst = shp_instance(data)[0] if kind == "SHP" else parse_instance(data)
+    return [(f.seq, f.value_text) for f in inst.facts]
+
+
 def _staged_coverage(stage_dir, con, data: bytes, kind: str) -> tuple[set, set, set]:
-    """(raw elements in scope, elements in the clean staged tables, raw elements only in pre-cutoff contexts)."""
+    """(raw elements in scope, elements in the clean staged tables or left in the vault by a named disc-2 rule, raw
+    elements only in pre-cutoff contexts). A vault-only element is one of the exclusion list for the filing's source
+    kind, or one whose every in-scope value is masked (X120)."""
     raw = _blob_facts(data, kind)
     t = {n: read_table(con, stage_dir, n) for n in ("stg_xbrl_facts", "stg_segments", "stg_related_parties",
                                                      "stg_reg23_rpt", "stg_group_structure", "stg_shp_line_items",
@@ -140,6 +225,14 @@ def _staged_coverage(stage_dir, con, data: bytes, kind: str) -> tuple[set, set, 
         clean |= set(json.loads(e["details"]).get("numeric", {}))
     kept = {e for e, end in raw if t["stg_events"] or end is None or end >= MIN_PERIOD_END_DATE}
     pre = {e for e, _ in raw} - kept
+    source_kind = {r["source_kind"] for r in t["stg_disclosures"]}
+    assert len(source_kind) <= 1
+    clean |= {e for k, e in D.excluded_elements() if k in source_kind}
+    values = defaultdict(list)
+    for e, end, v in _blob_values(data, kind):
+        if t["stg_events"] or end is None or end >= MIN_PERIOD_END_DATE:
+            values[e].append(v)
+    clean |= {e for e, vs in values.items() if e not in D.READ_ELEMENTS and all(D.is_masked(v) for v in vs)}
     return kept, clean, pre
 
 
@@ -150,9 +243,11 @@ PROFILES = ("INDAS_CORP", "INDAS_NBFC", "IGAAP_BANK", "IRDAI_LIFE", "IRDAI_GENER
 def test_every_element_of_every_parsed_fixture_reaches_a_clean_table(market):
     """X116, the decision J proof after the drop: for each committed XBRL fixture that parses, the staged batch the
     promoter loads holds every in-scope element of the file (parsed from the blob, not read from any table) in at
-    least one clean table; checked per accounting profile and file type, each with at least one real fixture (a
-    results filing carrying the Reg. 23(9) section counts for REG23_RPT too)."""
-    checked = defaultdict(list)
+    least one clean table, or leaves it in the vault by a named disc-2 rule (X120: the exclusion list, masked values;
+    a pointer row keeps its element); checked per accounting profile and file type, each with at least one real
+    fixture (a results filing carrying the Reg. 23(9) section counts for REG23_RPT too). Every staged pointer row
+    matches its fact in the blob."""
+    checked, pointers = defaultdict(list), 0
     for path in sorted(XBRL_DIR.glob("*.xml")) + sorted((FIXTURES / "events").glob("*WebXMLFile*.xml")):
         data, url = path.read_bytes(), ARCHIVE + path.name
         if path.parent.name == "events":
@@ -167,6 +262,13 @@ def test_every_element_of_every_parsed_fixture_reaches_a_clean_table(market):
         kept, clean, _ = _staged_coverage(stage, market.con, data, kind)
         assert not (stage / "raw_xbrl_facts.parquet").exists()  # no raw copy is staged (decision J)
         assert kept - clean == set(), path.name
+        texts = {seq: v for seq, v in _seq_texts(data, kind)}
+        for r in read_table(market.con, stage, "stg_disclosures"):
+            if r["value_text"] is None:
+                assert r["text_sha256"] == hashlib.sha256(texts[r["seq"]].encode()).hexdigest(), path.name
+                pointers += 1
+            else:
+                assert r["value_text"] == texts[r["seq"]], path.name
         meta = read_table(market.con, stage, "stg_xbrl_filing")
         profile = meta[0]["accounting_profile"] if meta else "REG30_EVENT" if path.parent.name == "events" else (
             "REG31_SHP")  # fmt: skip
@@ -176,6 +278,7 @@ def test_every_element_of_every_parsed_fixture_reaches_a_clean_table(market):
     assert [p for p in PROFILES if not checked[p]] == [], {p: len(v) for p, v in checked.items()}
     assert set(checked) <= set(PROFILES), set(checked)
     assert sum(len(v) for p, v in checked.items() if p != "REG23_RPT") >= 135
+    assert pointers > 100
 
 
 def test_captured_set_comes_from_the_rows_and_the_row_parsers_vocabularies():
@@ -374,6 +477,61 @@ def test_columns_are_point_in_time(filed):
     later = [_row_for(con, "ELECON")]
     F.add_columns(con, later, ist_to_utc(date(2026, 7, 23), datetime.min.time()) + timedelta(days=1))
     assert later[0]["insider_receivables"] == Decimal("442100000")  # visible from the broadcast day
+
+
+def test_full_text_reads_a_pointer_row_from_the_vault_and_verifies_it(filed):
+    """X120: a pointer row's text comes back whole from the filing's vault blob, checked against its sha256."""
+    from financials.disclosures import TextMismatch, full_text
+
+    con = filed.con
+    fid, seq, length, digest, snip = con.execute(
+        "SELECT filing_id, seq, text_len, text_sha256, text_snippet FROM disclosure_facts WHERE value_text IS NULL "
+        "ORDER BY text_len DESC, filing_id LIMIT 1").fetchone()  # fmt: skip
+    text = full_text(con, filed.vault, fid, seq)
+    assert len(text) == length > 50_000 and hashlib.sha256(text.encode()).hexdigest() == digest
+    assert D.snippet(text) == snip
+    sfid, sseq, short = con.execute("SELECT filing_id, seq, value_text FROM disclosure_facts WHERE value_text IS NOT "
+                                    "NULL ORDER BY filing_id, seq LIMIT 1").fetchone()  # fmt: skip
+    assert full_text(con, filed.vault, sfid, sseq) == short
+    assert full_text(con, filed.vault, fid, -1) is None
+    assert full_text(con, filed.vault, fid, seq, parser_version="disc-0") is None
+    con.execute("UPDATE disclosure_facts SET text_sha256 = repeat('0', 64) WHERE filing_id = ? AND seq = ?", [fid, seq])
+    with pytest.raises(TextMismatch):
+        full_text(con, filed.vault, fid, seq)
+
+
+def test_reparse_to_a_new_version_keeps_every_reader_answer_and_prunes_the_old_one(filed, tmp_path):
+    """Owner decision M: `backfill-disclosures` re-parses filings whose rows are of an earlier version (disc-1 here:
+    the rows relabelled, with the read values corrupted so a reader of the wrong version would show), the readers
+    select the current version, nothing is marked dirty, and `prune-versions` archives and removes the old rows."""
+    from financials import storage
+    from financials.filing_checks import filed_scrip_code
+
+    con = filed.con
+    syms = ("ELECON", "CUMMINSIND", "SAMMAANCAP")
+    as_of = ist_to_utc(date(2026, 11, 5), datetime.min.time())
+    before = [_row_for(con, s) for s in syms]
+    F.add_columns(con, before, as_of)
+    fids = [f for (f,) in con.execute("SELECT DISTINCT filing_id FROM disclosure_facts ORDER BY 1").fetchall()]
+    codes = {f: filed_scrip_code(con, f) for f in fids}
+    current = con.execute("SELECT count(*) FROM disclosure_facts").fetchone()[0]
+    con.execute("UPDATE disclosure_facts SET parser_version = 'disc-1'")
+    con.execute("UPDATE disclosure_facts SET value_inr = value_inr + 1 WHERE value_inr IS NOT NULL")
+    con.execute("UPDATE disclosure_facts SET value_bool = NOT value_bool, value_text = value_text || '9'")
+    assert len(pending_filings(con)) == 3
+    con.execute("DELETE FROM materialize_dirty")
+    r = backfill_disclosures(con, filed.vault, filed.stage_root, workers=1)
+    assert (r["filings"], r["rows"], r["error_count"]) == (3, current, 0)
+    assert con.execute("SELECT count(*) FROM materialize_dirty").fetchone()[0] == 0  # a re-parse marks nothing
+    after = [_row_for(con, s) for s in syms]
+    F.add_columns(con, after, as_of)
+    assert after == before and {f: filed_scrip_code(con, f) for f in fids} == codes
+    res = storage.prune_versions(con, tmp_path / "archive")
+    assert (res.status, res.removed) == ("PRUNED", current)
+    assert con.execute("SELECT DISTINCT parser_version FROM disclosure_facts").fetchall() == [("disc-2",)]
+    again = [_row_for(con, s) for s in syms]
+    F.add_columns(con, again, as_of)
+    assert again == before
 
 
 def test_dsl_aliases_compile():

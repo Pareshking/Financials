@@ -17,7 +17,7 @@ Read-only survey; nothing was run against the DB. Tag names below were grepped, 
 | IN PROGRESS | being added now by another agent (the e085eb5 columns are BUILT since; none open at 2026-11-15 batch A) |
 | BUILDABLE NOW | every input is already promoted (`fact_observations` curated or `li_` tags, `ohlcv`, `index_ohlcv`, `shareholding_*`, `corp_actions`, `corporate_events`, `filing_meta`, `raw_index_snapshot`) and the window fits after the cutoff today |
 | WHEN HISTORY | the formula is buildable but its window reaches before C9; NULL via `min_periods_required` until the date given |
-| NEEDS PARSER | *(extra status, used sparingly)* the source is already vaulted (raw XBRL in the vault blob, as filed in `disclosure_facts`) but the axis/element is not mapped to a canonical fact; needs a fixture-pinned rule, no new source |
+| NEEDS PARSER | *(extra status, used sparingly)* the source is already vaulted (raw XBRL in the vault blob; as filed in `disclosure_facts` unless a disc-2 rule leaves it in the vault, X120) but the axis/element is not mapped to a canonical fact; needs a fixture-pinned rule, no new source |
 | NEW FREE SOURCE | needs a feed we do not ingest; its `data_sources.yaml` status is given |
 | NOT POSSIBLE | forecast, proprietary/undisclosed, not disclosed in any free filing, or excluded by decision (C7/C9) |
 

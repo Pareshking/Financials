@@ -2084,7 +2084,10 @@ CREATE TABLE IF NOT EXISTS reg23_related_party_transactions (
 );
 -- Every XBRL fact whose element no other clean table holds per element, as filed (parsers/disclosures.py) [X116]: one
 -- row per fact of a parsed, in-scope results / annual / shareholding / Reg. 30 filing, promoted with it (same entity,
--- scope, visibility) and by `backfill-disclosures`. `seq` is the fact's document order (= parsers.xbrl Fact.seq). The
+-- scope, visibility) and by `backfill-disclosures`. Parser disc-2 (owner decision M, X120) leaves three kinds of fact
+-- in the vault blob only: elements of reference/disclosure_exclusions.csv, values that are asterisks only (masked),
+-- and the text of values longer than 1,000 characters (a pointer row: value_text NULL, text_len / text_sha256 /
+-- text_snippet; disclosures.full_text reads the blob). Elements a reader selects are exempt (READ_ELEMENTS). `seq` is the fact's document order (= parsers.xbrl Fact.seq). The
 -- captured set is computed per filing from its other clean rows (staging.captured_elements). Money is value_inr
 -- (unit INR, rupees); every other numeric unit (PURE fractions or percent points as filed, SHARES, per-share, foreign
 -- currency, counts) is value_num as filed, never rescaled; true/false/yes/no text also value_bool; value_text always.
@@ -2110,8 +2113,11 @@ CREATE TABLE IF NOT EXISTS disclosure_facts (
     value_inr        DECIMAL(20,2),              -- unit INR only, exact rupees
     value_num        DECIMAL(28,8),              -- every other numeric unit, exact as filed
     value_bool       BOOLEAN,                    -- non-numeric true / false / yes / no
-    value_text       VARCHAR NOT NULL,           -- exactly as filed (text blocks included)
+    value_text       VARCHAR,                    -- exactly as filed; NULL only for a pointer row (> 1,000 characters)
     visible_from_ts  TIMESTAMP NOT NULL,
+    text_len         INTEGER,                    -- pointer rows: characters of the text as filed
+    text_sha256      VARCHAR,                    -- pointer rows: sha256 of the text as filed (UTF-8)
+    text_snippet     VARCHAR,                    -- pointer rows: first 300 characters, HTML tags / entities removed
     PRIMARY KEY (filing_id, parser_version, seq),
     CHECK (source_kind IN ('RESULTS', 'ANNUAL', 'SHAREHOLDING', 'EVENT')),
     CHECK (period_type IN ('DURATION', 'INSTANT', 'NONE')),
@@ -2119,7 +2125,9 @@ CREATE TABLE IF NOT EXISTS disclosure_facts (
     CHECK (period_months IS NULL OR period_months BETWEEN 1 AND 18),
     CHECK (value_inr IS NULL OR unit = 'INR'),
     CHECK (value_num IS NULL OR (unit IS NOT NULL AND unit <> 'INR')),
-    CHECK (value_bool IS NULL OR unit_ref IS NULL)
+    CHECK (value_bool IS NULL OR unit_ref IS NULL),
+    CHECK ((value_text IS NULL) = (text_sha256 IS NOT NULL)),
+    CHECK ((text_sha256 IS NULL) = (text_len IS NULL) AND (text_sha256 IS NULL) = (text_snippet IS NULL))
 );
 -- ── Views ──────────────────────────────────────────────────────────────
 -- Everything below VIEWS_MARKER runs after the column upgrade (db.apply_schema), so a view may name columns that an

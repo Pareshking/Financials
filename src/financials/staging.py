@@ -83,7 +83,7 @@ CREATE TABLE stg_disclosures (
     seq INTEGER NOT NULL, element_ns VARCHAR NOT NULL, element VARCHAR NOT NULL, context_id VARCHAR NOT NULL,
     period_type VARCHAR NOT NULL, period_start DATE, period_end DATE, period_months INTEGER, in_window BOOLEAN NOT NULL,
     dimensions JSON, unit_ref VARCHAR, unit VARCHAR, value_inr DECIMAL(20,2), value_num DECIMAL(28,8),
-    value_bool BOOLEAN, value_text VARCHAR NOT NULL,
+    value_bool BOOLEAN, value_text VARCHAR, text_len INTEGER, text_sha256 VARCHAR, text_snippet VARCHAR,
     PRIMARY KEY (filing_id, seq)
 );
 CREATE TABLE stg_corp_actions (
@@ -485,10 +485,13 @@ def disclosure_rows(
     min_period_end=MIN_PERIOD_END_DATE,
 ) -> list[dict[str, Any]]:
     """disclosure_facts staging rows: every fact of the filing whose element no other clean table of `tables`
-    captures [X116]. `min_period_end` None (Reg. 30 events) applies no period cutoff."""
+    captures, after the named rules of parsers/disclosures.py [X116, X120]. `min_period_end` None (Reg. 30 events)
+    applies no period cutoff."""
     from financials.parsers.disclosures import DISCLOSURE_PARSER_VERSION, parse_disclosures
 
-    report = parse_disclosures(inst, captured_elements(tables), windows, min_period_end=min_period_end)
+    report = parse_disclosures(
+        inst, captured_elements(tables), windows, min_period_end=min_period_end, source_kind=source_kind
+    )
     return [{"filing_id": fid, "parser_version": DISCLOSURE_PARSER_VERSION, "source_kind": source_kind, "scope": scope,
              **asdict(f)} for f in report.facts]  # fmt: skip
 

@@ -55,8 +55,8 @@ def pending_filings(con) -> list[tuple]:
 def pending_results_filings(con) -> list[tuple]:
     """(filing_id, entity_id, scope, visible_from_ts, source_url, storage_path, sha256) of results filings (latest
     filing_meta version, not REG34_ANNUAL) that carry a Reg. 23(9) counterparty (reg23 rows of any version, or
-    `NameOfCounterParty` in disclosure_facts) and have no reg23_related_party_transactions rows at the current parser
-    version."""
+    `NameOfCounterParty` in disclosure_facts, any version: a READ_ELEMENTS member, kept by every version) and have
+    no reg23_related_party_transactions rows at the current parser version."""
     return con.execute(
         f"""SELECT m.filing_id, m.entity_id, m.scope, m.visible_from_ts, f.source_url, b.storage_path, b.sha256
             FROM filing_meta m JOIN filings f USING (filing_id) JOIN blobs b USING (sha256)

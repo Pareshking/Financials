@@ -1,0 +1,67 @@
+# Nightly data pipeline (docs/architecture.md §13, ops/README.md). It runs ONLY on the owner's own machine through a
+# self-hosted runner labelled `financials`: the market database (~10 GB, gitignored) and the vault live there, NSE
+# blocks datacenter IPs, and the data may not be redistributed. A GitHub-hosted runner can never run it.
+#
+# Never commits, pushes or uploads data: the only artifact is the run log. FINANCIALS_DATA_DIR and FINANCIALS_VENV
+# come from the runner's .env file (outside this repository); the data directory must be outside the workspace.
+# Use either this workflow or one of the ops/ schedulers (cron / systemd / Windows), never both: DuckDB has one
+# writer and a second run would fail on the file lock.
+name: nightly-pipeline
+
+on:
+  schedule:
+    - cron: "30 16 * * *"  # 22:00 IST (16:30 UTC); run-day without --date takes today's IST date
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: financials-nightly-pipeline  # single writer: never two runs at once, and a queued run waits
+  cancel-in-progress: false
+
+jobs:
+  pipeline:
+    runs-on: [self-hosted, financials]
+    timeout-minutes: 240
+    env:
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4  # code only; the data directory is never inside the workspace
+      - name: Check the runner environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${FINANCIALS_DATA_DIR:?set FINANCIALS_DATA_DIR in the runner's .env (see ops/README.md)}"
+          : "${FINANCIALS_VENV:?set FINANCIALS_VENV in the runner's .env (see ops/README.md)}"
+          test -d "$FINANCIALS_DATA_DIR" || { echo "::error::$FINANCIALS_DATA_DIR does not exist"; exit 1; }
+          data="$(cd "$FINANCIALS_DATA_DIR" && pwd -P)"; ws="$(cd "$GITHUB_WORKSPACE" && pwd -P)"
+          case "$data/" in "$ws"/*) echo "::error::FINANCIALS_DATA_DIR must be outside the workspace"; exit 1;; esac
+          test -x "$FINANCIALS_VENV/bin/python" || { echo "::error::no python in $FINANCIALS_VENV/bin"; exit 1; }
+          echo "$FINANCIALS_VENV/bin" >> "$GITHUB_PATH"
+          echo "PYTHONPATH=$GITHUB_WORKSPACE/src" >> "$GITHUB_ENV"  # this commit's code, the venv's dependencies
+          mkdir -p "$RUNNER_TEMP/nightly-log"
+          echo "RUN_LOG=$RUNNER_TEMP/nightly-log/nightly-pipeline.log" >> "$GITHUB_ENV"
+      - name: Daily run (fetch, discover, promote, materialise)
+        shell: bash
+        run: python -m financials --data-dir "$FINANCIALS_DATA_DIR" run-day 2>&1 | tee -a "$RUN_LOG"
+      - name: Classification for symbols that have none
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          rc=0  # promote what was staged even when one symbol's quote failed
+          python -m financials --data-dir "$FINANCIALS_DATA_DIR" fetch-classification --universe nifty500 --missing-only 2>&1 | tee -a "$RUN_LOG" || rc=$?
+          python -m financials --data-dir "$FINANCIALS_DATA_DIR" promote 2>&1 | tee -a "$RUN_LOG" || rc=$?
+          exit "$rc"
+      - name: Incremental catch-up (rows marked dirty tonight)
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: python -m financials --data-dir "$FINANCIALS_DATA_DIR" materialize --incremental 2>&1 | tee -a "$RUN_LOG"
+      - name: Upload the run log (never data or the database)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-pipeline-log-${{ github.run_id }}
+          path: ${{ runner.temp }}/nightly-log/nightly-pipeline.log
+          if-no-files-found: warn
+          retention-days: 14

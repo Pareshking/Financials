@@ -626,6 +626,26 @@ Paths assume the checkout at `~/Financials` with a `.venv`; edit them. `tests/te
 that the files call only existing CLI commands. The quarterly sweeps (`discover-filings --universe nifty500`,
 `fetch-classification`, `fetch-index`) are not scheduled: the daily run's RSS hint covers new results.
 
+**GitHub Actions nightly (batch K, 22:00 IST = cron `30 16 * * *` UTC).** Two workflows, both also `workflow_dispatch`:
+
+| Workflow | Runner | What it does |
+|---|---|---|
+| `.github/workflows/nightly-tests.yml` | GitHub-hosted `ubuntu-latest` | the CI checks (ruff check / format, offline pytest) on the default branch every night |
+| `.github/workflows/nightly-pipeline.yml` | **self-hosted**, labels `[self-hosted, financials]`, i.e. the owner's own machine | `run-day`, then `fetch-classification --universe nifty500 --missing-only` + `promote` (only entities with no current classification, so not the ~9 min full sweep), then `materialize --incremental` |
+
+The data pipeline cannot run on a GitHub-hosted runner: (1) the market database (~10 GB) and the vault are gitignored
+and live only on the owner's disk, and a hosted runner starts empty every time (no persistent disk; re-fetching history
+nightly would break the "never re-download a vaulted blob" rule); (2) NSE blocks datacenter IP ranges, and
+`www.nseindia.com` needs session cookies from a residential connection; (3) the exchange terms forbid redistribution,
+and data in a hosted runner, cache or artifact is data on someone else's servers. So the pipeline workflow is only a
+scheduler for the owner's machine: it checks out the code, runs it with `PYTHONPATH=<checkout>/src` and the owner's venv
+(`FINANCIALS_VENV`), against `FINANCIALS_DATA_DIR` (both set in the runner's `.env`; the data directory must be outside
+the workspace, a step refuses otherwise). It has `permissions: contents: read`, a `concurrency` group without
+cancellation (single writer: runs queue, never overlap), a 240 min timeout, and uploads only the run log
+(`$RUNNER_TEMP/nightly-log/nightly-pipeline.log`, 14 days). It never commits or uploads data. Use it **instead of** the
+`ops/` scheduler, not with it: two schedulers would race for the DuckDB write lock. Registration steps: `ops/README.md`.
+`tests/test_nightly_workflows.py` pins the cron, the runner labels, the CLI commands and the no-data rules.
+
 ## 14. Screener DSL
 
 ```

@@ -119,6 +119,8 @@ def build_parser() -> argparse.ArgumentParser:
     fcl = sub.add_parser("fetch-classification", help="NSE 4-level industry classification (quote API, 1 request/s)")
     fcl.add_argument("symbols", nargs="*")
     fcl.add_argument("--universe", choices=UNIVERSES)
+    fcl.add_argument("--missing-only", action="store_true",
+                     help="only symbols whose entity has no current classification (nightly workflow)")  # fmt: skip
     fe = sub.add_parser("fetch-events", help="Reg. 30 structured event XBRL from the announcements RSS")
     fe.add_argument("--limit", type=int)
     fa = sub.add_parser("fetch-annual", help="Reg. 34 annual report XBRL (FY ending 2025 onwards)")
@@ -558,6 +560,22 @@ def universe_series(db_path: Path) -> dict[str, str]:
     return {sym: "EQ" if s == "0" else s for sym, s in rows}
 
 
+def classified_symbols(db_path: Path) -> set[str]:
+    """Symbols (open identifier interval) whose entity has a current NSE classification (read-only)."""
+    if not db_path.exists():
+        return set()
+    con = connect(db_path, read_only=True)
+    try:
+        rows = con.execute(
+            "SELECT DISTINCT h.symbol FROM security_identifier_history h JOIN securities s USING (security_id) "
+            "WHERE h.valid_to IS NULL AND s.entity_id IN "
+            "(SELECT entity_id FROM entity_classification_history WHERE valid_to IS NULL)"
+        ).fetchall()
+    finally:
+        con.close()
+    return {r[0] for r in rows}
+
+
 def _symbols(args, db_path: Path, explicit: list[str]) -> list[str]:
     syms = list(explicit)
     if getattr(args, "universe", None):
@@ -590,6 +608,10 @@ def run_fetch(args, jobs: Jobs, db_path: Path, out) -> tuple[list[Path], list[st
             staged, errors = jobs.discover(syms, ["shareholding"], events=False)
     elif args.cmd == "fetch-classification":
         syms = _symbols(args, db_path, args.symbols)
+        if args.missing_only:
+            done = classified_symbols(db_path)
+            syms = [sym for sym in syms if sym not in done]
+            print(f"fetch-classification: {len(syms)} symbol(s) without a classification", file=out)
         series = universe_series(db_path) if args.universe else {}
         staged, errors = jobs.classification(syms, series)
     elif args.cmd == "fetch-events":

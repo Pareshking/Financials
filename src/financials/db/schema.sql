@@ -449,6 +449,8 @@ CREATE TABLE IF NOT EXISTS quarantine_queue (
 -- Raw XBRL and fact_observations stay as filed; readers rank a correction above the corrected filing's own value,
 -- visible from that filing's visibility (the PDF was published with it), and a later filing still wins. A NULL
 -- value withdraws the tag for that period (the X86 attribution_withheld marker once owners / NCI are corrected).
+-- Batch K: per-share tags (EPS, face value; admin.PER_SHARE_TAGS) carry value_other (rupees per share) with a NULL
+-- value_inr, like fact_observations; a rupee tag never has value_other (admin._correct enforces both).
 CREATE TABLE IF NOT EXISTS fact_corrections (
     correction_id   VARCHAR PRIMARY KEY,           -- stable_id(filing, tag, period, value)
     filing_id       VARCHAR NOT NULL REFERENCES filings(filing_id),
@@ -467,6 +469,7 @@ CREATE TABLE IF NOT EXISTS fact_corrections (
     note            VARCHAR NOT NULL,
     created_at      TIMESTAMP NOT NULL,
     revoked_at      TIMESTAMP,
+    value_other     DECIMAL(18,4),                 -- batch K: rupees per share for PER_SHARE_TAGS, else NULL
     CHECK (period_type IN ('DURATION', 'INSTANT'))
 );
 

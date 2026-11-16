@@ -1,4 +1,4 @@
-# Phase 1 and Phase 2: done and pending (2026-11-15)
+# Phase 1 and Phase 2: done and pending (2026-11-16)
 
 Measured against the owner's PDF (`docs/inputs/Aligning_Financial_Results_Databases.pdf`). The PDF defines the phases
 twice: an early roadmap (§7, "Core Engine / Deep Edge / Alpha") and the final "Phased Implementation Plan" (§5,
@@ -26,6 +26,11 @@ the full line-by-line audit of the PDF is `docs/master_backlog.md`; ratios are i
 2. **DONE (batch H)** Daily run scheduled: `ops/` systemd timer + service, crontab line, Windows Task Scheduler XML
    (20:15 IST daily: `run-day`, then `materialize --incremental`; arch §13). `run-day` takes today's IST date and
    publishes no feature day on a holiday. Installing the unit on the owner's machine is the remaining step.
+   **Batch K (2026-11-16):** alternatively GitHub Actions: `nightly-pipeline.yml` on a self-hosted runner (labels
+   `self-hosted, financials`) at 22:00 IST runs `run-day`, `fetch-classification --missing-only` + `promote` and
+   `materialize --incremental`; `nightly-tests.yml` runs the offline suite on a hosted runner. A hosted runner cannot
+   run the pipeline (no data, NSE blocks datacenter IPs, no redistribution); registering the runner is the owner's
+   step (`ops/README.md`).
 3. Credit rating (Screener ratio) needs credit-rating XBRL (G98, F22 UNVERIFIED).
 4. Not possible by design: all-time high/low (data starts 2024-10-01), "Expected quarterly …" (forecasts),
    G Factor (formula unpublished).
@@ -97,6 +102,10 @@ ranks and premiums (A1.19, B5.7, B5.8) were built by batch H.
 4. Filed ISCR / DSCR (catalogue B1.24): filed values are implausible (C26); needs an evidence row first.
 5. Price to quarterly earnings (catalogue A1.12) waits on Screener's definition (UNVERIFIED); "Is SME" (A1.24) is a
    constant in an SME-free universe (C7) and is not built. Every other BUILDABLE NOW catalogue row is built (batch I).
+
+**PDF corrections of per-share facts (batch K, features `2026.11.15-12K`)**: `correct_from_pdf` also takes EPS and face
+value (`fact_corrections.value_other`, rupees per share); the FactBook, the batch prefetch and the EPS result-date
+visibility rank them exactly like rupee corrections, and revoking restores the filed value (X107).
 
 ## Data quality still open (not a phase item, but blocks trust)
 

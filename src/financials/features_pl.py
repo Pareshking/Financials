@@ -108,23 +108,34 @@ _VIS_TAGS = ("pat", "eps_basic")
 
 def _visibility_rows(con, as_of: datetime, entities=None, where: str = "", params=()) -> list:
     """(entity, scope, tag, start, end, first visible, visible of the value the FactBook ranks first). The ranked
-    value is the latest results filing's, else the latest annual report's (`fundamentals._ANNUAL_LAST`)."""
+    value is the latest results filing's, else the latest annual report's (`fundamentals._ANNUAL_LAST`). A PDF
+    correction (decision B; batch K also per-share EPS) counts from its corrected filing's visibility, as in
+    `fundamentals._fact_source`, so a corrected EPS the filing never tagged still gets its result date."""
     only, only_p = entity_filter("entity_id", entities)
-    from financials.fundamentals import CURRENT_VERSION
+    from financials.fundamentals import _CURRENT_FILING, CURRENT_VERSION
 
+    tags = ", ".join(f"'{t}'" for t in _VIS_TAGS)
     return con.execute(
         """SELECT entity_id, scope, canonical_tag, period_start, period_end, min(visible_from_ts),
                   coalesce(max(visible_from_ts) FILTER (WHERE NOT annual), max(visible_from_ts))
            FROM (SELECT *, filing_id IN (SELECT filing_id FROM filing_meta WHERE accounting_profile = 'REG34_ANNUAL')
                            AS annual
-                 FROM fact_observations
-                 WHERE canonical_tag IN ('pat', 'eps_basic') AND period_type = 'DURATION' AND visible_from_ts <= ?"""
+                 FROM (SELECT entity_id, scope, canonical_tag, period_start, period_end, visible_from_ts, filing_id
+                       FROM fact_observations
+                       WHERE canonical_tag IN ("""
+        + tags
+        + ") AND period_type = 'DURATION' AND visible_from_ts <= ? AND "
+        + CURRENT_VERSION
+        + """ UNION ALL SELECT c.entity_id, c.scope, c.canonical_tag, c.period_start, c.period_end, m.vis, c.filing_id
+                       FROM fact_corrections c JOIN """
+        + _CURRENT_FILING
+        + " m USING (filing_id) WHERE c.revoked_at IS NULL AND c.canonical_tag IN ("
+        + tags
+        + ") AND c.period_type = 'DURATION' AND m.vis <= ?) WHERE TRUE"
         + only
         + where
-        + " AND "
-        + CURRENT_VERSION
         + ") GROUP BY ALL",
-        [as_of, *only_p, *params],
+        [as_of, as_of, *only_p, *params],
     ).fetchall()
 
 

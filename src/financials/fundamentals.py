@@ -290,7 +290,8 @@ _CURRENT_FILING = (
 
 
 def _fact_source(fact_where: str, corr_where: str) -> str:
-    """Candidate rows for the latest-value ranking: filed facts (current version, same basis) and corrections."""
+    """Candidate rows for the latest-value ranking: filed facts (current version, same basis) and corrections.
+    A per-share correction (EPS, face value) carries value_other like the filed fact, so it ranks the same way."""
     return (
         "(SELECT entity_id, scope, canonical_tag, period_type, period_start, period_end, value_inr, value_other, "
         "visible_from_ts, parser_version, filing_id, 0 AS corrected FROM fact_observations WHERE "
@@ -299,7 +300,7 @@ def _fact_source(fact_where: str, corr_where: str) -> str:
         + CURRENT_VERSION
         + " AND {basis} "
         "UNION ALL SELECT c.entity_id, c.scope, c.canonical_tag, c.period_type, c.period_start, c.period_end, "
-        "c.value_inr, NULL, m.vis, m.pv, c.filing_id, 1 FROM fact_corrections c JOIN "
+        "c.value_inr, c.value_other, m.vis, m.pv, c.filing_id, 1 FROM fact_corrections c JOIN "
         + _CURRENT_FILING
         + " m USING (filing_id) WHERE c.revoked_at IS NULL AND "
         + corr_where

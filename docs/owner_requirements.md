@@ -500,3 +500,5 @@ The owner asked the assistant to take these with its recommendation. Each is rev
   Actions as the writer, a private Cloudflare-hosted site behind a login, and a free LLM API that translates
   questions into the screener DSL. Recorded as a direction only; CLAUDE.md's "no Cloudflare/R2 without an explicit
   decision" still applies until the owner decides.
+- **L. Public repository with real fixtures (owner, 2026-11-16):** the repository stays public with the real NSE
+  fixtures in `tests/fixtures/`; not to be raised again. `data/` stays uncommitted as before.

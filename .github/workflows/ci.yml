@@ -42,4 +42,4 @@ jobs:
       - name: Offline tests, shard ${{ matrix.shard }}/6 (network is never required)
         env:
           TEST_SHARD: ${{ matrix.shard }}/6
-        run: python -m pytest --durations=15
+        run: python -m pytest

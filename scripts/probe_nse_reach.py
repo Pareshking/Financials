@@ -1,5 +1,6 @@
 """Can this machine reach NSE? One request per sample URL (plus the jobs' one warm-up page for www) through the
-project's polite fetcher (>= 1.5 s spacing, max 2 attempts). Prints status, size and sha256 only: nothing is saved, so no data leaves the run in logs.
+project's polite fetcher (>= 1.5 s spacing, max 2 attempts). Prints status, size and sha256 only: nothing is
+saved, so no data leaves the run in logs.
 
     python scripts/probe_nse_reach.py
 """

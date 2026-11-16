@@ -19,7 +19,7 @@ from financials import lineage
 from financials.calendar import is_trading_day
 from financials.db import apply_schema, connect
 from financials.dsl import run_screen
-from financials.features import materialize, materialize_incremental, settle_full_run
+from financials.features import materialize, materialize_incremental, materialize_run, settle_full_run
 from financials.fetch.http import PoliteFetcher, Transport
 from financials.fetch.jobs import WARMUP, Jobs
 from financials.promoter import close_resolved_share_findings, close_wrong_template_duplicates, promote
@@ -452,12 +452,13 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
             print(json.dumps(r, default=str), file=out)
             waiting = promote_pending(con, stage_root, out)
             done = []
-            for d in r["features_dates"]:
-                fr = materialize(con, d)
-                print(f"{fr.status} {fr.as_of_date} rows={fr.rows} {fr.gate or ''} {fr.message}", file=out)
-                if fr.status != "PROMOTED":
-                    break
-                done.append(d)
+            with materialize_run(con, r["features_dates"]) as prices:
+                for d in r["features_dates"]:
+                    fr = materialize(con, d, prices=prices)
+                    print(f"{fr.status} {fr.as_of_date} rows={fr.rows} {fr.gate or ''} {fr.message}", file=out)
+                    if fr.status != "PROMOTED":
+                        break
+                    done.append(d)
             if done == r["features_dates"]:
                 settle_full_run(con, done)
             return 1 if waiting else 0
@@ -662,11 +663,12 @@ def materialize_dates(con, as_of: date | None, start: date | None, end: date | N
     else:
         print("error: give a date or --from [--to]", file=out)
         return 2
-    for d in dates:  # ascending, so G4 always compares with the previous materialised date
-        r = materialize(con, d)
-        print(f"{r.status} {r.as_of_date} rows={r.rows} {r.gate or ''} {r.message}", file=out)
-        if r.status != "PROMOTED":
-            return 1
+    with materialize_run(con, dates) as prices:  # bars read once for the whole run [§11.11]
+        for d in dates:  # ascending, so G4 always compares with the previous materialised date
+            r = materialize(con, d, prices=prices)
+            print(f"{r.status} {r.as_of_date} rows={r.rows} {r.gate or ''} {r.message}", file=out)
+            if r.status != "PROMOTED":
+                return 1
     settle_full_run(con, dates)  # dirty markers this full run made obsolete
     return 0
 

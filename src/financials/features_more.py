@@ -495,7 +495,7 @@ def segment_columns(rows: list[tuple] | None) -> dict:
 
 
 def row_columns(row: dict, more: dict | None, hist: dict | None, bars, factors, frozen_from, index, events,
-                actions, segments) -> dict:  # fmt: skip
+                actions, segments, prices=None) -> dict:  # fmt: skip
     out = dict.fromkeys(MORE_COLUMNS)
     more = more or {}
     out.update({k: v for k, v in more.items() if k in out})
@@ -503,7 +503,8 @@ def row_columns(row: dict, more: dict | None, hist: dict | None, bars, factors, 
     hist = hist or {}
     for col, src in PERCENTILES.items():
         out[col] = percentile_rank(_f(row.get(src)), hist.get(src, []))
-    out |= price_columns(row, bars, factors, frozen_from, index)
+    out |= (prices.more_price_columns(row, row["as_of_date"]) if prices is not None
+            else price_columns(row, bars, factors, frozen_from, index))  # fmt: skip
     covered, inc_exc = events
     if covered:
         out["nifty500_inclusion_90d"], out["nifty500_exclusion_90d"] = inc_exc.get(row["security_id"], (False, False))
@@ -515,14 +516,15 @@ def row_columns(row: dict, more: dict | None, hist: dict | None, bars, factors, 
 
 
 def add_columns(con, rows: list[dict], as_of: date, as_of_ts: datetime, fundamentals: dict, factors, frozen,
-                entities=None, exchange: str = "NSE") -> None:  # fmt: skip
-    """The features.compute_rows hook: batched reads, each row's columns, then the cross-section, in place."""
+                entities=None, exchange: str = "NSE", prices=None) -> None:  # fmt: skip
+    """The features.compute_rows hook: batched reads, each row's columns, then the cross-section, in place. With the
+    run's `price_history.PriceHistory` (`prices`) the price columns are sliced from it (the same values)."""
     from financials.features_price import index_closes
 
     secs = None if entities is None else {r["security_id"] for r in rows}
     hist = valuation_history(con, as_of, secs)
-    bars = load_bars(con, exchange, as_of, secs)
-    index = index_closes(con, as_of)
+    bars = {} if prices is not None else load_bars(con, exchange, as_of, secs)
+    index = prices.index if prices is not None else index_closes(con, as_of)
     events = index_events(con, as_of, secs)
     actions = action_inputs(con, as_of, as_of_ts, secs)
     segments = segment_inputs(con, as_of_ts, entities)
@@ -531,7 +533,7 @@ def add_columns(con, rows: list[dict], as_of: date, as_of_ts: datetime, fundamen
         fund = fundamentals.get(ent) or {}
         row.update(row_columns(row, fund.get("_more"), hist.get(sec), bars.get(sec, []), factors.get(sec, []),
                                frozen.get(sec), index, events, actions.get(sec),
-                               segments.get((ent, row.get("scope_used")))))  # fmt: skip
+                               segments.get((ent, row.get("scope_used"))), prices))  # fmt: skip
     cross_section(rows)
 
 

@@ -575,8 +575,59 @@ rebuilt. Equivalence with a full rebuild, row for row, is pinned by `tests/test_
 results filing, a shareholding filing, a corporate-action batch, a gap resolution and a scope override.
 
 **Reader changes**: `FEATURES_VERSION` must be bumped whenever `features.py`, `fundamentals.py`, `scope.py`,
-`money.py` or `reference/valuation_archetypes.csv` changes; a test pins a hash of those files together with the
+`money.py`, `price_history.py` or `reference/valuation_archetypes.csv` changes; a test pins a hash of those files together with the
 version. After a bump only a full `materialize --from --to` is equivalent.
+
+## 11.11 Run-level materialisation (performance)
+
+A materialised day used to re-read every security's whole bar history (`_price_inputs`, `features_price.load_bars`,
+`features_more.load_bars`: up to ~450 days x ~3,000 securities, three times), recompute every indicator from the
+first bar, rebuild every entity's fundamentals from a fresh prefetch, and checkpoint the database on every commit:
+quadratic in the history, ~3 s a day at the start of the data and 25-35 s at the end (a full rebuild ~2.5 h). A
+`materialize --from/--to`, `--incremental` or `rebuild-market` run now shares one run state across its days
+(`features.materialize_run`); the rows are the same, row for row and column for column (`FEATURES_VERSION` -14P
+only because the pinned files changed).
+
+- **Price history** (`financials.price_history.PriceHistory`): bars (all fields), accepted price factors, open GAP
+  freezes and Nifty 500 closes are read once, up to the run's last day; a day sees each security's prefix of bars
+  dated <= D. A back-adjusted series depends on D only through the set of accepted actions with ex-date <= D
+  ("valid" knowledge, the only mode materialised history uses), so each security's adjusted series and every
+  causal indicator over it (RSI, MACD / signal EMAs, ATR restarting after a bar without high / low, running highs /
+  lows since data start, daily log returns) is computed once per such set (a *factor regime*) and indexed at D's
+  last bar; a GAP freeze only cuts the series at its first frozen bar (every adjusted column is NULL from there).
+  Windowed values (returns, 52-week and 1-year windows, beta, drawdown, delivery spike, PEAD, the 450-day window of
+  batch I) are computed per day from slices with the same expressions in the same order, so Decimals are equal and
+  floats bit-identical. Two windowed sums use prefix sums where that is provably the same value: Decimal sums
+  (DMAs, volume averages, the momentum DMA ratios) when every partial sum is exact in the 28-digit context (else
+  the window is summed as before), and the 1-year volatility from exact integer sums of the log returns and the
+  correctly rounded square root `statistics.stdev` itself uses (falls back to `statistics.stdev` where that
+  internal is missing). `features._momentum` multiplies factors in query order, `features_price` in ex-date order:
+  both orders are kept. Memory: ~1.5 KB a bar (~2-2.5 GB of Python objects for 3,000 securities x 526 days, plus
+  DuckDB's buffers); the run freezes these long-lived objects out of the cyclic garbage collector (`gc.freeze`,
+  one collection a day) because full collections over them took more than half of a day's time.
+- **Fundamentals cache** (`features.FundamentalsCache`): `_fundamentals(entity, as_of)` reads only rows filtered
+  `visible_from_ts <= as_of` (facts, filing_meta, corrections through their filing, result dates), MERGER /
+  DEMERGER ledger rows with ex-date <= as_of and static overrides. A run cannot change those tables, so an entity's
+  block (scope decision, TTM / annual / lender / insurer ratios, the period values of batches A, C, D, G, I) changes
+  only on a day one of its visibility timestamps or structural ex-dates falls on: the block is keyed by (latest
+  visible quarter, count of its visibility timestamps <= as_of, count of its structural ex-dates <= as_of) from one
+  read per run, and a day prefetches and recomputes only the entities whose key moved. Everything price-, share-
+  or day-dependent (market cap, EV, PE / PB / yields, percentiles, shareholding, Reg. 30 windows, KPIs,
+  cross-sectional ranks) is still computed every day.
+- **Checkpoints**: each day's commit writes ~30 MB of WAL; at DuckDB's default 16 MB threshold every commit
+  checkpointed and rewrote the history table's open row groups (3-4 s of a 4-5 s day). The run raises the
+  threshold to 512 MB (`RUN_CHECKPOINT_THRESHOLD`), restores it and checkpoints once at the end. Storage only: each
+  day is still published atomically after G4 / G5.
+- `FINANCIALS_MATERIALIZE_LEGACY=1` selects the per-day path (and `compute_rows(knowledge="system")` always uses
+  it). `tests/test_materialize_fast_path.py` pins the equality: every column of the price functions for every prefix
+  of randomised series (splits, several inexact factors on one bar, holes, missing index closes, GAP freezes,
+  sparse trading), and the materialised tables of the fixture market and of the fixture market extended with long
+  synthetic histories (`bench.extend_synthetic`), both paths. `scripts/compare_materialize.py DB --from --to
+  [--every N]` runs the same comparison on a copy of a real database.
+- Not done: parallel day computation. DuckDB lets no other process open the database file while the single writer
+  holds it, and the per-day Python work is GIL-bound, so worker processes would need their own copy of every input;
+  after the changes above a day of ~3,000 securities is ~1.5-2 s (half per-row Python, half the Arrow insert, the
+  cross-section SQL and the WAL), see docs/benchmarks.md section 6.
 
 ## 12. Promoter quality gates (in order)
 

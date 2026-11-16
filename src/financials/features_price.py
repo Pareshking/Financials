@@ -273,8 +273,14 @@ def price_columns(bars, factors, frozen_from: date | None, index: dict[date, flo
     return out
 
 
-def add_price_columns(con, rows: list[dict], as_of: date, exchange: str, factors, frozen, securities=None) -> None:
-    """Fill PRICE_COLUMNS into `rows` in place (the features.compute_rows hook): two batched reads."""
+def add_price_columns(con, rows: list[dict], as_of: date, exchange: str, factors, frozen, securities=None,
+                      prices=None) -> None:  # fmt: skip
+    """Fill PRICE_COLUMNS into `rows` in place (the features.compute_rows hook): two batched reads, or slices of the
+    run's `price_history.PriceHistory` (`prices`, the same values)."""
+    if prices is not None:
+        for row in rows:
+            row.update(prices.price_columns(row["security_id"], as_of))
+        return
     bars = load_bars(con, exchange, as_of, securities)
     index = index_closes(con, as_of)
     for row in rows:

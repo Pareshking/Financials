@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import statistics
 from collections import defaultdict
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
@@ -68,13 +70,15 @@ from financials.fundamentals import (
     screener_convention_ratios,
     yoy_growth,
 )
+from financials.price_history import PriceHistory
+from financials.price_history import legacy as legacy_materialize
 from financials.scope import MIN_PERIOD_END_DATE, MIN_TRADE_DATE
 from financials.timeutil import ist_to_utc, utc_now
 
 # Reader version of materialised rows. Bump it whenever features.py, fundamentals.py (or another file pinned by
 # tests/test_incremental_materialize.py) changes any output: `materialize --incremental` refuses days built by another
 # version, because only a full run then reproduces the history.
-FEATURES_VERSION = "2026.11.15-13"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
+FEATURES_VERSION = "2026.11.15-14P"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
 # -3: QoQ sales / profit growth, NPM, interest coverage, OPM same quarter last year, dividend yield / payout,
 #     promoter holding QoQ change (owner_requirements items 1, 3, 4)
 # -4A: period P&L family (features_pl: quarter / fiscal-year lines, quarter YoY growth, result dates, history-gated
@@ -102,6 +106,8 @@ FEATURES_VERSION = "2026.11.15-13"  # -2: X106 restatement TTM bridge + flag, X1
 # -12K: batch K per-share PDF corrections (fact_corrections.value_other: EPS / face value ranked like rupee
 #       corrections in the FactBook and in the EPS result-date visibility of features_pl)
 # -13: batches J and K merged
+# -14P: run-level materialisation (price_history.py, FundamentalsCache; architecture §11.11): identical rows, version
+#       bumped because the pinned files changed
 
 CRITICAL_COLUMNS = ("close", "market_cap", "sales_ttm", "pat_ttm", "total_equity")
 G4_MAX_NULL_RISE = 0.015
@@ -525,18 +531,34 @@ def _valuation_history(con, as_of: date, securities=None) -> dict[str, dict[str,
 
 
 def compute_rows(
-    con, as_of: date, exchange: str = "NSE", *, knowledge: str = "valid", entities: frozenset[str] | None = None
+    con,
+    as_of: date,
+    exchange: str = "NSE",
+    *,
+    knowledge: str = "valid",
+    entities: frozenset[str] | None = None,
+    prices: PriceHistory | None = None,
 ) -> list[dict]:
     """Feature rows for `as_of`. `knowledge` selects how price adjustments and gap freezes are read (see
     `_price_inputs`); materialised history always uses the default "valid" knowledge. `entities` computes only the
     rows of those entities' securities, through the same batched reads restricted to them: a row depends only on
-    its own security's and entity's inputs (and its own earlier rows), so the rows are identical (§11.10)."""
+    its own security's and entity's inputs (and its own earlier rows), so the rows are identical (§11.10).
+
+    Price columns ("valid" knowledge) come from a `PriceHistory` (read once per run, sliced per day; `prices`, or one
+    read here for this day); FINANCIALS_MATERIALIZE_LEGACY=1 (and knowledge="system") re-read and recompute the
+    whole history per day instead. Both give identical rows (tests/test_materialize_fast_path.py)."""
     as_of_ts = ist_to_utc(as_of + timedelta(days=1), time(0, 0))  # end of as_of day, IST
     universe = _universe(con, exchange, as_of, entities)
     if entities is not None and not universe:
         return []
     secs = None if entities is None else {u[0] for u in universe}
-    bars, factors, frozen = _price_inputs(con, exchange, as_of, knowledge, as_of_ts, secs)
+    if knowledge != "valid" or legacy_materialize():
+        prices = None
+        bars, factors, frozen = _price_inputs(con, exchange, as_of, knowledge, as_of_ts, secs)
+    else:
+        if prices is None or not prices.covers(exchange, as_of):
+            prices = PriceHistory(con, exchange, as_of, secs)
+        bars, factors, frozen = prices.inputs(as_of, secs)
     nifty = {
         s
         for (s,) in con.execute(
@@ -554,27 +576,38 @@ def compute_rows(
     arch_override = dict(con.execute("SELECT entity_id, valuation_archetype FROM entity_archetype_override").fetchall())
     fundamentals_cache: dict[str, dict] = {}
     rows = []
-    prefetch_fundamentals(con, as_of_ts, entities)  # one pass instead of a per-entity scan [benchmarks]
-    features_pl.prefetch(con, as_of_ts, entities)
+    run_cache = prices.fundamentals if prices is not None else None
+    keys: dict[str, tuple] = {}
+    stale = entities
+    if run_cache is not None:  # reuse the entities' blocks of an earlier day of the run when no input changed
+        keys = {e: run_cache.key(e, as_of, as_of_ts, quarter_end[e]) for (_, e, _, _) in universe if e in quarter_end}
+        fundamentals_cache.update(run_cache.hits(keys))
+        stale = frozenset(keys.keys() - fundamentals_cache.keys())
+    prefetch_fundamentals(con, as_of_ts, stale)  # one pass instead of a per-entity scan [benchmarks]
+    features_pl.prefetch(con, as_of_ts, stale)
     features_bs.prefetch(con, as_of_ts, entities)
     try:
         rows = _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all, paid_up, quarter_end,
-                     events, kpis, history, curated, arch_override, fundamentals_cache, dividends)  # fmt: skip
+                     events, kpis, history, curated, arch_override, fundamentals_cache, dividends, prices)  # fmt: skip
+        if run_cache is not None:
+            run_cache.store({e: (k, fundamentals_cache[e]) for e, k in keys.items() if e in stale})
     finally:
         clear_prefetch(con, as_of_ts)
         features_pl.clear(con, as_of_ts)
         features_bs.clear(con, as_of_ts)
-    add_price_columns(con, rows, as_of, exchange, factors, frozen, secs)  # batch B (price/technicals)
+    add_price_columns(con, rows, as_of, exchange, factors, frozen, secs, prices)  # batch B (price/technicals)
     features_gems.add_columns(con, rows, as_of, as_of_ts, fundamentals_cache, entities)  # batch D (hidden gems)
     features_peers.add_columns(con, rows, as_of, as_of_ts, entities)  # batch H (industry / peers)
     features_extra.add_columns(con, rows, as_of, as_of_ts, fundamentals_cache, factors, entities)  # batch G
-    features_more.add_columns(con, rows, as_of, as_of_ts, fundamentals_cache, factors, frozen, entities)  # batch I
+    features_more.add_columns(
+        con, rows, as_of, as_of_ts, fundamentals_cache, factors, frozen, entities, prices=prices
+    )  # batch I
     features_rpt.add_columns(con, rows, as_of_ts, entities)  # batch J (related-party leak, X113)
     return rows
 
 
 def _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all, paid_up, quarter_end, events, kpis,
-          history, curated, arch_override, fundamentals_cache, dividends=None) -> list[dict]:  # fmt: skip
+          history, curated, arch_override, fundamentals_cache, dividends=None, prices=None) -> list[dict]:  # fmt: skip
     rows = []
     for sec, ent, symbol, series in universe:
         b = bars.get(sec, [])
@@ -587,7 +620,7 @@ def _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all,
         row.update(
             events.get(ent) or {**dict.fromkeys(EVENT_COLUMNS, 0), "order_value_90d": None, "penalties_90d": None}
         )
-        row.update(_momentum(b, factors.get(sec, []), frozen.get(sec)))
+        row.update(prices.momentum(sec, as_of) if prices else _momentum(b, factors.get(sec, []), frozen.get(sec)))
         row.update(_delivery(b))
 
         if ent not in fundamentals_cache:
@@ -885,13 +918,21 @@ def _c9_expected_nulls(con, prev: date, rows: list[dict]) -> set[tuple[str, str]
 
 
 def materialize(
-    con, as_of: date, exchange: str = "NSE", *, entities: frozenset[str] | None = None
+    con,
+    as_of: date,
+    exchange: str = "NSE",
+    *,
+    entities: frozenset[str] | None = None,
+    prices: PriceHistory | None = None,
 ) -> MaterializeResult:
     """Compute, gate and atomically publish features for `as_of`. Caller must be the single writer.
 
     `entities` (incremental, §11.10): recompute only those entities' rows and merge them with the day's other rows
-    already stored; G5 and G4 are then checked on the merged day, and only the recomputed rows are replaced."""
-    rows = compute_rows(con, as_of, exchange, entities=entities)
+    already stored; G5 and G4 are then checked on the merged day, and only the recomputed rows are replaced.
+    `prices`: the run's PriceHistory (`materialize_run`), so a multi-day run reads the bars once."""
+    rows = compute_rows(con, as_of, exchange, entities=entities, prices=prices)
+    if prices is not None:
+        prices.settle()
     universe = _universe(con, exchange, as_of)
     merged = rows
     if entities is not None:
@@ -951,6 +992,96 @@ def materialize(
         raise
     con.execute("COMMIT")
     return MaterializeResult("PROMOTED", as_of, len(merged))
+
+
+class FundamentalsCache:
+    """Per-entity fundamental blocks (`_fundamentals`: the scope decision, TTM / annual / lender / insurer ratios and
+    the period values of features_pl / _bs / _gems / _extra / _more) reused across the days of one materialize run
+    while none of the entity's inputs changes (architecture §11.11).
+
+    `_fundamentals(con, e, as_of_ts, end)` reads, for entity e, only rows filtered `visible_from_ts <= as_of_ts`
+    (fact_observations, filing_meta; fact_corrections through their filing's visibility; the features_pl result
+    dates), MERGER / DEMERGER ledger rows with ex_date <= as_of (the restatement flag, X109) and the static
+    entity_scope_override; `end` (the latest visible quarter) is read the same way. Nothing else of the as-of enters
+    it. A run does not change those tables, so between two days the block can only change when one of e's
+    visibility timestamps or structural ex-dates falls in between: the key is (end, number of e's visibility
+    timestamps <= as_of_ts, number of its structural ex-dates <= as_of), from one read of the event dates for the
+    run. A day recomputes (and prefetches) only the entities whose key moved; everything that depends on the price,
+    the share count or the day (market cap, PE, yields, percentiles, ranks) is computed from the block every day."""
+
+    def __init__(self, con, through: date, entities=None) -> None:
+        import bisect
+
+        from financials.fundamentals import _CURRENT_FILING, _structural_actions
+
+        self._bisect = bisect.bisect_right
+        through_ts = ist_to_utc(through + timedelta(days=1), time(0, 0))
+        only, only_p = entity_filter("entity_id", entities)
+        vis: dict[str, list[datetime]] = defaultdict(list)
+        for ent, ts in con.execute(
+            "SELECT DISTINCT entity_id, ts FROM ("
+            "SELECT entity_id, visible_from_ts AS ts FROM fact_observations UNION ALL "
+            "SELECT entity_id, visible_from_ts FROM filing_meta UNION ALL "
+            "SELECT c.entity_id, m.vis FROM fact_corrections c JOIN " + _CURRENT_FILING + " m USING (filing_id)) "
+            "WHERE ts <= ?" + only + " ORDER BY 1, 2",
+            [through_ts, *only_p],
+        ).fetchall():
+            vis[ent].append(ts)
+        self._vis = dict(vis)
+        structural = _structural_actions(con, through_ts, only.replace("entity_id", "e"), only_p)
+        self._structural = {e: [d for d, _ in v] for e, v in structural.items()}
+        self._blocks: dict[str, tuple[tuple, dict]] = {}
+
+    def key(self, entity_id: str, as_of: date, as_of_ts: datetime, end: date) -> tuple:
+        return (end, self._bisect(self._vis.get(entity_id, ()), as_of_ts),
+                self._bisect(self._structural.get(entity_id, ()), as_of))  # fmt: skip
+
+    def hits(self, keys: dict[str, tuple]) -> dict[str, dict]:
+        out = {}
+        for e, k in keys.items():
+            cached = self._blocks.get(e)
+            if cached is not None and cached[0] == k:
+                out[e] = cached[1]
+        return out
+
+    def store(self, blocks: dict[str, tuple[tuple, dict]]) -> None:
+        self._blocks.update(blocks)
+
+
+# Checkpoint threshold for the length of a materialize run. Each day commits ~30 MB of WAL (the day's rows and the
+# cross-section updates); at DuckDB's default 16 MB every commit checkpointed, rewriting the history table's open
+# row groups: ~3-4 s of a 4-5 s day. Storage only: the rows and the per-day atomic publish are unchanged.
+RUN_CHECKPOINT_THRESHOLD = "512MB"
+
+
+@contextmanager
+def materialize_run(con, days, exchange: str = "NSE", entities=None) -> Iterator[PriceHistory | None]:
+    """The state shared by the days of one run (`materialize --from/--to`, `--incremental`, `rebuild-market`;
+    architecture §11.11): yields a PriceHistory read through the last day (restricted to the securities of `entities`
+    when given) carrying the run's FundamentalsCache, its heap frozen for the run (`PriceHistory.frozen_heap`); None
+    on the legacy per-day path (FINANCIALS_MATERIALIZE_LEGACY=1) or without days. Raises DuckDB's checkpoint
+    threshold for the run (RUN_CHECKPOINT_THRESHOLD) and checkpoints at the end."""
+    old = con.execute("SELECT current_setting('checkpoint_threshold')").fetchone()[0]
+    con.execute(f"SET checkpoint_threshold = '{RUN_CHECKPOINT_THRESHOLD}'")
+    done = False
+    try:
+        if legacy_materialize() or not days:
+            yield None
+        else:
+            secs = None
+            if entities is not None:
+                sql, params = in_list("entity_id", entities)
+                secs = {s for (s,) in con.execute("SELECT security_id FROM securities WHERE " + sql, params).fetchall()}
+            prices = PriceHistory(con, exchange, max(days), secs)
+            if len(days) > 1:  # nothing to reuse within one day
+                prices.fundamentals = FundamentalsCache(con, max(days), entities)
+            with prices.frozen_heap():
+                yield prices
+        done = True
+    finally:
+        con.execute(f"SET checkpoint_threshold = '{old}'")
+        if done and len(days) > 1:  # a run ends checkpointed (one day: DuckDB's usual threshold decides)
+            con.execute("CHECKPOINT")
 
 
 # ── incremental materialisation (§11.10) ──────────────────────────────────
@@ -1055,12 +1186,14 @@ def materialize_incremental(con, to: date | None = None, exchange: str = "NSE") 
         "SELECT DISTINCT as_of_date FROM screener_features_history WHERE as_of_date >= ? AND as_of_date <= ? "
         "ORDER BY 1", [earliest, to or date.max]).fetchall()]  # fmt: skip
     results: list[MaterializeResult] = []
-    for d in days:
-        due = [r for r in rows if r[2] <= d]
-        ents = None if any(r[1] == FULL for r in due) else frozenset(r[1] for r in due)
-        r = materialize(con, d, exchange, entities=ents)
-        results.append(r)
-        if r.status != "PROMOTED":
-            return IncrementalResult("ABORTED", results, f"{d}: {r.gate} {r.message}; dirty markers kept")
+    every = None if any(r[1] == FULL for r in rows) else frozenset(r[1] for r in rows)
+    with materialize_run(con, days, exchange, every) as prices:
+        for d in days:
+            due = [r for r in rows if r[2] <= d]
+            ents = None if any(r[1] == FULL for r in due) else frozenset(r[1] for r in due)
+            r = materialize(con, d, exchange, entities=ents, prices=prices)
+            results.append(r)
+            if r.status != "PROMOTED":
+                return IncrementalResult("ABORTED", results, f"{d}: {r.gate} {r.message}; dirty markers kept")
     settle_dirty(con, rows, None, to)
     return IncrementalResult("DONE", results, f"{len(days)} day(s)", len({r[1] for r in rows}))

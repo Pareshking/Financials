@@ -10,11 +10,12 @@ from __future__ import annotations
 import argparse
 import os
 import platform
+import shutil
 import sys
 import tempfile
 import time
 from collections.abc import Callable
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import duckdb
@@ -148,11 +149,159 @@ def run(fixtures: Path, work: Path) -> dict:
     return res
 
 
+def extend_synthetic(path: Path, n_secs: int, start: date, end: date, seed: int = 11) -> list[date]:
+    """Synthetic history on every weekday from `start` to `end` without a fixture day, for the first `n_secs`
+    securities traded on 2025-09-19 (random walks with holes in high / low / delivery, accepted splits, some two on
+    one ex-date), Nifty 500 closes for every day, identifiers valid from `start`. Benchmarks and the fast-path
+    equality test (never real data: the database at `path` is a throwaway copy). Returns every bar date."""
+    import random
+
+    import pyarrow as pa
+
+    con = connect(path)
+    rng = random.Random(seed)
+    have = {d for (d,) in con.execute("SELECT DISTINCT trade_date FROM ohlcv").fetchall()}
+    days, d = [], start
+    while d <= end:
+        if d.weekday() < 5 and d not in have:
+            days.append(d)
+        d += timedelta(days=1)
+    base = con.execute(
+        "SELECT security_id, exchange, series, close, price_filing_id FROM ohlcv WHERE trade_date = '2025-09-19' "
+        "ORDER BY security_id LIMIT ?",
+        [n_secs],
+    ).fetchall()
+    cols: dict[str, list] = {c: [] for c in ("security_id", "exchange", "series", "trade_date", "open", "high", "low",
+                                              "close", "volume", "turnover_inr", "deliv_qty", "price_filing_id",
+                                              "delivery_filing_id")}  # fmt: skip
+    for sec, ex, series, close, fid in base:
+        c = float(close)
+        for d in days:
+            c = max(1.0, c * (1 + rng.gauss(0, 0.02)))
+            hole = rng.random() < 0.02
+            vol = rng.randint(1000, 1_000_000)
+            for k, v in (("security_id", sec), ("exchange", ex), ("series", series), ("trade_date", d),
+                         ("open", round(c, 2)), ("high", None if hole else round(c * 1.01, 2)),
+                         ("low", None if hole else round(c * 0.99, 2)), ("close", round(c, 2)), ("volume", vol),
+                         ("turnover_inr", round(vol * c, 2)),
+                         ("deliv_qty", None if rng.random() < 0.05 else int(vol * rng.random())),
+                         ("price_filing_id", fid), ("delivery_filing_id", None)):  # fmt: skip
+                cols[k].append(v)
+    t = pa.table(cols)  # noqa: F841 (read by DuckDB)
+    con.execute("INSERT INTO ohlcv SELECT * FROM t")
+    fid = base[0][4]
+    idx_days = sorted(set(days) | have)
+    level, idx = 20000.0, {"index_name": [], "trade_date": [], "close": [], "filing_id": []}
+    for d in idx_days:
+        level *= 1 + rng.gauss(0, 0.01)
+        if rng.random() > 0.002:  # a missing index close now and then (beta / RS / PEAD NULL around it)
+            for k, v in (("index_name", "Nifty 500"), ("trade_date", d), ("close", round(level, 2)),
+                         ("filing_id", fid)):  # fmt: skip
+                idx[k].append(v)
+    it = pa.table(idx)  # noqa: F841
+    con.execute("DELETE FROM index_ohlcv WHERE upper(index_name) = 'NIFTY 500'")
+    con.execute("INSERT INTO index_ohlcv (index_name, trade_date, close, filing_id) SELECT * FROM it")
+    ent = dict(con.execute("SELECT security_id, entity_id FROM securities").fetchall())
+    for i, (sec, *_rest, fid) in enumerate(base):
+        if i % 6 == 0:
+            exd = days[rng.randrange(len(days))]
+            for j in range(1 + (i % 12 == 0)):  # two actions on the same ex-date for some
+                pf = rng.choice((0.5, 0.2, 2 / 3))
+                con.execute(
+                    "INSERT INTO corp_actions (action_id, entity_id, security_id, action_type, ex_date, price_factor, "
+                    "eps_factor, status, source_filing_id, decided_at) VALUES (?, ?, ?, 'SPLIT', ?, ?, ?, 'VERIFIED', "
+                    "?, ?)",
+                    [f"syn-{sec}-{j}", ent.get(sec), sec, exd, pf, pf, fid, exd],
+                )
+    con.execute(
+        """UPDATE security_identifier_history h SET valid_from = ?
+           FROM (SELECT security_id, exchange, min(valid_from) AS v FROM security_identifier_history GROUP BY ALL) m
+           WHERE h.security_id = m.security_id AND h.exchange = m.exchange AND h.valid_from = m.v
+             AND m.v <= DATE '2025-09-19'""",
+        [start],
+    )
+    out = [d for (d,) in con.execute("SELECT DISTINCT trade_date FROM ohlcv ORDER BY 1").fetchall()]
+    con.close()
+    return out
+
+
+def run_synthetic(db: Path, work: Path, n_secs: int, legacy_days: int = 3) -> dict:
+    """Materialise every day of the fixture market extended with `n_secs` synthetic histories (2024-10-01 to
+    2026-11-11): one full run on the run-level path (per-day timings), then the per-day legacy path
+    (FINANCIALS_MATERIALIZE_LEGACY=1) for `legacy_days` days spread over the history on a copy holding the same
+    earlier days (each rewrites one day of a copy that holds the run's history)."""
+    from financials import features
+    from financials.price_history import LEGACY_ENV
+
+    path = work / "synthetic.duckdb"
+    shutil.copy(db, path)
+    con = connect(path)
+    con.execute("DELETE FROM screener_features_history")
+    con.execute("DELETE FROM features_meta")
+    con.execute("DELETE FROM market_breadth")
+    con.close()
+    requested = n_secs
+    days = extend_synthetic(path, n_secs, date(2024, 10, 1), date(2026, 11, 11))
+    con = connect(path, read_only=True)
+    n_secs = con.execute("SELECT count(DISTINCT security_id) FROM ohlcv WHERE trade_date = ?", [days[0]]).fetchone()[0]
+    con.close()
+    shutil.copy(path, work / "synthetic_legacy.duckdb")
+    con = connect(path)
+    res: dict = {"secs": n_secs, "requested": requested, "days": len(days), "per_day": []}
+    t0 = time.perf_counter()
+    with features.materialize_run(con, days) as prices:
+        res["load_s"] = time.perf_counter() - t0
+        for d in days:
+            t = time.perf_counter()
+            r = features.materialize(con, d, prices=prices)
+            res["per_day"].append((d, time.perf_counter() - t, r.rows))
+            if r.status != "PROMOTED":
+                raise RuntimeError(f"{d}: {r}")
+    res["total_s"] = time.perf_counter() - t0
+    res["rss_mb"] = _rss_mb()
+    con.close()
+    # The legacy path on a few days, each on a database holding every earlier materialised day (as in a run).
+    sample = [days[int(i * (len(days) - 1) / max(1, legacy_days - 1))] for i in range(legacy_days)]
+    res["legacy"] = []
+    lcon = connect(work / "synthetic_legacy.duckdb")
+    lcon.execute(f"ATTACH '{path}' AS fast (READ_ONLY)")
+    lcon.execute("INSERT INTO screener_features_history SELECT * FROM fast.screener_features_history")
+    lcon.execute("INSERT INTO features_meta SELECT * FROM fast.features_meta")
+    lcon.execute("DETACH fast")
+    for d in sample:
+        os.environ[LEGACY_ENV] = "1"
+        try:
+            t = time.perf_counter()
+            r = features.materialize(lcon, d)  # rewrites day d; the earlier days are already there
+            legacy_s = time.perf_counter() - t
+        finally:
+            os.environ.pop(LEGACY_ENV, None)
+        fast_s = next(s for x, s, _ in res["per_day"] if x == d)
+        res["legacy"].append((d, r.rows, legacy_s, fast_s))
+    lcon.close()
+    return res
+
+
+def _rss_mb() -> float:
+    try:
+        import resource
+
+        return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+    except ImportError:  # not on Windows
+        return float("nan")
+
+
 def render(res: dict) -> str:
     lines = [
         "# Benchmarks",
         "",
-        "Generated by `python -m financials.bench --out docs/benchmarks.md` on the committed fixtures (offline).",
+        "Generated by `python -m financials.bench "
+        + (
+            f"--synthetic {res['synthetic']['requested']} --legacy-days {len(res['synthetic']['legacy'])} "
+            if res.get("synthetic")
+            else ""
+        )
+        + "--out docs/benchmarks.md` on the committed fixtures (offline).",
         f"Machine: {platform.platform()}, {os.cpu_count()} CPUs, Python {platform.python_version()}, "
         f"DuckDB {duckdb.__version__}. Single run; expect ±30% between runs and slower CI runners.",
         "",
@@ -205,6 +354,34 @@ def render(res: dict) -> str:
     ]
     for k, v in res["sizes"].items():
         lines.append(f"| {k} | {v:,} | {v / 1e6:.1f} |")
+    syn = res.get("synthetic")
+    if syn:
+        per = syn["per_day"]
+        q = [per[int(i * (len(per) - 1) / 8)] for i in range(9)]
+        lines += [
+            "",
+            "## 6. Full materialisation run over a long synthetic history (`--synthetic N`)",
+            "",
+            f"The fixture market plus random-walk histories for {syn['secs']:,} securities (every security of the "
+            f"2025-09-19 fixture day, up to N) on every weekday from 2024-10-01 (accepted splits, holes, Nifty 500 "
+            f"closes; `bench.extend_synthetic`): {syn['days']} days, "
+            f"one `materialize --from/--to` run on the run-level path (§11.11). Price history read in "
+            f"{syn['load_s']:.1f} s; **whole run {syn['total_s'] / 60:.1f} min** "
+            f"({syn['total_s'] / syn['days']:.2f} s a day on average), peak RSS {syn['rss_mb']:,.0f} MB.",
+            "",
+            "| Day | Rows | Run-level path s (materialize incl. gates and write) |",
+            "|---|---|---|",
+        ]
+        lines += [f"| {d} | {n:,} | {t:.2f} |" for d, t, n in q]
+        lines += [
+            "",
+            "Per-day legacy path (`FINANCIALS_MATERIALIZE_LEGACY=1`: every day re-reads and recomputes the whole "
+            "history) on the same days, each rewriting one day of a copy that holds the run's history:",
+            "",
+            "| Day | Rows | Legacy s | Run-level s | Speed-up |",
+            "|---|---|---|---|---|",
+        ]
+        lines += [f"| {d} | {n:,} | {lt:.2f} | {ft:.2f} | {lt / ft:.1f}x |" for d, n, lt, ft in syn["legacy"]]
     lines += ["", "Regression guards with generous margins live in `tests/test_benchmarks.py`.", ""]
     return "\n".join(lines)
 
@@ -213,9 +390,20 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="financials.bench")
     p.add_argument("--fixtures", type=Path, default=Path("tests/fixtures"))
     p.add_argument("--out", type=Path)
+    p.add_argument(
+        "--synthetic",
+        type=int,
+        default=0,
+        metavar="N",
+        help="also time a full run over N synthetic 2-year histories (section 6; N=3000: ~30 min)",
+    )
+    p.add_argument("--legacy-days", type=int, default=3, help="days timed on the legacy path in section 6")
     args = p.parse_args(argv)
     with tempfile.TemporaryDirectory() as tmp:
-        text = render(run(args.fixtures, Path(tmp)))
+        res = run(args.fixtures, Path(tmp))
+        if args.synthetic:
+            res["synthetic"] = run_synthetic(Path(tmp) / "market.duckdb", Path(tmp), args.synthetic, args.legacy_days)
+        text = render(res)
     if args.out:
         args.out.write_text(text, encoding="utf-8")
     print(text)

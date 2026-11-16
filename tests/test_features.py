@@ -6,6 +6,7 @@ from decimal import Decimal
 import pytest
 
 from financials.features import compute_rows, materialize
+from financials.features_store import write_rows as write_history
 
 NOV = date(2026, 11, 12)
 OCT = date(2025, 10, 14)
@@ -90,17 +91,17 @@ def test_rematerialising_is_idempotent(published):
 
 def test_g4_aborts_on_null_spike(published):
     # Pretend the previous run had full sales coverage; today's ~100% nulls is then a spike.
+    from financials.db import fetch_dicts
+
     con = published.con
-    con.execute("CREATE TEMP TABLE keep AS SELECT * FROM screener_features_history WHERE as_of_date = ?", [OCT])
+    keep = fetch_dicts(con, "SELECT * FROM screener_features_history WHERE as_of_date = ?", [OCT])
     try:
-        con.execute("UPDATE screener_features_history SET sales_ttm = 1 WHERE as_of_date = ?", [OCT])
+        write_history(con, [{**r, "sales_ttm": 1} for r in keep])
         result = materialize(con, NOV)
         assert (result.status, result.gate) == ("ABORTED", "G4")
         assert "sales_ttm" in result.message
     finally:
-        con.execute("DELETE FROM screener_features_history WHERE as_of_date = ?", [OCT])
-        con.execute("INSERT INTO screener_features_history SELECT * FROM keep")
-        con.execute("DROP TABLE keep")
+        write_history(con, keep)
 
 
 def test_g5_aborts_when_universe_is_empty(published):
@@ -114,14 +115,14 @@ def test_g4_forgives_only_ttm_nulls_caused_by_the_c9_window():
     Dec 2024 quarters, before the cutoff (C9). That is expected (rule G4_C9_WINDOW); any other new NULL still counts."""
     from datetime import date as d
 
-    from financials.db import apply_schema, connect, insert_rows
+    from financials.db import apply_schema, connect
     from financials.features import _c9_expected_nulls, _null_rates
 
     con = connect()
     apply_schema(con)
     base = {"as_of_date": d(2025, 7, 25), "entity_id": "e", "symbol": "S", "series": "EQ", "sales_ttm": 1, "pat_ttm": 1,
             "fundamentals_end": d(2025, 3, 31)}  # fmt: skip
-    insert_rows(con, "screener_features_history", [{**base, "security_id": s} for s in ("A", "B", "C", "D")])
+    write_history(con, [{**base, "security_id": s} for s in ("A", "B", "C", "D")])
     now = [
         {"security_id": "A", "fundamentals_end": d(2025, 6, 30), "sales_ttm": None, "pat_ttm": None},  # C9 window
         {"security_id": "B", "fundamentals_end": d(2025, 3, 31), "sales_ttm": None, "pat_ttm": 1},  # same end: defect

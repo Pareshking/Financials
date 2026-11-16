@@ -485,7 +485,13 @@ CREATE TABLE IF NOT EXISTS company_overrides (
 );
 
 -- ── L3 Features (rebuilt by the promoter process; G4/G5 in financials.features) ──
-CREATE TABLE IF NOT EXISTS screener_features_history (
+-- screener_features_history is stored event-sparse (architecture §4.1, features_store.py) and read through the view
+-- of the same name (below VIEWS_MARKER): features_daily holds the DAILY columns (price, volume, market cap / EV
+-- ratios, windows over the as-of day, the day's cross-section) for every materialised day; features_events holds
+-- the EVENT columns (features_store.EVENT_COLUMNS: values that change only when one of the security's
+-- fundamentals-cache inputs becomes visible) once per interval [valid_from_date, valid_to_date) of identical values.
+-- A new column goes into exactly one of the two tables (and the view; tests/test_features_store.py checks).
+CREATE TABLE IF NOT EXISTS features_daily (
     as_of_date          DATE    NOT NULL,
     security_id         VARCHAR NOT NULL,
     entity_id           VARCHAR NOT NULL,
@@ -497,28 +503,10 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     shares_source       VARCHAR,             -- REG31 | PAID_UP
     market_cap          DECIMAL(24,2),
     enterprise_value    DECIMAL(24,2),
-    sales_ttm           DECIMAL(24,2),
-    ebitda_ttm          DECIMAL(24,2),
-    pat_ttm             DECIMAL(24,2),
-    fcf_ttm             DECIMAL(24,2),
-    net_debt            DECIMAL(24,2),
-    total_equity        DECIMAL(24,2),
     pe                  DOUBLE,
     pb                  DOUBLE,
     ev_ebitda           DOUBLE,
-    opm                 DOUBLE,
-    sales_growth_yoy    DOUBLE,
-    profit_growth_yoy   DOUBLE,
-    roe                 DOUBLE,
-    roce                DOUBLE,
-    roic                DOUBLE,
-    croic               DOUBLE,
-    debt_to_equity      DOUBLE,
     fcff_yield          DOUBLE,
-    other_income_to_pbt DOUBLE,
-    altman_z_dd         DOUBLE,              -- X2 uses OtherEquity as retained-earnings proxy
-    piotroski_f         INTEGER,             -- 0..9, year-end-assets variant; NULL without two FYs [C23]
-    beneish_m           DOUBLE,              -- 8-variable M-score; NULL without two FYs [C23]
     return_1m           DOUBLE,
     return_3m           DOUBLE,
     return_6m           DOUBLE,
@@ -533,75 +521,22 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     promoter_pct        DOUBLE,
     fii_pct             DOUBLE,
     dii_pct             DOUBLE,
-    scope_used          VARCHAR,
-    fundamentals_end    DATE,                -- quarter end of the TTM window
-    bs_as_of            DATE,
-    cf_as_of            DATE,
     shp_as_of           DATE,
     in_nifty500         BOOLEAN,
     eps_ttm             DECIMAL(18,4),       -- TTM owners' profit / current shares [X53]
     eps_continuing_ttm  DECIMAL(18,4),       -- TTM continuing owners' profit / current shares [C10]
-    roe_continuing      DOUBLE,              -- same denominator as roe [C14]
-    core_profit_ttm     DECIMAL(24,2),       -- continuing owners' profit less exceptional items net of tax [C14]
-    is_lending_nbfc     BOOLEAN,             -- INDAS_NBFC only [C13]; NULL for other profiles
-    nii_ttm             DECIMAL(24,2),       -- lenders: interest earned - finance costs
-    ppop_ttm            DECIMAL(24,2),       -- lenders: pre-provision operating profit
-    cost_to_income      DOUBLE,
-    credit_cost         DOUBLE,              -- TTM impairment / avg loans (opening + closing)
-    nim_asset_proxy     DOUBLE,              -- TTM NII / avg total assets
-    roa                 DOUBLE,              -- TTM owners' profit / avg total assets (lenders)
-    loans               DECIMAL(24,2),
-    loans_as_of         DATE,
-    loans_avg_from      DATE,                -- opening balance-sheet date of the average
-    gnpa_pct            DOUBLE,              -- NULL for NBFCs: no taxonomy element [X54]
-    nnpa_pct            DOUBLE,
-    pcr                 DOUBLE,
-    credit_to_deposit   DOUBLE,              -- banks: advances / deposits (latest balance sheet)
-    cet1_pct            DOUBLE,              -- banks: filed CET1 ratio (standalone)
-    at1_pct             DOUBLE,              -- banks: filed AT1 ratio (standalone)
-    roa_filed           DOUBLE,              -- banks: filed ReturnOnAssets, annualisation varies by bank [X59]
-    govt_holding_pct    DOUBLE,              -- banks: PercentageOfShareHeldByGovernmentOfIndia (PSU marker)
-    insurer_basis       VARCHAR,             -- IRDAI_LIFE | IRDAI_GENERAL | INDAS117 (ratios not comparable across) [X64]
-    net_premium_earned_ttm DECIMAL(24,2),    -- IRDAI general: PremiumEarned; life: NetPremiumIncome
-    insurance_revenue_ttm  DECIMAL(24,2),    -- Ind AS 117 insurers only
-    claims_ratio        DOUBLE,              -- general / Ind AS 117 insurers (definitions in §10.6)
-    expense_ratio       DOUBLE,
-    combined_ratio      DOUBLE,
-    solvency_ratio      DOUBLE,              -- times, after SOLVENCY_PERCENT_SCALING [X65]; NULL for Ind AS 117 filers
-    investment_income_ttm DECIMAL(24,2),
     persistency_13m     DOUBLE,              -- life insurers, filed in XBRL [X62]
     persistency_61m     DOUBLE,
-    scope_reason        VARCHAR,             -- DEFAULT | FALLBACK_DEFAULT_INCOMPLETE | OVERRIDE | YTD_BRIDGE | BALANCE_SHEET_ONLY
-    restatement_suspected BOOLEAN,           -- X106: a restated quarter inside the TTM window; TTM uses the YTD bridge
-    default_quarterly_scope VARCHAR,         -- company default for quarterly / TTM figures [C18]
-    default_annual_scope    VARCHAR,         -- company default for annual statements [C18]
-    sloan_accrual       DOUBLE,              -- (TTM PAT - CFO - CFI) / avg total assets [C19]
-    cfo_to_ebitda       DOUBLE,
-    fcf_to_pat          DOUBLE,
-    working_capital_intensity DOUBLE,        -- (receivables + inventory - payables) / TTM revenue
-    receivables_sales_divergence DOUBLE,     -- receivables YoY - revenue YoY (needs 8 quarters)
-    net_debt_to_fcf     DOUBLE,
-    cost_of_debt        DOUBLE,              -- TTM finance costs / avg (borrowings + leases)
-    dol                 DOUBLE,              -- EBIT YoY / revenue YoY, only if |revenue YoY| >= 5% (needs 8 quarters)
-    gross_ebitda_spread DOUBLE,              -- (gross profit - EBITDA) / revenue; COGS >= 10% guard (C6)
     reverse_dcf_implied_g  DOUBLE,           -- 5Y FCFF growth implied by EV [C20]
     reverse_dcf_wacc_used  DOUBLE,           -- assumption stored with the result (0.12)
     reverse_dcf_terminal_g DOUBLE,           -- assumption stored with the result (0.04)
     pe_percentile       DOUBLE,              -- rank vs own prior quarter-end values, >= 4 quarters [C20]
     ev_ebitda_percentile DOUBLE,
-    valuation_archetype VARCHAR,             -- INDUSTRIAL_SERVICES | FINANCIAL_LENDING | INSURANCE | NEW_GEN_TECH [C21]
     ev_to_gross_profit  DOUBLE,
     ex_cash_pe          DOUBLE,              -- (mcap - liquid cash) / (continuing owners' PAT - OI x (1 - ETR))
     ev_to_billings      DOUBLE,              -- EV / (TTM revenue + YoY change in contract liabilities)
     ev_to_esop_adj_ebitda DOUBLE,            -- EV / (EBITDA + ESOP cost), cash-flow window
     price_to_cfo        DOUBLE,
-    rule_of_40          DOUBLE,              -- revenue YoY + EBITDA margin (needs 8 quarters)
-    billings_growth_pct DOUBLE,              -- billings YoY (needs 8 quarters and labelled contract liabilities)
-    neg_working_capital_float_pct DOUBLE,    -- ((payables + contract liabilities) - (receivables + inventory)) / revenue
-    net_burn_multiple   DOUBLE,              -- cash burn / incremental revenue, only when FCF < 0 (needs 8 quarters)
-    cash_runway_months  DOUBLE,              -- liquid cash / monthly burn, only when FCF < 0
-    esop_adj_fcf        DECIMAL(24,2),       -- FCF - ESOP cost
-    liquid_cash         DECIMAL(24,2),       -- cash + other bank balances + current investments
     promoter_holding_pct DOUBLE,             -- Reg. 31 fractions as filed; denominator excludes DR shares [SHP9]
     promoter_pledge_pct DOUBLE,              -- pledged / promoter shares [SHP10]
     promoter_encumbered_pct DOUBLE,          -- (pledge + NDU + other encumbrance) / promoter shares [SHP10]
@@ -611,26 +546,12 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     public_holding_pct  DOUBLE,
     non_promoter_non_public_pct DOUBLE,      -- DR custodian + employee trusts, of total issued shares
     fii_dii_qoq_change_pct DOUBLE,           -- (FII + DII) now minus previous quarter end; fraction points
-    capex_to_depreciation DOUBLE,            -- FY (PPE + intangibles capex) / D&A [C23]
-    cwip_to_gross_block DOUBLE,              -- CWIP / gross block (Reg. 34 PPE schedule) [X71]
-    rote                DOUBLE,              -- FY owners' PAT / (owners' equity - goodwill - other intangibles)
-    rnd_and_royalty_intensity DOUBLE,        -- (R&D + royalty) / revenue; NULL when neither is disclosed [X73]
-    contingent_liabilities_to_net_worth DOUBLE, -- contingent liabilities / owners' equity [X73]
-    annual_fy_end       DATE,                -- fiscal year the annual ratios (incl. Piotroski/Beneish) use
     order_wins_90d      INTEGER,             -- Reg. 30 order wins visible, occurred in the 90 days to as-of [E3]
     order_value_90d     DECIMAL(24,2),       -- sum of their filed amounts (rupees)
     kmp_resignations_90d INTEGER,            -- KMP / director cessations by resignation [E5]
     auditor_resignations_90d INTEGER,        -- auditor cessations by resignation [E5]
     fraud_or_default_90d INTEGER,            -- fraud / default disclosures [E7]
     penalties_90d       INTEGER,             -- NULL: no penalty / regulatory-action event observed (UNVERIFIED) [E7]
-    roce_screener       DOUBLE,              -- Screener export: (PBT + Interest) x 2 / (opening + closing capital) [S22]
-    debtor_days         DOUBLE,              -- Screener export: closing debtors / (sales / 365) [S22]
-    inventory_turnover  DOUBLE,              -- Screener export: sales / closing inventory [S22]
-    working_capital     DECIMAL(24,2),       -- Screener export: Other Assets - Other Liabilities (rupees) [S22]
-    inventory_days      DOUBLE,              -- closing inventory / (COGS / 365); NULL if COGS < 1% of sales [S23]
-    days_payable        DOUBLE,              -- closing trade payables / (COGS / 365) [S23]
-    cash_conversion_cycle DOUBLE,            -- debtor + inventory - payable days [S23]
-    working_capital_days DOUBLE,             -- (CA - cash & bank - current investments - CL) / (sales / 365) [S23]
     vnb_margin          DOUBLE,              -- supplemental_kpis (life insurers), latest period visible at as-of
     embedded_value      DECIMAL(24,2),       -- supplemental_kpis, rupees
     ape_growth          DOUBLE,              -- supplemental_kpis
@@ -639,11 +560,6 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     contribution_margin DOUBLE,              -- supplemental_kpis
     nrr                 DOUBLE,              -- supplemental_kpis: net revenue retention
     cac_payback         DOUBLE,              -- supplemental_kpis: months
-    sales_growth_qoq_pct DOUBLE,             -- latest quarter's sales / previous quarter's - 1, same scope book
-    profit_growth_qoq_pct DOUBLE,            -- same for COALESCE(owners, PAT) per filing; NULL if the base <= 0
-    npm_pct             DOUBLE,              -- TTM owners' profit / sales_ttm (fraction)
-    interest_coverage   DOUBLE,              -- TTM (PBT + finance costs) / finance costs; NULL for lenders, insurers
-    opm_last_year_pct   DOUBLE,              -- last fiscal year's EBITDA / sales (fraction; was same quarter until 4A)
     dividend_yield_pct  DOUBLE,              -- trailing-365-day accepted cash dividends (today's share basis) / close
     dividend_payout_pct DOUBLE,              -- the same dividends per share / eps_ttm; NULL if EPS <= 0
     promoter_holding_change_qoq_pp DOUBLE,   -- Reg. 31 promoter % now minus the previous quarter end, in pp
@@ -684,6 +600,248 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     deliv_pct_avg_20d   DOUBLE,              -- mean daily delivery fraction, 20 bars
     vwap                DECIMAL(18,4),       -- today's turnover / volume (= AVG_PRICE) [P16]
     vwap_20d            DECIMAL(18,4),       -- 20-bar traded value / adjusted volume (today's share basis)
+    eps_latest_quarter                       DECIMAL(18,4),   -- filed EPS x later EPS factors
+    eps_preceding_quarter                    DECIMAL(18,4),
+    eps_preceding_year_quarter               DECIMAL(18,4),
+    eps_last_year                            DECIMAL(18,4),
+    eps_preceding_year                       DECIMAL(18,4),
+    eps_growth_3y_pct                        DOUBLE,
+    eps_growth_5y_pct                        DOUBLE,
+    eps_growth_7y_pct                        DOUBLE,
+    eps_growth_10y_pct                       DOUBLE,
+    book_value_per_share                     DECIMAL(18,4),   -- owners' equity / shares
+    is_trade_to_trade                        BOOLEAN,         -- series BE or BZ
+    book_value_preceding_year                DECIMAL(18,4),      -- owners' equity / Reg. 31 shares, both at that FY end, today's share basis
+    book_value_3y_back                       DECIMAL(18,4),      -- gated (~May 2028)
+    book_value_5y_back                       DECIMAL(18,4),
+    book_value_10y_back                      DECIMAL(18,4),
+    graham_number                            DECIMAL(18,4),      -- sqrt(22.5 x EPS TTM x book value per share)
+    shares_preceding_year                    BIGINT,             -- Reg. 31 total a year before the latest SHP, today's basis
+    shares_10y_back                          BIGINT,             -- gated (~Apr 2035)
+    price_to_fcf                             DOUBLE,             -- market cap / fcf_ttm; NULL when FCF <= 0
+    equity_fcf_yield                         DOUBLE,             -- fcf_ttm / market cap (G170, signed)
+    shareholder_yield                        DOUBLE,             -- TTM (dividends + buybacks - share issues) cash / mcap (G316)
+    buyback_yield                            DOUBLE,             -- TTM buyback cash / market cap
+    dilution_1y                              DOUBLE,             -- Reg. 31 shares now / a year earlier - 1 (today's basis)
+    dilution_5y                              DOUBLE,             -- G219: same, 5 years (gated, ~Apr 2030)
+    ev_ebitda_percentile_20q                 DOUBLE,             -- G240: rank vs the last 20 quarter-ends (C9: ~2031)
+    -- batch D (ownership / hidden gems): features_gems.py; fractions like other _pct columns
+    fii_holding_change_qoq_pct               DOUBLE,          -- Reg. 31 FII (Institutions Foreign) now - previous quarter end (fraction points)
+    dii_holding_change_qoq_pct               DOUBLE,          -- same for DII; NULL unless the two latest are adjacent quarters [SHP14]
+    inst_holding_pct                         DOUBLE,          -- FII + DII (fraction)
+    unpledged_promoter_holding_pct           DOUBLE,          -- promoter pct x (1 - pledge of promoter shares)
+    mf_holding_pct                           DOUBLE,          -- Reg. 31 mutual funds / UTI (fraction)
+    mf_holding_change_qoq_pct                DOUBLE,          -- adjacent quarters (fraction points)
+    insurance_holding_pct                    DOUBLE,          -- InsuranceCompaniesMember line item [SHP19]
+    retail_holding_pct                       DOUBLE,          -- resident individuals up to Rs 2 lakh nominal capital [SHP19]
+    num_shareholders                         BIGINT,          -- TOTAL NumberOfShareholders, latest visible pattern [SHP19]
+    num_shareholders_preceding_quarter       BIGINT,          -- adjacent previous quarter end
+    num_shareholders_change_qoq_pct          DOUBLE,          -- growth vs the preceding quarter (fraction)
+    num_shareholders_1y_back                 BIGINT,          -- pattern exactly 12 months before the latest
+    pe_core                                  DOUBLE,          -- market cap / TTM core profit after TTM tax, owners' share
+    peg                                      DOUBLE,          -- pe_core / (100 x core growth): quarter YoY, TTM YoY once 8 quarters exist
+    earnings_yield                           DOUBLE,          -- TTM EBIT / EV; NULL if EV <= 0 or lender
+    industry                                 VARCHAR,         -- Nifty 500 snapshot industry (latest on/before as-of listing the ISIN)
+    cyclical_flag                            BOOLEAN,         -- industry in the cyclical set or reference/cyclical_symbols.csv
+    under_owned                              BOOLEAN,         -- inst <= 15% and promoter >= 50% and pledge = 0
+    forensic_clean                           BOOLEAN,         -- no measured red flag (features_gems.forensic_clean)
+    pe_vs_own_5y_median                      DOUBLE,          -- PE / own 5-year median daily PE (gated, C9)
+    magic_formula_rank                       INTEGER,         -- EY rank + ROCE rank position in the gated non-financial universe (1 = best)
+    pe_core_universe_median                  DOUBLE,          -- median pe_core of the day's gated non-financial universe
+    market_cap_universe_median               DECIMAL(24,2),   -- median market cap of the same universe, rupees
+    gem_score                                DOUBLE,          -- weighted clipped z-score blend (hidden_gems.md), non-cyclical universe
+    hat_hidden_compounder                    BOOLEAN,         -- hidden_gems.md section B screen
+    hat_quality_fair_price                   BOOLEAN,
+    hat_magic_formula                        BOOLEAN,
+    hat_garp                                 BOOLEAN,
+    hat_turnaround                           BOOLEAN,
+    hat_under_owned                          BOOLEAN,
+    hat_cash_machine                         BOOLEAN,
+    hat_fallen_quality                       BOOLEAN,
+    hat_capex_pay_off                        BOOLEAN,
+    hat_cyclical                             BOOLEAN,
+    hat_lender                               BOOLEAN,
+    hats_passed                              INTEGER,         -- count of hat_* TRUE
+    -- batch H (industry / peers): features_peers.py; NSE 4-level classification [IC1-IC3], visible from its first fetch
+    nse_macro_sector                         VARCHAR,         -- NSE macro-economic sector (quote API secInfo.macro), PIT
+    nse_sector                               VARCHAR,         -- NSE sector (secInfo.sector)
+    nse_industry                             VARCHAR,         -- NSE industry (secInfo.industryInfo)
+    nse_basic_industry                       VARCHAR,         -- NSE basic industry (secInfo.basicIndustry)
+    industry_pe_median                       DOUBLE,          -- median PE (> 0) of the day's companies in nse_industry (>= 3 values)
+    industry_pb_median                       DOUBLE,          -- same for PB (> 0)
+    industry_roce_median                     DOUBLE,          -- same for ROCE (fraction)
+    industry_sales_growth_median             DOUBLE,          -- same for sales_growth_yoy (fraction)
+    basic_industry_pe_median                 DOUBLE,          -- the four medians within nse_basic_industry
+    basic_industry_pb_median                 DOUBLE,
+    basic_industry_roce_median               DOUBLE,
+    basic_industry_sales_growth_median       DOUBLE,
+    pe_premium_to_industry                   DOUBLE,          -- pe / industry_pe_median - 1 (negative = discount)
+    pb_premium_to_industry                   DOUBLE,          -- pb / industry_pb_median - 1
+    pe_premium_to_basic_industry             DOUBLE,          -- pe / basic_industry_pe_median - 1 (G199)
+    pb_premium_to_basic_industry             DOUBLE,          -- pb / basic_industry_pb_median - 1
+    peer_count                               INTEGER,         -- companies in nse_basic_industry on the day (incl. itself)
+    peer_rank_market_cap                     INTEGER,         -- 1 = largest market cap in nse_basic_industry (G112)
+    peer_rank_pe                             INTEGER,         -- 1 = lowest PE (> 0)
+    peer_rank_roce                           INTEGER,         -- 1 = highest ROCE
+    peer_rank_profit_growth                  INTEGER,         -- 1 = highest profit_growth_yoy_quarter_pct
+    industry_group_pe_median                 DOUBLE,          -- fallback: medians over the Nifty 500 file's `industry` (never mixed with NSE levels)
+    industry_group_pb_median                 DOUBLE,
+    industry_group_roce_median               DOUBLE,
+    industry_group_sales_growth_median       DOUBLE,
+    pe_premium_to_industry_group             DOUBLE,          -- pe / industry_group_pe_median - 1
+    pb_premium_to_industry_group             DOUBLE,          -- pb / industry_group_pb_median - 1
+    net_cash_to_market_cap                   DOUBLE,          -- -(net debt) / market cap (B2.17)
+    price_to_sales                           DOUBLE,          -- market cap / sales_ttm (A1.7)
+    ev_to_sales                              DOUBLE,          -- EV / sales_ttm (B5.6)
+    price_to_embedded_value                  DOUBLE,          -- market cap / embedded value KPI (G270)
+    gov_ttm                                  DECIMAL(24,2),   -- TTM gross order value KPI, rupees (12M period or 4 quarters)
+    ev_to_gov                                DOUBLE,          -- EV / gov_ttm (G265)
+    gov_growth_yoy_pct                       DOUBLE,          -- latest KPI period vs the same period a year earlier
+    arpu                                     DECIMAL(24,2),   -- KPI, rupees per user, latest period (G266)
+    arpu_growth_yoy_pct                      DOUBLE,          -- YoY, same-length period
+    mtu                                      BIGINT,          -- KPI, monthly transacting users, latest period (G266)
+    mtu_growth_yoy_pct                       DOUBLE,          -- YoY, same-length period
+    contribution_margin_change_yoy_pp        DOUBLE,          -- KPI contribution margin YoY change (G257)
+    casa_pct                                 DOUBLE,          -- banks, KPI (master backlog M4)
+    inst_shares_change_qoq                   BIGINT,          -- FII + DII shares, adjacent Reg. 31 quarters
+    volume_median_90d                        DOUBLE,          -- median daily volume, 90 calendar days
+    institutional_absorption_90d             DOUBLE,          -- inst_shares_change_qoq / volume_median_90d, days (G241)
+    promoter_pledge_change_qoq_pp            DOUBLE,          -- pledged / promoter shares QoQ (B7.4)
+    public_holders_above_1pct                INTEGER,         -- named public holders > 1%, latest Reg. 31 (B7.6)
+    litigations_90d                          INTEGER,         -- Reg. 30 LITIGATION disclosures in 90 days (B8.3)
+    allotments_90d                           INTEGER,         -- Reg. 30 ALLOTMENT records (B8.2)
+    fund_raising_events_90d                  INTEGER,         -- Reg. 30 FUND_RAISING family
+    rf_auditor_resignation_90d               BOOLEAN,         -- red flags (G117): separate columns, never summed
+    rf_kmp_resignations_90d                  BOOLEAN,         -- >= 2 KMP / director resignations in 90 days
+    rf_fraud_or_default_90d                  BOOLEAN,
+    rf_litigation_90d                        BOOLEAN,
+    rf_pledge_increase_qoq                   BOOLEAN,         -- promoter_pledge_change_qoq_pp > 0
+    pe_numerator                             DECIMAL(24,2),   -- G244 raw inputs: market cap
+    ev_ebitda_numerator                      DECIMAL(24,2),   -- EV
+    altman_z_original                        DOUBLE,          -- B1.5 original Z, manufacturers (C6 guard), MVE = market cap
+    pb_percentile                            DOUBLE,          -- B5.2 / B5.3 vs own prior quarter-ends [C20], >= 4
+    price_to_sales_percentile                DOUBLE,
+    ev_to_sales_percentile                   DOUBLE,
+    momentum_12m_1m                          DOUBLE,          -- B6.3 (1 + return_12m) / (1 + return_1m) - 1
+    volatility_1y                            DOUBLE,          -- B6.4 annualised std of 252 daily log returns
+    max_drawdown_1y                          DOUBLE,
+    high_52w_on_delivery_spike               BOOLEAN,         -- B6.11 / G283 52W high with delivery > 2x 20D median
+    pead_event_date                          DATE,            -- B6.14 / G151 latest results broadcast (IST)
+    pead_ar_t0                               DOUBLE,          -- stock - Nifty 500 return since the pre-results close
+    pead_ar_t1                               DOUBLE,
+    pead_ar_t5                               DOUBLE,
+    pead_ar_t20                              DOUBLE,
+    pead_relvol_t0                           DOUBLE,          -- volume / mean of the 20 bars before T+0
+    pead_relvol_t1                           DOUBLE,
+    pead_relvol_t5                           DOUBLE,
+    pead_relvol_t20                          DOUBLE,
+    nifty500_inclusion_90d                   BOOLEAN,         -- B8.4 NULL until stored history covers 90 days
+    nifty500_exclusion_90d                   BOOLEAN,
+    days_to_next_ex_date                     INTEGER,         -- B8.5 announced (visible) actions only
+    next_ex_date_action                      VARCHAR,
+    dividend_365d                            BOOLEAN,         -- NULL while the window starts before C9
+    bonus_365d                               BOOLEAN,
+    split_365d                               BOOLEAN,
+    rs_rank_12m_1m                           DOUBLE,          -- cross-section (refresh step): 1 = strongest
+    industry_earnings_breadth                DOUBLE,          -- B4.9 / G205 share of NSE industry with core profit YoY > 0
+    industry_earnings_breadth_n              INTEGER,         -- companies measured (latest quarter of the industry)
+    PRIMARY KEY (as_of_date, security_id)
+);
+
+CREATE TABLE IF NOT EXISTS features_events (
+    security_id         VARCHAR NOT NULL,
+    valid_from_date     DATE    NOT NULL,    -- first materialised day with these values
+    valid_to_date       DATE,                -- exclusive; NULL = open (still current)
+    sales_ttm           DECIMAL(24,2),
+    ebitda_ttm          DECIMAL(24,2),
+    pat_ttm             DECIMAL(24,2),
+    fcf_ttm             DECIMAL(24,2),
+    net_debt            DECIMAL(24,2),
+    total_equity        DECIMAL(24,2),
+    opm                 DOUBLE,
+    sales_growth_yoy    DOUBLE,
+    profit_growth_yoy   DOUBLE,
+    roe                 DOUBLE,
+    roce                DOUBLE,
+    roic                DOUBLE,
+    croic               DOUBLE,
+    debt_to_equity      DOUBLE,
+    other_income_to_pbt DOUBLE,
+    altman_z_dd         DOUBLE,              -- X2 uses OtherEquity as retained-earnings proxy
+    piotroski_f         INTEGER,             -- 0..9, year-end-assets variant; NULL without two FYs [C23]
+    beneish_m           DOUBLE,              -- 8-variable M-score; NULL without two FYs [C23]
+    scope_used          VARCHAR,
+    fundamentals_end    DATE,                -- quarter end of the TTM window
+    bs_as_of            DATE,
+    cf_as_of            DATE,
+    roe_continuing      DOUBLE,              -- same denominator as roe [C14]
+    core_profit_ttm     DECIMAL(24,2),       -- continuing owners' profit less exceptional items net of tax [C14]
+    is_lending_nbfc     BOOLEAN,             -- INDAS_NBFC only [C13]; NULL for other profiles
+    nii_ttm             DECIMAL(24,2),       -- lenders: interest earned - finance costs
+    ppop_ttm            DECIMAL(24,2),       -- lenders: pre-provision operating profit
+    cost_to_income      DOUBLE,
+    credit_cost         DOUBLE,              -- TTM impairment / avg loans (opening + closing)
+    nim_asset_proxy     DOUBLE,              -- TTM NII / avg total assets
+    roa                 DOUBLE,              -- TTM owners' profit / avg total assets (lenders)
+    loans               DECIMAL(24,2),
+    loans_as_of         DATE,
+    loans_avg_from      DATE,                -- opening balance-sheet date of the average
+    gnpa_pct            DOUBLE,              -- NULL for NBFCs: no taxonomy element [X54]
+    nnpa_pct            DOUBLE,
+    pcr                 DOUBLE,
+    credit_to_deposit   DOUBLE,              -- banks: advances / deposits (latest balance sheet)
+    cet1_pct            DOUBLE,              -- banks: filed CET1 ratio (standalone)
+    at1_pct             DOUBLE,              -- banks: filed AT1 ratio (standalone)
+    roa_filed           DOUBLE,              -- banks: filed ReturnOnAssets, annualisation varies by bank [X59]
+    govt_holding_pct    DOUBLE,              -- banks: PercentageOfShareHeldByGovernmentOfIndia (PSU marker)
+    insurer_basis       VARCHAR,             -- IRDAI_LIFE | IRDAI_GENERAL | INDAS117 (ratios not comparable across) [X64]
+    net_premium_earned_ttm DECIMAL(24,2),    -- IRDAI general: PremiumEarned; life: NetPremiumIncome
+    insurance_revenue_ttm  DECIMAL(24,2),    -- Ind AS 117 insurers only
+    claims_ratio        DOUBLE,              -- general / Ind AS 117 insurers (definitions in §10.6)
+    expense_ratio       DOUBLE,
+    combined_ratio      DOUBLE,
+    solvency_ratio      DOUBLE,              -- times, after SOLVENCY_PERCENT_SCALING [X65]; NULL for Ind AS 117 filers
+    investment_income_ttm DECIMAL(24,2),
+    scope_reason        VARCHAR,             -- DEFAULT | FALLBACK_DEFAULT_INCOMPLETE | OVERRIDE | YTD_BRIDGE | BALANCE_SHEET_ONLY
+    restatement_suspected BOOLEAN,           -- X106: a restated quarter inside the TTM window; TTM uses the YTD bridge
+    default_quarterly_scope VARCHAR,         -- company default for quarterly / TTM figures [C18]
+    default_annual_scope    VARCHAR,         -- company default for annual statements [C18]
+    sloan_accrual       DOUBLE,              -- (TTM PAT - CFO - CFI) / avg total assets [C19]
+    cfo_to_ebitda       DOUBLE,
+    fcf_to_pat          DOUBLE,
+    working_capital_intensity DOUBLE,        -- (receivables + inventory - payables) / TTM revenue
+    receivables_sales_divergence DOUBLE,     -- receivables YoY - revenue YoY (needs 8 quarters)
+    net_debt_to_fcf     DOUBLE,
+    cost_of_debt        DOUBLE,              -- TTM finance costs / avg (borrowings + leases)
+    dol                 DOUBLE,              -- EBIT YoY / revenue YoY, only if |revenue YoY| >= 5% (needs 8 quarters)
+    gross_ebitda_spread DOUBLE,              -- (gross profit - EBITDA) / revenue; COGS >= 10% guard (C6)
+    valuation_archetype VARCHAR,             -- INDUSTRIAL_SERVICES | FINANCIAL_LENDING | INSURANCE | NEW_GEN_TECH [C21]
+    rule_of_40          DOUBLE,              -- revenue YoY + EBITDA margin (needs 8 quarters)
+    billings_growth_pct DOUBLE,              -- billings YoY (needs 8 quarters and labelled contract liabilities)
+    neg_working_capital_float_pct DOUBLE,    -- ((payables + contract liabilities) - (receivables + inventory)) / revenue
+    net_burn_multiple   DOUBLE,              -- cash burn / incremental revenue, only when FCF < 0 (needs 8 quarters)
+    cash_runway_months  DOUBLE,              -- liquid cash / monthly burn, only when FCF < 0
+    esop_adj_fcf        DECIMAL(24,2),       -- FCF - ESOP cost
+    liquid_cash         DECIMAL(24,2),       -- cash + other bank balances + current investments
+    capex_to_depreciation DOUBLE,            -- FY (PPE + intangibles capex) / D&A [C23]
+    cwip_to_gross_block DOUBLE,              -- CWIP / gross block (Reg. 34 PPE schedule) [X71]
+    rote                DOUBLE,              -- FY owners' PAT / (owners' equity - goodwill - other intangibles)
+    rnd_and_royalty_intensity DOUBLE,        -- (R&D + royalty) / revenue; NULL when neither is disclosed [X73]
+    contingent_liabilities_to_net_worth DOUBLE, -- contingent liabilities / owners' equity [X73]
+    annual_fy_end       DATE,                -- fiscal year the annual ratios (incl. Piotroski/Beneish) use
+    roce_screener       DOUBLE,              -- Screener export: (PBT + Interest) x 2 / (opening + closing capital) [S22]
+    debtor_days         DOUBLE,              -- Screener export: closing debtors / (sales / 365) [S22]
+    inventory_turnover  DOUBLE,              -- Screener export: sales / closing inventory [S22]
+    working_capital     DECIMAL(24,2),       -- Screener export: Other Assets - Other Liabilities (rupees) [S22]
+    inventory_days      DOUBLE,              -- closing inventory / (COGS / 365); NULL if COGS < 1% of sales [S23]
+    days_payable        DOUBLE,              -- closing trade payables / (COGS / 365) [S23]
+    cash_conversion_cycle DOUBLE,            -- debtor + inventory - payable days [S23]
+    working_capital_days DOUBLE,             -- (CA - cash & bank - current investments - CL) / (sales / 365) [S23]
+    sales_growth_qoq_pct DOUBLE,             -- latest quarter's sales / previous quarter's - 1, same scope book
+    profit_growth_qoq_pct DOUBLE,            -- same for COALESCE(owners, PAT) per filing; NULL if the base <= 0
+    npm_pct             DOUBLE,              -- TTM owners' profit / sales_ttm (fraction)
+    interest_coverage   DOUBLE,              -- TTM (PBT + finance costs) / finance costs; NULL for lenders, insurers
+    opm_last_year_pct   DOUBLE,              -- last fiscal year's EBITDA / sales (fraction; was same quarter until 4A)
     -- batch A (P&L family)
     sales_latest_quarter                     DECIMAL(24,2),   -- quarter lines, rupees (features_pl)
     sales_preceding_quarter                  DECIMAL(24,2),
@@ -751,11 +909,6 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     avg_earnings_10y                         DECIMAL(24,2),
     avg_ebit_5y                              DECIMAL(24,2),
     avg_ebit_10y                             DECIMAL(24,2),
-    eps_latest_quarter                       DECIMAL(18,4),   -- filed EPS x later EPS factors
-    eps_preceding_quarter                    DECIMAL(18,4),
-    eps_preceding_year_quarter               DECIMAL(18,4),
-    eps_last_year                            DECIMAL(18,4),
-    eps_preceding_year                       DECIMAL(18,4),
     equity_capital_latest_quarter            DECIMAL(24,2),   -- paid-up, results filing
     equity_capital_preceding_quarter         DECIMAL(24,2),
     equity_capital_preceding_year_quarter    DECIMAL(24,2),
@@ -785,18 +938,12 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     operating_profit_growth_5y_pct           DOUBLE,
     operating_profit_growth_7y_pct           DOUBLE,
     operating_profit_growth_10y_pct          DOUBLE,
-    eps_growth_3y_pct                        DOUBLE,
-    eps_growth_5y_pct                        DOUBLE,
-    eps_growth_7y_pct                        DOUBLE,
-    eps_growth_10y_pct                       DOUBLE,
     sales_growth_median_5y_pct               DOUBLE,          -- median yearly FY growth (gated)
     sales_growth_median_10y_pct              DOUBLE,
     opm_5y_pct                               DOUBLE,          -- mean FY OPM over 5 / 10 FYs (gated)
     opm_10y_pct                              DOUBLE,
     last_result_date                         DATE,            -- IST, latest quarter first visible
     last_annual_result_date                  DATE,            -- IST, latest FY first visible
-    book_value_per_share                     DECIMAL(18,4),   -- owners' equity / shares
-    is_trade_to_trade                        BOOLEAN,         -- series BE or BZ
     opm_preceding_year_quarter_pct           DOUBLE,          -- same quarter last year (fraction)
     -- batch C (balance sheet / cash flow): features_bs.py; money in rupees, ratios as fractions, days in days;
     -- unsuffixed BS lines = latest BS, 'preceding year' / 'N years back' = FY ends; NULL for lenders where noted
@@ -865,13 +1012,6 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     cfi_7y                                   DECIMAL(24,2),
     cfi_10y                                  DECIMAL(24,2),
     face_value                               DECIMAL(18,4),      -- INR per share, latest results filing
-    book_value_preceding_year                DECIMAL(18,4),      -- owners' equity / Reg. 31 shares, both at that FY end, today's share basis
-    book_value_3y_back                       DECIMAL(18,4),      -- gated (~May 2028)
-    book_value_5y_back                       DECIMAL(18,4),
-    book_value_10y_back                      DECIMAL(18,4),
-    graham_number                            DECIMAL(18,4),      -- sqrt(22.5 x EPS TTM x book value per share)
-    shares_preceding_year                    BIGINT,             -- Reg. 31 total a year before the latest SHP, today's basis
-    shares_10y_back                          BIGINT,             -- gated (~Apr 2035)
     current_ratio                            DOUBLE,             -- current assets / current liabilities (latest BS)
     quick_ratio                              DOUBLE,             -- (current assets - inventory) / current liabilities
     net_debt_to_equity                       DOUBLE,             -- net_debt / total equity
@@ -899,97 +1039,25 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     fcf_conversion_3y                        DOUBLE,             -- 3-FY FCF / 3-FY owners' profit (G224, gated)
     cfo_to_ebitda_3y                         DOUBLE,             -- 3-FY CFO / 3-FY EBITDA (G223, gated)
     net_debt_to_fcf_3y                       DOUBLE,             -- net_debt / mean 3-FY FCF > 0 (G233, gated)
-    price_to_fcf                             DOUBLE,             -- market cap / fcf_ttm; NULL when FCF <= 0
-    equity_fcf_yield                         DOUBLE,             -- fcf_ttm / market cap (G170, signed)
-    shareholder_yield                        DOUBLE,             -- TTM (dividends + buybacks - share issues) cash / mcap (G316)
-    buyback_yield                            DOUBLE,             -- TTM buyback cash / market cap
-    dilution_1y                              DOUBLE,             -- Reg. 31 shares now / a year earlier - 1 (today's basis)
-    dilution_5y                              DOUBLE,             -- G219: same, 5 years (gated, ~Apr 2030)
     reinvestment_rate                        DOUBLE,             -- FY (capex - D&A + change in non-cash WC) / NOPAT (G216)
     incremental_roic_1y                      DOUBLE,             -- FY change in NOPAT / change in invested capital
     incremental_roic_3y                      DOUBLE,             -- G215, gated (~May 2028)
     incremental_roic_5y                      DOUBLE,             -- G215, gated (~May 2030)
     net_debt_to_ebitda                       DOUBLE,             -- net_debt / ebitda_ttm (> 0)
-    ev_ebitda_percentile_20q                 DOUBLE,             -- G240: rank vs the last 20 quarter-ends (C9: ~2031)
-    -- batch D (ownership / hidden gems): features_gems.py; fractions like other _pct columns
-    fii_holding_change_qoq_pct               DOUBLE,          -- Reg. 31 FII (Institutions Foreign) now - previous quarter end (fraction points)
-    dii_holding_change_qoq_pct               DOUBLE,          -- same for DII; NULL unless the two latest are adjacent quarters [SHP14]
-    inst_holding_pct                         DOUBLE,          -- FII + DII (fraction)
-    unpledged_promoter_holding_pct           DOUBLE,          -- promoter pct x (1 - pledge of promoter shares)
-    mf_holding_pct                           DOUBLE,          -- Reg. 31 mutual funds / UTI (fraction)
-    mf_holding_change_qoq_pct                DOUBLE,          -- adjacent quarters (fraction points)
-    insurance_holding_pct                    DOUBLE,          -- InsuranceCompaniesMember line item [SHP19]
-    retail_holding_pct                       DOUBLE,          -- resident individuals up to Rs 2 lakh nominal capital [SHP19]
-    num_shareholders                         BIGINT,          -- TOTAL NumberOfShareholders, latest visible pattern [SHP19]
-    num_shareholders_preceding_quarter       BIGINT,          -- adjacent previous quarter end
-    num_shareholders_change_qoq_pct          DOUBLE,          -- growth vs the preceding quarter (fraction)
-    num_shareholders_1y_back                 BIGINT,          -- pattern exactly 12 months before the latest
     sales_growth_yoy_preceding_quarter_pct   DOUBLE,          -- preceding quarter vs the same quarter a year earlier
     profit_growth_yoy_preceding_quarter_pct  DOUBLE,          -- same for owners' profit; NULL if the base <= 0
     core_profit_latest_quarter               DECIMAL(24,2),   -- PBT - other income - exceptional items, rupees
     core_profit_yoy_latest_q                 DOUBLE,          -- core profit YoY, latest quarter; NULL if the base <= 0 or lender
     core_profit_yoy_preceding_q              DOUBLE,          -- same, preceding quarter
     other_income_lift_pp                     DOUBLE,          -- profit YoY - core profit YoY, latest quarter (fraction points)
-    pe_core                                  DOUBLE,          -- market cap / TTM core profit after TTM tax, owners' share
     growth_sustained                         BOOLEAN,         -- sales YoY >= 12% in both latest and preceding quarter
     growth_acceleration_pp                   DOUBLE,          -- sales YoY latest - preceding quarter (fraction points)
     opm_change_yoy_pp                        DOUBLE,          -- quarter OPM - same quarter last year (fraction points)
     operating_leverage                       DOUBLE,          -- core profit YoY / sales YoY, latest quarter; NULL if sales YoY <= 0
-    peg                                      DOUBLE,          -- pe_core / (100 x core growth): quarter YoY, TTM YoY once 8 quarters exist
-    earnings_yield                           DOUBLE,          -- TTM EBIT / EV; NULL if EV <= 0 or lender
-    industry                                 VARCHAR,         -- Nifty 500 snapshot industry (latest on/before as-of listing the ISIN)
-    cyclical_flag                            BOOLEAN,         -- industry in the cyclical set or reference/cyclical_symbols.csv
-    under_owned                              BOOLEAN,         -- inst <= 15% and promoter >= 50% and pledge = 0
-    forensic_clean                           BOOLEAN,         -- no measured red flag (features_gems.forensic_clean)
     cash_conversion_ok                       BOOLEAN,         -- CFO / EBITDA >= 0.7
     capex_pay_off_signal                     BOOLEAN,         -- CWIP / gross block >= 25% and capex / D&A >= 2 and D/E <= 1
     roce_stability_5y                        DOUBLE,          -- 1 - std / mean of 5 FY ROCE (gated, C9)
     opm_stability_5y                         DOUBLE,          -- 1 - std / mean of 5 FY OPM (gated, C9)
-    pe_vs_own_5y_median                      DOUBLE,          -- PE / own 5-year median daily PE (gated, C9)
-    magic_formula_rank                       INTEGER,         -- EY rank + ROCE rank position in the gated non-financial universe (1 = best)
-    pe_core_universe_median                  DOUBLE,          -- median pe_core of the day's gated non-financial universe
-    market_cap_universe_median               DECIMAL(24,2),   -- median market cap of the same universe, rupees
-    gem_score                                DOUBLE,          -- weighted clipped z-score blend (hidden_gems.md), non-cyclical universe
-    hat_hidden_compounder                    BOOLEAN,         -- hidden_gems.md section B screen
-    hat_quality_fair_price                   BOOLEAN,
-    hat_magic_formula                        BOOLEAN,
-    hat_garp                                 BOOLEAN,
-    hat_turnaround                           BOOLEAN,
-    hat_under_owned                          BOOLEAN,
-    hat_cash_machine                         BOOLEAN,
-    hat_fallen_quality                       BOOLEAN,
-    hat_capex_pay_off                        BOOLEAN,
-    hat_cyclical                             BOOLEAN,
-    hat_lender                               BOOLEAN,
-    hats_passed                              INTEGER,         -- count of hat_* TRUE
-    -- batch H (industry / peers): features_peers.py; NSE 4-level classification [IC1-IC3], visible from its first fetch
-    nse_macro_sector                         VARCHAR,         -- NSE macro-economic sector (quote API secInfo.macro), PIT
-    nse_sector                               VARCHAR,         -- NSE sector (secInfo.sector)
-    nse_industry                             VARCHAR,         -- NSE industry (secInfo.industryInfo)
-    nse_basic_industry                       VARCHAR,         -- NSE basic industry (secInfo.basicIndustry)
-    industry_pe_median                       DOUBLE,          -- median PE (> 0) of the day's companies in nse_industry (>= 3 values)
-    industry_pb_median                       DOUBLE,          -- same for PB (> 0)
-    industry_roce_median                     DOUBLE,          -- same for ROCE (fraction)
-    industry_sales_growth_median             DOUBLE,          -- same for sales_growth_yoy (fraction)
-    basic_industry_pe_median                 DOUBLE,          -- the four medians within nse_basic_industry
-    basic_industry_pb_median                 DOUBLE,
-    basic_industry_roce_median               DOUBLE,
-    basic_industry_sales_growth_median       DOUBLE,
-    pe_premium_to_industry                   DOUBLE,          -- pe / industry_pe_median - 1 (negative = discount)
-    pb_premium_to_industry                   DOUBLE,          -- pb / industry_pb_median - 1
-    pe_premium_to_basic_industry             DOUBLE,          -- pe / basic_industry_pe_median - 1 (G199)
-    pb_premium_to_basic_industry             DOUBLE,          -- pb / basic_industry_pb_median - 1
-    peer_count                               INTEGER,         -- companies in nse_basic_industry on the day (incl. itself)
-    peer_rank_market_cap                     INTEGER,         -- 1 = largest market cap in nse_basic_industry (G112)
-    peer_rank_pe                             INTEGER,         -- 1 = lowest PE (> 0)
-    peer_rank_roce                           INTEGER,         -- 1 = highest ROCE
-    peer_rank_profit_growth                  INTEGER,         -- 1 = highest profit_growth_yoy_quarter_pct
-    industry_group_pe_median                 DOUBLE,          -- fallback: medians over the Nifty 500 file's `industry` (never mixed with NSE levels)
-    industry_group_pb_median                 DOUBLE,
-    industry_group_roce_median               DOUBLE,
-    industry_group_sales_growth_median       DOUBLE,
-    pe_premium_to_industry_group             DOUBLE,          -- pe / industry_group_pe_median - 1
-    pb_premium_to_industry_group             DOUBLE,          -- pb / industry_group_pb_median - 1
     -- batch G (remaining Phase 2 ratios): features_extra.py; fractions like other _pct columns, money in rupees
     opm_acceleration_pp                      DOUBLE,          -- [OPM(Q) - OPM(Q-4)] - [OPM(Q-1) - OPM(Q-5)] (G152)
     gpm_change_yoy_pp                        DOUBLE,          -- quarter GPM - same quarter last year, C6 guard (G257)
@@ -1032,7 +1100,6 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     exceptional_to_pbt                       DOUBLE,          -- TTM exceptional items / PBT (B1.14)
     exceptional_quarters_4q                  INTEGER,         -- last 4 quarters with exceptional items != 0
     capex_intensity                          DOUBLE,          -- capex / sales, cash-flow window (B2.11)
-    net_cash_to_market_cap                   DOUBLE,          -- -(net debt) / market cap (B2.17)
     rpt_to_sales                             DOUBLE,          -- RPT total / sales of the same period (B1.19; G236 split blocked)
     intangibles_to_equity                    DOUBLE,          -- (goodwill + other intangibles) / owners' equity (B1.23)
     audit_fees_to_sales                      DOUBLE,          -- Reg. 34 last FY (B1.20)
@@ -1041,39 +1108,12 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     unquoted_investments                     DECIMAL(24,2),   -- book value, non-current + current, last FY end (A6.12)
     quoted_investments_market_value          DECIMAL(24,2),   -- market value, non-current + current (A6.13)
     revaluation_reserve                      DECIMAL(24,2),   -- PPE revaluation surplus (A6.14)
-    price_to_sales                           DOUBLE,          -- market cap / sales_ttm (A1.7)
-    ev_to_sales                              DOUBLE,          -- EV / sales_ttm (B5.6)
-    price_to_embedded_value                  DOUBLE,          -- market cap / embedded value KPI (G270)
-    gov_ttm                                  DECIMAL(24,2),   -- TTM gross order value KPI, rupees (12M period or 4 quarters)
-    ev_to_gov                                DOUBLE,          -- EV / gov_ttm (G265)
-    gov_growth_yoy_pct                       DOUBLE,          -- latest KPI period vs the same period a year earlier
-    arpu                                     DECIMAL(24,2),   -- KPI, rupees per user, latest period (G266)
-    arpu_growth_yoy_pct                      DOUBLE,          -- YoY, same-length period
-    mtu                                      BIGINT,          -- KPI, monthly transacting users, latest period (G266)
-    mtu_growth_yoy_pct                       DOUBLE,          -- YoY, same-length period
-    contribution_margin_change_yoy_pp        DOUBLE,          -- KPI contribution margin YoY change (G257)
-    casa_pct                                 DOUBLE,          -- banks, KPI (master backlog M4)
-    inst_shares_change_qoq                   BIGINT,          -- FII + DII shares, adjacent Reg. 31 quarters
-    volume_median_90d                        DOUBLE,          -- median daily volume, 90 calendar days
-    institutional_absorption_90d             DOUBLE,          -- inst_shares_change_qoq / volume_median_90d, days (G241)
-    promoter_pledge_change_qoq_pp            DOUBLE,          -- pledged / promoter shares QoQ (B7.4)
-    public_holders_above_1pct                INTEGER,         -- named public holders > 1%, latest Reg. 31 (B7.6)
-    litigations_90d                          INTEGER,         -- Reg. 30 LITIGATION disclosures in 90 days (B8.3)
-    allotments_90d                           INTEGER,         -- Reg. 30 ALLOTMENT records (B8.2)
-    fund_raising_events_90d                  INTEGER,         -- Reg. 30 FUND_RAISING family
-    rf_auditor_resignation_90d               BOOLEAN,         -- red flags (G117): separate columns, never summed
-    rf_kmp_resignations_90d                  BOOLEAN,         -- >= 2 KMP / director resignations in 90 days
-    rf_fraud_or_default_90d                  BOOLEAN,
-    rf_litigation_90d                        BOOLEAN,
     rf_audit_qualified                       BOOLEAN,         -- qualified Reg. 34 report or IF qualification statement [E8] (B1.16)
-    rf_pledge_increase_qoq                   BOOLEAN,         -- promoter_pledge_change_qoq_pp > 0
-    pe_numerator                             DECIMAL(24,2),   -- G244 raw inputs: market cap
     pe_denominator                           DECIMAL(24,2),   -- continuing owners' TTM profit
     roe_numerator                            DECIMAL(24,2),   -- owners' TTM profit
     roe_denominator                          DECIMAL(24,2),   -- owners' equity
     roce_numerator                           DECIMAL(24,2),   -- TTM EBIT
     roce_denominator                         DECIMAL(24,2),   -- total equity + debt
-    ev_ebitda_numerator                      DECIMAL(24,2),   -- EV
     ev_ebitda_denominator                    DECIMAL(24,2),   -- TTM EBITDA
     opm_numerator                            DECIMAL(24,2),   -- TTM EBITDA
     opm_denominator                          DECIMAL(24,2),   -- sales_ttm
@@ -1095,7 +1135,6 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     piotroski_no_dilution                    BOOLEAN,
     piotroski_gross_margin_up                BOOLEAN,
     piotroski_asset_turnover_up              BOOLEAN,
-    altman_z_original                        DOUBLE,          -- B1.5 original Z, manufacturers (C6 guard), MVE = market cap
     bs_accruals                              DOUBLE,          -- B1.7 change in NOA / avg total assets, last FY
     depreciation_rate                        DOUBLE,          -- B2.12 FY D&A / avg gross block (Reg. 34)
     asset_age_proxy                          DOUBLE,          -- B2.12 accumulated depreciation / gross block
@@ -1106,38 +1145,12 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     inventory_days_h1                        DOUBLE,
     debtor_days_h1_change_yoy                DOUBLE,
     inventory_days_h1_change_yoy             DOUBLE,
-    pb_percentile                            DOUBLE,          -- B5.2 / B5.3 vs own prior quarter-ends [C20], >= 4
-    price_to_sales_percentile                DOUBLE,
-    ev_to_sales_percentile                   DOUBLE,
-    momentum_12m_1m                          DOUBLE,          -- B6.3 (1 + return_12m) / (1 + return_1m) - 1
-    volatility_1y                            DOUBLE,          -- B6.4 annualised std of 252 daily log returns
-    max_drawdown_1y                          DOUBLE,
-    high_52w_on_delivery_spike               BOOLEAN,         -- B6.11 / G283 52W high with delivery > 2x 20D median
-    pead_event_date                          DATE,            -- B6.14 / G151 latest results broadcast (IST)
-    pead_ar_t0                               DOUBLE,          -- stock - Nifty 500 return since the pre-results close
-    pead_ar_t1                               DOUBLE,
-    pead_ar_t5                               DOUBLE,
-    pead_ar_t20                              DOUBLE,
-    pead_relvol_t0                           DOUBLE,          -- volume / mean of the 20 bars before T+0
-    pead_relvol_t1                           DOUBLE,
-    pead_relvol_t5                           DOUBLE,
-    pead_relvol_t20                          DOUBLE,
-    nifty500_inclusion_90d                   BOOLEAN,         -- B8.4 NULL until stored history covers 90 days
-    nifty500_exclusion_90d                   BOOLEAN,
-    days_to_next_ex_date                     INTEGER,         -- B8.5 announced (visible) actions only
-    next_ex_date_action                      VARCHAR,
-    dividend_365d                            BOOLEAN,         -- NULL while the window starts before C9
-    bonus_365d                               BOOLEAN,
-    split_365d                               BOOLEAN,
     segment_period_end                       DATE,            -- B9.1 / B9.2 BUSINESS SEGMENT members, row scope
     segment_count                            INTEGER,
     largest_segment_revenue_share            DOUBLE,
     fastest_growing_segment                  VARCHAR,
     fastest_growing_segment_growth_yoy       DOUBLE,
     largest_segment_margin_change_yoy_pp     DOUBLE,
-    rs_rank_12m_1m                           DOUBLE,          -- cross-section (refresh step): 1 = strongest
-    industry_earnings_breadth                DOUBLE,          -- B4.9 / G205 share of NSE industry with core profit YoY > 0
-    industry_earnings_breadth_n              INTEGER,         -- companies measured (latest quarter of the industry)
     -- batch J (related-party leak, G236): features_rpt.py; last FY related-party schedule (Reg. 34) [X113]
     rpt_fy_end                               DATE,            -- FY end of the schedule used (row scope, else the other)
     rpt_counterparties                       INTEGER,         -- outside the group, non-zero FY transactions
@@ -1145,7 +1158,7 @@ CREATE TABLE IF NOT EXISTS screener_features_history (
     rpt_purchases_to_sales                   DOUBLE,
     rpt_royalty_to_sales                     DOUBLE,
     rpt_loans_given_to_net_worth             DOUBLE,          -- loans given / total equity at the FY end
-    PRIMARY KEY (as_of_date, security_id)
+    PRIMARY KEY (security_id, valid_from_date)
 );
 
 CREATE TABLE IF NOT EXISTS screener_features (
@@ -2048,6 +2061,122 @@ CREATE TABLE IF NOT EXISTS reg23_related_party_transactions (
 -- Everything below VIEWS_MARKER runs after the column upgrade (db.apply_schema), so a view may name columns that an
 -- existing database gains in the same run. Views hold no data; CREATE OR REPLACE keeps them at this definition.
 -- views (after column upgrade)
+
+-- screener_features_history (architecture §4.1): one row per security and materialised day, the exact columns (names,
+-- order, types) of screener_features. Every daily row lies in exactly one interval of its security (features_store).
+CREATE OR REPLACE VIEW screener_features_history AS
+SELECT d.as_of_date, d.security_id, d.entity_id, d.symbol, d.series, d.price_date,
+       d.close, d.shares, d.shares_source, d.market_cap, d.enterprise_value, e.sales_ttm,
+       e.ebitda_ttm, e.pat_ttm, e.fcf_ttm, e.net_debt, e.total_equity, d.pe,
+       d.pb, d.ev_ebitda, e.opm, e.sales_growth_yoy, e.profit_growth_yoy, e.roe,
+       e.roce, e.roic, e.croic, e.debt_to_equity, d.fcff_yield, e.other_income_to_pbt,
+       e.altman_z_dd, e.piotroski_f, e.beneish_m, d.return_1m, d.return_3m, d.return_6m,
+       d.return_12m, d.price_to_dma50, d.price_to_dma200, d.dist_52w_high, d.deliv_avg_5d, d.deliv_avg_20d,
+       d.delivery_velocity, d.float_turnover_pct, d.promoter_pct, d.fii_pct, d.dii_pct, e.scope_used,
+       e.fundamentals_end, e.bs_as_of, e.cf_as_of, d.shp_as_of, d.in_nifty500, d.eps_ttm,
+       d.eps_continuing_ttm, e.roe_continuing, e.core_profit_ttm, e.is_lending_nbfc, e.nii_ttm, e.ppop_ttm,
+       e.cost_to_income, e.credit_cost, e.nim_asset_proxy, e.roa, e.loans, e.loans_as_of,
+       e.loans_avg_from, e.gnpa_pct, e.nnpa_pct, e.pcr, e.credit_to_deposit, e.cet1_pct,
+       e.at1_pct, e.roa_filed, e.govt_holding_pct, e.insurer_basis, e.net_premium_earned_ttm, e.insurance_revenue_ttm,
+       e.claims_ratio, e.expense_ratio, e.combined_ratio, e.solvency_ratio, e.investment_income_ttm, d.persistency_13m,
+       d.persistency_61m, e.scope_reason, e.restatement_suspected, e.default_quarterly_scope, e.default_annual_scope, e.sloan_accrual,
+       e.cfo_to_ebitda, e.fcf_to_pat, e.working_capital_intensity, e.receivables_sales_divergence, e.net_debt_to_fcf, e.cost_of_debt,
+       e.dol, e.gross_ebitda_spread, d.reverse_dcf_implied_g, d.reverse_dcf_wacc_used, d.reverse_dcf_terminal_g, d.pe_percentile,
+       d.ev_ebitda_percentile, e.valuation_archetype, d.ev_to_gross_profit, d.ex_cash_pe, d.ev_to_billings, d.ev_to_esop_adj_ebitda,
+       d.price_to_cfo, e.rule_of_40, e.billings_growth_pct, e.neg_working_capital_float_pct, e.net_burn_multiple, e.cash_runway_months,
+       e.esop_adj_fcf, e.liquid_cash, d.promoter_holding_pct, d.promoter_pledge_pct, d.promoter_encumbered_pct, d.fii_holding_pct,
+       d.fpi_holding_pct, d.dii_holding_pct, d.public_holding_pct, d.non_promoter_non_public_pct, d.fii_dii_qoq_change_pct, e.capex_to_depreciation,
+       e.cwip_to_gross_block, e.rote, e.rnd_and_royalty_intensity, e.contingent_liabilities_to_net_worth, e.annual_fy_end, d.order_wins_90d,
+       d.order_value_90d, d.kmp_resignations_90d, d.auditor_resignations_90d, d.fraud_or_default_90d, d.penalties_90d, e.roce_screener,
+       e.debtor_days, e.inventory_turnover, e.working_capital, e.inventory_days, e.days_payable, e.cash_conversion_cycle,
+       e.working_capital_days, d.vnb_margin, d.embedded_value, d.ape_growth, d.gov, d.take_rate,
+       d.contribution_margin, d.nrr, d.cac_payback, e.sales_growth_qoq_pct, e.profit_growth_qoq_pct, e.npm_pct,
+       e.interest_coverage, e.opm_last_year_pct, d.dividend_yield_pct, d.dividend_payout_pct, d.promoter_holding_change_qoq_pp, d.return_1d,
+       d.return_1w, d.return_3y, d.return_5y, d.return_7y, d.return_10y, d.volume,
+       d.volume_1w_avg, d.volume_1m_avg, d.volume_1y_avg, d.high_52w, d.low_52w, d.dist_52w_low,
+       d.high_since_data_start, d.low_since_data_start, d.dma50, d.dma200, d.dma50_prev, d.dma200_prev,
+       d.rsi_14, d.rsi_14_prev, d.macd, d.macd_signal, d.macd_prev, d.macd_signal_prev,
+       d.atr_14_pct, d.rs_nifty500_3m, d.rs_nifty500_6m, d.rs_nifty500_12m, d.beta_1y_nifty500, d.turnover_median_20d,
+       d.deliv_pct, d.deliv_pct_avg_20d, d.vwap, d.vwap_20d, e.sales_latest_quarter, e.sales_preceding_quarter,
+       e.sales_preceding_year_quarter, e.operating_profit_latest_quarter, e.operating_profit_preceding_quarter, e.operating_profit_preceding_year_quarter, e.other_income_latest_quarter, e.other_income_preceding_quarter,
+       e.other_income_preceding_year_quarter, e.depreciation_latest_quarter, e.depreciation_preceding_quarter, e.depreciation_preceding_year_quarter, e.ebit_latest_quarter, e.ebit_preceding_quarter,
+       e.ebit_preceding_year_quarter, e.interest_latest_quarter, e.interest_preceding_quarter, e.interest_preceding_year_quarter, e.pbt_latest_quarter, e.pbt_preceding_quarter,
+       e.pbt_preceding_year_quarter, e.tax_latest_quarter, e.tax_preceding_quarter, e.tax_preceding_year_quarter, e.pat_latest_quarter, e.pat_preceding_quarter,
+       e.pat_preceding_year_quarter, e.net_profit_latest_quarter, e.net_profit_preceding_quarter, e.net_profit_preceding_year_quarter, e.exceptional_items_latest_quarter, e.exceptional_items_preceding_quarter,
+       e.exceptional_items_preceding_year_quarter, e.sales_2quarters_back, e.sales_3quarters_back, e.operating_profit_2quarters_back, e.operating_profit_3quarters_back, e.net_profit_2quarters_back,
+       e.net_profit_3quarters_back, e.sales_last_year, e.sales_preceding_year, e.operating_profit_last_year, e.operating_profit_preceding_year, e.other_income_last_year,
+       e.other_income_preceding_year, e.depreciation_last_year, e.depreciation_preceding_year, e.ebit_last_year, e.ebit_preceding_year, e.interest_last_year,
+       e.interest_preceding_year, e.pbt_last_year, e.pbt_preceding_year, e.tax_last_year, e.tax_preceding_year, e.pat_last_year,
+       e.pat_preceding_year, e.net_profit_last_year, e.net_profit_preceding_year, e.exceptional_items_last_year, e.exceptional_items_preceding_year, e.sales_ttm_1y_back,
+       e.avg_earnings_5y, e.avg_earnings_10y, e.avg_ebit_5y, e.avg_ebit_10y, d.eps_latest_quarter, d.eps_preceding_quarter,
+       d.eps_preceding_year_quarter, d.eps_last_year, d.eps_preceding_year, e.equity_capital_latest_quarter, e.equity_capital_preceding_quarter, e.equity_capital_preceding_year_quarter,
+       e.opm_latest_quarter_pct, e.opm_preceding_quarter_pct, e.opm_preceding_year_pct, e.npm_latest_quarter_pct, e.npm_preceding_quarter_pct, e.npm_preceding_year_quarter_pct,
+       e.npm_last_year_pct, e.npm_preceding_year_pct, e.gpm_latest_quarter_pct, e.gpm_last_year_pct, e.gpm_preceding_year_pct, e.sales_growth_yoy_quarter_pct,
+       e.profit_growth_yoy_quarter_pct, e.operating_profit_growth_yoy_quarter_pct, e.sales_growth_3y_pct, e.sales_growth_5y_pct, e.sales_growth_7y_pct, e.sales_growth_10y_pct,
+       e.profit_growth_3y_pct, e.profit_growth_5y_pct, e.profit_growth_7y_pct, e.profit_growth_10y_pct, e.operating_profit_growth_3y_pct, e.operating_profit_growth_5y_pct,
+       e.operating_profit_growth_7y_pct, e.operating_profit_growth_10y_pct, d.eps_growth_3y_pct, d.eps_growth_5y_pct, d.eps_growth_7y_pct, d.eps_growth_10y_pct,
+       e.sales_growth_median_5y_pct, e.sales_growth_median_10y_pct, e.opm_5y_pct, e.opm_10y_pct, e.last_result_date, e.last_annual_result_date,
+       d.book_value_per_share, d.is_trade_to_trade, e.opm_preceding_year_quarter_pct, e.debt, e.equity_capital, e.reserves,
+       e.balance_sheet_total, e.net_block, e.cwip, e.investments, e.current_assets, e.current_liabilities,
+       e.lease_liabilities, e.inventory, e.trade_receivables, e.trade_payables, e.cash_equivalents, e.gross_block,
+       e.accumulated_depreciation, e.contingent_liabilities, e.advance_from_customers, e.debt_preceding_year, e.net_block_preceding_year, e.gross_block_preceding_year,
+       e.cwip_preceding_year, e.working_capital_preceding_year, e.debt_3y_back, e.debt_5y_back, e.debt_7y_back, e.debt_10y_back,
+       e.net_block_3y_back, e.net_block_5y_back, e.net_block_7y_back, e.net_block_10y_back, e.working_capital_3y_back, e.working_capital_5y_back,
+       e.working_capital_7y_back, e.working_capital_10y_back, e.cash_3y_back, e.cash_5y_back, e.cash_7y_back, e.cfo_last_year,
+       e.cfo_preceding_year, e.cfi_last_year, e.cfi_preceding_year, e.cff_last_year, e.cff_preceding_year, e.net_cash_flow_last_year,
+       e.net_cash_flow_preceding_year, e.cash_beginning_last_year, e.cash_beginning_preceding_year, e.cash_end_last_year, e.cash_end_preceding_year, e.fcf_last_year,
+       e.fcf_preceding_year, e.fcf_3y, e.fcf_5y, e.fcf_7y, e.fcf_10y, e.cfo_3y,
+       e.cfo_5y, e.cfo_7y, e.cfo_10y, e.cfi_3y, e.cfi_5y, e.cfi_7y,
+       e.cfi_10y, e.face_value, d.book_value_preceding_year, d.book_value_3y_back, d.book_value_5y_back, d.book_value_10y_back,
+       d.graham_number, d.shares_preceding_year, d.shares_10y_back, e.current_ratio, e.quick_ratio, e.net_debt_to_equity,
+       e.long_term_debt_to_equity, e.debt_to_equity_preceding_year, e.financial_leverage, e.asset_turnover, e.earning_power, e.roe_preceding_year,
+       e.roce_preceding_year, e.roa_preceding_year, e.exports_pct, e.exports_pct_3y_back, e.exports_pct_5y_back, e.inventory_turnover_3y_back,
+       e.inventory_turnover_5y_back, e.inventory_turnover_7y_back, e.inventory_turnover_10y_back, e.debtor_days_3y_back, e.debtor_days_5y_back, e.avg_debtor_days_3y,
+       e.avg_working_capital_days_3y, e.cfo_to_ebitda_last_year, e.cfo_to_ebitda_preceding_year, e.fcf_conversion_3y, e.cfo_to_ebitda_3y, e.net_debt_to_fcf_3y,
+       d.price_to_fcf, d.equity_fcf_yield, d.shareholder_yield, d.buyback_yield, d.dilution_1y, d.dilution_5y,
+       e.reinvestment_rate, e.incremental_roic_1y, e.incremental_roic_3y, e.incremental_roic_5y, e.net_debt_to_ebitda, d.ev_ebitda_percentile_20q,
+       d.fii_holding_change_qoq_pct, d.dii_holding_change_qoq_pct, d.inst_holding_pct, d.unpledged_promoter_holding_pct, d.mf_holding_pct, d.mf_holding_change_qoq_pct,
+       d.insurance_holding_pct, d.retail_holding_pct, d.num_shareholders, d.num_shareholders_preceding_quarter, d.num_shareholders_change_qoq_pct, d.num_shareholders_1y_back,
+       e.sales_growth_yoy_preceding_quarter_pct, e.profit_growth_yoy_preceding_quarter_pct, e.core_profit_latest_quarter, e.core_profit_yoy_latest_q, e.core_profit_yoy_preceding_q, e.other_income_lift_pp,
+       d.pe_core, e.growth_sustained, e.growth_acceleration_pp, e.opm_change_yoy_pp, e.operating_leverage, d.peg,
+       d.earnings_yield, d.industry, d.cyclical_flag, d.under_owned, d.forensic_clean, e.cash_conversion_ok,
+       e.capex_pay_off_signal, e.roce_stability_5y, e.opm_stability_5y, d.pe_vs_own_5y_median, d.magic_formula_rank, d.pe_core_universe_median,
+       d.market_cap_universe_median, d.gem_score, d.hat_hidden_compounder, d.hat_quality_fair_price, d.hat_magic_formula, d.hat_garp,
+       d.hat_turnaround, d.hat_under_owned, d.hat_cash_machine, d.hat_fallen_quality, d.hat_capex_pay_off, d.hat_cyclical,
+       d.hat_lender, d.hats_passed, d.nse_macro_sector, d.nse_sector, d.nse_industry, d.nse_basic_industry,
+       d.industry_pe_median, d.industry_pb_median, d.industry_roce_median, d.industry_sales_growth_median, d.basic_industry_pe_median, d.basic_industry_pb_median,
+       d.basic_industry_roce_median, d.basic_industry_sales_growth_median, d.pe_premium_to_industry, d.pb_premium_to_industry, d.pe_premium_to_basic_industry, d.pb_premium_to_basic_industry,
+       d.peer_count, d.peer_rank_market_cap, d.peer_rank_pe, d.peer_rank_roce, d.peer_rank_profit_growth, d.industry_group_pe_median,
+       d.industry_group_pb_median, d.industry_group_roce_median, d.industry_group_sales_growth_median, d.pe_premium_to_industry_group, d.pb_premium_to_industry_group, e.opm_acceleration_pp,
+       e.gpm_change_yoy_pp, e.profit_growth_acceleration_pp, e.sales_growth_streak_quarters, e.profit_growth_streak_quarters, e.material_cost_latest_quarter_pct, e.material_cost_last_year_pct,
+       e.employee_cost_latest_quarter_pct, e.employee_cost_last_year_pct, e.other_expenses_latest_quarter_pct, e.other_expenses_last_year_pct, e.power_fuel_latest_quarter_pct, e.power_fuel_last_year_pct,
+       e.freight_latest_quarter_pct, e.freight_last_year_pct, e.ad_promo_latest_quarter_pct, e.ad_promo_last_year_pct, e.marketing_efficiency_latest_quarter, e.marketing_efficiency_last_year,
+       e.material_cost_last_year, e.material_cost_preceding_year, e.employee_cost_last_year, e.employee_cost_preceding_year, e.minority_share_last_year, e.minority_share_preceding_year,
+       e.dividends_paid_last_year, e.dividends_paid_preceding_year, e.acquisition_outflow_last_year, e.acquisition_outflow_preceding_year, e.acquisition_outflow_to_sales_last_year, e.inorganic_growth_flag,
+       e.standalone_pat_ttm, e.profit_leakage_pct, e.profit_leakage_latest_quarter_pct, e.incremental_asset_turnover_3y, e.cfo_to_pat, e.cash_tax_rate,
+       e.effective_tax_rate, e.exceptional_to_pbt, e.exceptional_quarters_4q, e.capex_intensity, d.net_cash_to_market_cap, e.rpt_to_sales,
+       e.intangibles_to_equity, e.audit_fees_to_sales, e.managerial_remuneration_to_pat, e.capital_commitments_to_net_worth, e.unquoted_investments, e.quoted_investments_market_value,
+       e.revaluation_reserve, d.price_to_sales, d.ev_to_sales, d.price_to_embedded_value, d.gov_ttm, d.ev_to_gov,
+       d.gov_growth_yoy_pct, d.arpu, d.arpu_growth_yoy_pct, d.mtu, d.mtu_growth_yoy_pct, d.contribution_margin_change_yoy_pp,
+       d.casa_pct, d.inst_shares_change_qoq, d.volume_median_90d, d.institutional_absorption_90d, d.promoter_pledge_change_qoq_pp, d.public_holders_above_1pct,
+       d.litigations_90d, d.allotments_90d, d.fund_raising_events_90d, d.rf_auditor_resignation_90d, d.rf_kmp_resignations_90d, d.rf_fraud_or_default_90d,
+       d.rf_litigation_90d, e.rf_audit_qualified, d.rf_pledge_increase_qoq, d.pe_numerator, e.pe_denominator, e.roe_numerator,
+       e.roe_denominator, e.roce_numerator, e.roce_denominator, d.ev_ebitda_numerator, e.ev_ebitda_denominator, e.opm_numerator,
+       e.opm_denominator, e.beneish_dsri, e.beneish_gmi, e.beneish_aqi, e.beneish_sgi, e.beneish_depi,
+       e.beneish_sgai, e.beneish_lvgi, e.beneish_tata, e.piotroski_roa_positive, e.piotroski_cfo_positive, e.piotroski_roa_up,
+       e.piotroski_cfo_above_pat, e.piotroski_leverage_down, e.piotroski_current_ratio_up, e.piotroski_no_dilution, e.piotroski_gross_margin_up, e.piotroski_asset_turnover_up,
+       d.altman_z_original, e.bs_accruals, e.depreciation_rate, e.asset_age_proxy, e.debtor_days_change_yoy, e.ccc_change_yoy,
+       e.h1_bs_as_of, e.debtor_days_h1, e.inventory_days_h1, e.debtor_days_h1_change_yoy, e.inventory_days_h1_change_yoy, d.pb_percentile,
+       d.price_to_sales_percentile, d.ev_to_sales_percentile, d.momentum_12m_1m, d.volatility_1y, d.max_drawdown_1y, d.high_52w_on_delivery_spike,
+       d.pead_event_date, d.pead_ar_t0, d.pead_ar_t1, d.pead_ar_t5, d.pead_ar_t20, d.pead_relvol_t0,
+       d.pead_relvol_t1, d.pead_relvol_t5, d.pead_relvol_t20, d.nifty500_inclusion_90d, d.nifty500_exclusion_90d, d.days_to_next_ex_date,
+       d.next_ex_date_action, d.dividend_365d, d.bonus_365d, d.split_365d, e.segment_period_end, e.segment_count,
+       e.largest_segment_revenue_share, e.fastest_growing_segment, e.fastest_growing_segment_growth_yoy, e.largest_segment_margin_change_yoy_pp, d.rs_rank_12m_1m, d.industry_earnings_breadth,
+       d.industry_earnings_breadth_n, e.rpt_fy_end, e.rpt_counterparties, e.rpt_leak_pct, e.rpt_purchases_to_sales, e.rpt_royalty_to_sales,
+       e.rpt_loans_given_to_net_worth
+FROM features_daily d
+LEFT JOIN features_events e ON e.security_id = d.security_id AND e.valid_from_date <= d.as_of_date
+     AND d.as_of_date < coalesce(e.valid_to_date, DATE '9999-12-31');  -- open interval; an OR here is ~400x slower
 
 -- Capital-allocation scorecard (G201): the batch C / G components side by side, one row per security of the latest
 -- materialised day. Never summed into one score (architecture §10.2); history-gated components stay NULL (C9).

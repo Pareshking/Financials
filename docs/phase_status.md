@@ -36,6 +36,16 @@ the full line-by-line audit of the PDF is `docs/master_backlog.md`; ratios are i
    (monthly cron line; automatic after full runs when the disk has room) and `prune-versions` archives and deletes
    superseded parser versions (~24 M raw rows, ~2.3 GB). Owner steps: free >= ~4.5 GB next to `data/`, then
    `prune-versions` (it compacts itself when there is room). Architecture §4.1, ops/README.md.
+2c. **DONE (event-sparse history, 2026-11-16, features `2026.11.16-17E`)** `screener_features_history` is a view
+   over `features_daily` (249 DAILY columns, every day) and `features_events` (400 EVENT columns, one row per interval
+   of identical values; `features_store.py`, architecture §4.1). Split checked on the live database (read-only):
+   no EVENT column ever changed on a day its FundamentalsCache key did not. Live projection (the live history
+   converted into a scratch database and verified row for row, EXCEPT ALL both ways): 1,330,525 daily rows, 493 MB,
+   + 8,150 intervals (~2.6 per security, at most 13), 7.9 MB, vs the 1.04 GB wide table; full scans of the view
+   ~0.02 s; conversion + verification 134 s. Fixture market: 15,276 daily rows (2.10 MB) + 3,034 intervals
+   (0.26 MB) vs 2.62 MB; a full materialise run takes the same time (8.0-8.6 s both). Owner steps: stop the writer,
+   `python -m financials --data-dir data migrate-sparse-history` (one transaction; compacts afterwards when there is
+   room, else run `compact`), then a full `materialize --from 2024-10-01 --to <last day>` (FEATURES_VERSION bump).
 3. Credit rating (Screener ratio) needs credit-rating XBRL (G98, F22 UNVERIFIED).
 4. Not possible by design: all-time high/low (data starts 2024-10-01), "Expected quarterly …" (forecasts),
    G Factor (formula unpublished).

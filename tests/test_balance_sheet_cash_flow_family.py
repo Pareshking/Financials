@@ -21,6 +21,7 @@ from _fixture_helpers import XBRL_DIR, load_instance
 from financials import features_bs as B
 from financials.dsl import ALIASES, compile_screen, run_screen
 from financials.features import compute_rows, materialize
+from financials.features_store import write_rows as write_history
 from financials.fundamentals import FactBook, _add_months, building_blocks, screener_convention_ratios
 from financials.parsers.integrated import parse_integrated_results
 from financials.parsers.reg34_annual import parse_reg34_annual
@@ -439,7 +440,7 @@ def test_industrial_rows_get_liquidity_ratios(full_market):
 def test_every_new_column_has_an_alias_and_a_schema_column():
     from financials.db import declared_columns
 
-    for table in ("screener_features", "screener_features_history"):
+    for table in ("screener_features",):  # the history view has its columns (test_features_store)
         cols = [c for c, _ in declared_columns()[table]]
         block = [*B.OUTPUT_COLUMNS, "ev_ebitda_percentile_20q"]  # appended as one contiguous block, in order
         start = cols.index(block[0])
@@ -489,7 +490,7 @@ def test_preceding_year_is_the_fiscal_year_before_the_last():
 def test_ev_ebitda_band_of_20_quarter_ends_needs_20_of_them():
     """G240: the 5-year band ranks today's EV/EBITDA among the last 20 prior quarter-ends (oldest first from
     _valuation_history); fewer than 20 stored quarter-ends (C9: first possible ~2031) is NULL."""
-    from financials.db import apply_schema, connect, insert_rows
+    from financials.db import apply_schema, connect
     from financials.features import _valuation_history
     from financials.fundamentals import percentile_rank
 
@@ -498,7 +499,7 @@ def test_ev_ebitda_band_of_20_quarter_ends_needs_20_of_them():
     ends = [_add_months(date(2026, 3, 31), 3 * i) for i in range(22)]
     rows = [{"as_of_date": d, "security_id": "S", "entity_id": "E", "symbol": "X", "series": "EQ",
              "ev_ebitda": float(i + 1)} for i, d in enumerate(ends)]  # fmt: skip
-    insert_rows(con, "screener_features_history", list(reversed(rows)))
+    write_history(con, list(reversed(rows)))
     hist = _valuation_history(con, date(2031, 9, 1))["S"]["ev_ebitda"]
     con.close()
     assert hist == [float(i + 1) for i in range(22)]  # oldest first, whatever the insert order

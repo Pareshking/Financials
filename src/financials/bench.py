@@ -127,7 +127,7 @@ def run(fixtures: Path, work: Path) -> dict:
     t = time.perf_counter()
     inc = materialize_incremental(con)
     res["incremental_1_ms"], res["incremental_1_days"] = (time.perf_counter() - t) * 1000, len(inc.days)
-    ents = [e for (e,) in con.execute("SELECT DISTINCT entity_id FROM screener_features_history WHERE as_of_date = ? "
+    ents = [e for (e,) in con.execute("SELECT DISTINCT entity_id FROM features_daily WHERE as_of_date = ? "
                                        "ORDER BY 1 LIMIT 300", [date(2026, 11, 12)]).fetchall()]  # fmt: skip
     dirty.mark_entities(con, ents, date(2026, 11, 12), "BENCH")
     t = time.perf_counter()
@@ -230,13 +230,13 @@ def run_synthetic(db: Path, work: Path, n_secs: int, legacy_days: int = 3) -> di
     2026-11-11): one full run on the run-level path (per-day timings), then the per-day legacy path
     (FINANCIALS_MATERIALIZE_LEGACY=1) for `legacy_days` days spread over the history on a copy holding the same
     earlier days (each rewrites one day of a copy that holds the run's history)."""
-    from financials import features
+    from financials import features, features_store
     from financials.price_history import LEGACY_ENV
 
     path = work / "synthetic.duckdb"
     shutil.copy(db, path)
     con = connect(path)
-    con.execute("DELETE FROM screener_features_history")
+    features_store.truncate(con)
     con.execute("DELETE FROM features_meta")
     con.execute("DELETE FROM market_breadth")
     con.close()
@@ -266,7 +266,8 @@ def run_synthetic(db: Path, work: Path, n_secs: int, legacy_days: int = 3) -> di
     res["legacy"] = []
     lcon = connect(work / "synthetic_legacy.duckdb")
     lcon.execute(f"ATTACH '{path}' AS fast (READ_ONLY)")
-    lcon.execute("INSERT INTO screener_features_history SELECT * FROM fast.screener_features_history")
+    lcon.execute("INSERT INTO features_daily SELECT * FROM fast.features_daily")
+    lcon.execute("INSERT INTO features_events SELECT * FROM fast.features_events")
     lcon.execute("INSERT INTO features_meta SELECT * FROM fast.features_meta")
     lcon.execute("DETACH fast")
     for d in sample:

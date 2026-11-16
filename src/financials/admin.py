@@ -118,6 +118,7 @@ def rebuild_market(con, from_date: date, *, note: str = "rebuild-market") -> dic
     of `promotion_log` on/after the date are removed so `promote` replays them. Audited in `admin_log`."""
 
     def run(con):
+        from financials import features_store
         from financials.promoter import REBUILD_SUPERSEDED
 
         now = utc_now()
@@ -127,7 +128,7 @@ def rebuild_market(con, from_date: date, *, note: str = "rebuild-market") -> dic
             counts[key] = len(con.execute(sql + " RETURNING 1", params).fetchall())
 
         features_dates = [r[0] for r in con.execute(
-            "SELECT DISTINCT as_of_date FROM screener_features_history WHERE as_of_date >= ? ORDER BY 1", [from_date]
+            "SELECT DISTINCT as_of_date FROM features_daily WHERE as_of_date >= ? ORDER BY 1", [from_date]
         ).fetchall()]  # fmt: skip
         n("ohlcv", "DELETE FROM ohlcv WHERE trade_date >= ?", [from_date])
         n("calendar", "DELETE FROM trading_calendar WHERE cal_date >= ? "
@@ -147,13 +148,13 @@ def rebuild_market(con, from_date: date, *, note: str = "rebuild-market") -> dic
           "WHERE (resolved_at IS NULL OR resolution = 'FIXED_BY_RULE') AND stage IN ('GAP', 'IDENTIFIER', 'CALENDAR') "
           "AND CAST(json_extract_string(details, '$.trade_date') AS DATE) >= ?",
           [now, REBUILD_SUPERSEDED, f"rebuild-market --from {from_date}: {note}", from_date])  # fmt: skip
-        n("features", "DELETE FROM screener_features_history WHERE as_of_date >= ?", [from_date])
+        counts["features"] = features_store.delete_from(con, from_date)  # daily rows and intervals (§4.1)
         con.execute("DELETE FROM features_meta WHERE as_of_date >= ?", [from_date])
         con.execute("DELETE FROM market_breadth WHERE as_of_date >= ?", [from_date])
         dirty.mark_all(con, from_date, "REBUILD_MARKET", str(from_date))
         con.execute("DELETE FROM screener_features")
-        con.execute("INSERT INTO screener_features SELECT * FROM screener_features_history WHERE as_of_date = "
-                    "(SELECT max(as_of_date) FROM screener_features_history)")  # fmt: skip
+        con.execute("INSERT INTO screener_features BY NAME SELECT * FROM screener_features_history WHERE as_of_date = "
+                    "(SELECT max(as_of_date) FROM features_daily)")  # fmt: skip
         logged = [r[0] for r in con.execute("SELECT stage_path FROM promotion_log WHERE job = 'market_day'").fetchall()]
         replay = [p for p in logged if p.split("/", 1)[-1][:8] >= f"{from_date:%Y%m%d}"]  # run id = YYYYMMDD-...
         if replay:

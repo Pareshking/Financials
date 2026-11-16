@@ -14,7 +14,8 @@ from conftest import Market
 from _fixture_helpers import FIXTURES, XBRL_DIR
 from financials import features_peers as P
 from financials.cli import build_parser, main
-from financials.db import declared_columns, insert_rows
+from financials.db import declared_columns
+from financials.features_store import write_rows as write_history
 from financials.fetch.jobs import Jobs, quote_url
 from financials.group_structure import backfill_group_structure, pending_filings
 from financials.parsers import ParseError
@@ -229,7 +230,7 @@ def test_industry_and_basic_industry_medians_premiums_and_ranks():
 
 def test_columns_are_declared_as_one_block_in_both_feature_tables():
     cols = declared_columns()
-    for table in ("screener_features_history", "screener_features"):
+    for table in ("screener_features",):  # the history view has its columns (test_features_store)
         names = [c for c, _ in cols[table]]
         start = min(names.index(c) for c in P.COLUMNS)  # one contiguous block (later batches append after it)
         assert set(names[start : start + len(P.COLUMNS)]) == set(P.COLUMNS), table
@@ -242,7 +243,7 @@ def test_refresh_ranks_the_stored_day(tmp_path):
     apply_schema(con)
     day = date(2026, 11, 13)
     stored = [{**r, "as_of_date": day, "symbol": r["security_id"].upper(), "series": "EQ"} for r in _day()]
-    insert_rows(con, "screener_features_history", stored)
+    write_history(con, stored)
     P.refresh_cross_section(con, day)
     got = dict(con.execute("SELECT security_id, peer_rank_market_cap FROM screener_features_history").fetchall())
     expected = _day()

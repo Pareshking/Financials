@@ -30,8 +30,15 @@ def apply_schema(con: duckdb.DuckDBPyConnection) -> list[str]:
     Idempotent: a second run changes nothing. Only nullable, constraint-free columns are added automatically;
     a new NOT NULL / PRIMARY KEY / UNIQUE / REFERENCES column needs a deliberate migration and raises.
     Returns the statements executed by the upgrade (empty for a fresh or current database). Views (below
-    VIEWS_MARKER in schema.sql) are created last, so they may name columns the upgrade just added.
+    VIEWS_MARKER in schema.sql) are created last, so they may name columns the upgrade just added. A database whose
+    screener_features_history is still the wide table raises SchemaMigrationError: `migrate-sparse-history`
+    (features_store.migrate_legacy) converts it explicitly.
     """
+    if con.execute(_LEGACY_HISTORY).fetchone()[0]:
+        raise SchemaMigrationError(
+            "screener_features_history is still the wide table: run `python -m financials --data-dir data "
+            "migrate-sparse-history` (event-sparse storage, architecture §4.1), then `compact`"
+        )
     tables, _, views = SCHEMA_SQL.partition(VIEWS_MARKER)
     con.execute(tables)
     executed = upgrade_columns(con)
@@ -47,6 +54,13 @@ _CONSTRAINED = re.compile(r"\b(NOT NULL|PRIMARY KEY|UNIQUE|REFERENCES)\b", re.I)
 
 class SchemaMigrationError(RuntimeError):
     pass
+
+
+# A database from before event-sparse storage (features_store.migrate_legacy converts it): the history is a table.
+_LEGACY_HISTORY = (
+    "SELECT count(*) FROM duckdb_tables() WHERE table_name = 'screener_features_history' AND schema_name = 'main' "
+    "AND database_name = current_database()"
+)
 
 
 def declared_columns(schema_sql: str | None = None) -> dict[str, list[tuple[str, str]]]:

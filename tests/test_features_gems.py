@@ -26,6 +26,7 @@ from financials import features_gems as G
 from financials.db import apply_schema, connect, declared_columns, insert_rows
 from financials.dsl import ALIASES, load_saved_screens, run_saved_screen
 from financials.features import compute_rows
+from financials.features_store import write_rows as write_history
 from financials.fundamentals import FactBook, _add_months, building_blocks
 from financials.parsers.shareholding import parse_shareholding
 from financials.promoter import promote
@@ -368,7 +369,7 @@ def test_pe_vs_own_median_needs_five_years_of_stored_pe():
                      "pe": 10.0 + i})  # fmt: skip
         rows.append({"as_of_date": d, "security_id": "S2", "entity_id": "E", "symbol": "B", "series": "EQ",
                      "pe": None if i == 0 else 20.0})  # fmt: skip
-    insert_rows(con, "screener_features_history", rows)
+    write_history(con, rows)
     assert G.pe_medians(con, date(2029, 10, 1)) == {"S1": 11.5}  # S2's history starts too late
     assert G.pe_medians(con, date(2029, 9, 30)) == {}
     out = G.signal_columns({"pe": 23.0, "valuation_archetype": "INDUSTRIAL_SERVICES"}, None, None, {}, 11.5)
@@ -523,7 +524,7 @@ def test_refresh_cross_section_rewrites_the_stored_day():
     day = date(2026, 11, 13)
     stored = [{"as_of_date": day, "entity_id": r["symbol"], "series": "EQ",
                **{k: v for k, v in r.items() if k in G.CROSS_INPUTS}} for r in rows]  # fmt: skip
-    insert_rows(con, "screener_features_history", stored)
+    write_history(con, stored)
     G.refresh_cross_section(con, day)
     G.cross_section(rows)
     cur = con.execute(f"SELECT symbol, {', '.join(G.CROSS_COLUMNS)} FROM screener_features_history")
@@ -539,7 +540,7 @@ def test_refresh_cross_section_rewrites_the_stored_day():
 
 def test_every_column_is_in_both_tables_in_order_and_has_an_alias():
     cols = declared_columns()
-    for t in ("screener_features", "screener_features_history"):
+    for t in ("screener_features",):  # the history view has its columns (test_features_store)
         names = [c for c, _ in cols[t]]
         start = names.index(G.GEM_COLUMNS[0])  # one contiguous block, in order (batch G appends after it)
         assert names[start : start + len(G.GEM_COLUMNS)] == list(G.GEM_COLUMNS), t

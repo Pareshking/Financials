@@ -92,7 +92,7 @@ Fetch etiquette (implemented in `financials.fetch.http.PoliteFetcher`): ≥1 s b
 | `data/staging/` | parsed Parquet batches waiting for (or recorded by) `promote` | |
 | `data/market.duckdb` | every table below; one file, one writer | 22.4 GiB file, ~6 GB in use by tables |
 | `raw_xbrl_facts` | every XBRL fact verbatim, once per parser version that parsed the filing | 48.9 M rows, 4.4 GB |
-| `screener_features_history` | one row per security and materialised day (§11.9) | 1.33 M rows, 1.0 GB |
+| `screener_features_history` | view: one row per security and materialised day (§11.9) over `features_daily` + `features_events` (below) | 1.33 M rows; was a 1.0 GB table before -17E |
 | `fact_observations`, `shareholding_*`, `segment_observations`, … | canonical facts, per parser version | ~0.4 GB together |
 | `data/archive/` | `prune-versions` output: zstd Parquet per table / version + `manifest.json` | |
 
@@ -139,6 +139,74 @@ deleted and rewrote the history, and every re-parse added a full copy of a filin
   `tests/test_storage.py` materialises the fixture market with injected superseded versions (different values) and
   the rows above that must stay, prunes, materialises again and compares every table; the archive is read back.
 
+**Event-sparse history (features `2026.11.16-17E`, `financials.features_store`).** The wide history table stored
+every column of every security on every day, although most columns (TTM / annual / quarterly lines, margins, growth,
+ratios on filed values, scope and restatement flags, Beneish / Piotroski, segment mix, related-party ratios) change
+only when one of the security's filed inputs becomes visible. It is now two tables and a view:
+
+- `features_daily (as_of_date, security_id, DAILY columns)`, PRIMARY KEY (as_of_date, security_id): every
+  materialised day. 249 columns (with the two keys): identity (entity, symbol, series), price / volume / delivery
+  and every technical, share count, market cap, EV and every ratio on them (PE, PB, EV/EBITDA, yields, P/S,
+  P/FCF, PE core, PEG, earnings yield, EPS restated for share-count events, book value per share, Graham number,
+  dilution), percentiles vs own history, windows that move with the as-of date (Reg. 30 90-day counts and red
+  flags, 365-day corporate-action flags, Nifty 500 inclusion, days to the next ex-date, PEAD), inputs outside the
+  fundamentals-cache key (shareholding and ownership, NSE classification, supplemental KPIs and what reads them,
+  Nifty 500 membership) and the same-day cross-section (magic formula, gem score, hats, industry medians and peer
+  ranks, RS rank, industry earnings breadth: the refresh steps UPDATE only this table).
+- `features_events (security_id, valid_from_date, valid_to_date, EVENT columns)`, PRIMARY KEY (security_id,
+  valid_from_date): one row per interval [valid_from_date, valid_to_date) of identical EVENT values (400 columns,
+  `features_store.EVENT_COLUMNS`); `valid_to_date` NULL = open.
+- `screener_features_history` (view, below VIEWS_MARKER): `features_daily LEFT JOIN features_events` on the
+  security and `valid_from_date <= as_of_date < valid_to_date`, with exactly the names, order and types of
+  `screener_features` (a test compares `information_schema`), so the DSL, `screen --as-of`, the backtest readers,
+  G4 and the compare script read the same rows as before. `screener_features` stays a table.
+
+*The split.* EVENT = exactly the columns computed from the per-entity fundamentals block (`features._fundamentals`
+and the period values of batches A, C, D, G, I, J) and from static inputs (archetype override, curated CSVs).
+`FundamentalsCache` (§11.11) reuses that block for every day of a run whose key (latest visible quarter, number of
+the entity's visibility timestamps in `fact_observations` / `filing_meta` / `fact_corrections`, number of its
+structural ex-dates) did not move, so these values can change only on a key change; `segment_observations` and
+`related_party_transactions` rows are written by the same promotion as their filing's `filing_meta` row, with the
+same entity and visibility. Empirical check on the live database (read-only, 2026-11-16, 1.33 M rows, 526 days):
+for each column, the security-day transitions where the value changed while the key did not. 485 columns had none;
+85 of them stay DAILY by code reading (they read the price, the day, KPIs, classification, a moving window, or are
+always NULL so far but price-based, e.g. `return_3y`, `pe_vs_own_5y_median`, peer medians); the 400 EVENT columns all
+had zero. Every column with a violation is DAILY (e.g. `eps_latest_quarter`: 42 days where only a split moved it;
+the shareholding columns: shareholding is outside the key). When in doubt a column is DAILY. The split never
+decides correctness: a write stores the values it was given, whatever their column; a wrongly classified column
+only adds intervals.
+
+*Writes* (`features_store.write_day`, inside the day's publish transaction): the day's DAILY rows are replaced
+(the whole day, or for `--incremental` only the recomputed entities' rows, as before); then each security's EVENT
+values are compared (`IS NOT DISTINCT FROM`, column by column) with the interval covering the day. Equal: nothing
+is written. Different: the values are set on [D, N), N = the security's next materialised day after D (open when
+none); the overlapping interval keeps its parts before D and from N; adjacent intervals with identical values are
+merged. In a normal run (days ascending) this is "close the open interval at D, open a new one". Batched: a fixed
+handful of statements per day whatever the number of securities. Invariants (`check_invariants`, tested): no
+overlap, no identical neighbours, every daily row in exactly one interval; any write order (full runs, incremental
+runs, a re-materialised past day, deletions) leaves the intervals a day-by-day write of the final rows would.
+`rebuild-market` calls `features_store.delete_from` (daily rows >= the date, intervals starting from it, the
+interval still covering an earlier day reopens). Multi-day readers that need only DAILY columns (PE / EV-EBITDA /
+PB / P/S / EV/S percentile history, the 5-year PE median, market breadth, `max(as_of_date)`) read `features_daily`
+directly; everything else reads the view.
+
+*Identity.* `tests/test_features_store.py` materialises the fixture market while a shadow wide table is written the
+old way (DELETE + INSERT of the full rows, the cross-section UPDATEs run on it): after a full run, an incremental
+run, an out-of-order day, a deletion from a middle day and its replay, `rebuild-market`, and the migration, the view
+and the wide table are identical (Decimals with their exponent, floats, NULLs). On the live database (read-only
+copy into a temporary DuckDB) the whole history converted with `convert_wide` equals the live table row for row
+(EXCEPT ALL both ways), and the `write_day` path fed the live rows of a sample of days in and out of order too
+(`docs/phase_status.md` has the numbers).
+
+*Migration of an existing database* (single writer, one transaction): `apply_schema` refuses a database whose
+`screener_features_history` is still a table (`SchemaMigrationError`), so nothing writes into the old layout.
+`python -m financials --data-dir data migrate-sparse-history` renames the wide table, creates the two tables and
+the view, fills them (`features_store.convert_wide`: DAILY columns copied, EVENT runs of identical consecutive rows
+found with exact window comparisons, 40 columns per pass), verifies the view against the wide table (counts and
+EXCEPT ALL both ways, 20 days per pass) and drops it; any difference rolls everything back. It then compacts
+when the dead space is worth it (the dropped table), as a full run does. Then `materialize --from 2024-10-01 --to
+<last day>` (FEATURES_VERSION changed, so `--incremental` refuses until a full run).
+
 Measured read-only on the live database (2026-11-16, `prune-versions --dry-run` rules): prune removes 23.97 M of
 48.9 M `raw_xbrl_facts` rows (~2.16 GB), 2.73 M of 5.78 M `fact_observations` (~0.10 GB), 3.84 M shareholding rows
 (~0.06 GB) and 1,340 segment rows; nothing in `related_party_transactions` / `group_structure` (one version each).
@@ -162,7 +230,7 @@ This section only records the decisions; it does not duplicate the DDL.
 | Control | `corp_actions`, `quarantine_queue`, `company_overrides` |
 | L2 calendar/index | `trading_calendar`, `calendar_coverage`, `raw_index_snapshot`, `index_constituents_history` |
 | L2 shareholding | `shareholding_meta`, `shareholding_observations` |
-| L3 | `screener_features`, `screener_features_history`, `user_custom_ratios`; control: `promotion_log` |
+| L3 | `screener_features`, `features_daily` + `features_events` (read as the view `screener_features_history`, §4.1), `user_custom_ratios`; control: `promotion_log` |
 | L2 classification | `raw_quote_classification` (NSE quote answer as sent [IC1]), `entity_classification_history` (NSE macro / sector / industry / basic industry, date-bounded, visible from the first fetch, never backdated [IC3]) |
 
 Decisions:
@@ -462,7 +530,8 @@ A later filing for the same key is **not** always the better one: some companies
 
 ### 10.7 `screener_features` columns in Phase 1
 
-Source of truth: `screener_features_history` in `schema.sql`; aliases in `financials.dsl.ALIASES`.
+Source of truth: `screener_features` in `schema.sql` (the history view has the same columns); aliases in
+`financials.dsl.ALIASES`.
 
 | Status | Columns |
 |---|---|
@@ -582,10 +651,11 @@ value exists only once both filings are visible (visibility = the later broadcas
 ## 11.9 Knowledge modes and feature snapshots
 
 `screener_features_history` holds one row per security in the universe per materialised `as_of_date`: a full
-daily snapshot, not a change log. `screen --as-of D` reads `as_of_date = D` exactly; a date that was never
+daily snapshot, not a change log (read through a view; stored event-sparse, §4.1). `screen --as-of D` reads `as_of_date = D` exactly; a date that was never
 materialised returns no rows. Re-materialising a date replaces that date's rows (the inputs stay append-only), and
 `rebuild-market` deletes the history from its date before replaying. Unchanged rows are not deduplicated: a screen
-on `D` needs the full universe of `D`, and ~2,500 securities × ~530 sessions (2024-10 → 2026-11) is ~1.3 M rows.
+on `D` needs the full universe of `D`, and ~2,500 securities × ~530 sessions (2024-10 → 2026-11) is ~1.3 M rows
+(what is deduplicated is the storage of the EVENT columns, §4.1: the rows read are the same).
 
 Price inputs are read in one of two knowledge modes (`features._price_inputs`):
 - `valid` (default; all materialised history): what the market knew on `D`. A corporate action counts from its
@@ -639,8 +709,12 @@ rebuilt. Equivalence with a full rebuild, row for row, is pinned by `tests/test_
 results filing, a shareholding filing, a corporate-action batch, a gap resolution and a scope override.
 
 **Reader changes**: `FEATURES_VERSION` must be bumped whenever `features.py`, `fundamentals.py`, `scope.py`,
-`money.py`, `price_history.py` or `reference/valuation_archetypes.csv` changes; a test pins a hash of those files together with the
+`money.py`, `price_history.py`, `features_store.py` or `reference/valuation_archetypes.csv` changes; a test pins a hash of those files together with the
 version. After a bump only a full `materialize --from --to` is equivalent.
+
+An incremental day replaces only the recomputed entities' `features_daily` rows and sets their EVENT values through
+the interval store (§4.1); the other securities' intervals are not touched (their EVENT values did not change) and
+the cross-section refresh UPDATEs the day's `features_daily` rows of every security, as before.
 
 ## 11.11 Run-level materialisation (performance)
 

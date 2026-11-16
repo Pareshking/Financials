@@ -21,9 +21,10 @@ from conftest import Market
 from _fixture_helpers import XBRL_DIR, load_instance
 from financials import features_extra as X
 from financials.cli import main
-from financials.db import apply_schema, connect, declared_columns, insert_rows, table_columns
+from financials.db import apply_schema, connect, declared_columns, table_columns
 from financials.dsl import ALIASES, compile_screen
 from financials.features import compute_rows
+from financials.features_store import write_rows as write_history
 from financials.fundamentals import FactBook, _add_months, building_blocks
 from financials.parsers.integrated import parse_integrated_results
 from financials.parsers.kpis import parse_kpis
@@ -312,7 +313,7 @@ def test_rows_on_the_full_market(full_market):
     con = connect()
     apply_schema(con)
     cols = table_columns(con, "screener_features_history")
-    insert_rows(con, "screener_features_history", [{c: r.get(c) for c in cols} for r in rows.values()])
+    write_history(con, [{c: r.get(c) for c in cols} for r in rows.values()])
     assert con.execute("SELECT count(*) FROM screener_features_history WHERE pe_numerator IS NOT NULL").fetchone()[0]
 
 
@@ -330,7 +331,7 @@ def test_capital_allocation_view_lists_components_side_by_side():
 
 
 def test_every_column_is_appended_in_both_tables_and_has_an_alias():
-    for t in ("screener_features", "screener_features_history"):
+    for t in ("screener_features",):  # the history view has its columns (test_features_store)
         names = [c for c, _ in declared_columns()[t]]
         start = names.index(X.EXTRA_COLUMNS[0])  # one contiguous block (batch I appends after it)
         assert names[start : start + len(X.EXTRA_COLUMNS)] == list(X.EXTRA_COLUMNS), t

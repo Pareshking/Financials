@@ -302,6 +302,6 @@ def refresh_breadth(con, as_of: date) -> None:
                   count(*) FILTER (WHERE return_1d > 0), count(*) FILTER (WHERE return_1d < 0),
                   count(*) FILTER (WHERE return_1d = 0),
                   count(*) FILTER (WHERE return_1d > 0) / nullif(count(*) FILTER (WHERE return_1d < 0), 0)
-           FROM screener_features_history WHERE as_of_date = ? AND in_nifty500 GROUP BY as_of_date""",
+           FROM features_daily WHERE as_of_date = ? AND in_nifty500 GROUP BY as_of_date""",  # DAILY columns
         [as_of],
     )

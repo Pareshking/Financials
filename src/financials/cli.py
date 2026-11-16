@@ -184,6 +184,11 @@ def build_parser() -> argparse.ArgumentParser:
     rb.add_argument("--from", dest="from_date", type=_date, required=True)
     rb.add_argument("--note", default="rebuild-market")
     rb.add_argument("--no-compact", action="store_true", help="do not compact the database file afterwards")
+    ms = sub.add_parser(
+        "migrate-sparse-history",
+        help="one-off: convert the wide screener_features_history table to event-sparse storage",
+    )
+    ms.add_argument("--no-compact", action="store_true", help="do not compact the database file afterwards")
     cp = sub.add_parser("compact", help="rewrite the database file without dead space (verified copy, atomic swap)")
     cp.add_argument("--keep-old", action="store_true", help="keep the previous file as market.duckdb.bak")
     pv = sub.add_parser(
@@ -456,7 +461,7 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
         return 0 if r.status == "COMPACTED" else 1
     rc = write_command(args, db_path, stage_root, out)
     full_run = (args.cmd == "materialize" and args.from_date is not None and not args.incremental) or args.cmd in (
-        "rebuild-market", "prune-versions")  # fmt: skip
+        "rebuild-market", "prune-versions", "migrate-sparse-history")  # fmt: skip
     if rc == 0 and full_run and not getattr(args, "no_compact", False) and not getattr(args, "dry_run", False):
         from financials.storage import maybe_compact
 
@@ -469,6 +474,11 @@ def write_command(args, db_path: Path, stage_root: Path, out) -> int:
     args.data_dir.mkdir(parents=True, exist_ok=True)
     con = connect(db_path)
     try:
+        if args.cmd == "migrate-sparse-history":  # before apply_schema, which refuses the wide table
+            from financials.features_store import migrate_legacy
+
+            print(json.dumps(migrate_legacy(con)), file=out)
+            return 0
         upgraded = apply_schema(con)
         if args.cmd == "init-db":
             for stmt in upgraded:

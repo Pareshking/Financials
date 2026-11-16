@@ -20,7 +20,7 @@ import pytest
 from conftest import FETCHED_AT, build_full_market
 
 from _fixture_helpers import XBRL_DIR
-from financials import features, storage
+from financials import features, features_store, storage
 from financials.cli import main, materialize_dates
 from financials.db import connect
 from financials.promoter import promote
@@ -274,7 +274,7 @@ def _inject_edges(con) -> dict[str, str]:
 
 
 def _materialise_all(con) -> dict:
-    con.execute("DELETE FROM screener_features_history")
+    features_store.truncate(con)
     con.execute("DELETE FROM features_meta")
     con.execute("DELETE FROM market_breadth")
     assert materialize_dates(con, None, date(2024, 10, 1), None, io.StringIO()) == 0

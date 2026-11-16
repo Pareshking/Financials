@@ -1,11 +1,13 @@
-"""Materialised `screener_features` (latest) and `screener_features_history` (one row per as_of_date).
+"""Materialised `screener_features` (latest) and `screener_features_history` (one row per as_of_date; a view over
+the event-sparse features_daily / features_events tables, features_store.py, architecture §4.1).
 
 Runs inside the single writer process. Gates (architecture §12):
 - G4 null-spike: a critical column's null rate may not rise > 1.5 percentage points vs the previous run. A TTM
   value that turns NULL because the company filed a newer quarter whose 4-quarter window reaches before the
   financials cutoff (C9: never a partial window) is expected, not a defect, and is not counted (rule G4_C9_WINDOW).
-- G5 atomic swap: history rows for the date (and, on the last day of a run, the live table) are replaced in one
-  transaction, only after the row count equals the universe size.
+- G5 atomic swap: history rows for the date (features_store.write_day: the day's daily rows and the EVENT intervals
+  it changes; on the last day of a run, the live table) are replaced in one transaction, only after the row count
+  equals the universe size.
 
 Prices: momentum uses back-adjusted closes (withheld after an unresolved gap); market cap uses the
 raw close × share count rolled forward across later share-count actions (shares / eps_factor).
@@ -30,9 +32,10 @@ from financials import (
     features_peers,
     features_pl,
     features_rpt,
+    features_store,
 )
 from financials.corp_actions import ACCEPTED_STATUSES
-from financials.db import insert_rows, table_columns, version_key
+from financials.db import version_key
 from financials.features_price import add_price_columns, refresh_breadth
 from financials.fundamentals import (
     ANNUAL_COLUMNS,
@@ -78,7 +81,7 @@ from financials.timeutil import ist_to_utc, utc_now
 # Reader version of materialised rows. Bump it whenever features.py, fundamentals.py (or another file pinned by
 # tests/test_incremental_materialize.py) changes any output: `materialize --incremental` refuses days built by another
 # version, because only a full run then reproduces the history.
-FEATURES_VERSION = "2026.11.16-16S"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
+FEATURES_VERSION = "2026.11.16-17E"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
 # -3: QoQ sales / profit growth, NPM, interest coverage, OPM same quarter last year, dividend yield / payout,
 #     promoter holding QoQ change (owner_requirements items 1, 3, 4)
 # -4A: period P&L family (features_pl: quarter / fiscal-year lines, quarter YoY growth, result dates, history-gated
@@ -113,6 +116,9 @@ FEATURES_VERSION = "2026.11.16-16S"  # -2: X106 restatement TTM bridge + flag, X
 #       label add up, audit-opinion ties broken by filing_id
 # -16S: storage (architecture §4.1): a run rewrites the live screener_features table once, in its last day's
 #       transaction (materialize_days), instead of every day; identical rows, bumped because features.py changed
+# -17E: event-sparse history (features_store.py, architecture §4.1): screener_features_history is a view over
+#       features_daily (DAILY columns, every day) and features_events (EVENT columns, one row per interval of identical
+#       values); identical rows, bumped because the pinned files changed
 
 CRITICAL_COLUMNS = ("close", "market_cap", "sales_ttm", "pat_ttm", "total_equity")
 G4_MAX_NULL_RISE = 0.015
@@ -528,7 +534,7 @@ def _valuation_history(con, as_of: date, securities=None) -> dict[str, dict[str,
     rows = con.execute(
         """SELECT security_id, date_trunc('quarter', as_of_date) AS q, arg_max(pe, as_of_date),
                   arg_max(ev_ebitda, as_of_date)
-           FROM screener_features_history
+           FROM features_daily
            WHERE as_of_date < date_trunc('quarter', CAST(? AS DATE))"""
         + only
         + " GROUP BY 1, 2 ORDER BY 1, 2",
@@ -964,9 +970,7 @@ def materialize(
     if len(merged) != len(universe) or {r["security_id"] for r in merged} != {u[0] for u in universe} or not merged:
         return MaterializeResult("ABORTED", as_of, len(merged), "G5", f"{len(merged)} rows vs universe {len(universe)}")
 
-    prev = con.execute(
-        "SELECT max(as_of_date) FROM screener_features_history WHERE as_of_date < ?", [as_of]
-    ).fetchone()[0]
+    prev = con.execute("SELECT max(as_of_date) FROM features_daily WHERE as_of_date < ?", [as_of]).fetchone()[0]
     if prev is not None:
         cols = ", ".join(f"avg(CASE WHEN {c} IS NULL THEN 1 ELSE 0 END)" for c in CRITICAL_COLUMNS)
         before = dict(zip(CRITICAL_COLUMNS, con.execute(
@@ -977,24 +981,15 @@ def materialize(
         if spikes:
             return MaterializeResult("ABORTED", as_of, len(merged), "G4", f"null-rate spike vs {prev}: {spikes}")
 
-    columns = table_columns(con, "screener_features_history")
-    rows = [{c: r.get(c) for c in columns} for r in rows]
+    rows = [{c: r.get(c) for c in features_store.COLUMNS} for r in rows]
     con.execute("BEGIN TRANSACTION")
     try:
-        if entities is None:
-            con.execute("DELETE FROM screener_features_history WHERE as_of_date = ?", [as_of])
-        else:
-            by_ent, by_sec = in_list("entity_id", entities), in_list("security_id", {r["security_id"] for r in rows})
-            con.execute(
-                f"DELETE FROM screener_features_history WHERE as_of_date = ? AND ({by_ent[0]} OR {by_sec[0]})",
-                [as_of, *by_ent[1], *by_sec[1]],
-            )
-        insert_rows(con, "screener_features_history", rows)
+        features_store.write_day(con, as_of, rows, entities=entities)  # event-sparse (architecture §4.1)
         refresh_breadth(con, as_of)  # batch B: market-level breadth from the day's stored rows
         features_gems.refresh_cross_section(con, as_of)  # batch D: ranks / scores / hats over the stored day
         features_peers.refresh_cross_section(con, as_of)  # batch H: industry medians / peer ranks over the stored day
         features_more.refresh_cross_section(con, as_of)  # batch I: RS rank / industry earnings breadth
-        latest = con.execute("SELECT max(as_of_date) FROM screener_features_history").fetchone()[0]
+        latest = con.execute("SELECT max(as_of_date) FROM features_daily").fetchone()[0]
         due = latest == as_of or entities is None
         if snapshot and (due or snapshot_due):
             _write_snapshot(con)
@@ -1012,8 +1007,8 @@ def materialize(
 def _write_snapshot(con) -> None:
     """The live table = the latest materialised day of the history (inside the caller's transaction)."""
     con.execute("DELETE FROM screener_features")
-    con.execute("INSERT INTO screener_features SELECT * FROM screener_features_history WHERE as_of_date = "
-                "(SELECT max(as_of_date) FROM screener_features_history)")  # fmt: skip
+    con.execute("INSERT INTO screener_features BY NAME SELECT * FROM screener_features_history WHERE as_of_date = "
+                "(SELECT max(as_of_date) FROM features_daily)")  # fmt: skip
 
 
 def publish_snapshot(con) -> None:
@@ -1168,7 +1163,7 @@ def version_mismatch(con) -> str | None:
     """None when every materialised day was built by FEATURES_VERSION; else why `--incremental` must not run."""
     rows = con.execute(
         """SELECT min(h.as_of_date), max(h.as_of_date), count(*), list(DISTINCT coalesce(m.features_version, 'unknown'))
-           FROM (SELECT DISTINCT as_of_date FROM screener_features_history) h
+           FROM (SELECT DISTINCT as_of_date FROM features_daily) h
            LEFT JOIN features_meta m USING (as_of_date)
            WHERE m.features_version IS DISTINCT FROM ?""",
         [FEATURES_VERSION],
@@ -1199,7 +1194,7 @@ def settle_dirty(con, rows, lo: date | None, hi: date | None) -> int:
         return 0
     later = (
         hi is not None
-        and con.execute("SELECT count(*) FROM screener_features_history WHERE as_of_date > ?", [hi]).fetchone()[0] > 0
+        and con.execute("SELECT count(*) FROM features_daily WHERE as_of_date > ?", [hi]).fetchone()[0] > 0
     )
     con.execute("BEGIN TRANSACTION")
     try:
@@ -1223,11 +1218,11 @@ def settle_full_run(con, days: list[date]) -> int:
         return 0
     lo, hi = min(days), max(days)
     stored = {r[0] for r in con.execute(
-        "SELECT DISTINCT as_of_date FROM screener_features_history WHERE as_of_date BETWEEN ? AND ?", [lo, hi]
+        "SELECT DISTINCT as_of_date FROM features_daily WHERE as_of_date BETWEEN ? AND ?", [lo, hi]
     ).fetchall()}  # fmt: skip
     if not stored <= set(days):
         return 0
-    prev = con.execute("SELECT max(as_of_date) FROM screener_features_history WHERE as_of_date < ?", [lo]).fetchone()[0]
+    prev = con.execute("SELECT max(as_of_date) FROM features_daily WHERE as_of_date < ?", [lo]).fetchone()[0]
     return settle_dirty(con, _dirty_rows(con), None if prev is None else prev + timedelta(days=1), hi)
 
 
@@ -1252,7 +1247,7 @@ def materialize_incremental(con, to: date | None = None, exchange: str = "NSE") 
             return IncrementalResult("NOTHING", [], f"no dirty entities from on or before {to}")
     earliest = min(r[2] for r in rows)
     days = [d for (d,) in con.execute(
-        "SELECT DISTINCT as_of_date FROM screener_features_history WHERE as_of_date >= ? AND as_of_date <= ? "
+        "SELECT DISTINCT as_of_date FROM features_daily WHERE as_of_date >= ? AND as_of_date <= ? "
         "ORDER BY 1", [earliest, to or date.max]).fetchall()]  # fmt: skip
     every = None if any(r[1] == FULL for r in rows) else frozenset(r[1] for r in rows)
 

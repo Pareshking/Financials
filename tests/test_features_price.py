@@ -19,7 +19,7 @@ import pytest
 from conftest import FETCHED_AT, Market
 
 from _fixture_helpers import FIXTURES, load_sec_bhavdata_full, load_udiff
-from financials.db import apply_schema, connect, insert_rows
+from financials.db import apply_schema, connect
 from financials.features import compute_rows
 from financials.features_price import (
     PRICE_COLUMNS,
@@ -34,6 +34,7 @@ from financials.features_price import (
     rsi_series,
     sma,
 )
+from financials.features_store import write_rows as write_history
 from financials.promoter import promote
 from financials.staging import stage_corp_actions, stage_index_closes
 
@@ -338,7 +339,7 @@ def test_market_breadth_counts_nifty500_rows(tmp_path: Path):
     rows = [{"as_of_date": d, "security_id": f"s{i}", "entity_id": f"e{i}", "symbol": f"S{i}", "series": "EQ",
              "in_nifty500": m, "price_to_dma50": a, "price_to_dma200": b, "dist_52w_high": h, "dist_52w_low": lo,
              "return_1d": r} for i, (m, a, b, h, lo, r) in enumerate(spec)]  # fmt: skip
-    insert_rows(con, "screener_features_history", rows)
+    write_history(con, rows)
     refresh_breadth(con, d)
     refresh_breadth(con, d)  # idempotent
     got = con.execute("SELECT * EXCLUDE (as_of_date) FROM market_breadth").fetchall()

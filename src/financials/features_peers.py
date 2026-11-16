@@ -134,12 +134,14 @@ _ARROW_TYPES = {"peer_count": "int32", **dict.fromkeys(RANKS, "int32")}
 
 def refresh_cross_section(con, as_of: date) -> None:
     """Recompute CROSS_COLUMNS for every stored row of `as_of` (inside the materialize transaction, after the day's
-    rows are written): one read, one UPDATE through Arrow."""
+    rows are written): one read of the history view, one UPDATE of features_daily (CROSS_COLUMNS are DAILY columns,
+    tests/test_features_store.py) through Arrow."""
     import pyarrow as pa
 
     from financials.db import fetch_dicts
 
-    rows = fetch_dicts(con, f"SELECT {', '.join(CROSS_INPUTS)} FROM screener_features_history WHERE as_of_date = ?",
+    rows = fetch_dicts(con, f"SELECT {', '.join(CROSS_INPUTS)} FROM screener_features_history WHERE as_of_date = ? "
+                       "ORDER BY security_id",
                        [as_of])  # fmt: skip
     if not rows:
         return
@@ -154,7 +156,7 @@ def refresh_cross_section(con, as_of: date) -> None:
     try:
         sets = ", ".join(f"{c} = s.{c}" for c in CROSS_COLUMNS)
         con.execute(
-            f"UPDATE screener_features_history h SET {sets} FROM _peers_cross s "
+            f"UPDATE features_daily h SET {sets} FROM _peers_cross s "  # DAILY columns (features_store)
             "WHERE h.as_of_date = ? AND h.security_id = s.security_id",
             [as_of],
         )

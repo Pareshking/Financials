@@ -19,7 +19,7 @@ import pytest
 from conftest import FETCHED_AT, Market
 
 from _fixture_helpers import CORP, FIXTURES, XBRL_DIR
-from financials import dirty, features
+from financials import dirty, features, features_store
 from financials.cli import main, materialize_dates
 from financials.features import FEATURES_VERSION, materialize, materialize_incremental
 from financials.promoter import promote
@@ -86,7 +86,7 @@ def days(con) -> list[date]:
 def full_rebuild(con) -> list[tuple]:
     """From scratch: drop every materialised row, then materialise each day again in order."""
     ds = days(con)
-    con.execute("DELETE FROM screener_features_history")
+    features_store.truncate(con)
     con.execute("DELETE FROM features_meta")
     for d in ds:
         assert materialize(con, d).status == "PROMOTED", d
@@ -193,17 +193,21 @@ def test_incremental_equals_full_rebuild(db, name, monkeypatch):
 
 
 def test_rows_of_untouched_entities_and_days_are_not_rewritten(db):
-    """Rows of other entities, and every day before the first dirty date, are left exactly as stored."""
+    """Rows of other entities, and every day before the first dirty date, are left exactly as stored (the daily rows
+    and the EVENT intervals of the event-sparse history, features_store)."""
     con = db.con
-    for t in ("screener_features_history", "screener_features"):
-        con.execute(f"ALTER TABLE {t} ADD COLUMN probe INTEGER DEFAULT 1")
+    for t in ("features_daily", "features_events", "screener_features"):  # a rewritten row has probe NULL
+        con.execute(f"ALTER TABLE {t} ADD COLUMN probe INTEGER")
+        con.execute(f"UPDATE {t} SET probe = 1")
     ent = _results(db)
     assert materialize_incremental(con).status == "DONE"
-    rewritten = con.execute(
-        "SELECT DISTINCT entity_id, as_of_date FROM screener_features_history WHERE probe IS NULL"
-    ).fetchall()
+    rewritten = con.execute("SELECT DISTINCT entity_id, as_of_date FROM features_daily WHERE probe IS NULL").fetchall()
     assert {e for e, _ in rewritten} == ent
     assert min(d for _, d in rewritten) == date(2025, 9, 22)  # first materialised day >= 20 Sep
+    intervals = con.execute(
+        "SELECT DISTINCT s.entity_id FROM features_events e JOIN securities s USING (security_id) WHERE e.probe IS NULL"
+    ).fetchall()
+    assert {e for (e,) in intervals} <= ent
 
 
 def test_writers_mark_what_they_change(db, tmp_path):
@@ -325,10 +329,11 @@ PINNED_SOURCES = (
     "src/financials/scope.py",
     "src/financials/money.py",
     "src/financials/price_history.py",
+    "src/financials/features_store.py",
     "reference/valuation_archetypes.csv",
     "reference/cyclical_symbols.csv",
 )
-PINNED = ("2026.11.16-16S", "1bee929d22a4946d5fbfaa164836a0f7575bd96276ca4e0d3e52122ca02cc7e5")
+PINNED = ("2026.11.16-17E", "cacf84310553354df91921e23c585e22eae7688b407bdbc29af54acc962fc44f")
 
 
 def sources_sha256() -> str:

@@ -6,6 +6,7 @@ import pytest
 
 from financials.db import apply_schema, connect
 from financials.features import _valuation_history
+from financials.features_store import write_rows as write_history
 from financials.fundamentals import percentile_rank, reverse_dcf_implied_growth
 
 
@@ -38,12 +39,8 @@ def test_history_is_one_value_per_prior_quarter():
     apply_schema(con)
     rows = [("2026-04-10", 10.0), ("2026-06-30", 12.0), ("2026-07-15", 14.0), ("2026-09-29", 16.0),
             ("2026-10-05", 99.0)]  # fmt: skip
-    for d, pe in rows:
-        con.execute(
-            "INSERT INTO screener_features_history (as_of_date, security_id, entity_id, symbol, series, pe, ev_ebitda)"
-            " VALUES (?, 's', 'e', 'S', 'EQ', ?, ?)",
-            [d, pe, pe / 2],
-        )
+    write_history(con, [{"as_of_date": date.fromisoformat(d), "security_id": "s", "entity_id": "e", "symbol": "S",
+                         "series": "EQ", "pe": pe, "ev_ebitda": pe / 2} for d, pe in rows])  # fmt: skip
     h = _valuation_history(con, date(2026, 11, 13))
     assert sorted(h["s"]["pe"]) == [12.0, 16.0]  # last value of Q1 FY27 and Q2 FY27; current quarter excluded
     assert sorted(h["s"]["ev_ebitda"]) == [6.0, 8.0]

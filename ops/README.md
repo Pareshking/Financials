@@ -83,8 +83,19 @@ python -m financials --data-dir data prune-versions --dry-run   # rows of supers
 python -m financials --data-dir data prune-versions             # archive to data/archive, delete, then compact
 ```
 
-A full `materialize --from/--to`, `rebuild-market` and `prune-versions` compact by themselves when at least 20% (and
-256 MB) of the file is dead space and the disk has room; otherwise they print the `compact` command. `compact` needs
+Once, on a database from before features `2026.11.16-17E` (every write command refuses it until then):
+
+```bash
+python -m financials --data-dir data migrate-sparse-history   # wide history -> features_daily + features_events + view
+python -m financials --data-dir data materialize --from 2024-10-01 --to <last day>   # the FEATURES_VERSION bump
+```
+
+The migration runs in one transaction (the live database: ~2-3 minutes, the new tables reuse the file's free
+blocks), verifies the view against the wide table row for row before dropping it, and rolls back on any difference.
+
+A full `materialize --from/--to`, `rebuild-market`, `migrate-sparse-history` and `prune-versions` compact by
+themselves when at least 20% (and 256 MB) of the file is dead space and the disk has room; otherwise they print the
+`compact` command. `compact` needs
 1.1 x the live size free next to the database and refuses otherwise. If a compaction is interrupted between its two
 renames, `data/market.duckdb.bak` is the complete previous database: rename it back.
 

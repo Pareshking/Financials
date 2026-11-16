@@ -175,7 +175,7 @@ def test_columns_without_a_schedule_or_with_a_non_positive_denominator():
 
 
 def test_every_column_is_appended_in_both_tables_and_has_an_alias():
-    for t in ("screener_features", "screener_features_history"):
+    for t in ("screener_features",):  # the history view has its columns (test_features_store)
         names = [c for c, _ in declared_columns()[t]]
         assert names[-len(R.RPT_COLUMNS) :] == list(R.RPT_COLUMNS), t
     used = " ".join(sql for sql, _ in ALIASES.values())

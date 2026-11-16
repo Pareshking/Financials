@@ -18,10 +18,11 @@ import pytest
 
 from _fixture_helpers import XBRL_DIR
 from financials import features_more as M
-from financials.db import apply_schema, connect, declared_columns, insert_rows, table_columns
+from financials.db import apply_schema, connect, declared_columns, table_columns
 from financials.dsl import ALIASES, compile_screen
 from financials.features import compute_rows
 from financials.features_rpt import RPT_COLUMNS
+from financials.features_store import write_rows as write_history
 from financials.fundamentals import BENEISH, FactBook, _add_months, annual_ratios, building_blocks, load_segments
 from financials.parsers.reg34_annual import parse_reg34_annual
 
@@ -342,7 +343,7 @@ def test_percentile_history_is_read_from_prior_quarter_ends():
     rows = [{"as_of_date": d, "security_id": "s", "entity_id": "e", "symbol": "S", "series": "EQ", "pb": pb}
             for d, pb in ((date(2026, 3, 30), 2.0), (date(2026, 3, 31), 3.0), (date(2026, 6, 30), 4.0),
                           (date(2026, 10, 1), 9.0))]  # fmt: skip
-    insert_rows(con, "screener_features_history", rows)
+    write_history(con, rows)
     assert M.valuation_history(con, date(2026, 11, 12))["s"]["pb"] == [3.0, 4.0]
 
 
@@ -359,13 +360,13 @@ def test_rows_on_the_full_market(full_market):
     con = connect()
     apply_schema(con)
     cols = table_columns(con, "screener_features_history")
-    insert_rows(con, "screener_features_history", [{c: r.get(c) for c in cols} for r in rows.values()])
+    write_history(con, [{c: r.get(c) for c in cols} for r in rows.values()])
     M.refresh_cross_section(con, date(2026, 11, 12))
     assert con.execute("SELECT count(*) FROM screener_features_history").fetchone()[0] == len(rows)
 
 
 def test_every_column_is_appended_in_both_tables_and_has_an_alias():
-    for t in ("screener_features", "screener_features_history"):
+    for t in ("screener_features",):  # the history view has its columns (test_features_store)
         names = [c for c, _ in declared_columns()[t]]
         start = names.index(M.MORE_COLUMNS[0])  # batch I block, followed only by batch J (features_rpt)
         assert names[start : start + len(M.MORE_COLUMNS)] == list(M.MORE_COLUMNS), t

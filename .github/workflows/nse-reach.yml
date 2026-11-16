@@ -1,12 +1,15 @@
 name: nse-reach
 
-# One-off probe (owner request 2026-11-16): can GitHub-hosted runners reach NSE? 4 requests, >= 1.5 s apart;
-# prints status / size / sha256 only. Runs when this file or the probe changes, or by hand.
+# One-off probe (owner request 2026-11-16): can GitHub-hosted runners reach NSE? 5 requests (+1 warm-up), >= 1.5 s apart;
+# prints status / size / sha256 only. Runs when this file or the probe changes, by hand, and nightly (schedules run
+# only from the default branch, so the nightly probe starts once this is merged).
 on:
   push:
     paths:
       - .github/workflows/nse-reach.yml
       - scripts/probe_nse_reach.py
+  schedule:
+    - cron: "45 18 * * *"  # 00:15 IST, the planned nightly hour (deployment_plan.md P0.1: 7 nights, then remove)
   workflow_dispatch:
 
 permissions:

@@ -36,6 +36,8 @@ python -m financials --data-dir data materialize --incremental                 #
 # features.FEATURES_VERSION and the pinned hash together; --incremental then refuses until a full --from/--to run.
 python -m financials --data-dir data load-kpis kpis.csv                        # supplemental KPIs (then promote)
 python -m financials --data-dir data export-bundle --out data/bundle           # zstd Parquet shards; never commit them
+python -m financials --data-dir data compact [--keep-old]                      # monthly: rewrite the file without dead space
+python -m financials --data-dir data prune-versions [--dry-run] [--archive DIR]  # archive + delete superseded parser versions
 python -m financials --data-dir data backfill-index --manifest reference/nifty500_changes.csv
 python -m financials.bench --out docs/benchmarks.md                # after performance-relevant changes
 ```
@@ -68,6 +70,9 @@ data/                  local only, gitignored: vault/, staging/, market.duckdb
 
 1. **Append-only.** Vault blobs, `filings`, raw tables and `fact_observations` are never updated
    in place. A revision is a new filing (`supersedes_filing_id`). A re-parse is a new `parser_version`.
+   Rows of superseded parser versions may be pruned only by `prune-versions` after archiving them (owner decision
+   2026-11-16, decision I), and only rows no reader can select; vault blobs remain the source of truth, so every
+   version is reproducible by a re-parse. Nothing else deletes from these tables.
 2. **Blob ≠ filing.** One sha256 can have many filings (NSE + BSE mirror, re-sends), each with its own `broadcast_ts`.
 3. **Raw keeps source identifiers.** Raw tables store symbol/series/ISIN exactly as sent. Resolution
    to `security_id` happens in L2 via `security_identifier_history` (date-bounded). Splits change the

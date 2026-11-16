@@ -31,6 +31,8 @@ Operator commands (`python -m financials --data-dir data …`):
 | `rebuild-market --from D` | rolls market-derived state back to `D` (bars, bhavcopy/inferred calendar rows, identifier intervals, auto-decided corporate actions, feature history), replays the staged days and re-materialises; raw tables untouched; audited in `admin_log` |
 | `materialize D` / `materialize --from D1 --to D2` | builds features for `D` (or every promoted trading day in the range, ascending) with gates G4/G5; consumes the dirty markers the range covers (§11.10) |
 | `materialize --incremental [--to D]` | recomputes only the rows marked dirty since the last run, on already-materialised days, with G4/G5 on each merged day (§11.10); refuses when a day was built by another `FEATURES_VERSION` |
+| `compact [--keep-old]` | CHECKPOINT, copy every table into a sibling file created from `schema.sql`, verify row counts and views, swap the files atomically (§4.1). Refuses when free disk < 1.1 x the live size. Also runs at the end of a full `materialize --from/--to`, `rebuild-market` and `prune-versions` when there is dead space and room (`--no-compact` skips it) |
+| `prune-versions [--archive DIR] [--dry-run]` | archives (zstd Parquet + manifest + `admin_log`) and then deletes the rows of superseded parser versions no reader can select (decision I, §4.1) |
 | `run-day --date D` | holiday list, market days D−7..D, corporate actions D−7..D+30, discovery for symbols with results in the day's RSS (A9) + Reg. 30 events, promote, `materialize --incremental --to D−1`, materialise D in full; idempotent |
 | `screen "QUERY" [--as-of D]` | runs a DSL screen on the live table or point-in-time on history (read-only connection) |
 | `load-kpis FILE` | stages a supplemental-KPI CSV/JSON (`parsers.kpis`) for `promote` into `supplemental_kpis` |
@@ -81,6 +83,68 @@ Fetch etiquette (implemented in `financials.fetch.http.PoliteFetcher`): ≥1 s b
 | L1 Raw | `raw_xbrl_facts`, `raw_cm_bhavcopy`, `raw_delivery`, `raw_index_snapshot`, all keyed by **source identifiers** (symbol, series, ISIN as the exchange sent them) | Append-only. Re-parse appends new rows keyed by `parser_version`. |
 | L2 Canonical | Identity (`entity_master`, `securities`, `security_identifier_history`), `ohlcv`, `filing_meta`, `fact_observations`, `corp_actions`, `index_constituents_history`, `trading_calendar` | Rebuildable from L0/L1 + `quarantine_queue` resolutions + `company_overrides`. |
 | L3 Derived | Adjustment factors, adjusted prices, total-return index, `screener_features`, snapshots | Fully rebuildable. Swapped atomically. |
+
+### 4.1 Storage: what lives where, sizes, compaction and pruning
+
+| Where | What | Size (live database, 2026-11-16) |
+|---|---|---|
+| `data/vault/` | every downloaded file, by sha256; the source of truth for every parse | |
+| `data/staging/` | parsed Parquet batches waiting for (or recorded by) `promote` | |
+| `data/market.duckdb` | every table below; one file, one writer | 22.4 GiB file, ~6 GB in use by tables |
+| `raw_xbrl_facts` | every XBRL fact verbatim, once per parser version that parsed the filing | 48.9 M rows, 4.4 GB |
+| `screener_features_history` | one row per security and materialised day (§11.9) | 1.33 M rows, 1.0 GB |
+| `fact_observations`, `shareholding_*`, `segment_observations`, … | canonical facts, per parser version | ~0.4 GB together |
+| `data/archive/` | `prune-versions` output: zstd Parquet per table / version + `manifest.json` | |
+
+The rest of the file is dead space. DuckDB marks deleted rows and reuses whole free blocks, but never shrinks the file.
+Before -16S every materialised day of a run deleted and rewrote the live `screener_features` table, a full rebuild
+deleted and rewrote the history, and every re-parse added a full copy of a filing's raw facts (9 parser versions:
+0.6.0 alone holds 21.6 M raw rows). Three things keep the file at its live size:
+
+- **The live table once per run** (`features.materialize_days`, §11.11): a `materialize --from/--to`, `--incremental`
+  or `rebuild-market` run writes `screener_features` in the transaction of its last day only (gates unchanged; if
+  the run stops early, it is written from the last published day, so the tables end as the day-by-day publish
+  left them).
+- **`compact`** (`financials.storage.compact`): CHECKPOINT; the live size is the blocks the tables' persistent
+  segments occupy (`pragma_storage_info`); refuses when the free disk is below 1.1 x that. A sibling
+  `market.duckdb.compact` is created from `schema.sql` (constraints and views from the source of truth), every table
+  is copied in schema order (each foreign key finds its parent), each table's row count and the views are verified,
+  then `market.duckdb` is renamed to `.bak`, the copy to `market.duckdb`, and the `.bak` deleted (`--keep-old`
+  keeps it). It opens the database for writing, so it refuses while another process holds it. Run it monthly
+  (`ops/cron/financials.cron`) and after full rebuilds; full `materialize --from/--to`, `rebuild-market` and
+  `prune-versions` run it themselves when >= 20% (and >= 256 MB) of the file is dead and the disk has room, else
+  print the command.
+- **`prune-versions`** (owner decision I, `financials.storage.PRUNE_RULES`): deletes the rows of superseded parser
+  versions that no reader can select, after writing them to `DIR/prune-<UTC time>/<table>/parser_version=<v>/
+  rows.parquet` (zstd) with `manifest.json` (table, version, rows, sha256), reading each file back, and logging the
+  run in `admin_log`; a failed archive write deletes nothing. What a reader can select, per table:
+  - `fact_observations`, `segment_observations`: every value reader filters `CURRENT_VERSION` (the latest
+    `filing_meta` version of the filing; a filing without `filing_meta` keeps every version). The scope decision's
+    anchor periods (`pat`, 3 / 12 months) group every version, so an old anchor row stays unless the current version
+    has the same period visible no later.
+  - `raw_xbrl_facts`: readers take the current `filing_meta` version (`statements.segments`, which now reads one
+    version instead of every version's copy) or any one version (ScripCode, unparsed-filing checks): the latest raw
+    version and the `filing_meta` version stay.
+  - `shareholding_observations` / `_line_items` / `_major_holders`: readers join the ranked `shareholding_meta` row
+    (latest visible, then highest version), so an old version goes only when a newer version of the same filing,
+    entity and as-of date is visible from the same instant (a re-parse that moved visibility leaves it selectable,
+    X83); observations also need the same category in the newer version (the promoter's share cross-check).
+  - `related_party_transactions`: ranked per (entity, scope, period end) by visibility, filing, version: an old row
+    goes only when a newer version covers the same period from the same instant. `group_structure`: the latest
+    version per filing stays (no feature reader).
+  - Never pruned: versions named by a quarantine finding (`details.parser_version`) and every version of a filing
+    with an open finding; `filing_meta` and `shareholding_meta` whole (read across versions: rounding level, fiscal
+    year starts, accounting basis, visibility timestamps; small); `corporate_events` (one row per event);
+    `fact_corrections` names a filing, not a version.
+  `tests/test_storage.py` materialises the fixture market with injected superseded versions (different values) and
+  the rows above that must stay, prunes, materialises again and compares every table; the archive is read back.
+
+Measured read-only on the live database (2026-11-16, `prune-versions --dry-run` rules): prune removes 23.97 M of
+48.9 M `raw_xbrl_facts` rows (~2.16 GB), 2.73 M of 5.78 M `fact_observations` (~0.10 GB), 3.84 M shareholding rows
+(~0.06 GB) and 1,340 segment rows; nothing in `related_party_transactions` / `group_structure` (one version each).
+After prune + compact the file should be ~4-5 GB (≈3.6 GB of table blocks plus primary-key indexes), from 22.4 GiB.
+The owner kept the full feature universe (every security with a recent bar, ~3,000 today, to be expanded): the
+history is ~1 GB for 1.33 M rows and grows with the days and the universe.
 
 ## 5. Schema
 
@@ -634,6 +698,11 @@ only because the pinned files changed).
   add up, a member reported by two elements counts once; audit ties broken by filing_id
   (`tests/test_materialize_determinism.py`). Every other read under `_fundamentals` and the period-value stages
   ranks with a full tie-break (filing_id / parser version) or groups by its key.
+- **Live table once per run** (-16S, `features.materialize_days`): every day of a run used to delete and rewrite
+  `screener_features` with the latest materialised day (the same rows again), leaving the deleted copies as dead
+  blocks. Now only the run's last day rewrites it, inside its own publish transaction (`materialize(...,
+  snapshot=False)` on the others reports `snapshot_due`); a run that stops early rewrites it from the last
+  published day. The tables end identical to the day-by-day publish (`tests/test_storage.py`).
 - Not done: parallel day computation. DuckDB lets no other process open the database file while the single writer
   holds it, and the per-day Python work is GIL-bound, so worker processes would need their own copy of every input;
   after the changes above a day of ~3,000 securities is ~1.5-2 s (half per-row Python, half the Arrow insert, the

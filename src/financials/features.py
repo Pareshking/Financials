@@ -4,8 +4,8 @@ Runs inside the single writer process. Gates (architecture §12):
 - G4 null-spike: a critical column's null rate may not rise > 1.5 percentage points vs the previous run. A TTM
   value that turns NULL because the company filed a newer quarter whose 4-quarter window reaches before the
   financials cutoff (C9: never a partial window) is expected, not a defect, and is not counted (rule G4_C9_WINDOW).
-- G5 atomic swap: history rows for the date and the live table are replaced in one transaction,
-  only after the row count equals the universe size.
+- G5 atomic swap: history rows for the date (and, on the last day of a run, the live table) are replaced in one
+  transaction, only after the row count equals the universe size.
 
 Prices: momentum uses back-adjusted closes (withheld after an unresolved gap); market cap uses the
 raw close × share count rolled forward across later share-count actions (shares / eps_factor).
@@ -78,7 +78,7 @@ from financials.timeutil import ist_to_utc, utc_now
 # Reader version of materialised rows. Bump it whenever features.py, fundamentals.py (or another file pinned by
 # tests/test_incremental_materialize.py) changes any output: `materialize --incremental` refuses days built by another
 # version, because only a full run then reproduces the history.
-FEATURES_VERSION = "2026.11.15-15P"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
+FEATURES_VERSION = "2026.11.16-16S"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
 # -3: QoQ sales / profit growth, NPM, interest coverage, OPM same quarter last year, dividend yield / payout,
 #     promoter holding QoQ change (owner_requirements items 1, 3, 4)
 # -4A: period P&L family (features_pl: quarter / fiscal-year lines, quarter YoY growth, result dates, history-gated
@@ -111,6 +111,8 @@ FEATURES_VERSION = "2026.11.15-15P"  # -2: X106 restatement TTM bridge + flag, X
 # -15P: deterministic reads that depended on DuckDB's scan order (found by scripts/compare_materialize.py on the live
 #       database): paid-up share count (latest period end, STANDALONE first, count > 0), segment members sharing a
 #       label add up, audit-opinion ties broken by filing_id
+# -16S: storage (architecture §4.1): a run rewrites the live screener_features table once, in its last day's
+#       transaction (materialize_days), instead of every day; identical rows, bumped because features.py changed
 
 CRITICAL_COLUMNS = ("close", "market_cap", "sales_ttm", "pat_ttm", "total_equity")
 G4_MAX_NULL_RISE = 0.015
@@ -131,6 +133,7 @@ class MaterializeResult:
     rows: int = 0
     gate: str | None = None
     message: str = ""
+    snapshot_due: bool = False  # published with snapshot=False although the live table would have been rewritten
 
 
 def _f(x) -> float | None:
@@ -932,12 +935,17 @@ def materialize(
     *,
     entities: frozenset[str] | None = None,
     prices: PriceHistory | None = None,
+    snapshot: bool = True,
+    snapshot_due: bool = False,
 ) -> MaterializeResult:
     """Compute, gate and atomically publish features for `as_of`. Caller must be the single writer.
 
     `entities` (incremental, §11.10): recompute only those entities' rows and merge them with the day's other rows
     already stored; G5 and G4 are then checked on the merged day, and only the recomputed rows are replaced.
-    `prices`: the run's PriceHistory (`materialize_run`), so a multi-day run reads the bars once."""
+    `prices`: the run's PriceHistory (`materialize_run`), so a multi-day run reads the bars once.
+    `snapshot=False` (every day of a run but the last, `materialize_days`): the live `screener_features` table is not
+    rewritten; the result's `snapshot_due` says whether it would have been. `snapshot_due=True` (the run's last day):
+    an earlier day of the run deferred it, so this day's transaction rewrites it in any case (architecture §11.11)."""
     rows = compute_rows(con, as_of, exchange, entities=entities, prices=prices)
     if prices is not None:
         prices.settle()
@@ -987,10 +995,9 @@ def materialize(
         features_peers.refresh_cross_section(con, as_of)  # batch H: industry medians / peer ranks over the stored day
         features_more.refresh_cross_section(con, as_of)  # batch I: RS rank / industry earnings breadth
         latest = con.execute("SELECT max(as_of_date) FROM screener_features_history").fetchone()[0]
-        if latest == as_of or entities is None:
-            con.execute("DELETE FROM screener_features")
-            con.execute("INSERT INTO screener_features SELECT * FROM screener_features_history WHERE as_of_date = ?",
-                        [latest])  # fmt: skip
+        due = latest == as_of or entities is None
+        if snapshot and (due or snapshot_due):
+            _write_snapshot(con)
         con.execute(
             "INSERT OR REPLACE INTO features_meta VALUES (?, ?, ?, ?, ?)",
             [as_of, FEATURES_VERSION, "FULL" if entities is None else "INCREMENTAL", len(merged), utc_now()],
@@ -999,7 +1006,61 @@ def materialize(
         con.execute("ROLLBACK")
         raise
     con.execute("COMMIT")
-    return MaterializeResult("PROMOTED", as_of, len(merged))
+    return MaterializeResult("PROMOTED", as_of, len(merged), snapshot_due=due and not snapshot)
+
+
+def _write_snapshot(con) -> None:
+    """The live table = the latest materialised day of the history (inside the caller's transaction)."""
+    con.execute("DELETE FROM screener_features")
+    con.execute("INSERT INTO screener_features SELECT * FROM screener_features_history WHERE as_of_date = "
+                "(SELECT max(as_of_date) FROM screener_features_history)")  # fmt: skip
+
+
+def publish_snapshot(con) -> None:
+    """Rewrite the live table from the latest materialised day in its own transaction (a run that stopped early)."""
+    con.execute("BEGIN TRANSACTION")
+    try:
+        _write_snapshot(con)
+    except BaseException:
+        con.execute("ROLLBACK")
+        raise
+    con.execute("COMMIT")
+
+
+def materialize_days(
+    con,
+    days,
+    exchange: str = "NSE",
+    *,
+    prices: PriceHistory | None = None,
+    entities_for=None,
+    report=None,
+) -> list[MaterializeResult]:
+    """`materialize` each of `days` in order (one run: `materialize --from/--to`, `--incremental`, `rebuild-market`),
+    stopping at the first day that does not publish. The live `screener_features` table is rewritten once, in the
+    transaction of the run's last day (architecture §11.11): rewriting it every day only replaced it with the same
+    latest day again and left the deleted copies as dead blocks in the file. When the run stops early (a failed
+    gate, an error) after a day that deferred it, it is rewritten on its own, so the tables end exactly as the
+    day-by-day publish left them. `entities_for(day)`: the entities to recompute on that day (None = all);
+    `report(result)`: called after each day."""
+    days = list(days)
+    results: list[MaterializeResult] = []
+    due = False
+    try:
+        for i, d in enumerate(days):
+            ents = entities_for(d) if entities_for is not None else None
+            r = materialize(con, d, exchange, entities=ents, prices=prices, snapshot=i == len(days) - 1,
+                            snapshot_due=due)  # fmt: skip
+            results.append(r)
+            if report is not None:
+                report(r)
+            if r.status != "PROMOTED":
+                break
+            due = (due or r.snapshot_due) and i < len(days) - 1  # the last day's transaction wrote it
+    finally:
+        if due:  # the last day did not publish (or raised): the days before it did, as day-by-day would have shown
+            publish_snapshot(con)
+    return results
 
 
 class FundamentalsCache:
@@ -1193,15 +1254,16 @@ def materialize_incremental(con, to: date | None = None, exchange: str = "NSE") 
     days = [d for (d,) in con.execute(
         "SELECT DISTINCT as_of_date FROM screener_features_history WHERE as_of_date >= ? AND as_of_date <= ? "
         "ORDER BY 1", [earliest, to or date.max]).fetchall()]  # fmt: skip
-    results: list[MaterializeResult] = []
     every = None if any(r[1] == FULL for r in rows) else frozenset(r[1] for r in rows)
+
+    def entities_for(d: date) -> frozenset[str] | None:
+        due = [r for r in rows if r[2] <= d]
+        return None if any(r[1] == FULL for r in due) else frozenset(r[1] for r in due)
+
     with materialize_run(con, days, exchange, every) as prices:
-        for d in days:
-            due = [r for r in rows if r[2] <= d]
-            ents = None if any(r[1] == FULL for r in due) else frozenset(r[1] for r in due)
-            r = materialize(con, d, exchange, entities=ents, prices=prices)
-            results.append(r)
-            if r.status != "PROMOTED":
-                return IncrementalResult("ABORTED", results, f"{d}: {r.gate} {r.message}; dirty markers kept")
+        results = materialize_days(con, days, exchange, prices=prices, entities_for=entities_for)
+    if results and results[-1].status != "PROMOTED":
+        r = results[-1]
+        return IncrementalResult("ABORTED", results, f"{r.as_of_date}: {r.gate} {r.message}; dirty markers kept")
     settle_dirty(con, rows, None, to)
     return IncrementalResult("DONE", results, f"{len(days)} day(s)", len({r[1] for r in rows}))

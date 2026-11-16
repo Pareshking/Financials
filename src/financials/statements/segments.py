@@ -17,19 +17,25 @@ from financials.parsers.segments import SEGMENT_ELEMENTS
 
 
 def segment_facts(con, entity_id: str, as_of: datetime, *, scope: str | None = None) -> list[dict]:
-    """Rows {scope, period_end_of_filing, segment, member, element, period_start, period_end, value}."""
+    """Rows {scope, period_end_of_filing, segment, member, element, period_start, period_end, value}. Each filing is
+    read at its current parser version (the latest filing_meta version, X83), raw facts of that version only."""
     rows = con.execute(
         """WITH f AS (
-             SELECT filing_id, scope, period_end, row_number() OVER (
+             SELECT filing_id, parser_version, scope, period_end, row_number() OVER (
                       PARTITION BY scope, period_end ORDER BY visible_from_ts DESC, """
         + version_key()
         + """ DESC) AS rn
              FROM filing_meta
              WHERE entity_id = ? AND visible_from_ts <= ? AND accounting_profile <> 'REG34_ANNUAL'
-               AND (? IS NULL OR scope = ?))
+               AND (? IS NULL OR scope = ?)
+               AND """
+        + version_key()
+        + """ = (SELECT max("""
+        + version_key("x.parser_version")
+        + """) FROM filing_meta x WHERE x.filing_id = filing_meta.filing_id))
            SELECT f.scope, f.period_end, r.element_name, r.ctx_start, r.ctx_end, r.ctx_instant, r.dimensions,
                   r.value_text
-           FROM f JOIN raw_xbrl_facts r USING (filing_id)
+           FROM f JOIN raw_xbrl_facts r USING (filing_id, parser_version)  -- the ranked version only
            WHERE f.rn = 1 AND r.dimensions IS NOT NULL
              AND r.element_name IN (SELECT unnest(?))""",
         [entity_id, as_of, scope, scope, [*SEGMENT_ELEMENTS, "DescriptionOfReportableSegment"]],

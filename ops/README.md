@@ -15,7 +15,7 @@ the data and can run alongside any of them.
 
 ## Why the pipeline cannot run on a GitHub-hosted runner
 
-- **No data there.** `data/` (vault, staging, `market.duckdb`, ~10 GB) is gitignored and lives only on your disk. A
+- **No data there.** `data/` (vault, staging, `market.duckdb`, several GB) is gitignored and lives only on your disk. A
   hosted runner starts from an empty VM every time and has no persistent disk; rebuilding the database nightly would
   mean re-downloading every vaulted blob, which the fetch rules forbid.
 - **NSE blocks datacenter IPs.** Archive and API requests from cloud ranges are refused, and `www.nseindia.com` needs
@@ -70,6 +70,23 @@ run at home, and everything happens on your disk.
 
 GitHub-hosted schedules run on the default branch, can start late under load, and are paused after 60 days without
 repository activity on public repositories.
+
+## Storage maintenance (monthly, and after full rebuilds)
+
+DuckDB never shrinks its file: re-materialised feature days and deleted rows stay as dead blocks
+(docs/architecture.md §4.1). Run, with no other `financials` writer running:
+
+```bash
+python -m financials --data-dir data compact            # monthly (cron line in cron/financials.cron), keeps nothing
+python -m financials --data-dir data compact --keep-old # keep the previous file as data/market.duckdb.bak
+python -m financials --data-dir data prune-versions --dry-run   # rows of superseded parser versions, per table
+python -m financials --data-dir data prune-versions             # archive to data/archive, delete, then compact
+```
+
+A full `materialize --from/--to`, `rebuild-market` and `prune-versions` compact by themselves when at least 20% (and
+256 MB) of the file is dead space and the disk has room; otherwise they print the `compact` command. `compact` needs
+1.1 x the live size free next to the database and refuses otherwise. If a compaction is interrupted between its two
+renames, `data/market.duckdb.bak` is the complete previous database: rename it back.
 
 ## The ops/ files
 

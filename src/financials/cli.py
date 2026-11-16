@@ -19,7 +19,7 @@ from financials import lineage
 from financials.calendar import is_trading_day
 from financials.db import apply_schema, connect
 from financials.dsl import run_screen
-from financials.features import materialize, materialize_incremental, materialize_run, settle_full_run
+from financials.features import materialize_days, materialize_incremental, materialize_run, settle_full_run
 from financials.fetch.http import PoliteFetcher, Transport
 from financials.fetch.jobs import WARMUP, Jobs
 from financials.promoter import close_resolved_share_findings, close_wrong_template_duplicates, promote
@@ -183,6 +183,16 @@ def build_parser() -> argparse.ArgumentParser:
     rb = sub.add_parser("rebuild-market", help="roll market-derived state back to a date and replay it (audited)")
     rb.add_argument("--from", dest="from_date", type=_date, required=True)
     rb.add_argument("--note", default="rebuild-market")
+    rb.add_argument("--no-compact", action="store_true", help="do not compact the database file afterwards")
+    cp = sub.add_parser("compact", help="rewrite the database file without dead space (verified copy, atomic swap)")
+    cp.add_argument("--keep-old", action="store_true", help="keep the previous file as market.duckdb.bak")
+    pv = sub.add_parser(
+        "prune-versions", help="archive to Parquet, then delete, superseded parser versions (decision I)"
+    )
+    pv.add_argument("--archive", type=Path, help="archive directory (default: DATA_DIR/archive)")
+    pv.add_argument("--dry-run", action="store_true", help="only report the rows per table and version")
+    pv.add_argument("--note", default="")
+    pv.add_argument("--no-compact", action="store_true", help="do not compact the database file afterwards")
     mt = sub.add_parser("materialize", help="one date, or every promoted trading day in --from/--to, in order")
     mt.add_argument("as_of", type=_date, nargs="?")
     mt.add_argument("--from", dest="from_date", type=_date)
@@ -192,6 +202,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="recompute only rows marked dirty since the last run, on materialised days (<= --to)",
     )
+    mt.add_argument("--no-compact", action="store_true", help="after --from/--to: do not compact the database file")
     q = sub.add_parser("quarantine", help="list or resolve quarantined items (audited)")
     qs = q.add_subparsers(dest="qcmd", required=True)
     ql = qs.add_parser("list")
@@ -434,6 +445,27 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
     if args.cmd in ("screen", "ratios") or (args.cmd == "quarantine" and args.qcmd in ("list", "inspect")):
         return read_command(args, db_path, out)
 
+    if args.cmd == "compact":
+        from financials.storage import compact
+
+        if not db_path.exists():
+            print(f"error: no market database at {db_path}", file=out)
+            return 2
+        r = compact(db_path, keep_old=args.keep_old)
+        print(f"compact: {r.status} {r.message}", file=out)
+        return 0 if r.status == "COMPACTED" else 1
+    rc = write_command(args, db_path, stage_root, out)
+    full_run = (args.cmd == "materialize" and args.from_date is not None and not args.incremental) or args.cmd in (
+        "rebuild-market", "prune-versions")  # fmt: skip
+    if rc == 0 and full_run and not getattr(args, "no_compact", False) and not getattr(args, "dry_run", False):
+        from financials.storage import maybe_compact
+
+        maybe_compact(db_path, out, data_dir_arg=str(args.data_dir))  # dead space of the rewritten history [§4.1]
+    return rc
+
+
+def write_command(args, db_path: Path, stage_root: Path, out) -> int:
+    """Every command that opens the market database for writing (the single writer)."""
     args.data_dir.mkdir(parents=True, exist_ok=True)
     con = connect(db_path)
     try:
@@ -451,17 +483,28 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
             r = rebuild_market(con, args.from_date, note=args.note)
             print(json.dumps(r, default=str), file=out)
             waiting = promote_pending(con, stage_root, out)
-            done = []
             with materialize_run(con, r["features_dates"]) as prices:
-                for d in r["features_dates"]:
-                    fr = materialize(con, d, prices=prices)
-                    print(f"{fr.status} {fr.as_of_date} rows={fr.rows} {fr.gate or ''} {fr.message}", file=out)
-                    if fr.status != "PROMOTED":
-                        break
-                    done.append(d)
+                results = materialize_days(con, r["features_dates"], prices=prices, report=_reporter(out))
+            done = [fr.as_of_date for fr in results if fr.status == "PROMOTED"]
             if done == r["features_dates"]:
                 settle_full_run(con, done)
             return 1 if waiting else 0
+        if args.cmd == "prune-versions":
+            from financials.storage import StorageError, prune_versions
+
+            try:
+                r = prune_versions(con, args.archive or args.data_dir / "archive", dry_run=args.dry_run,
+                                   note=args.note)  # fmt: skip
+            except StorageError as exc:
+                print(f"error: {exc}", file=out)
+                return 1
+            for p in r.plan:
+                if p["rows"] or args.dry_run:
+                    print(f"{p['table']} {p['parser_version']}: {p['rows']} of {p['total_rows']} rows "
+                          + ("removable" if args.dry_run else "removed"), file=out)  # fmt: skip
+            print(f"prune-versions: {r.status} {r.removed} rows" + (f", manifest {r.manifest}" if r.manifest else ""),
+                  file=out)  # fmt: skip
+            return 0
         if args.cmd == "materialize":
             if args.incremental:
                 if args.as_of is not None or args.from_date is not None:
@@ -664,13 +707,19 @@ def materialize_dates(con, as_of: date | None, start: date | None, end: date | N
         print("error: give a date or --from [--to]", file=out)
         return 2
     with materialize_run(con, dates) as prices:  # bars read once for the whole run [§11.11]
-        for d in dates:  # ascending, so G4 always compares with the previous materialised date
-            r = materialize(con, d, prices=prices)
-            print(f"{r.status} {r.as_of_date} rows={r.rows} {r.gate or ''} {r.message}", file=out)
-            if r.status != "PROMOTED":
-                return 1
+        # ascending, so G4 always compares with the previous materialised date; live table once, on the last day
+        results = materialize_days(con, dates, prices=prices, report=_reporter(out))
+    if any(r.status != "PROMOTED" for r in results):
+        return 1
     settle_full_run(con, dates)  # dirty markers this full run made obsolete
     return 0
+
+
+def _reporter(out):
+    def report(r) -> None:
+        print(f"{r.status} {r.as_of_date} rows={r.rows} {r.gate or ''} {r.message}", file=out)
+
+    return report
 
 
 def materialize_incremental_cli(con, to: date | None, out) -> int:

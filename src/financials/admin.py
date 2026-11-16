@@ -715,6 +715,12 @@ def _set_archetype(con, entity_id: str, archetype: str | None, reason: str) -> d
 
 # ── PDF-verified corrections (owner decision B, 2026-11-15) ──
 
+# Batch K: tags the parsers file as INR_PER_SHARE (fact_observations.value_other). Their corrections carry
+# `value_other` (rupees per share, at most 4 decimals); every other tag is corrected in rupees (`value_inr`).
+PER_SHARE_TAGS = frozenset({
+    "eps_basic", "eps_basic_continuing", "eps_diluted", "eps_basic_before_extraordinary", "face_value_per_share",
+})  # fmt: skip
+
 
 def correct_from_pdf(
     con,
@@ -729,11 +735,12 @@ def correct_from_pdf(
     quarantine_id: str | None = None,
 ) -> list[str]:
     """Record values read from the filing's signed statutory results PDF, where the company's XBRL is wrong. Each
-    correction: {canonical_tag, period_start, period_end, value_inr} in rupees. Requires the evidence (URL, page,
-    printed text) and at least two independent reads that agreed (`reads`, e.g. "TEXT+HAIKU"). Correcting owners
-    or NCI also withdraws the X86 attribution_withheld marker for that period. Raw XBRL and fact_observations are
-    never touched; readers rank a correction above the filing's own value (fundamentals._fact_source). Resolves
-    `quarantine_id` as CORRECTED when given. Returns the correction ids."""
+    correction: {canonical_tag, period_start, period_end, value_inr} in rupees, or for a per-share tag
+    (PER_SHARE_TAGS: EPS, face value) {canonical_tag, period_start, period_end, value_other} in rupees per share.
+    Requires the evidence (URL, page, printed text) and at least two independent reads that agreed (`reads`, e.g.
+    "TEXT+HAIKU"). Correcting owners or NCI also withdraws the X86 attribution_withheld marker for that period. Raw
+    XBRL and fact_observations are never touched; readers rank a correction above the filing's own value
+    (fundamentals._fact_source). Resolves `quarantine_id` as CORRECTED when given. Returns the correction ids."""
     if not corrections or not evidence_url or not evidence_text.strip() or not note.strip():
         raise AdminError("corrections, evidence_url, evidence_text and note are required")
     if "+" not in reads:
@@ -757,14 +764,15 @@ def _correct(con, filing_id, corrections, url, page, text, reads, note, qid) -> 
                 rows_in.append(marker)
     for c in rows_in:
         start, end = date.fromisoformat(str(c["period_start"])), date.fromisoformat(str(c["period_end"]))
-        value = None if c["value_inr"] is None else Decimal(str(c["value_inr"]))
+        value_inr, value_other = _correction_values(c)
+        value = value_other if c["canonical_tag"] in PER_SHARE_TAGS else value_inr
         cid = stable_id("corr", filing_id, c["canonical_tag"], start, end, value)
         rows.append({
             "correction_id": cid, "filing_id": filing_id, "entity_id": entity, "scope": scope,
             "canonical_tag": c["canonical_tag"], "period_type": "INSTANT" if start == end else "DURATION",
-            "period_start": start, "period_end": end, "value_inr": value, "evidence_url": url,
+            "period_start": start, "period_end": end, "value_inr": value_inr, "evidence_url": url,
             "evidence_page": page, "evidence_text": text, "reads": reads, "quarantine_id": qid, "note": note,
-            "created_at": now, "revoked_at": None,
+            "created_at": now, "revoked_at": None, "value_other": value_other,
         })  # fmt: skip
     existing = {r[0] for r in con.execute("SELECT correction_id FROM fact_corrections").fetchall()}
     new = [r for r in rows if r["correction_id"] not in existing]
@@ -782,6 +790,26 @@ def _correct(con, filing_id, corrections, url, page, text, reads, note, qid) -> 
                 [now, f"{note} [PDF {url} p.{page}; reads {reads}]", qid],
             )
     return [r["correction_id"] for r in rows]
+
+
+def _correction_values(c: dict) -> tuple[Decimal | None, Decimal | None]:
+    """(value_inr, value_other) of one correction. A per-share tag takes `value_other` only (DECIMAL(18,4), as in
+    fact_observations it is never rupees); any other tag takes `value_inr` only (DECIMAL(20,2) rupees). None
+    withdraws the tag for that period either way."""
+    tag = c["canonical_tag"]
+    per_share = tag in PER_SHARE_TAGS
+    key, other = ("value_other", "value_inr") if per_share else ("value_inr", "value_other")
+    if key not in c or c.get(other) is not None:
+        unit = "rupees per share" if per_share else "rupees"
+        raise AdminError(f"{tag}: give `{key}` ({unit}), not `{other}`")
+    if c[key] is None:
+        return None, None
+    v = Decimal(str(c[key]))
+    places = Decimal("0.0001") if per_share else Decimal("0.01")
+    if v != v.quantize(places) or abs(v) >= Decimal(10) ** (14 if per_share else 18):
+        raise AdminError(f"{tag}: {v} does not fit {'DECIMAL(18,4)' if per_share else 'DECIMAL(20,2)'}")
+    # not quantized: the stable_id of a rupee correction recorded before batch K must not change
+    return (None, v) if per_share else (v, None)
 
 
 def revoke_correction(con, correction_id: str, note: str) -> None:

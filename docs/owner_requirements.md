@@ -30,7 +30,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G29 | 3-stage PDF pipeline: PyMuPDF page triage, vision-LLM to strict JSON, deterministic checks | OUT_OF_SCOPE_BY_DECISION | arch 7.6, arch 15. PDF numbers out of scope; see decision G28 |
 | G30 | PDF checks: note tie-out 0.5%, balance-sheet identity, cross-source scale check vs XBRL; quarantine failures | OUT_OF_SCOPE_BY_DECISION | arch 7.6, arch 15. Gate G3 already checks filed XBRL identities |
 | G36 | Permanent entity master: immutable entity_id mapped to ISIN; tickers may change | DONE | entity_master, securities, security_identifier_history; arch 5.1; tests/test_identity.py. Keyed by FinInstrmId + ISIN, not ISIN alone |
-| G40 | Evening job polls NSE corporate actions and bhavcopy; purposes parsed by deterministic rules | DONE | run-day; arch 11.2; CA9; tests/test_nse_corp_actions.py, tests/test_phase1_fixes_b.py |
+| G40 | Evening job polls NSE corporate actions and bhavcopy; purposes parsed by deterministic rules | DONE | run-day; arch 11.2, 13; CA9; tests/test_nse_corp_actions.py, tests/test_phase1_fixes_b.py. Scheduled by ops/ (20:15 IST) or, batch K, by the GitHub Actions nightly-pipeline workflow on a self-hosted runner (22:00 IST; ops/README.md, tests/test_nightly_workflows.py) |
 | G79 | Map NSE symbols to BSE scrip codes | DONE | X111; filing_checks.apply_bse_scrip_code fills security_identifier_history.bse_scrip_code from the in-filing ScripCode (rows matching the filing's ISIN and symbol); IDENTIFIER/BSE_SCRIP_CODE_CONFLICT on disagreement; tests/test_restatement_triggers.py (TCS, HDFC Bank) |
 | G85 | Key the master table on ISIN, identical across NSE and BSE | CONFLICTS_WITH_EVIDENCE | P5 (split changes ISIN), P13; arch 5.1 |
 | G90 | Quarterly + annual XBRL: statements, notes (borrowings, leases, fixed assets) | DONE | F06, F07; parsers/integrated.py, parsers/reg34_annual.py; X71-X73. Segments tracked separately |
@@ -374,7 +374,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 
 | id | requirement | status | where / next step |
 |---|---|---|---|
-| G60 | Daily master and lineage sync: symbol master, ISIN changes, new listings, delistings | DONE | arch 5.1, 12 (inactive securities), 13 (daily run scheduled by ops/); F28; tests/test_identity.py, tests/test_phase1_fixes_b.py, tests/test_batch_h_industry_peers.py. Identity sync runs from the daily bhavcopy; EQUITY_L (fetch-equity-master) is not in the daily run. BSE master not reachable (A1) |
+| G60 | Daily master and lineage sync: symbol master, ISIN changes, new listings, delistings | DONE | arch 5.1, 12 (inactive securities), 13 (daily run scheduled by ops/); F28; tests/test_identity.py, tests/test_phase1_fixes_b.py, tests/test_batch_h_industry_peers.py. Identity sync runs from the daily bhavcopy; EQUITY_L (fetch-equity-master) is not in the daily run. BSE master not reachable (A1). Batch K: the nightly-pipeline workflow also fetches the NSE classification of Nifty 500 symbols that have none (fetch-classification --missing-only) |
 | G144 | Poll RSS every 1-2 minutes for live alerts | OUT_OF_SCOPE_BY_DECISION | CLAUDE.md Fetching (minimal volume); C8; arch 13 |
 | G213 | Three-phase roadmap (core / deep edge / alpha) | DONE | arch 15 (corrected: corporate actions in Phase 1) |
 | G284 | Taxonomy namespace registry: detect unknown namespaces / version bumps | DONE | arch 7.1; docs/tag_registry.yaml; tests/test_indas_corp_parser.py, tests/test_registry_audit.py |
@@ -382,7 +382,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G286 | Null-rate circuit breaker (critical columns, 2% spike) | DONE | gate G4 (1.5 pp); tests/test_features.py |
 | G287 | SHA-256 vault for offline replay | DONE | vault.py; invariant 2; tests/test_foundations.py |
 | G288 | Keep the raw vault in Cloudflare R2 | OUT_OF_SCOPE_BY_DECISION | CLAUDE.md Don'ts (no Cloudflare/R2) |
-| G289 | Make the platform self-healing and autonomous from next quarter *(owner)* | DONE | run-day (arch 2, 13) scheduled daily by ops/ (systemd, cron, Windows Task Scheduler) with materialize --incremental after it; tests/test_phase1_fixes_b.py, tests/test_batch_h_industry_peers.py. Auto-healing limited to named rules (invariant 9) |
+| G289 | Make the platform self-healing and autonomous from next quarter *(owner)* | DONE | run-day (arch 2, 13) scheduled daily by ops/ (systemd, cron, Windows Task Scheduler) or by the GitHub Actions nightly-pipeline on the owner's self-hosted runner (batch K, ops/README.md), with materialize --incremental after it; nightly-tests runs the offline suite on GitHub at 22:00 IST; tests/test_phase1_fixes_b.py, tests/test_batch_h_industry_peers.py, tests/test_nightly_workflows.py. Auto-healing limited to named rules (invariant 9) |
 | G291 | Multi-mirror NSE <-> BSE failover | DOCUMENTED_PLANNED | D-4 (not built). BSE unreachable (A1) |
 | G292 | Tables entity_securities, subsidiary_tree, pipeline_audit_log | DONE | schema.sql securities, promotion_log, admin_log; subsidiary tree = group_structure (AOC-1, X112) |
 | G297 | Review: corporate-action adjustment must ship with Phase 1 momentum features *(owner)* | DONE | arch 15 Phase 1 |

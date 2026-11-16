@@ -1,0 +1,35 @@
+# Nightly offline test run (docs/architecture.md §13): the same lint + pytest as ci.yml, every day at 22:00 IST
+# (16:30 UTC; GitHub cron is always UTC) on a GitHub-hosted runner. Offline: no test touches the network or data/.
+name: nightly-tests
+
+on:
+  schedule:
+    - cron: "30 16 * * *"  # 22:00 IST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-tests
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q poppler-utils  # pdftotext: checks derived fixture text
+          python -m pip install -e ".[dev]"
+      - name: Lint
+        run: |
+          ruff check src tests
+          ruff format --check src tests
+      - name: Offline tests (network is never required)
+        run: python -m pytest

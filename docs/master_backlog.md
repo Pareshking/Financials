@@ -424,7 +424,7 @@ exists (file / column); Class.
 | E72 | 2343-2346, 2428-2429 | legal / licensing; personal; polite fetching with UA and caching | G324, G330 DONE | C8, PoliteFetcher | **BUILT** |
 | E73 | 2346-2348, 2439-2441 | golden fixtures (~20 companies), thin slice, real XBRL per profile first | G325, G326, G342, G343 DONE | `tests/fixtures` | **BUILT** |
 | E74 | 2604 | `is_audited` on every fact row | not in digest | `filing_meta.audited` | **BUILT** |
-| E75 | 2601 | `VERIFIED_PDF_SUPP` source type | G28 / decision B | `fact_corrections` (X107) | **BUILT** (in progress per decision B) |
+| E75 | 2601 | `VERIFIED_PDF_SUPP` source type | G28 / decision B | `fact_corrections` (X107; per-share EPS / face value in `value_other` since batch K) | **BUILT** (in progress per decision B) |
 | E76 | 2348-2351 | short CLAUDE.md; blueprint in architecture.md | G327 DONE | — | **BUILT** |
 | E77 | 2546-2547 | prices / values as REAL | G337 OOS | invariant 7 | **OOS** |
 | E78 | 42-44 | Integrated Filing from Dec 2024 / Mar 2025 | G7 CONFLICTS | C9, X38 | **BUILT** (corrected) |

@@ -132,3 +132,25 @@ def full_market(tmp_path_factory) -> Market:
     m = build_full_market(tmp_path_factory.mktemp("full_market"))
     yield m
     m.con.close()
+
+
+def pytest_collection_modifyitems(config, items):
+    """CI sharding: with TEST_SHARD="k/n" keep only shard k (1-based) of n. Whole files stay together (their
+    module and session fixtures are built once per shard); files are assigned greedily by test count, heaviest
+    first, so the split is deterministic for a given test set. Unset: every test runs."""
+    import os
+
+    spec = os.environ.get("TEST_SHARD")
+    if not spec:
+        return
+    k, n = (int(x) for x in spec.split("/"))
+    per_file: dict[str, int] = {}
+    for it in items:
+        per_file[it.nodeid.split("::")[0]] = per_file.get(it.nodeid.split("::")[0], 0) + 1
+    load, owner = [0] * n, {}
+    for f, c in sorted(per_file.items(), key=lambda x: (-x[1], x[0])):
+        i = min(range(n), key=lambda j: (load[j], j))
+        owner[f], load[i] = i, load[i] + c
+    keep = [it for it in items if owner[it.nodeid.split("::")[0]] == k - 1]
+    config.hook.pytest_deselected(items=[it for it in items if owner[it.nodeid.split("::")[0]] != k - 1])
+    items[:] = keep

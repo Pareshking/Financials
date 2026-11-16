@@ -374,21 +374,32 @@ def prune_versions(con, archive: Path, *, dry_run: bool = False, note: str = "",
     if run.exists():
         raise StorageError(f"{run} exists; refusing to overwrite an archive")
     entries = []
+    # Stream the archive COPYs: with insertion order preserved DuckDB buffers each export (the 24 M superseded
+    # raw_xbrl_facts rows of the live DB spilled > 4 GB of temp files, 2026-11-16). Row order in the archive does not
+    # matter: it is checked by count and sha256, and the deletes go by rowid.
+    con.execute("SET preserve_insertion_order = false")
     try:
         for p in todo:
             rule = next(r for r in PRUNE_RULES if r.table == p["table"])
-            path = run / p["table"] / f"parser_version={_safe(p['parser_version'])}" / "rows.parquet"
-            path.parent.mkdir(parents=True, exist_ok=True)
-            con.execute(
-                f"COPY (SELECT t.* {_removable_sql(rule)} AND t.parser_version = ?) TO '{path}' "
-                "(FORMAT parquet, COMPRESSION zstd)",
-                [p["parser_version"]],
-            )
-            n = con.execute(f"SELECT count(*) FROM read_parquet('{path}')").fetchone()[0]
-            if n != p["rows"]:
-                raise StorageError(f"{path}: {n} rows written, {p['rows']} planned")
-            entries.append({"table": p["table"], "parser_version": p["parser_version"], "rows": n,
-                            "path": path.relative_to(run).as_posix(), "sha256": _sha256(path)})  # fmt: skip
+            folder = run / p["table"] / f"parser_version={_safe(p['parser_version'])}"
+            folder.mkdir(parents=True, exist_ok=True)
+            n_all = 0
+            for k, bucket in _buckets(rule.table):
+                path = folder / (f"rows-{k:02d}.parquet" if bucket else "rows.parquet")
+                con.execute(
+                    f"COPY (SELECT t.* {_removable_sql(rule)} AND t.parser_version = ?{bucket}) TO '{path}' "
+                    "(FORMAT parquet, COMPRESSION zstd)",
+                    [p["parser_version"]],
+                )
+                n = con.execute(f"SELECT count(*) FROM read_parquet('{path}')").fetchone()[0]
+                n_all += n
+                if not n:  # an empty bucket leaves no file
+                    path.unlink()
+                    continue
+                entries.append({"table": p["table"], "parser_version": p["parser_version"], "rows": n,
+                                "path": path.relative_to(run).as_posix(), "sha256": _sha256(path)})  # fmt: skip
+            if n_all != p["rows"]:
+                raise StorageError(f"{folder}: {n_all} rows written, {p['rows']} planned")
         manifest = run / "manifest.json"
         manifest.write_text(json.dumps({"created_at": now.isoformat(), "note": note, "files": entries,
                                         "rules": {r.table: r.why for r in PRUNE_RULES}}, indent=1),
@@ -402,10 +413,12 @@ def prune_versions(con, archive: Path, *, dry_run: bool = False, note: str = "",
             want = sum(e["rows"] for e in entries if e["table"] == rule.table)
             if not want:
                 continue
-            versions = [e["parser_version"] for e in entries if e["table"] == rule.table]
-            got = len(con.execute(
-                f"DELETE FROM {rule.table} WHERE rowid IN (SELECT t.rowid {_removable_sql(rule)} "
-                "AND t.parser_version IN (SELECT unnest(?))) RETURNING 1", [versions]).fetchall())  # fmt: skip
+            versions = sorted({e["parser_version"] for e in entries if e["table"] == rule.table})
+            got = 0
+            for _k, bucket in _buckets(rule.table):
+                sql = (f"DELETE FROM {rule.table} WHERE rowid IN (SELECT t.rowid {_removable_sql(rule)} "
+                       f"AND t.parser_version IN (SELECT unnest(?)){bucket}) RETURNING 1")  # fmt: skip
+                got += len(con.execute(sql, [versions]).fetchall())
             if got != want:
                 raise StorageError(f"{rule.table}: {got} rows to delete, {want} archived; nothing deleted")
             removed += got
@@ -425,6 +438,19 @@ def prune_versions(con, archive: Path, *, dry_run: bool = False, note: str = "",
         raise
     con.execute("COMMIT")
     return PruneResult("PRUNED", plan, manifest, removed)
+
+
+# Tables whose prune query is split by filing: the per-filing max-version subquery of raw_xbrl_facts makes DuckDB
+# buffer the whole removable side (24 M rows on the live DB spilled > 4 GB of temp files, 2026-11-16).
+BUCKETED = {"raw_xbrl_facts": 32}
+
+
+def _buckets(table: str) -> list[tuple[int, str]]:
+    """[(k, extra SQL predicate)]: one unfiltered pass, or one pass per filing_id hash bucket."""
+    n = BUCKETED.get(table)
+    if not n:
+        return [(0, "")]
+    return [(k, f" AND hash(t.filing_id) % {n} = {k}") for k in range(n)]
 
 
 def _sha256(path: Path) -> str:

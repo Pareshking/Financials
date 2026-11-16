@@ -21,6 +21,7 @@ from financials import features_more as M
 from financials.db import apply_schema, connect, declared_columns, table_columns
 from financials.dsl import ALIASES, compile_screen
 from financials.features import compute_rows
+from financials.features_disclosures import COLUMNS as DISCLOSURE_COLUMNS
 from financials.features_rpt import RPT_COLUMNS
 from financials.features_store import write_rows as write_history
 from financials.fundamentals import BENEISH, FactBook, _add_months, annual_ratios, building_blocks, load_segments
@@ -368,9 +369,11 @@ def test_rows_on_the_full_market(full_market):
 def test_every_column_is_appended_in_both_tables_and_has_an_alias():
     for t in ("screener_features",):  # the history view has its columns (test_features_store)
         names = [c for c, _ in declared_columns()[t]]
-        start = names.index(M.MORE_COLUMNS[0])  # batch I block, followed only by batch J (features_rpt)
+        start = names.index(M.MORE_COLUMNS[0])  # batch I block, followed by batch J (features_rpt), then 18D
         assert names[start : start + len(M.MORE_COLUMNS)] == list(M.MORE_COLUMNS), t
-        assert names[start + len(M.MORE_COLUMNS) :] == list(RPT_COLUMNS), t
+        end = start + len(M.MORE_COLUMNS) + len(RPT_COLUMNS)
+        assert names[start + len(M.MORE_COLUMNS) : end] == list(RPT_COLUMNS), t
+        assert names[end:] == list(DISCLOSURE_COLUMNS), t
     used = " ".join(sql for sql, _ in ALIASES.values())
     text = {"next_ex_date_action", "fastest_growing_segment"}  # labels, shown with `screen --columns`
     assert [c for c in M.MORE_COLUMNS if c not in used and c not in text] == []

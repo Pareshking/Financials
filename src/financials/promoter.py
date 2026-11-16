@@ -1273,6 +1273,7 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     reg23 = read_table(con, stage_dir, "stg_reg23_rpt")
     insert_rows(con, "reg23_related_party_transactions", [{**r, "entity_id": entity_id, "visible_from_ts": visible}
                                                           for r in reg23], or_ignore=True)  # fmt: skip
+    _insert_disclosures(con, stage_dir, entity_id, visible)  # X116: every element no other clean table holds
     # Non-blocking parse findings (X86 ATTRIBUTION_WITHHELD): the filing is promoted, the finding stays open.
     finding_rows = [
         _quarantine_row(stage=i["stage"], reason_code=i["reason_code"], filing_id=fid, entity_id=entity_id,
@@ -1288,6 +1289,14 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     q = cross_check_shares(con, entity_id, meta["period_end"])
     qa = annual_share_check(con, fid, entity_id, meta) if meta["accounting_profile"] == "REG34_ANNUAL" else None  # G93
     return PromotionResult("PROMOTED", "results_xbrl", message=fid, quarantined=qs + [x for x in (q, qa) if x])
+
+
+def _insert_disclosures(con, stage_dir: Path, entity_id: str, visible: datetime) -> None:
+    """disclosure_facts rows of a promoted filing [X116]: same entity and visibility as its other clean rows;
+    deterministic keys, so a replay inserts nothing twice."""
+    rows = read_table(con, stage_dir, "stg_disclosures")
+    insert_rows(con, "disclosure_facts", [{**r, "entity_id": entity_id, "visible_from_ts": visible} for r in rows],
+                or_ignore=True)  # fmt: skip
 
 
 def _filing_check_rows(con, fid: str, exchange: str, entity_id: str, meta: dict, visible: datetime) -> list[dict]:
@@ -1781,6 +1790,7 @@ def _promote_shareholding(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
             for c in read_table(con, stage_dir, "stg_shp_categories")
         ],
     )
+    _insert_disclosures(con, stage_dir, entity_id, visible)  # X116
     _close_shp_parse_findings(con, fid, f"parser {meta['parser_version']}: {meta.get('rules_applied') or 'parses'}")
     q = cross_check_shares(con, entity_id, meta["as_of_date"])
     return PromotionResult("PROMOTED", "shareholding", message=fid, quarantined=[q] if q else [])
@@ -1967,5 +1977,6 @@ def _promote_reg30_event(con, stage_dir: Path, manifest: dict[str, Any]) -> Prom
         ],
         or_ignore=True,  # a byte-identical re-send is the same event [E4]
     )  # fmt: skip
+    _insert_disclosures(con, stage_dir, entities[0], filing["broadcast_ts"])  # X116
     dirty.mark_visible(con, entities[0], filing["broadcast_ts"], "REG30_EVENT", fid)
     return PromotionResult("PROMOTED", "reg30_event", message=fid)

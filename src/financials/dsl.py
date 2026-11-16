@@ -453,6 +453,16 @@ def _rpt_aliases() -> dict[str, tuple[str, str]]:
 
 ALIASES.update(_rpt_aliases())
 
+
+def _disclosure_aliases() -> dict[str, tuple[str, str]]:
+    """Batch 18D (disclosure_facts: insider receivables, subsidiary contribution): features_disclosures.dsl_aliases."""
+    from financials.features_disclosures import dsl_aliases
+
+    return dsl_aliases()
+
+
+ALIASES.update(_disclosure_aliases())
+
 KEYWORDS = {"and", "or", "not"}
 COMPARATORS = {"<", "<=", ">", ">=", "=", "!="}
 NAME_RE = re.compile(r"^[a-z][a-z0-9 ]{0,62}$")

@@ -28,6 +28,7 @@ from financials.parsers.nse_corp_actions import PURPOSE_RULES_VERSION, parse_nse
 from financials.parsers.segments import Windows, parse_segments
 from financials.parsers.udiff import parse_udiff_cm
 from financials.parsers.xbrl import parse_instance
+from financials.scope import MIN_PERIOD_END_DATE
 from financials.timeutil import ist_to_utc
 from financials.vault import Blob, Filing, Vault, make_filing
 
@@ -76,6 +77,14 @@ CREATE TABLE stg_reg23_rpt (
     amount_inr DECIMAL(20,2) NOT NULL, approved_value_inr DECIMAL(20,2), ratified_value_inr DECIMAL(20,2),
     opening_balance_inr DECIMAL(20,2), closing_balance_inr DECIMAL(20,2),
     PRIMARY KEY (filing_id, row_member)
+);
+CREATE TABLE stg_disclosures (
+    filing_id VARCHAR NOT NULL, parser_version VARCHAR NOT NULL, source_kind VARCHAR NOT NULL, scope VARCHAR,
+    seq INTEGER NOT NULL, element_ns VARCHAR NOT NULL, element VARCHAR NOT NULL, context_id VARCHAR NOT NULL,
+    period_type VARCHAR NOT NULL, period_start DATE, period_end DATE, period_months INTEGER, in_window BOOLEAN NOT NULL,
+    dimensions JSON, unit_ref VARCHAR, unit VARCHAR, value_inr DECIMAL(20,2), value_num DECIMAL(28,8),
+    value_bool BOOLEAN, value_text VARCHAR NOT NULL,
+    PRIMARY KEY (filing_id, seq)
 );
 CREATE TABLE stg_corp_actions (
     filing_id VARCHAR NOT NULL, seq INTEGER NOT NULL, component INTEGER NOT NULL, exchange VARCHAR NOT NULL,
@@ -150,6 +159,7 @@ TABLE_ORDER = (
     "stg_group_structure",
     "stg_related_parties",
     "stg_reg23_rpt",
+    "stg_disclosures",
     "stg_corp_actions",
     "stg_events",
     "stg_kpis",
@@ -335,7 +345,14 @@ def stage_results_xbrl(
         return write_stage(stage_root, "results_xbrl", run_id, tables)
 
     tables["raw_xbrl_facts"] = _raw_fact_rows(fid, inst)
+    tables.update(results_tables(fid, inst, data, source_url))
+    return write_stage(stage_root, "results_xbrl", run_id, tables)
 
+
+def results_tables(fid: str, inst, data: bytes, source_url: str) -> dict[str, list[dict[str, Any]]]:
+    """The parsed (clean) staging tables of one results / annual XBRL: issues only when it does not parse. Shared by
+    stage_results_xbrl and the vault backfills (disclosures.backfill_disclosures)."""
+    tables: dict[str, list[dict[str, Any]]] = {}
     try:
         parsed = parse_integrated_results(data, source_url.rsplit("/", 1)[-1])
     except ParseError as exc:
@@ -347,7 +364,7 @@ def stage_results_xbrl(
                 "details": json.dumps({"error": str(exc)}),
             }
         ]
-        return write_stage(stage_root, "results_xbrl", run_id, tables)
+        return tables
 
     if parsed.issues:
         tables["stg_issues"] = [
@@ -359,7 +376,7 @@ def stage_results_xbrl(
             }
             for i in parsed.issues
         ]
-        return write_stage(stage_root, "results_xbrl", run_id, tables)
+        return tables
 
     if getattr(parsed, "findings", None):  # non-blocking: promoted, each opens a quarantine row [X86]
         tables["stg_findings"] = [
@@ -422,7 +439,58 @@ def stage_results_xbrl(
         tables["stg_related_parties"] = related_party_rows(fid, inst, parsed)  # X113
     else:
         tables["stg_reg23_rpt"] = reg23_rpt_rows(fid, inst, parsed)  # X115: standalone Q2 / Q4 Integrated Filings
-    return write_stage(stage_root, "results_xbrl", run_id, tables)
+    tables["stg_disclosures"] = disclosure_rows(
+        fid,
+        inst,
+        tables,
+        Windows.from_meta(m),
+        scope=m["scope"],
+        source_kind="ANNUAL" if parsed.profile == "REG34_ANNUAL" else "RESULTS",
+    )
+    return tables
+
+
+def captured_elements(tables: dict[str, list[dict[str, Any]]]) -> frozenset[str]:
+    """Element local names the filing's other clean staging rows hold per element, as filed (parsers/disclosures.py):
+    computed from the rows themselves and the row parsers' own element vocabularies, never from a hand-written list."""
+    from financials.parsers.aoc1 import verbatim_elements
+    from financials.parsers.reg23_rpt import ELEMENTS as REG23_ELEMENTS
+    from financials.parsers.rpt import TEXT_ELEMENTS as RPT_TEXT
+    from financials.parsers.shareholding import HOLDER_ELEMENTS
+
+    def rows(name: str) -> list[dict[str, Any]]:
+        return tables.get(name) or []
+
+    out = {r["source_element"] for r in rows("stg_xbrl_facts")}
+    out |= {r["element"] for r in rows("stg_segments")}
+    out |= {r["source_element"] for r in rows("stg_related_parties")}
+    out |= set(RPT_TEXT) if rows("stg_related_parties") else set()
+    out |= REG23_ELEMENTS if rows("stg_reg23_rpt") else set()
+    for relation in {r["relation"] for r in rows("stg_group_structure")}:
+        out |= verbatim_elements(relation)
+    out |= {r["element"] for r in rows("stg_shp_line_items")}
+    out |= HOLDER_ELEMENTS if rows("stg_shp_holders") else set()
+    out |= set().union(*(json.loads(e["details"]).get("numeric", {}).keys() for e in rows("stg_events")))
+    return frozenset(out)
+
+
+def disclosure_rows(
+    fid: str,
+    inst,
+    tables: dict[str, list[dict[str, Any]]],
+    windows: Windows | None,
+    *,
+    scope: str | None,
+    source_kind: str,
+    min_period_end=MIN_PERIOD_END_DATE,
+) -> list[dict[str, Any]]:
+    """disclosure_facts staging rows: every fact of the filing whose element no other clean table of `tables`
+    captures [X116]. `min_period_end` None (Reg. 30 events) applies no period cutoff."""
+    from financials.parsers.disclosures import DISCLOSURE_PARSER_VERSION, parse_disclosures
+
+    report = parse_disclosures(inst, captured_elements(tables), windows, min_period_end=min_period_end)
+    return [{"filing_id": fid, "parser_version": DISCLOSURE_PARSER_VERSION, "source_kind": source_kind, "scope": scope,
+             **asdict(f)} for f in report.facts]  # fmt: skip
 
 
 def group_structure_rows(fid: str, inst, parsed) -> list[dict[str, Any]]:
@@ -670,7 +738,7 @@ def stage_shareholding(
     """Vault + parse one Reg. 31 shareholding XBRL. Broadcast time comes from the NSE master JSON.
     `run_suffix` (restage) gives a re-parse its own batch next to the first one, so it promotes as a new
     parser_version instead of being taken for the batch already promoted."""
-    from financials.parsers.shareholding import parse_shareholding, shp_instance
+    from financials.parsers.shareholding import shp_instance
 
     blob = vault.put(data, ext="xml", media_type="application/xml", fetched_at=fetched_at)
     filing = make_filing(
@@ -686,8 +754,7 @@ def stage_shareholding(
     run_id = fid if run_suffix is None else f"{fid}-{run_suffix}"
     tables: dict[str, list[dict[str, Any]]] = {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)]}
     try:
-        tables["raw_xbrl_facts"] = _raw_fact_rows(fid, shp_instance(data)[0])
-        parsed = parse_shareholding(data)
+        inst = shp_instance(data)[0]
     except ParseError as exc:
         tables["stg_issues"] = [
             {
@@ -698,6 +765,29 @@ def stage_shareholding(
             }
         ]
         return write_stage(stage_root, "shareholding", run_id, tables)
+    tables["raw_xbrl_facts"] = _raw_fact_rows(fid, inst)
+    tables.update(shareholding_tables(fid, inst, data))
+    return write_stage(stage_root, "shareholding", run_id, tables)
+
+
+def shareholding_tables(fid: str, inst, data: bytes) -> dict[str, list[dict[str, Any]]]:
+    """The parsed (clean) staging tables of one Reg. 31 XBRL (`inst` = shp_instance(data)): issues only when it does
+    not parse. Shared by stage_shareholding and the vault backfill (disclosures.backfill_disclosures)."""
+    from financials.parsers.shareholding import parse_shareholding
+
+    tables: dict[str, list[dict[str, Any]]] = {}
+    try:
+        parsed = parse_shareholding(data)
+    except ParseError as exc:
+        tables["stg_issues"] = [
+            {
+                "filing_id": fid,
+                "stage": "PARSE",
+                "reason_code": "PARSE_ERROR",
+                "details": json.dumps({"error": str(exc)}),
+            }
+        ]
+        return tables
     if parsed.issues:
         tables["stg_issues"] = [
             {
@@ -708,7 +798,7 @@ def stage_shareholding(
             }
             for i in parsed.issues
         ]
-        return write_stage(stage_root, "shareholding", run_id, tables)
+        return tables
     m = parsed.meta
     tables["stg_shp_meta"] = [
         {
@@ -751,7 +841,10 @@ def stage_shareholding(
         }
         for cat, vals in sorted(parsed.categories.items())
     ]
-    return write_stage(stage_root, "shareholding", run_id, tables)
+    tables["stg_disclosures"] = disclosure_rows(
+        fid, inst, tables, Windows(frozenset(), frozenset({m["as_of_date"]})), scope=None, source_kind="SHAREHOLDING"
+    )
+    return tables
 
 
 def stage_reg30_event(
@@ -766,8 +859,6 @@ def stage_reg30_event(
     exchange: str = "NSE",
 ) -> Path:
     """Vault + parse one Reg. 30 structured event XBRL [E1-E7]; broadcast time from the announcements RSS."""
-    from financials.parsers.reg30_events import parse_reg30_event
-
     blob = vault.put(data, ext="xml", media_type="application/xml", fetched_at=fetched_at)
     filing = make_filing(
         blob,
@@ -781,8 +872,7 @@ def stage_reg30_event(
     fid = filing.filing_id
     tables: dict[str, list[dict[str, Any]]] = {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)]}
     try:
-        tables["raw_xbrl_facts"] = _raw_fact_rows(fid, parse_instance(data))
-        parsed = parse_reg30_event(data)
+        inst = parse_instance(data)
     except ParseError as exc:
         tables["stg_issues"] = [
             {
@@ -793,6 +883,31 @@ def stage_reg30_event(
             }
         ]
         return write_stage(stage_root, "reg30_event", fid, tables)
+    tables["raw_xbrl_facts"] = _raw_fact_rows(fid, inst)
+    clean, family = reg30_tables(fid, inst, data)
+    tables.update(clean)
+    extra = None if clean.get("stg_issues") else {"family": family}
+    return write_stage(stage_root, "reg30_event", fid, tables, extra=extra)
+
+
+def reg30_tables(fid: str, inst, data: bytes) -> tuple[dict[str, list[dict[str, Any]]], str | None]:
+    """The parsed (clean) staging tables of one Reg. 30 event XBRL and its family: issues only when it does not
+    parse. Shared by stage_reg30_event and the vault backfill (disclosures.backfill_disclosures)."""
+    from financials.parsers.reg30_events import parse_reg30_event
+
+    tables: dict[str, list[dict[str, Any]]] = {}
+    try:
+        parsed = parse_reg30_event(data)
+    except ParseError as exc:
+        tables["stg_issues"] = [
+            {
+                "filing_id": fid,
+                "stage": "PARSE",
+                "reason_code": "PARSE_ERROR",
+                "details": json.dumps({"error": str(exc)}),
+            }
+        ]
+        return tables, None
     if parsed.issues:
         tables["stg_issues"] = [
             {
@@ -803,7 +918,7 @@ def stage_reg30_event(
             }
             for i in parsed.issues
         ]
-        return write_stage(stage_root, "reg30_event", fid, tables)
+        return tables, parsed.family
     m = parsed.meta
     tables["stg_events"] = [
         {
@@ -826,7 +941,10 @@ def stage_reg30_event(
         }
         for e in parsed.events
     ]
-    return write_stage(stage_root, "reg30_event", fid, tables, extra={"family": parsed.family})
+    if tables["stg_events"]:  # an unparsed family stays raw only [E2]: nothing is promoted beyond the vault rows
+        tables["stg_disclosures"] = disclosure_rows(fid, inst, tables, None, scope=None, source_kind="EVENT",
+                                                    min_period_end=None)  # fmt: skip
+    return tables, parsed.family
 
 
 def stage_kpis(vault: Vault, stage_root: Path, *, data: bytes, source_url: str, fetched_at: datetime) -> Path:

@@ -318,6 +318,7 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 | B1.23 | Goodwill + intangibles / equity | quality | (`goodwill` + `other_intangibles`) / owners' equity | BUILT | `intangibles_to_equity` (batch G) |
 | B1.24 | Filed DSCR / ISCR / D/E (listed-debt issuers) | credit | `li_debt_service_coverage_ratio`, `li_interest_service_coverage_ratio`, `li_debt_equity_ratio` as filed | BUILDABLE NOW | deferred (C26): Tata Motors CV files DSCR −0.0014 / ISCR −0.0181 for Q2 FY26, which no definition reproduces; needs an evidence row before exposing |
 | B1.25 | Composite forensic score (G237) | forensic | — | NOT POSSIBLE | excluded by decision (arch 10.2: never summed) |
+| B1.26 | Receivables due by insiders (directors, officers, their firms / companies) | forensic | Schedule III note (Reg. 34): directors + other officers + firms / companies subtotal, last FY end; / trade receivables of the same filing | BUILT | 18D (`features_disclosures.py`, X117, C28): `insider_receivables`, `insider_receivables_to_receivables`, `has_insider_receivables`, `insider_receivables_as_of`; `...OrOthers` (includes third parties) never added. DSL `insider receivables` (crore), `insider receivables pct` |
 
 ## B2. Capital allocation
 
@@ -422,6 +423,7 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 | B7.8 | Insider net buy 3M (G180) | insider | | NEW FREE SOURCE | F11, F13 UNVERIFIED |
 | B7.9 | Bulk / block deals (G102) | flow | | NEW FREE SOURCE | F14 OBSERVED, no history at the URL (capture daily) |
 | B7.10 | Pledge events between Reg. 31 snapshots (G92) | ownership | | NEW FREE SOURCE | F12 OBSERVED |
+| B7.11 | Reg. 31 declarations: warrants, convertibles, partly paid, locked-in, DVR shares, SBO, PSU | ownership | entity-level `Whether...` declarations of the latest visible shareholding filing | BUILT | 18D (X118, C28): `has_warrants`, `has_convertibles`, `has_partly_paid`, `has_locked_in`, `has_dvr_shares`, `has_sbo`, `is_psu` (BOOLEAN; screen by column name) |
 
 ## B8. Event flags
 
@@ -446,6 +448,7 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 |---|---|---|---|---|---|
 | B9.1 | Number of reportable segments; largest-segment revenue share | mix | `segment_observations` (BUSINESS, REVENUE, member_role SEGMENT) | BUILT | `segment_count`, `largest_segment_revenue_share`, `segment_period_end` (batch I; Cummins Q2 FY27: 2 segments, 76.2%) |
 | B9.2 | Fastest-growing segment YoY; segment margin change | mix | segment RESULT / REVENUE, quarter YoY | BUILT | `fastest_growing_segment`, `fastest_growing_segment_growth_yoy`, `largest_segment_margin_change_yoy_pp` (batch I; matched by filed label within the entity) |
+| B9.3 | Subsidiary contribution (Schedule III additional information) | group mix | `AmountOfShareInProfitOrLossOfEntityConsolidated` per entity row / the filing's consolidated PAT | BUILT | 18D (X119, C28): `parent_profit_share`, `largest_subsidiary_profit_share`, `largest_subsidiary_name`, `consolidated_entities_count`, `subsidiary_fy_end`; adjustment / NCI rows excluded. DSL `parent profit share`, `largest subsidiary profit share`, `consolidated entities` |
 
 ## B10. Not buildable for lack of a free source (not elsewhere listed)
 
@@ -483,14 +486,18 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 
 | Status | Part A (Screener gallery) | Part B (beyond Screener) | Total |
 |---|---|---|---|
-| BUILT | 150 | 107 | 257 |
+| BUILT | 150 | 110 | 260 |
 | IN PROGRESS | 0 | 0 | 0 |
 | BUILDABLE NOW | 2 | 1 | 3 |
 | WHEN HISTORY | 16 | 3 | 19 |
 | NEEDS PARSER | 2 | 1 | 3 |
 | NEW FREE SOURCE | 1 | 15 | 16 |
 | NOT POSSIBLE | 2 | 4 | 6 |
-| **Total rows** | 173 | 131 | 304 |
+| **Total rows** | 173 | 134 | 307 |
+
+Recounted after 18D (2026-11-16, features `2026.11.16-18D`, `features_disclosures.py`): three new BUILT rows in Part
+B from `disclosure_facts` [X116]: B1.26 (insider receivables), B7.11 (Reg. 31 declarations), B9.3 (subsidiary
+contribution).
 
 Recounted from the status column after batch I (2026-11-15, features `2026.11.15-11I`, `features_more.py`): 21 rows
 BUILT (1 in Part A, 20 in Part B): A1.19, B5.7, B5.8 were already built by batch H (`features_peers.py`) and only had

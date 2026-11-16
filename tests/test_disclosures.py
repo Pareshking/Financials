@@ -1,0 +1,395 @@
+"""disclosure_facts [X116] and the 18D feature columns (insider receivables X117, Reg. 31 declarations X118,
+Schedule III subsidiary contribution X119). Every value is read straight from committed, unmodified fixtures."""
+
+from __future__ import annotations
+
+import json
+from collections import defaultdict
+from datetime import date, datetime, timedelta
+from decimal import Decimal
+
+import pytest
+
+from _fixture_helpers import FIXTURES, XBRL_DIR
+from financials import features_disclosures as F
+from financials.db import fetch_dicts
+from financials.disclosures import STAGE_DIR, _stage_one, backfill_disclosures, pending_filings
+from financials.dsl import ALIASES, compile_screen
+from financials.parsers.aoc1 import SCHEDULES, verbatim_elements
+from financials.parsers.disclosures import DISCLOSURE_PARSER_VERSION, parse_disclosures, typed_value
+from financials.parsers.reg23_rpt import ELEMENTS as REG23_ELEMENTS
+from financials.parsers.reg34_annual import parse_reg34_annual
+from financials.parsers.rpt import TEXT_ELEMENTS as RPT_TEXT
+from financials.parsers.segments import Windows
+from financials.parsers.shareholding import HOLDER_ELEMENTS, shp_instance
+from financials.parsers.xbrl import parse_instance
+from financials.promoter import promote
+from financials.scope import MIN_PERIOD_END_DATE
+from financials.staging import (
+    captured_elements,
+    read_table,
+    results_tables,
+    shareholding_tables,
+    stage_reg30_event,
+    stage_results_xbrl,
+    stage_shareholding,
+)
+from financials.timeutil import ist_to_utc
+
+ARCHIVE = "https://nsearchives.nseindia.com/corporate/xbrl/"
+ELECON, INOX = "AR_XBRL_ELECON_23072026161247.xml", "AR_XBRL_INOXINDIA_09082026015537.xml"
+CUMMINS, ETERNAL, SRF = "AR_XBRL_CUMMINSIND_04092026113534.xml", "AR_XBRL_ETERNAL_23092026175418.xml", (
+    "AR_XBRL_SRF_09082026022508.xml")  # fmt: skip
+TCS, SPARC, ELIN = "AR_XBRL_TCS_09082026012216.xml", "AR_XBRL_SPARC_08092026160440.xml", (
+    "AR_XBRL_ELIN_30092025131606.xml")  # fmt: skip
+SAMMAAN, PSU_SHP, OLD_SHP = "SHP_1752549_04112026032917_WEB.xml", "SHP_1643664_30032026100841_WEB.xml", (
+    "SHP_198754_1421266_21042025041033_WEB.xml")  # fmt: skip
+FY25, FY26 = date(2025, 3, 31), date(2026, 3, 31)
+FETCHED = datetime(2026, 11, 14, 6)
+
+
+def _tables(name: str) -> dict:
+    data = (XBRL_DIR / name).read_bytes()
+    if name.startswith("SHP"):
+        return shareholding_tables("fil_x", shp_instance(data)[0], data)
+    return results_tables("fil_x", parse_instance(data), data, ARCHIVE + name)
+
+
+def _cells(rows: list[dict], element: str, end: date) -> list[dict]:
+    return [r for r in rows if r["element"] == element and r["period_end"] == end]
+
+
+# ── parser [X116] ─────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    ("text", "unit", "expected"),
+    [("442100000", "INR", (Decimal("442100000"), None, None)), ("0.00", "INR", (Decimal(0), None, None)),
+     ("1.005", "INR", (None, None, None)), ("0.9866", "PURE", (None, Decimal("0.9866"), None)),
+     ("1234567", "SHARES", (None, Decimal(1234567), None)), ("n/a", "PURE", (None, None, None)),
+     ("true", None, (None, None, True)), (" False ", None, (None, None, False)), ("Yes", None, (None, None, True)),
+     ("******", None, (None, None, None)), ("Parent", None, (None, None, None))],
+)  # fmt: skip
+def test_typed_values_never_float_never_rescaled(text, unit, expected):
+    assert typed_value(text, unit) == expected
+
+
+def test_elecon_insider_elements_are_kept_with_their_dimensions():
+    t = _tables(ELECON)
+    rows = t["stg_disclosures"]
+    (d,) = _cells(rows, F.DIRECTORS, FY26)
+    assert F._axes(d["dimensions"]) == {
+        "ClassificationBasedOnCurrentNoncurrentAxis": "CurrentMember",
+        "ClassificationOfAssetsBasedOnSecurityAxis": "UnsecuredConsideredGoodMember",
+    }
+    assert all(":" in k and ":" in v for k, v in json.loads(d["dimensions"]).items())  # QNames as filed
+    assert (d["value_inr"], d["value_text"], d["unit"], d["period_type"], d["in_window"], d["source_kind"]) == (
+        Decimal("442100000"), "442100000", "INR", "INSTANT", True, "ANNUAL")  # fmt: skip
+    others = _cells(rows, "TradeReceivablesDueByOthers", FY26)[0]["value_inr"]
+    total = _cells(rows, "TradeReceivablesDueByDirectorsOtherOfficersOrOthers", FY26)[0]["value_inr"]
+    assert total == d["value_inr"] + others == Decimal("6653800000")  # a subtotal that includes third parties
+    assert {r["source_element"] for r in t["stg_xbrl_facts"]} & {F.DIRECTORS, F.FIRMS} == set()
+
+
+def test_text_blocks_are_stored_as_filed_and_pre_cutoff_facts_are_not():
+    data = (XBRL_DIR / ELIN).read_bytes()
+    inst = parse_instance(data)
+    m = parse_reg34_annual(data, ELIN).meta
+    report = parse_disclosures(inst, frozenset(), Windows.from_meta(m), min_period_end=MIN_PERIOD_END_DATE)
+    assert report.skipped_pre_cutoff > 0  # FY24 comparatives (C9)
+    assert all(f.period_end is None or f.period_end >= FY25 for f in report.facts)
+    by_seq = {f.seq: f for f in inst.facts}
+    assert all(r.value_text == by_seq[r.seq].value_text for r in report.facts)  # exactly as filed, not stripped
+    assert max(len(r.value_text) for r in report.facts) > 50_000  # notes text blocks are kept whole
+
+
+def test_shp16_entity_contexts_are_period_none():
+    rows = _tables(OLD_SHP)["stg_disclosures"]
+    flags = [r for r in rows if r["element"] == "WhetherTheListedEntityHasAnySignificantBeneficialOwner"]
+    assert [(r["period_type"], r["period_end"], r["in_window"], r["value_bool"]) for r in flags] == [
+        ("NONE", None, False, True)]  # fmt: skip
+
+
+# ── coverage: every element of every parsed fixture reaches a clean table ─────────────────────────────────────────
+
+
+def _staged_coverage(stage_dir, con) -> tuple[set, set, set]:
+    """(raw elements in scope, elements in the clean staged tables, raw elements only in pre-cutoff contexts)."""
+    raw = read_table(con, stage_dir, "raw_xbrl_facts")
+    t = {n: read_table(con, stage_dir, n) for n in ("stg_xbrl_facts", "stg_segments", "stg_related_parties",
+                                                     "stg_reg23_rpt", "stg_group_structure", "stg_shp_line_items",
+                                                     "stg_shp_holders", "stg_events", "stg_disclosures")}  # fmt: skip
+    clean = {r["source_element"] for r in t["stg_xbrl_facts"]} | {r["element"] for r in t["stg_segments"]}
+    clean |= {r["source_element"] for r in t["stg_related_parties"]} | {r["element"] for r in t["stg_shp_line_items"]}
+    clean |= {r["element"] for r in t["stg_disclosures"]}
+    clean |= set(RPT_TEXT) if t["stg_related_parties"] else set()
+    clean |= REG23_ELEMENTS if t["stg_reg23_rpt"] else set()
+    clean |= HOLDER_ELEMENTS if t["stg_shp_holders"] else set()
+    for rel in {r["relation"] for r in t["stg_group_structure"]}:
+        clean |= verbatim_elements(rel)
+    for e in t["stg_events"]:
+        clean |= set(json.loads(e["details"]).get("numeric", {}))
+    end = lambda r: r["ctx_instant"] or r["ctx_end"]  # noqa: E731
+    kept = {r["element_name"] for r in raw if t["stg_events"] or end(r) is None or end(r) >= MIN_PERIOD_END_DATE}
+    pre = {r["element_name"] for r in raw} - kept
+    return kept, clean, pre
+
+
+PROFILES = ("INDAS_CORP", "INDAS_NBFC", "IGAAP_BANK", "IRDAI_LIFE", "IRDAI_GENERAL", "INDAS_INSURANCE", "REG34_ANNUAL",
+            "REG31_SHP", "REG23_RPT", "REG30_EVENT")  # fmt: skip
+
+
+def test_every_element_of_every_parsed_fixture_reaches_a_clean_table(market):
+    """X116: for each committed XBRL fixture that parses, the staged batch the promoter loads holds every in-scope raw
+    element in at least one clean table; checked per accounting profile, each with at least one real fixture (a
+    results filing carrying the Reg. 23(9) section counts for REG23_RPT too)."""
+    checked = defaultdict(list)
+    for path in sorted(XBRL_DIR.glob("*.xml")) + sorted((FIXTURES / "events").glob("*WebXMLFile*.xml")):
+        data, url = path.read_bytes(), ARCHIVE + path.name
+        if path.parent.name == "events":
+            stage = stage_reg30_event(market.vault, market.stage_root, data=data, source_url=url, fetched_at=FETCHED)
+        elif path.name.startswith("SHP"):
+            stage = stage_shareholding(market.vault, market.stage_root, data=data, source_url=url, fetched_at=FETCHED)
+        else:
+            stage = stage_results_xbrl(market.vault, market.stage_root, data=data, source_url=url, fetched_at=FETCHED)
+        if read_table(market.con, stage, "stg_issues") or not read_table(market.con, stage, "stg_disclosures"):
+            continue  # not parsed (routed profile, quarantine, raw-only event family): nothing clean is promoted
+        kept, clean, _ = _staged_coverage(stage, market.con)
+        assert kept - clean == set(), path.name
+        meta = read_table(market.con, stage, "stg_xbrl_filing")
+        profile = meta[0]["accounting_profile"] if meta else "REG30_EVENT" if path.parent.name == "events" else (
+            "REG31_SHP")  # fmt: skip
+        checked[profile].append(path.name)
+        if read_table(market.con, stage, "stg_reg23_rpt"):
+            checked["REG23_RPT"].append(path.name)
+    assert [p for p in PROFILES if not checked[p]] == [], {p: len(v) for p, v in checked.items()}
+    assert set(checked) <= set(PROFILES), set(checked)
+    assert sum(len(v) for p, v in checked.items() if p != "REG23_RPT") >= 135
+
+
+def test_captured_set_comes_from_the_rows_and_the_row_parsers_vocabularies():
+    t = _tables(CUMMINS)
+    cap = captured_elements(t)
+    assert {r["source_element"] for r in t["stg_xbrl_facts"]} <= cap
+    assert {r["element"] for r in t["stg_segments"]} <= cap and set(RPT_TEXT) <= cap
+    assert verbatim_elements("SUBSIDIARY") <= cap or "SUBSIDIARY" not in {
+        r["relation"] for r in t["stg_group_structure"]
+    }
+    # stored only as a sum (net worth) or as a fallback: kept as filed in disclosure_facts
+    assert SCHEDULES["SUBSIDIARY"][1]["share_capital"] not in verbatim_elements("SUBSIDIARY")
+    assert not cap & {r["element"] for r in t["stg_disclosures"]}
+
+
+# ── features: pure functions on fixture rows ──────────────────────────────────────────────────────────────────────
+
+
+def _insider(name: str, end: date) -> Decimal | None:
+    by = defaultdict(list)
+    for r in _tables(name)["stg_disclosures"]:
+        if r["element"] in F.INSIDER_ELEMENTS and r["period_end"] == end and r["value_inr"] is not None:
+            by[r["element"]].append((F._axes(r["dimensions"]), r["value_inr"]))
+    return F.insider_total(by)
+
+
+def test_insider_receivables_sum_without_double_counting():
+    assert _insider(ELECON, FY26) == Decimal("442100000")  # directors only; ...OrOthers (third parties) is not added
+    assert _insider(INOX, FY25) == Decimal("528618000")  # firms / companies subtotal = its one filed part, once
+    assert _insider(INOX, FY26) == Decimal(0)
+    assert _insider(CUMMINS, FY26) == Decimal(0)  # filed nil (0 in every class)
+    assert F.insider_total({}) is None  # not filed
+
+
+def test_element_total_uses_the_most_detailed_dimension_set_only():
+    cur, non = {"A": "Current", "S": "Good"}, {"A": "Noncurrent", "S": "Good"}
+    assert F.element_total([({"S": "Good"}, Decimal(5)), (cur, Decimal(2)), (non, Decimal(3))]) == Decimal(5)
+    assert F.element_total([({"S": "Good"}, Decimal(5)), ({"S": "Doubtful"}, Decimal(1))]) == Decimal(6)
+
+
+def _shp_values(name: str) -> dict:
+    return {r["element"]: r["value_bool"] for r in _tables(name)["stg_disclosures"] if r["dimensions"] is None}
+
+
+def test_shareholding_declarations():
+    assert F.shp_columns(_shp_values(SAMMAAN)) == {
+        "has_warrants": True, "has_convertibles": True, "has_partly_paid": True, "has_locked_in": True,
+        "has_dvr_shares": True, "has_sbo": False, "is_psu": False}  # fmt: skip
+    psu = F.shp_columns(_shp_values(PSU_SHP))
+    assert (psu["is_psu"], psu["has_locked_in"], psu["has_warrants"]) == (True, True, False)
+    assert F.shp_columns(_shp_values(OLD_SHP))["has_sbo"] is True  # 2022-09-30 taxonomy, SHP16 contexts
+    assert F.shp_columns(None) == dict.fromkeys(F.SHP_DECLARATION_COLUMNS)
+
+
+def test_declaration_falls_back_to_the_category_variants():
+    e = F.SHP_DECLARATIONS["has_warrants"]
+    assert F.declaration({e + "ForPromoterAndPromoterGroup": False, e + "ForPublicShareholder": True}, e) is True
+    assert F.declaration({e + v: False for v in F.SHP_VARIANTS}, e) is False
+    assert F.declaration({e: False, e + "ForPublicShareholder": True}, e) is False  # the entity-level value wins
+    assert F.declaration({}, e) is None
+
+
+def _subsidiary(name: str) -> dict:
+    t = _tables(name)
+    fy_end = t["stg_xbrl_filing"][0]["fy_end"]
+    rows = defaultdict(dict)
+    for r in t["stg_disclosures"]:
+        axes = F._axes(r["dimensions"])
+        if set(axes) == {F.ENTITY_AXIS} and r["period_end"] == fy_end and r["element"] in (
+                F.ENTITY_NAME, F.ENTITY_TYPE, F.ENTITY_PROFIT):  # fmt: skip
+            rows[axes[F.ENTITY_AXIS]][r["element"]] = r["value_inr"] if r["element"] == F.ENTITY_PROFIT else r[
+                "value_text"]  # fmt: skip
+    pat = next(r["value_inr"] for r in t["stg_xbrl_facts"] if r["canonical_tag"] == "pat"
+               and r["period_end"] == fy_end and r["period_months"] == 12)  # fmt: skip
+    return F.subsidiary_columns({"fy_end": fy_end, "rows": list(rows.values()), "pat": pat})
+
+
+def test_subsidiary_contribution():
+    c = _subsidiary(CUMMINS)  # Parent + an associate + a JV, no subsidiary
+    assert c["parent_profit_share"] == pytest.approx(23301800000 / 23617500000)  # filed 0.9866
+    assert (c["largest_subsidiary_profit_share"], c["consolidated_entities_count"]) == (None, 2)
+    e = _subsidiary(ETERNAL)  # "Consolidation Adjustments" typed Parent; an NCI row
+    assert e["parent_profit_share"] == pytest.approx(26550000000 / 3660000000)  # filed 7.25
+    assert (e["largest_subsidiary_name"], e["consolidated_entities_count"]) == ("Zomato Payments Private Limited", 23)
+    assert e["largest_subsidiary_profit_share"] == pytest.approx(80000000 / 3660000000)
+    s = _subsidiary(SRF)  # "Adjustments arising out of consolidation" typed Indian Subsidiary
+    assert s["parent_profit_share"] == pytest.approx(17246300000 / 18351800000)  # filed 0.9397
+    assert (s["largest_subsidiary_name"], s["consolidated_entities_count"]) == ("SRF Global BV (Consolidated)", 4)
+    t = _subsidiary(TCS)  # TCS files % of the pre-elimination sum (0.8548); the column uses the filing's PAT
+    assert t["parent_profit_share"] == pytest.approx(490960000000 / 494540000000)
+    assert t["largest_subsidiary_name"] == "Tata America International Corporation"
+    # TCS files the NCI share of 7 subsidiaries as second rows typed "Subsidiary" with the subsidiary's name: 6 repeat
+    # the name exactly, one does not ("... (South Africa) (PTY) Ltd." vs "(Proprietary) Limited"): 68 entities count 69
+    assert t["consolidated_entities_count"] == 69
+    p = _subsidiary(SPARC)  # subsidiaries only, no Parent row
+    assert (p["parent_profit_share"], p["largest_subsidiary_name"]) == (None, "SPARCLIFE Inc.")
+
+
+@pytest.mark.parametrize(
+    ("name", "kind", "role"),
+    [("Consolidation Adjustments", "Parent", "ADJUSTMENT"), ("Eternal Limited ", "Parent", "PARENT"),
+     ("Non Controlling Interest in all Subsidiaries", "Non Controlling Interests In All Subsidiaries", "NCI"),
+     ("Minority interest in all subsidiaries", "Indian Subsidiary", "NCI"), ("X Ltd", "Foreign Joint Venture",
+     "JOINT_VENTURE"), ("Y Ltd", "Indian Associate", "ASSOCIATE"), ("Z Inc", "Foreign Subsidiary", "SUBSIDIARY")],
+)  # fmt: skip
+def test_entity_roles(name, kind, role):
+    assert F.entity_role(name, kind) == role
+
+
+# ── promotion, backfill, point-in-time features ───────────────────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def filed(market):
+    for day in ("20251023", "20261112"):  # the filers must be known on their broadcast dates
+        promote(market.con, market.stage_day(day))
+    for name, ts in ((ELECON, datetime(2026, 7, 23, 10, 42)), (CUMMINS, datetime(2026, 9, 4, 6, 5))):
+        stage = stage_results_xbrl(market.vault, market.stage_root, data=(XBRL_DIR / name).read_bytes(),
+                                   source_url=ARCHIVE + name, fetched_at=FETCHED, broadcast_ts=ts,
+                                   broadcast_ts_source="API_FIELD")  # fmt: skip
+        assert promote(market.con, stage).status == "PROMOTED"
+        assert promote(market.con, stage).status == "ALREADY_PROMOTED"
+    stage = stage_shareholding(market.vault, market.stage_root, data=(XBRL_DIR / SAMMAAN).read_bytes(),
+                               source_url=ARCHIVE + SAMMAAN, fetched_at=FETCHED,
+                               broadcast_ts=datetime(2026, 11, 4, 9, 59), broadcast_ts_source="API_FIELD")  # fmt: skip
+    assert promote(market.con, stage).status == "PROMOTED"
+    return market
+
+
+def _counts(con):
+    return con.execute("SELECT source_kind, count(*) FROM disclosure_facts GROUP BY 1 ORDER BY 1").fetchall()
+
+
+def test_rows_are_promoted_with_their_filing_and_backfilled_idempotently(filed):
+    con = filed.con
+    staged = len(_tables(ELECON)["stg_disclosures"]) + len(_tables(CUMMINS)["stg_disclosures"])
+    counts = dict(_counts(con))
+    assert counts["ANNUAL"] == staged and counts["SHAREHOLDING"] == len(_tables(SAMMAAN)["stg_disclosures"])
+    same = con.execute(
+        """SELECT bool_and(d.visible_from_ts = m.visible_from_ts AND d.entity_id = m.entity_id AND d.scope = m.scope
+                           AND d.parser_version = ?)
+           FROM disclosure_facts d JOIN filing_meta m USING (filing_id)""", [DISCLOSURE_PARSER_VERSION]
+    ).fetchone()[0]  # fmt: skip
+    assert same is True
+    assert pending_filings(con) == []
+    before, raw = _counts(con), con.execute("SELECT count(*) FROM raw_xbrl_facts").fetchone()
+    snapshot = con.execute("SELECT * FROM disclosure_facts ORDER BY filing_id, seq").fetchall()
+    con.execute("DELETE FROM disclosure_facts")  # as if promoted before X116
+    con.execute("DELETE FROM materialize_dirty")
+    # an interrupted run left one filing staged: it is reused, not re-parsed
+    kind, fid, _, _, _, url, path, sha = pending_filings(con)[0]
+    out = filed.stage_root / STAGE_DIR
+    out.mkdir(parents=True)
+    assert _stage_one((str(filed.vault.root), str(out), kind, fid, url, path, sha))[1] is None
+    r = backfill_disclosures(con, filed.vault, filed.stage_root, workers=2)  # process pool, one insert
+    assert (r["filings"], r["parsed"], r["rows"], r["error_count"]) == (3, 2, sum(n for _, n in before), 0)
+    assert con.execute("SELECT * FROM disclosure_facts ORDER BY filing_id, seq").fetchall() == snapshot
+    assert list(out.iterdir()) == []  # staged files removed after the commit
+    assert {d for (d,) in con.execute("SELECT from_date FROM materialize_dirty WHERE reason = 'DISCLOSURE_BACKFILL'")
+            .fetchall()} == {date(2026, 7, 23), date(2026, 9, 4), date(2026, 11, 4)}  # fmt: skip
+    assert backfill_disclosures(con, filed.vault, filed.stage_root, workers=1)["filings"] == 0  # idempotent
+    assert con.execute("SELECT count(*) FROM raw_xbrl_facts").fetchone() == raw  # no second raw copy
+    assert con.execute("SELECT count(DISTINCT parser_version) FROM filing_meta").fetchone() == (1,)
+
+
+def _row_for(con, symbol: str) -> dict:
+    ent = con.execute("SELECT DISTINCT s.entity_id FROM security_identifier_history h JOIN securities s "
+                      "USING (security_id) WHERE h.symbol = ?", [symbol]).fetchone()[0]  # fmt: skip
+    return {"entity_id": ent, "scope_used": None}
+
+
+def test_columns_are_point_in_time(filed):
+    con = filed.con
+    rows = [_row_for(con, s) for s in ("ELECON", "CUMMINSIND", "SAMMAANCAP")]
+    before = ist_to_utc(date(2026, 7, 23), datetime.min.time())
+    F.add_columns(con, rows, before)
+    assert all(r[c] is None for r in rows for c in F.COLUMNS)
+    F.add_columns(con, rows, ist_to_utc(date(2026, 11, 5), datetime.min.time()))
+    elecon, cummins, sammaan = rows
+    recv = fetch_dicts(
+        con,
+        "SELECT canonical_tag, value_inr FROM fact_observations WHERE entity_id = ? AND "
+        "canonical_tag LIKE 'trade_receivables_%' AND period_end = ?",
+        [elecon["entity_id"], FY26],
+    )
+    den = sum(r["value_inr"] for r in recv)
+    assert (elecon["insider_receivables"], elecon["insider_receivables_as_of"], elecon["has_insider_receivables"]) == (
+        Decimal("442100000"), FY26, True)  # fmt: skip
+    assert elecon["insider_receivables_to_receivables"] == pytest.approx(442100000 / float(den))
+    assert (cummins["insider_receivables"], cummins["has_insider_receivables"]) == (Decimal(0), False)
+    assert cummins["parent_profit_share"] == pytest.approx(23301800000 / 23617500000)
+    assert cummins["consolidated_entities_count"] == 2 and elecon["subsidiary_fy_end"] is None  # standalone only
+    assert (sammaan["has_warrants"], sammaan["has_dvr_shares"], sammaan["is_psu"]) == (True, True, False)
+    assert elecon["has_warrants"] is None  # no shareholding filing loaded for ELECON
+    later = [_row_for(con, "ELECON")]
+    F.add_columns(con, later, ist_to_utc(date(2026, 7, 23), datetime.min.time()) + timedelta(days=1))
+    assert later[0]["insider_receivables"] == Decimal("442100000")  # visible from the broadcast day
+
+
+def test_dsl_aliases_compile():
+    for name in ("insider receivables pct", "parent profit share", "largest subsidiary profit share",
+                 "consolidated entities", "insider receivables"):  # fmt: skip
+        assert name in ALIASES
+        compile_screen(f"{name} > 1")
+
+
+def test_columns_are_appended_and_split_event_daily():
+    from financials.db import declared_columns
+    from financials.features_store import DAILY_COLUMNS, EVENT_COLUMNS
+
+    names = [c for c, _ in declared_columns()["screener_features"]]
+    assert names[-len(F.COLUMNS) :] == list(F.COLUMNS)
+    assert {*F.INSIDER_COLUMNS, *F.SUBSIDIARY_COLUMNS} <= set(EVENT_COLUMNS)  # annual filings: in the cache key
+    assert set(F.SHP_DECLARATION_COLUMNS) <= set(DAILY_COLUMNS)  # shareholding is outside the key
+
+
+def test_coverage_script_finds_every_element_in_a_clean_table(filed):
+    """scripts/disclosure_coverage.py (the check before dropping raw_xbrl_facts) on promoted real filings."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("disclosure_coverage", FIXTURES.parents[1] / "scripts" /
+                                                  "disclosure_coverage.py")  # fmt: skip
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    rows = {r["profile"]: r for r in mod.coverage(filed.con)}
+    assert set(rows) >= {"REG34_ANNUAL", "REG31_SHP"} and all(r["uncaptured"] == 0 for r in rows.values()), rows
+    filed.con.execute("DELETE FROM disclosure_facts")
+    assert mod.coverage(filed.con)[0]["uncaptured"] > 0  # the check fails without disclosure_facts

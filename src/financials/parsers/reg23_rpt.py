@@ -82,6 +82,8 @@ AMOUNTS = {
     "ValueOfTheRelatedPartyTransactionRatifiedByTheAuditCommittee": "ratified_value",
 }
 BALANCE = "AmountOfRelatedPartyTransaction"
+# Every element reg23_related_party_transactions keeps in a column of its own (disclosures.captured)
+ELEMENTS = frozenset({*TEXT, *TERMS, *AMOUNTS, BALANCE})
 
 
 @dataclass(frozen=True)

@@ -178,6 +178,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="related-party schedule rows for annual filings promoted before batch J, from the vault (audited) [X113]",
     )
     br.add_argument("--limit", type=int)
+    bd = sub.add_parser(
+        "backfill-disclosures",
+        help="disclosure_facts rows (every element no other clean table holds) for promoted filings, from the vault "
+        "(parallel parse to staging Parquet, one insert by the single writer; audited, resumable) [X116]",
+    )
+    bd.add_argument("--limit", type=int)
+    bd.add_argument("--workers", type=int, help="parse processes (default: os.cpu_count())")
     sub.add_parser("audit-ytd", help="raise YTD_QUARTER_MISMATCH findings for every entity and scope [X80]")
     sub.add_parser("promote", help="apply all pending staged batches (single writer)")
     rb = sub.add_parser("rebuild-market", help="roll market-derived state back to a date and replay it (audited)")
@@ -407,6 +414,17 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
             con.execute("BEGIN")
             r = backfill_rpt(con, Vault(vault_dir), limit=args.limit)
             con.execute("COMMIT")
+        finally:
+            con.close()
+        print(json.dumps(r, indent=1), file=out)
+        return 1 if r["error_count"] else 0
+    if args.cmd == "backfill-disclosures":
+        from financials.disclosures import backfill_disclosures
+
+        con = connect(db_path)
+        try:
+            apply_schema(con)
+            r = backfill_disclosures(con, Vault(vault_dir), stage_root, limit=args.limit, workers=args.workers)
         finally:
             con.close()
         print(json.dumps(r, indent=1), file=out)

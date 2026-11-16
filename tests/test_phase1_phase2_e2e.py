@@ -89,7 +89,7 @@ def test_every_batch_promotes_with_only_the_documented_exceptions(unified):
     assert m.pending == 0
     assert Counter(tuple(x) for x in m.log) == {
         ("PROMOTED", "market_day"): 10, ("PROMOTED", "holidays"): 1, ("PROMOTED", "index_snapshot"): 1,
-        ("PROMOTED", "corp_actions"): 1, ("PROMOTED", "results_xbrl"): 109, ("PROMOTED", "shareholding"): 14,
+        ("PROMOTED", "corp_actions"): 1, ("PROMOTED", "results_xbrl"): 111, ("PROMOTED", "shareholding"): 15,
         ("PROMOTED", "reg30_event"): 8,
         ("QUARANTINED", "results_xbrl"): 2,  # MRPL Q1 FY26 on the non-Ind AS template (UNKNOWN_TAXONOMY) [X89]
         ("FIXED_BY_RULE", "results_xbrl"): 1,  # ... closed once its Ind AS re-filing is promoted [X89]
@@ -135,7 +135,7 @@ def test_all_profiles_and_scopes_land_without_collisions(unified):
         ("INDAS_NBFC", "STANDALONE"): 5, ("IGAAP_BANK", "CONSOLIDATED"): 5, ("IGAAP_BANK", "STANDALONE"): 5,
         ("IRDAI_LIFE", "CONSOLIDATED"): 2, ("IRDAI_LIFE", "STANDALONE"): 4, ("IRDAI_GENERAL", "CONSOLIDATED"): 1,
         ("IRDAI_GENERAL", "STANDALONE"): 4, ("INDAS_INSURANCE", "STANDALONE"): 2,
-        ("REG34_ANNUAL", "CONSOLIDATED"): 6, ("REG34_ANNUAL", "STANDALONE"): 2,
+        ("REG34_ANNUAL", "CONSOLIDATED"): 7, ("REG34_ANNUAL", "STANDALONE"): 3,
     }  # fmt: skip
     # one results profile per entity (Reg. 34 annual sits beside its company's quarterly profile), except the
     # documented change of basis of general insurers to Ind AS 117 in FY27 (Go Digit), which FactBook keeps apart [X90]
@@ -173,10 +173,10 @@ def test_segment_rows_land_with_their_filings(unified):
 
 
 # Rows per profile / axis kind: IRDAI_LIFE files segment assets and liabilities only; geography exists only in the
-# Reg. 34 annual filings (TCS, Eternal, SRF).
+# Reg. 34 annual filings (TCS, Eternal, SRF, and the 18D fixtures ELECON / INOXINDIA).
 SEGMENT_ROWS = {
     "INDAS_CORP/BUSINESS": 930, "INDAS_NBFC/BUSINESS": 38, "IGAAP_BANK/BUSINESS": 332, "IRDAI_LIFE/BUSINESS": 176,
-    "REG34_ANNUAL/BUSINESS": 300, "REG34_ANNUAL/GEOGRAPHY": 66,
+    "REG34_ANNUAL/BUSINESS": 300, "REG34_ANNUAL/GEOGRAPHY": 78,
 }  # fmt: skip
 
 
@@ -192,8 +192,10 @@ def test_materialised_universe_spans_every_archetype_and_screens_run(unified):
         return {r["symbol"] for r in run_screen(m.con, q)}
 
     # Reg. 34 annual; SPARC FY26 as filed: PBT 15,530,099,000 on revenue 18,791,683,000 (FY25 PBT -3,427,812,000);
-    # SRF FY26 consolidated (the segment fixture, X98) and Cummins FY26 (X100) have FY25 and FY26 in scope too
-    assert syms("Piotroski F score >= 0 AND ROCE screener > 0") == {"TCS", "ETERNAL", "SPARC", "SRF", "CUMMINSIND"}
+    # SRF FY26 consolidated (the segment fixture, X98) and Cummins FY26 (X100) have FY25 and FY26 in scope too, as do
+    # the 18D insider-receivable fixtures ELECON (standalone) and INOXINDIA (consolidated) [X117]
+    assert syms("Piotroski F score >= 0 AND ROCE screener > 0") == {"TCS", "ETERNAL", "SPARC", "SRF", "CUMMINSIND",
+                                                                     "ELECON", "INOXINDIA"}  # fmt: skip
     assert syms("Debtor days > 0") >= {"TCS", "ITC", "RELIANCE"}  # industrial, incl. excise FMCG
     assert syms("GNPA > 0") >= {"HDFCBANK", "PNB"}  # private + PSU banks
     assert syms("Solvency ratio > 0") >= {"HDFCLIFE", "SBILIFE", "ICICIGI"}  # life + general insurers

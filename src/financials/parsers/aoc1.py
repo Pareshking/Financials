@@ -74,6 +74,15 @@ SCHEDULES: dict[str, tuple[str, dict[str, str]]] = {
     ),
 }
 _AXIS_RELATION = {axis: rel for rel, (axis, _) in SCHEDULES.items()}
+# Fields whose element value group_structure keeps as filed (one column each). Not verbatim: `holding_alt` (kept only
+# when `holding` is absent), subsidiary `share_capital` and `reserves` (stored only as their sum): disclosure_facts.
+VERBATIM_FIELDS = ("name", "cin", "country", "holding", "net_worth", "turnover", "pat", "investment")
+
+
+def verbatim_elements(relation: str) -> frozenset[str]:
+    """The elements of one relation's schedule that group_structure holds as filed (disclosures.captured)."""
+    fields = SCHEDULES[relation][1]
+    return frozenset(fields[f] for f in VERBATIM_FIELDS if f in fields)
 
 
 @dataclass(frozen=True)

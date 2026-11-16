@@ -86,6 +86,10 @@ PUBLIC_HOLDER_AXES = {
     ),
 }
 SUBTOTAL_FLAG = "WhetherACategoryOrMoreThan1PercentageOfShareholding"  # "Category" rows are sub-totals
+HOLDER_NAME, HOLDER_SHARES, HOLDER_PCT = (
+    "NameOfTheShareholder", "NumberOfShares", "ShareholdingAsAPercentageOfTotalNumberOfShares",
+)  # fmt: skip
+HOLDER_ELEMENTS = frozenset({HOLDER_NAME, HOLDER_SHARES, HOLDER_PCT})  # kept verbatim in shareholding_major_holders
 NO_PROMOTER_RULE = "NO_PROMOTER_CATEGORY"
 MEASURES = {
     "NumberOfShares": "shares",
@@ -261,10 +265,10 @@ def parse_shareholding(data: bytes) -> ParsedShareholding:
                                "unit": inst.unit_kind(fact.unit_ref)})  # fmt: skip
 
     for (axis, member), row in sorted(holders.items()):
-        name, shares = row.get("NameOfTheShareholder"), row.get("NumberOfShares")
+        name, shares = row.get(HOLDER_NAME), row.get(HOLDER_SHARES)
         if not name or shares is None or row.get(SUBTOTAL_FLAG) == "Category":
             continue
-        pct = row.get("ShareholdingAsAPercentageOfTotalNumberOfShares")
+        pct = row.get(HOLDER_PCT)
         out.major_holders.append(
             {
                 "holder_category": PUBLIC_HOLDER_AXES[axis],

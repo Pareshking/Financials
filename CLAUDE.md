@@ -35,6 +35,8 @@ python -m financials --data-dir data materialize --incremental                 #
 # Changing features.py / fundamentals.py (or another file pinned in tests/test_incremental_materialize.py) means bumping
 # features.FEATURES_VERSION and the pinned hash together; --incremental then refuses until a full --from/--to run.
 python -m financials --data-dir data load-kpis kpis.csv                        # supplemental KPIs (then promote)
+python -m financials --data-dir data backfill-disclosures [--workers N]        # disclosure_facts for promoted filings (resumable)
+python scripts/disclosure_coverage.py data/market.duckdb                       # per-profile check: 0 uncaptured elements
 python -m financials --data-dir data export-bundle --out data/bundle           # zstd Parquet shards; never commit them
 python -m financials --data-dir data migrate-sparse-history                    # once: wide history table -> features_daily + features_events + view
 python -m financials --data-dir data compact [--keep-old | --spill data/spill]  # monthly: rewrite without dead space (--spill: low disk)

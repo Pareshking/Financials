@@ -128,7 +128,9 @@ EVENT_COLUMNS = (
     "segment_count", "largest_segment_revenue_share", "fastest_growing_segment",
     "fastest_growing_segment_growth_yoy", "largest_segment_margin_change_yoy_pp", "rpt_fy_end",
     "rpt_counterparties", "rpt_leak_pct", "rpt_purchases_to_sales", "rpt_royalty_to_sales",
-    "rpt_loans_given_to_net_worth",
+    "rpt_loans_given_to_net_worth", "insider_receivables_as_of", "insider_receivables",
+    "insider_receivables_to_receivables", "has_insider_receivables", "subsidiary_fy_end", "parent_profit_share",
+    "largest_subsidiary_profit_share", "largest_subsidiary_name", "consolidated_entities_count",
 )  # fmt: skip
 
 _DECLARED = declared_columns()

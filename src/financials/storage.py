@@ -427,6 +427,14 @@ PRUNE_RULES: tuple[PruneRule, ...] = (
         "no feature reader; the AOC-1 backfill checks the current AOC-1 version only: the latest version per filing "
         "stays",
     ),
+    PruneRule(
+        "disclosure_facts",
+        f"""{VK("t.parser_version")} < (SELECT max({VK("d.parser_version")}) FROM disclosure_facts d
+                                         WHERE d.filing_id = t.filing_id)""",
+        "features_disclosures ranks rows by visible_from_ts, filing, then the highest version (the Reg. 31 read takes "
+        "the filing's highest version); the backfill checks the current version only: the latest version per filing "
+        "stays",
+    ),
 )
 
 # Kept whole, and why (docs/architecture.md §4.1): filing_meta and shareholding_meta are read across every

@@ -26,6 +26,7 @@ from decimal import Decimal
 
 from financials import (
     features_bs,
+    features_disclosures,
     features_extra,
     features_gems,
     features_more,
@@ -81,7 +82,7 @@ from financials.timeutil import ist_to_utc, utc_now
 # Reader version of materialised rows. Bump it whenever features.py, fundamentals.py (or another file pinned by
 # tests/test_incremental_materialize.py) changes any output: `materialize --incremental` refuses days built by another
 # version, because only a full run then reproduces the history.
-FEATURES_VERSION = "2026.11.16-17E"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
+FEATURES_VERSION = "2026.11.16-18D"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
 # -3: QoQ sales / profit growth, NPM, interest coverage, OPM same quarter last year, dividend yield / payout,
 #     promoter holding QoQ change (owner_requirements items 1, 3, 4)
 # -4A: period P&L family (features_pl: quarter / fiscal-year lines, quarter YoY growth, result dates, history-gated
@@ -119,6 +120,8 @@ FEATURES_VERSION = "2026.11.16-17E"  # -2: X106 restatement TTM bridge + flag, X
 # -17E: event-sparse history (features_store.py, architecture §4.1): screener_features_history is a view over
 #       features_daily (DAILY columns, every day) and features_events (EVENT columns, one row per interval of identical
 #       values); identical rows, bumped because the pinned files changed
+# -18D: disclosure_facts columns (features_disclosures.py): insider receivables (X117), Reg. 31 declarations (X118),
+#       Schedule III subsidiary contribution (X119)
 
 CRITICAL_COLUMNS = ("close", "market_cap", "sales_ttm", "pat_ttm", "total_equity")
 G4_MAX_NULL_RISE = 0.015
@@ -620,6 +623,7 @@ def compute_rows(
         con, rows, as_of, as_of_ts, fundamentals_cache, factors, frozen, entities, prices=prices
     )  # batch I
     features_rpt.add_columns(con, rows, as_of_ts, entities)  # batch J (related-party leak, X113)
+    features_disclosures.add_columns(con, rows, as_of_ts, entities)  # 18D (disclosure_facts, X116-X119)
     return rows
 
 

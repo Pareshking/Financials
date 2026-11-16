@@ -745,6 +745,14 @@ CREATE TABLE IF NOT EXISTS features_daily (
     rs_rank_12m_1m                           DOUBLE,          -- cross-section (refresh step): 1 = strongest
     industry_earnings_breadth                DOUBLE,          -- B4.9 / G205 share of NSE industry with core profit YoY > 0
     industry_earnings_breadth_n              INTEGER,         -- companies measured (latest quarter of the industry)
+    -- 18D: Reg. 31 declarations of the latest visible shareholding filing (entity-level element) [X118]
+    has_warrants                             BOOLEAN,
+    has_convertibles                         BOOLEAN,
+    has_partly_paid                          BOOLEAN,
+    has_locked_in                            BOOLEAN,
+    has_dvr_shares                           BOOLEAN,         -- equity shares with differential voting rights
+    has_sbo                                  BOOLEAN,         -- any significant beneficial owner
+    is_psu                                   BOOLEAN,         -- public sector undertaking
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -1158,6 +1166,17 @@ CREATE TABLE IF NOT EXISTS features_events (
     rpt_purchases_to_sales                   DOUBLE,
     rpt_royalty_to_sales                     DOUBLE,
     rpt_loans_given_to_net_worth             DOUBLE,          -- loans given / total equity at the FY end
+    -- 18D (disclosure_facts, X116): features_disclosures.py; insider receivables (Reg. 34 trade-receivables note) [X117]
+    insider_receivables_as_of                DATE,            -- FY-end instant used (row scope, else the other)
+    insider_receivables                      DECIMAL(24,2),   -- due by directors + other officers + their firms / companies
+    insider_receivables_to_receivables       DOUBLE,          -- / trade receivables of the same filing and instant
+    has_insider_receivables                  BOOLEAN,         -- insider_receivables > 0
+    -- 18D: Schedule III additional information per consolidated entity (latest consolidated annual) [X119]
+    subsidiary_fy_end                        DATE,
+    parent_profit_share                      DOUBLE,          -- parent row's share in profit / consolidated PAT
+    largest_subsidiary_profit_share          DOUBLE,          -- largest subsidiary row / consolidated PAT
+    largest_subsidiary_name                  VARCHAR,
+    consolidated_entities_count              INTEGER,         -- distinct subsidiaries + associates + joint ventures
     PRIMARY KEY (security_id, valid_from_date)
 );
 
@@ -1821,6 +1840,25 @@ CREATE TABLE IF NOT EXISTS screener_features (
     rpt_purchases_to_sales                   DOUBLE,
     rpt_royalty_to_sales                     DOUBLE,
     rpt_loans_given_to_net_worth             DOUBLE,          -- loans given / total equity at the FY end
+    -- 18D (disclosure_facts, X116): features_disclosures.py; insider receivables (Reg. 34 trade-receivables note) [X117]
+    insider_receivables_as_of                DATE,            -- FY-end instant used (row scope, else the other)
+    insider_receivables                      DECIMAL(24,2),   -- due by directors + other officers + their firms / companies
+    insider_receivables_to_receivables       DOUBLE,          -- / trade receivables of the same filing and instant
+    has_insider_receivables                  BOOLEAN,         -- insider_receivables > 0
+    -- 18D: Reg. 31 declarations of the latest visible shareholding filing (entity-level element) [X118]
+    has_warrants                             BOOLEAN,
+    has_convertibles                         BOOLEAN,
+    has_partly_paid                          BOOLEAN,
+    has_locked_in                            BOOLEAN,
+    has_dvr_shares                           BOOLEAN,         -- equity shares with differential voting rights
+    has_sbo                                  BOOLEAN,         -- any significant beneficial owner
+    is_psu                                   BOOLEAN,         -- public sector undertaking
+    -- 18D: Schedule III additional information per consolidated entity (latest consolidated annual) [X119]
+    subsidiary_fy_end                        DATE,
+    parent_profit_share                      DOUBLE,          -- parent row's share in profit / consolidated PAT
+    largest_subsidiary_profit_share          DOUBLE,          -- largest subsidiary row / consolidated PAT
+    largest_subsidiary_name                  VARCHAR,
+    consolidated_entities_count              INTEGER,         -- distinct subsidiaries + associates + joint ventures
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -2057,6 +2095,45 @@ CREATE TABLE IF NOT EXISTS reg23_related_party_transactions (
     visible_from_ts     TIMESTAMP NOT NULL,
     PRIMARY KEY (filing_id, parser_version, row_member)
 );
+-- Every XBRL fact whose element no other clean table holds per element, as filed (parsers/disclosures.py) [X116]: one
+-- row per fact of a parsed, in-scope results / annual / shareholding / Reg. 30 filing, promoted with it (same entity,
+-- scope, visibility) and by `backfill-disclosures`. `seq` is the fact's document order (= raw_xbrl_facts.seq). The
+-- captured set is computed per filing from its other clean rows (staging.captured_elements). Money is value_inr
+-- (unit INR, rupees); every other numeric unit (PURE fractions or percent points as filed, SHARES, per-share, foreign
+-- currency, counts) is value_num as filed, never rescaled; true/false/yes/no text also value_bool; value_text always.
+-- Readers take in_window rows (periods the filing's own parser validated) unless they state otherwise.
+CREATE TABLE IF NOT EXISTS disclosure_facts (
+    filing_id        VARCHAR NOT NULL REFERENCES filings(filing_id),
+    parser_version   VARCHAR NOT NULL,           -- parsers.disclosures.DISCLOSURE_PARSER_VERSION
+    entity_id        VARCHAR NOT NULL REFERENCES entity_master(entity_id),   -- the filer
+    source_kind      VARCHAR NOT NULL,           -- RESULTS | ANNUAL | SHAREHOLDING | EVENT
+    scope            VARCHAR,                    -- the filing's scope (results / annual); NULL for SHAREHOLDING, EVENT
+    seq              INTEGER NOT NULL,           -- document order of the fact in its filing
+    element_ns       VARCHAR NOT NULL,
+    element          VARCHAR NOT NULL,           -- local name as filed
+    context_id       VARCHAR NOT NULL,
+    period_type      VARCHAR NOT NULL,           -- DURATION | INSTANT | NONE (a context with no period, SHP16)
+    period_start     DATE,                       -- = period_end for INSTANT; NULL for NONE
+    period_end       DATE,                       -- the instant for INSTANT
+    period_months    INTEGER,                    -- DURATION on whole calendar months (1..18), else NULL
+    in_window        BOOLEAN NOT NULL,           -- a period the filing's own parser validated
+    dimensions       JSON,                       -- {axis QName: member QName} as filed; NULL when none
+    unit_ref         VARCHAR,                    -- as filed; NULL for a non-numeric fact
+    unit             VARCHAR,                    -- INR | PURE | SHARES | INR_PER_SHARE | <CCY> | UNKNOWN
+    value_inr        DECIMAL(20,2),              -- unit INR only, exact rupees
+    value_num        DECIMAL(28,8),              -- every other numeric unit, exact as filed
+    value_bool       BOOLEAN,                    -- non-numeric true / false / yes / no
+    value_text       VARCHAR NOT NULL,           -- exactly as filed (text blocks included)
+    visible_from_ts  TIMESTAMP NOT NULL,
+    PRIMARY KEY (filing_id, parser_version, seq),
+    CHECK (source_kind IN ('RESULTS', 'ANNUAL', 'SHAREHOLDING', 'EVENT')),
+    CHECK (period_type IN ('DURATION', 'INSTANT', 'NONE')),
+    CHECK ((period_type = 'NONE') = (period_end IS NULL)),
+    CHECK (period_months IS NULL OR period_months BETWEEN 1 AND 18),
+    CHECK (value_inr IS NULL OR unit = 'INR'),
+    CHECK (value_num IS NULL OR (unit IS NOT NULL AND unit <> 'INR')),
+    CHECK (value_bool IS NULL OR unit_ref IS NULL)
+);
 -- ── Views ──────────────────────────────────────────────────────────────
 -- Everything below VIEWS_MARKER runs after the column upgrade (db.apply_schema), so a view may name columns that an
 -- existing database gains in the same run. Views hold no data; CREATE OR REPLACE keeps them at this definition.
@@ -2173,7 +2250,9 @@ SELECT d.as_of_date, d.security_id, d.entity_id, d.symbol, d.series, d.price_dat
        d.next_ex_date_action, d.dividend_365d, d.bonus_365d, d.split_365d, e.segment_period_end, e.segment_count,
        e.largest_segment_revenue_share, e.fastest_growing_segment, e.fastest_growing_segment_growth_yoy, e.largest_segment_margin_change_yoy_pp, d.rs_rank_12m_1m, d.industry_earnings_breadth,
        d.industry_earnings_breadth_n, e.rpt_fy_end, e.rpt_counterparties, e.rpt_leak_pct, e.rpt_purchases_to_sales, e.rpt_royalty_to_sales,
-       e.rpt_loans_given_to_net_worth
+       e.rpt_loans_given_to_net_worth, e.insider_receivables_as_of, e.insider_receivables, e.insider_receivables_to_receivables, e.has_insider_receivables, d.has_warrants, d.has_convertibles,
+       d.has_partly_paid, d.has_locked_in, d.has_dvr_shares, d.has_sbo, d.is_psu, e.subsidiary_fy_end,
+       e.parent_profit_share, e.largest_subsidiary_profit_share, e.largest_subsidiary_name, e.consolidated_entities_count
 FROM features_daily d
 LEFT JOIN features_events e ON e.security_id = d.security_id AND e.valid_from_date <= d.as_of_date
      AND d.as_of_date < coalesce(e.valid_to_date, DATE '9999-12-31');  -- open interval; an OR here is ~400x slower

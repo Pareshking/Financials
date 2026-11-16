@@ -335,6 +335,14 @@ Inspected for Batch 10 but not committed: the other Reg. 30 files listed in docs
 |---|---|---|---|
 | `xbrl/AR_XBRL_SRF_09082026022508.xml` | X97-X99: SRF FY26 consolidated Reg. 34 annual (fetched 2026-11-14T04:35:26Z; inspected for Batch 9, now committed). Business segments with `UnallocatedAmountsMember`, `EliminationOfIntersegmentAmountsMember` and `MaterialReconcilingItemsMember`; geography with country labels on `GeographicalAreasAxis` | `https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_SRF_09082026022508.xml` | `9cd7592d33a6e62a4162ef662ad21c7e63c91133e406db78ea60e5a143965b98` |
 
+## Disclosure facts (copied 2026-11-16 from the local vault blob, gunzipped, sha256 verified)
+
+| File | Why it is here | Source URL | SHA-256 |
+|---|---|---|---|
+| `xbrl/AR_XBRL_ELECON_23072026161247.xml` | X116 / X117: ELECON FY26 standalone Reg. 34 annual (fetched 2026-11-14T03:38:21Z). Non-zero `TradeReceivablesDueByDirectors` (442.1 Mn) next to `TradeReceivablesDueByOthers`; `TradeReceivablesDueByDirectorsOtherOfficersOrOthers` = their sum = total trade receivables (a subtotal that includes third parties) | `https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_ELECON_23072026161247.xml` | `50a8e66e066fb65d7da92939a486593b6cb0f8331c2fc63b47ad17d949509dc7` |
+| `xbrl/AR_XBRL_INOXINDIA_09082026015537.xml` | X117: INOXINDIA FY26 consolidated Reg. 34 annual (fetched 2026-11-14T04:00:50Z). FY25 comparative: `TradeReceivablesDueByPrivateCompaniesInWhichAnyDirectorIsDirector` = `TradeReceivablesDueByFirmsOrCompaniesInWhichAnyDirectorIsPartnerOrDirector` = 528.618 Mn (the firms / companies subtotal); FY26: 0 | `https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_INOXINDIA_09082026015537.xml` | `6890f120eaec7192946dc97b938960df7ab9a088635bee641bf72177e9eee51a` |
+| `xbrl/SHP_1752549_04112026032917_WEB.xml` | X118: SAMMAANCAP Reg. 31 as of 2026-10-30 (fetched 2026-11-14T04:31:32Z). Declares warrants, convertible securities, partly paid-up shares, DVR shares, locked-in shares and ESOPs `true` (every other committed SHP fixture files the first four `false`) | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_1752549_04112026032917_WEB.xml` | `7248bfdf1dc49ff4382782829ea12190a43bbacbe95cf2623147c4827a70ec68` |
+
 ## Screener goldens (local only, not committed)
 
 The repository is public, so the user-supplied Screener Excel exports (2026-11-13; 42 distinct files, some uploaded twice)

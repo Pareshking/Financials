@@ -10,7 +10,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45  # the full offline suite takes ~20-25 min on a hosted runner (2026-11-16)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

@@ -539,6 +539,9 @@ The owner asked the assistant to take these with its recommendation. Each is rev
   caught after the load instead of refused at entry. All constraints stay. Consequence for decision K: 7 daily
   snapshots of the ~2.5 GB file (~17 GB) do not fit R2's 10 GB free tier; snapshots would need to be fewer or stored
   as the zstd Parquet bundle (~0.47 GB measured), to be settled with decision K.
+- **P. Exchange data in public places (owner, 2026-11-17):** "Everything on exchange is public limited company data
+  and do not worry about it again and again." Workflow artifacts and fixtures with exchange data in this public
+  repository are acceptable; not to be raised again (as decision L). Artifact retention is a size choice only.
 - **Site data layout (agreed 2026-11-17, part of the proposed decision K):** the site never reads the DuckDB file.
   Page views read small precomputed files (per-company JSON, saved-screen results); custom screens read one Parquet
   file of the latest screener table (3,003 x 665: 2.9 MB zstd measured) with column-only range reads; Cloudflare

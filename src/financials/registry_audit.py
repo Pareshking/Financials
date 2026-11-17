@@ -301,6 +301,12 @@ OVERRIDES: dict[tuple[str, str], str] = {
     ("REG34_ANNUAL", "IncomeExportIncentives"): "ANNUAL_INCOME_DETAIL",
     ("REG34_ANNUAL", "RevenueFromInterest"): "ANNUAL_INCOME_DETAIL",
     ("REG34_ANNUAL", "MATCreditRecognisedDuringYear"): "ANNUAL_TAX_NOTE",
+    # Seen first in the X150-X155 fixtures (Choice International, Premier Energies, Siemens Energy India FY25).
+    ("REG34_ANNUAL", "CateringCanteenExpenses"): "ANNUAL_EXPENSE_DETAIL",
+    ("REG34_ANNUAL", "SeminarsConferenceExpenses"): "ANNUAL_EXPENSE_DETAIL",
+    ("REG34_ANNUAL", "ReclassificationAdjustmentsOnExchangeDifferencesOnTranslationNetOfTax"): "OCI_SUBLINE",
+    # Ind AS 7.40: consideration paid / received on obtaining or losing control of subsidiaries.
+    ("REG34_ANNUAL", "ConsiderationPaidReceived"): "CASH_FLOW_DETAIL",
 }
 
 

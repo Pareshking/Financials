@@ -20,6 +20,7 @@ Evidence (docs/references.md SHP1-SHP15):
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
@@ -140,6 +141,20 @@ def shp_instance(data: bytes) -> tuple[Instance, bool]:
     return inst, True
 
 
+EXCHANGE_SPECIFIC_RULE = "SHP_EXCHANGE_SPECIFIC_TAXONOMY"
+EXCHANGE_SPECIFIC_NS = re.compile(
+    r"^https?://www\.sebi\.gov\.in/xbrl/SHP_Exchange_Specific/\d{4}-\d{2}-\d{2}/in-capmkt$"
+)
+
+
+def exchange_specific_ns(inst: Instance) -> str | None:
+    """SHP_EXCHANGE_SPECIFIC_TAXONOMY [X154]: a listed stock exchange (BSE Ltd, Q1 FY26-Q1 FY27) files its Reg. 31
+    pattern on SEBI's `SHP_Exchange_Specific/<date>/in-capmkt` taxonomy. Its CategoryOfShareholdersAxis members,
+    measures and Details axes carry the same local names as `in-bse-shp` (plus trading-member categories that no
+    mapping reads), and the parser reads local names, so the same rules apply, including the exact SHP8 identity."""
+    return next((u for u in inst.namespaces.values() if EXCHANGE_SPECIFIC_NS.match(u)), None)
+
+
 def _bool(text: str | None) -> bool | None:
     return {"true": True, "false": False}.get((text or "").strip().lower())
 
@@ -195,6 +210,7 @@ def parse_shareholding(data: bytes) -> ParsedShareholding:
     inst, shp16 = shp_instance(data)
     out = ParsedShareholding()
     ns = next((u for u in inst.namespaces.values() if SHP_NS_FRAGMENT in u and u.endswith("/in-bse-shp")), None)
+    exchange_specific = ns is None and (ns := exchange_specific_ns(inst)) is not None
     if ns is None:
         out.issues.append(ShpIssue("PARSE", "UNKNOWN_TAXONOMY", {"namespaces": sorted(inst.namespaces.values())}))
         return out
@@ -215,6 +231,8 @@ def parse_shareholding(data: bytes) -> ParsedShareholding:
         "promoter_pledge_flag": flags["pledged"],
         "rules_applied": [SHP16_RULE] if shp16 else [],
     }
+    if exchange_specific:
+        out.meta["rules_applied"].append(EXCHANGE_SPECIFIC_RULE)
     event_date = _event_date(inst, as_of_date)
     if event_date is not None:
         as_of_date = out.meta["as_of_date"] = event_date

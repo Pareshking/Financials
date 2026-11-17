@@ -469,6 +469,13 @@ None open. Decided 2026-11-15: no paid sources at all (G74, by the owner); E-H b
     both are admin-entered, audited edges (architecture §11.7); the terms are announced only in PDFs (R7 UNVERIFIED).
 30. Reg. 30 penalty amounts (G117 red flags carry the event, not the amount). Verify: an E12 content fixture.
 
+**Later (owner, 2026-11-17: "Companies listed only on BSE but having market cap > 500 Cr must be also added in our
+Universe, this will be later, not right now. Companies like NSE are listed on BSE and we miss such companies.")**
+31. BSE-only companies with market cap >= Rs 500 Cr join the universe (same sticky weekly rule as U1). Needs: a
+    verified BSE market-cap / share-count source (fetched with headless Chrome on a GitHub runner, as for the
+    permitted securities), identity without an NSE symbol (BSE scrip code + ISIN), BSE price history (no NSE
+    bhavcopy rows exist for them), and BSE filings. Not started.
+
 
 ## Decisions taken on the owner's behalf (2026-11-15)
 
@@ -532,6 +539,9 @@ The owner asked the assistant to take these with its recommendation. Each is rev
   caught after the load instead of refused at entry. All constraints stay. Consequence for decision K: 7 daily
   snapshots of the ~2.5 GB file (~17 GB) do not fit R2's 10 GB free tier; snapshots would need to be fewer or stored
   as the zstd Parquet bundle (~0.47 GB measured), to be settled with decision K.
+- **P. Exchange data in public places (owner, 2026-11-17):** "Everything on exchange is public limited company data
+  and do not worry about it again and again." Workflow artifacts and fixtures with exchange data in this public
+  repository are acceptable; not to be raised again (as decision L). Artifact retention is a size choice only.
 - **Site data layout (agreed 2026-11-17, part of the proposed decision K):** the site never reads the DuckDB file.
   Page views read small precomputed files (per-company JSON, saved-screen results); custom screens read one Parquet
   file of the latest screener table (3,003 x 665: 2.9 MB zstd measured) with column-only range reads; Cloudflare

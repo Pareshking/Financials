@@ -1,7 +1,7 @@
 name: bse-reach
 
 # Probe (owner 2026-11-17): can GitHub-hosted runners reach BSE, by plain HTTP and by headless Chrome? ~10 requests
-# per mode, >= 1.5 s apart. Saves the 200 bodies as a private workflow artifact (7 days) so real files can become
+# per mode, >= 1.5 s apart. Saves the 200 bodies as a private workflow artifact (1 day; the repository is public) so real files can become
 # fixtures (scrip master, listing JSON, one XBRL file, one bhavcopy). Runs when this file or the probe changes, and by
 # hand. No database is read or written.
 on:
@@ -38,5 +38,5 @@ jobs:
         with:
           name: bse-probe
           path: bse_probe/
-          retention-days: 7
+          retention-days: 1
           if-no-files-found: warn

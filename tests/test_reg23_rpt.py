@@ -1,5 +1,5 @@
 """Reg. 23(9) related-party transactions per counterparty in the Integrated Filing [X19, X115]: parser
-characterisation on the 27 committed filings that carry the section, promotion with the results filing, and
+characterisation on the 28 committed filings that carry the section, promotion with the results filing, and
 `backfill-rpt` for results filings. Every value is read straight from the XML."""
 
 from __future__ import annotations
@@ -98,7 +98,7 @@ def test_reliance_investment_terms_kept_as_filed():
 
 
 def test_only_standalone_q2_q4_filings_carry_the_section():
-    assert len(WITH_SECTION) == 27
+    assert len(WITH_SECTION) == 28  # 27 + Niva Bupa Q2 FY27 standalone (X155 fixture, insurer)
     for name in WITH_SECTION:
         m = parse_integrated_results((XBRL_DIR / name).read_bytes(), name).meta
         assert m["scope"] == "STANDALONE" and m["period_end"].month in (3, 9), name

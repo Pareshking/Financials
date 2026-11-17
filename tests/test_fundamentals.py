@@ -176,3 +176,15 @@ def test_services_company_has_no_gross_profit_and_losses_get_no_tax_shield(con):
     b = building_blocks(load_factbook(con, E, "STANDALONE", datetime(2030, 1, 1)), QEND[-1])
     assert b["gross_profit"] is None  # COGS lines < 10% of revenue [C6]
     assert b["etr"] == 0 and b["nopat"] == b["ebit"]  # [C5]
+
+
+def test_core_profit_is_money_to_the_paisa_whatever_the_tax_rate_precision():
+    """Regression (2026-11-17, expanded universe): an effective tax rate with 28 decimals made core profit a Decimal
+    with 36 decimals; Arrow typed the column decimal256 and DuckDB refused the insert. Money is rupees to the paisa."""
+    from financials.fundamentals import _core
+
+    etr = Decimal(1) / Decimal(3)  # 0.3333333333333333333333333333
+    v = _core(Decimal("1000000.00"), Decimal("123457.00"), etr)
+    assert v == Decimal("917695.33") and v.as_tuple().exponent == -2
+    assert _core(Decimal("0"), Decimal("0"), etr).as_tuple().exponent == -2
+    assert _core(None, Decimal("1"), etr) is None

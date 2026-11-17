@@ -951,7 +951,9 @@ def newgen_inputs(book: FactBook, end: date, b: dict) -> dict:
 def _core(continuing: Decimal | None, exceptional: Decimal | None, etr: Decimal) -> Decimal | None:
     if continuing is None or exceptional is None:
         return None
-    return continuing - exceptional * (1 - etr)
+    # Money (invariant 7): rupees to the paisa. Unquantized, an effective tax rate carried to 28 places gave values
+    # with 36 decimals that Arrow could not hand to DuckDB (decimal256) on the expanded universe.
+    return (continuing - exceptional * (1 - etr)).quantize(Decimal("0.01"))
 
 
 def average_instant(book: FactBook, tag: str, end: date) -> tuple[Decimal | None, date | None, date | None]:

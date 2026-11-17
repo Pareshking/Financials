@@ -137,8 +137,8 @@ deleted and rewrote the history, and every re-parse added a full copy of a filin
     entity and as-of date is visible from the same instant (a re-parse that moved visibility leaves it selectable,
     X83); observations also need the same category in the newer version (the promoter's share cross-check).
   - `related_party_transactions`: ranked per (entity, scope, period end) by visibility, filing, version: an old row
-    goes only when a newer version covers the same period from the same instant. `group_structure`: the latest
-    version per filing stays (no feature reader).
+    goes only when a newer version covers the same period from the same instant. `group_structure` and
+    `reg23_related_party_transactions` (X160): the latest version per filing stays (no feature reader).
   - Never pruned: versions named by a quarantine finding (`details.parser_version`) and every version of a filing
     with an open finding; `filing_meta` and `shareholding_meta` whole (read across versions: rounding level, fiscal
     year starts, accounting basis, visibility timestamps; small); `corporate_events` (one row per event);
@@ -251,7 +251,7 @@ This section only records the decisions; it does not duplicate the DDL.
 | L1 | `raw_cm_bhavcopy`, `raw_delivery`, `raw_index_snapshot`. Keyed by source identifiers plus `filing_id`. No surrogate IDs. XBRL facts have no raw table (decision J): the vault blob. |
 | L2 identity | `entity_master`, `securities`, `security_identifier_history` (date-bounded; `valid_to` exclusive), `trading_calendar` |
 | L2 market | `ohlcv` (resolved, unadjusted; delivery joined) |
-| L2 fundamentals | `filing_meta` (per filing × parser_version), `fact_observations` (long format), `segment_observations` (Ind AS 108 segment and geography rows, §14b-1), `group_structure` (AOC-1 subsidiaries / associates / JVs per fiscal year from Reg. 34 [X112]), `related_party_transactions` (Ind AS 24 related-party schedule per counterparty, category and transaction element from Reg. 34 [X113]), `reg23_related_party_transactions` (Reg. 23(9) rows per counterparty from standalone Q2 / Q4 Integrated Filings [X115]; period as tagged, never feeds a ratio, R13), `disclosure_facts` (every fact of an element no other clean table holds per element, as filed: results, annual, Reg. 31 and Reg. 30 filings; typed value columns, `in_window`; [X116, C28]) |
+| L2 fundamentals | `filing_meta` (per filing × parser_version), `fact_observations` (long format), `segment_observations` (Ind AS 108 segment and geography rows, §14b-1), `group_structure` (AOC-1 subsidiaries / associates / JVs per fiscal year from Reg. 34 [X112]), `related_party_transactions` (Ind AS 24 related-party schedule per counterparty, category and transaction element from Reg. 34 [X113]), `reg23_related_party_transactions` (Reg. 23(9) rows per counterparty from standalone Q2 / Q4 Integrated Filings [X115]; the half-year in `disclosure_start` / `disclosure_months` [X160, exceptions X161], never feeds a ratio), `disclosure_facts` (every fact of an element no other clean table holds per element, as filed: results, annual, Reg. 31 and Reg. 30 filings; typed value columns, `in_window`; [X116, C28]) |
 | Control | `corp_actions`, `quarantine_queue`, `company_overrides` |
 | L2 calendar/index | `trading_calendar`, `calendar_coverage`, `raw_index_snapshot`, `index_constituents_history` |
 | L2 shareholding | `shareholding_meta`, `shareholding_observations` |
@@ -1044,8 +1044,11 @@ Status (2026-11-13): **built and tested end to end** on real fixtures, all liste
   [X113] (`parsers/rpt.py`), promoted with each annual filing; `backfill-rpt` fills filings promoted earlier. The
   Reg. 23(9) per-counterparty rows of the Integrated Filing (X19) are **built** too: `reg23_related_party_transactions`
   [X115] (`parsers/reg23_rpt.py`), promoted with each results filing and filled by the same `backfill-rpt`. They are a
-  separate table and feed no feature: their context period is the filing's own quarter context, so whether the
-  amounts cover the quarter or the half-year is UNVERIFIED (R13).
+  separate table and feed no feature. Their context is the filing's own quarter context, but the amounts cover the
+  Reg. 23(9) half-year ending on the period end (SEBI format D note 4; Q2 + Q4 tie out to the Ind AS 24 year and Q4
+  opening balances to Q2 closing balances: X160, R13 resolved), recorded as `disclosure_start` / `disclosure_months`
+  (HALF_YEAR_RULE, parser `reg23-2`). A few filers put financial-year-to-date amounts in the Q4 filing with nothing in
+  the filing to say so (X161), which is why the rows still feed no ratio; `prune-versions` keeps the latest version.
 - Everything else filed in XBRL: **built** (18D): `disclosure_facts` [X116] (`parsers/disclosures.py`, parser
   `disc-2` since owner decision M, X120) holds every fact of every element that no other clean table holds per
   element, for results, annual, Reg. 31 and Reg. 30 filings, promoted with each filing, except what the named disc-2

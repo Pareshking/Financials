@@ -2069,18 +2069,22 @@ CREATE TABLE IF NOT EXISTS related_party_transactions (
 );
 -- Reg. 23(9) related-party transactions per counterparty from the Integrated Filing (Governance) section [X19, X115]:
 -- one row per typed RelatedPartyTransactionAxis member of a standalone Q2 / Q4 results filing, promoted with it and
--- by `backfill-rpt`. A separate table from the annual schedule on purpose: the period is the filing's reporting-period
--- context as tagged, and whether the amounts cover that quarter or the Reg. 23(9) half-year is UNVERIFIED (R13), so
--- these rows never feed a ratio or a feature column (features_rpt reads related_party_transactions only).
+-- by `backfill-rpt`. A separate table from the annual schedule on purpose: the tagged context is the filing's quarter,
+-- the amounts cover the Reg. 23(9) half-year (disclosure_start / disclosure_months, X160), and a few filers put
+-- financial-year-to-date amounts in the Q4 filing without saying so (X161), so these rows never feed a ratio or a
+-- feature column (features_rpt reads related_party_transactions only). prune-versions keeps the latest version.
 CREATE TABLE IF NOT EXISTS reg23_related_party_transactions (
     filing_id           VARCHAR NOT NULL REFERENCES filings(filing_id),
     parser_version      VARCHAR NOT NULL,        -- parsers.reg23_rpt.REG23_PARSER_VERSION
     entity_id           VARCHAR NOT NULL REFERENCES entity_master(entity_id),   -- the filer
     scope               VARCHAR NOT NULL,
     row_member          VARCHAR NOT NULL,        -- typed RelatedPartyTransactionAxis member as filed
-    period_start        DATE NOT NULL,           -- the duration context as tagged (see R13)
+    period_start        DATE NOT NULL,           -- the duration context as tagged: the filing's quarter, not the disclosure
     period_end          DATE NOT NULL,           -- = the filing's declared period end
-    period_months       INTEGER,
+    period_months       INTEGER,                 -- of the tagged context
+    disclosure_start    DATE,                    -- the period the amounts cover: the Reg. 23(9) half-year ending on
+    disclosure_months   INTEGER,                 -- period_end (HALF_YEAR_RULE, X160; NULL only on reg23-1 rows). A few
+                                                 -- filers put FY-to-date in Q4 (X161), undetectable inside the filing
     listed_party_name   VARCHAR,                 -- the listed entity or subsidiary entering into the transaction
     counterparty_name   VARCHAR NOT NULL,
     counterparty_pan    VARCHAR,                 -- NULL when masked ("******")

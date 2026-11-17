@@ -71,7 +71,8 @@ CREATE TABLE stg_related_parties (
 );
 CREATE TABLE stg_reg23_rpt (
     filing_id VARCHAR NOT NULL, parser_version VARCHAR NOT NULL, scope VARCHAR NOT NULL, row_member VARCHAR NOT NULL,
-    period_start DATE NOT NULL, period_end DATE NOT NULL, period_months INTEGER, listed_party_name VARCHAR,
+    period_start DATE NOT NULL, period_end DATE NOT NULL, period_months INTEGER, disclosure_start DATE,
+    disclosure_months INTEGER, listed_party_name VARCHAR,
     counterparty_name VARCHAR NOT NULL, counterparty_pan VARCHAR, relationship VARCHAR, type_as_filed VARCHAR,
     txn_type VARCHAR NOT NULL, details VARCHAR, approval_remarks VARCHAR, terms VARCHAR,
     amount_inr DECIMAL(20,2) NOT NULL, approved_value_inr DECIMAL(20,2), ratified_value_inr DECIMAL(20,2),

@@ -542,6 +542,17 @@ The owner asked the assistant to take these with its recommendation. Each is rev
 - **P. Exchange data in public places (owner, 2026-11-17):** "Everything on exchange is public limited company data
   and do not worry about it again and again." Workflow artifacts and fixtures with exchange data in this public
   repository are acceptable; not to be raised again (as decision L). Artifact retention is a size choice only.
+- **Q. Re-validate every rule on the expanded universe (owner, 2026-11-17):** "When we are expanding our universe, we
+  need to be careful about rules we made to match our data with Screener etc. ... be careful once all 3 financial
+  statements are available for expanded universe." The named rules (X82 onward) and the Screener / Tijori
+  cross-checks were derived on ~595 mostly large companies. Before the ~1,350 new members' fundamentals are trusted,
+  once their results, balance sheets, cash flows and annual reports are promoted: (1) the existing companies' values
+  must be unchanged (or every change explained by a rule or parser change); (2) quarantine rate per reason and the
+  firing rate of each named rule, new members vs the original set, with any outlier investigated; (3) accounting
+  identity pass rates (balance sheet, P&L lines, cash flow) per accounting profile and size band; (4) a fresh,
+  stratified sample of new members cross-checked against Screener / Tijori as before (compared, never stored); (5) a
+  rule found wrong is fixed for every company with a new parser version, a fixture and a test, never special-cased for
+  the new set. Until then the new members' fundamentals are marked as not yet validated.
 - **Site data layout (agreed 2026-11-17, part of the proposed decision K):** the site never reads the DuckDB file.
   Page views read small precomputed files (per-company JSON, saved-screen results); custom screens read one Parquet
   file of the latest screener table (3,003 x 665: 2.9 MB zstd measured) with column-only range reads; Cloudflare

@@ -110,7 +110,7 @@ CREATE TABLE stg_holidays (
 CREATE TABLE stg_shp_meta (
     filing_id VARCHAR PRIMARY KEY, parser_version VARCHAR NOT NULL, as_of_date DATE NOT NULL,
     stated_isin VARCHAR NOT NULL, stated_symbol VARCHAR, has_partly_paid BOOLEAN, promoter_pledge_flag BOOLEAN,
-    promoter_pledged_shares BIGINT, promoter_encumbered_shares BIGINT, rules_applied VARCHAR
+    promoter_pledged_shares BIGINT, promoter_encumbered_shares BIGINT, rules_applied VARCHAR, company_name VARCHAR
 );
 CREATE TABLE stg_shp_line_items (
     filing_id VARCHAR NOT NULL, category_member VARCHAR NOT NULL, element VARCHAR NOT NULL,
@@ -813,6 +813,7 @@ def shareholding_tables(fid: str, inst, data: bytes) -> dict[str, list[dict[str,
             "promoter_pledged_shares": _int_or_none(m["promoter_pledged_shares"]),
             "promoter_encumbered_shares": _int_or_none(m["promoter_encumbered_shares"]),
             "rules_applied": ",".join(m["rules_applied"]) or None,
+            "company_name": m.get("company_name"),
         }
     ]
     tables["stg_shp_line_items"] = [

@@ -893,6 +893,7 @@ files:
 - SHP_1652898_17042026122104_WEB.xml
 - SHP_1687801_03072026023346_WEB.xml
 - SHP_1690795_10072026081131_WEB.xml
+- SHP_1697747_21072026110424_WEB.xml
 - SHP_1698632_21072026062045_WEB.xml
 - SHP_1733480_06102026050037_WEB.xml
 - SHP_1733654_07102026112959_WEB.xml
@@ -938,7 +939,7 @@ members:
   REG31_SHP:
     CategoryOfShareholdersAxis:
       AlternativeInvestmentFundsMember:
-        filings: 25
+        filings: 26
         first_batch: '8'
         mapped_to: null
       AssetReconstructionCompaniesMember:
@@ -974,7 +975,7 @@ members:
         first_batch: '8'
         mapped_to: null
       BodiesCorporateMember:
-        filings: 26
+        filings: 27
         first_batch: '8'
         mapped_to: null
       CentralGovernmentOrPresidentOfIndiaMember:
@@ -994,7 +995,7 @@ members:
         first_batch: '8'
         mapped_to: DR_CUSTODIAN
       DirectorsAndDirectorsRelativesMember:
-        filings: 19
+        filings: 20
         first_batch: '8'
         mapped_to: null
       EmployeeBenefitsTrustsMember:
@@ -1002,7 +1003,7 @@ members:
         first_batch: '8'
         mapped_to: EMPLOYEE_TRUSTS
       ForeignCompaniesMember:
-        filings: 14
+        filings: 15
         first_batch: '8'
         mapped_to: null
       ForeignDirectInvestmentMember:
@@ -1046,7 +1047,7 @@ members:
         first_batch: shp-live
         mapped_to: null
       IndianMember:
-        filings: 18
+        filings: 19
         first_batch: '8'
         mapped_to: null
       IndividualTradingMember:
@@ -1054,23 +1055,23 @@ members:
         first_batch: qf-x150
         mapped_to: null
       IndividualsOrHinduUndividedFamilyMember:
-        filings: 18
+        filings: 19
         first_batch: '8'
         mapped_to: null
       InstitutionsDomesticMember:
-        filings: 26
+        filings: 27
         first_batch: '8'
         mapped_to: DII
       InstitutionsForeignMember:
-        filings: 26
+        filings: 27
         first_batch: '8'
         mapped_to: FII
       InstitutionsForeignPortfolioInvestorCategoryOneMember:
-        filings: 25
+        filings: 26
         first_batch: '8'
         mapped_to: FPI_CAT1
       InstitutionsForeignPortfolioInvestorCategoryTwoMember:
-        filings: 23
+        filings: 24
         first_batch: '8'
         mapped_to: FPI_CAT2
       InstitutionsForeignPortfolioInvestorCatergoryOneMember:
@@ -1082,7 +1083,7 @@ members:
         first_batch: shp-live
         mapped_to: null
       InsuranceCompaniesMember:
-        filings: 25
+        filings: 26
         first_batch: '8'
         mapped_to: null
       InvestorEducationAndProtectionFundMember:
@@ -1090,11 +1091,11 @@ members:
         first_batch: '8'
         mapped_to: null
       KeyManagerialPersonnelMember:
-        filings: 21
+        filings: 22
         first_batch: '8'
         mapped_to: null
       MutualFundsOrUTIMember:
-        filings: 25
+        filings: 26
         first_batch: '8'
         mapped_to: MUTUAL_FUNDS
       MutualFundsOrUtiMember:
@@ -1102,7 +1103,7 @@ members:
         first_batch: shp-live
         mapped_to: MUTUAL_FUNDS
       NBFCsRegisteredWithRBIMember:
-        filings: 22
+        filings: 23
         first_batch: '8'
         mapped_to: null
       NBFCsRegisteredWithRbiMember:
@@ -1110,11 +1111,11 @@ members:
         first_batch: shp-live
         mapped_to: null
       NonInstitutionsMember:
-        filings: 26
+        filings: 27
         first_batch: '8'
         mapped_to: NON_INSTITUTIONS
       NonResidentIndiansMember:
-        filings: 26
+        filings: 27
         first_batch: '8'
         mapped_to: null
       NonResidentIndividualsOrForeignIndividualsMember:
@@ -1130,7 +1131,7 @@ members:
         first_batch: '8'
         mapped_to: null
       OtherIndianShareholdersMember:
-        filings: 17
+        filings: 18
         first_batch: '8'
         mapped_to: null
       OtherInstitutionsDomesticMember:
@@ -1142,7 +1143,7 @@ members:
         first_batch: '8'
         mapped_to: null
       OtherNonInstitutionsMember:
-        filings: 26
+        filings: 27
         first_batch: '8'
         mapped_to: null
       OverseasDepositoriesMember:
@@ -1154,7 +1155,7 @@ members:
         first_batch: '8'
         mapped_to: null
       PublicShareholdingMember:
-        filings: 26
+        filings: 27
         first_batch: '8'
         mapped_to: PUBLIC
       RelativesOfPromotersOtherThanPromoterGroupMember:
@@ -1162,11 +1163,11 @@ members:
         first_batch: '8'
         mapped_to: null
       ResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhMember:
-        filings: 25
+        filings: 26
         first_batch: '8'
         mapped_to: null
       ResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhMember:
-        filings: 26
+        filings: 27
         first_batch: '8'
         mapped_to: null
       ShareholdingByCompaniesOrBodiesCorporateWhereCentralOrStateGovernmentIsPromoterMember:
@@ -1178,11 +1179,11 @@ members:
         first_batch: shp-live
         mapped_to: null
       ShareholdingOfPromoterAndPromoterGroupMember:
-        filings: 20
+        filings: 21
         first_batch: '8'
         mapped_to: PROMOTER
       ShareholdingPatternMember:
-        filings: 26
+        filings: 27
         first_batch: '8'
         mapped_to: TOTAL
       SharesHeldByNonPromoterNonPublicShareholdersMember:
@@ -16601,7 +16602,7 @@ profiles:
       context_kinds:
       - duration_3m@DetailsOfSharesHeldByOthersIndianShareholdersAxis
       - duration_4m@DetailsOfSharesHeldByOthersIndianShareholdersAxis
-      filings: 17
+      filings: 18
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -16619,7 +16620,7 @@ profiles:
       context_kinds:
       - duration_3m@DetailsOfSharesHeldByOtherNonInstitutionsAxis
       - duration_4m@DetailsOfSharesHeldByOtherNonInstitutionsAxis
-      filings: 26
+      filings: 27
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -16628,7 +16629,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_4m
-      filings: 25
+      filings: 26
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -16661,7 +16662,7 @@ profiles:
       context_kinds:
       - instant
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: '8'
       mapped_to: meta.as_of_date
       numeric: false
@@ -16808,7 +16809,7 @@ profiles:
       - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
       - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
       - instant@DetailsSharesHeldByIndividualsOrHUFAxis
-      filings: 9
+      filings: 10
       first_batch: '8'
       line_item_category: SHAREHOLDING
       mapped_to: shareholding_line_items.EncumberedShareUnderPledgedAsPercentageOfTotalNumberOfShares
@@ -16822,7 +16823,7 @@ profiles:
       - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
       - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
       - instant@DetailsSharesHeldByIndividualsOrHUFAxis
-      filings: 10
+      filings: 11
       first_batch: '8'
       line_item_category: SHAREHOLDING
       mapped_to: shareholding_line_items.EncumberedSharesHeldAsPercentageOfTotalNumberOfShares
@@ -16833,7 +16834,7 @@ profiles:
       - duration_3m
       - duration_4m
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: sc
       mapped_to: meta.stated_isin
       numeric: false
@@ -16852,7 +16853,7 @@ profiles:
       - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
       - instant@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
       - instant@DetailsSharesHeldByIndividualsOrHUFAxis
-      filings: 5
+      filings: 6
       first_batch: '8'
       line_item_category: SHAREHOLDING
       mapped_to: shareholding_line_items.LockedInSharesAsAPercentageOfTotalNumberOfShares
@@ -16863,7 +16864,7 @@ profiles:
       - duration_3m
       - duration_4m
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -16898,7 +16899,7 @@ profiles:
       - duration_3m
       - duration_4m
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: B1
       mapped_to: null
       numeric: false
@@ -16948,7 +16949,7 @@ profiles:
       - duration_4m@DetailsOfSharesHeldByOtherForeignShareholdersAxis
       - duration_4m@DetailsOfSharesHeldByOthersIndianShareholdersAxis
       - duration_4m@DetailsSharesHeldByIndividualsOrHUFAxis
-      filings: 26
+      filings: 27
       first_batch: '8'
       mapped_to: major_holder.holder_name
       numeric: false
@@ -17017,7 +17018,7 @@ profiles:
       - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
       - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
       - instant@DetailsSharesHeldByIndividualsOrHUFAxis
-      filings: 26
+      filings: 27
       first_batch: '8'
       line_item_category: SHAREHOLDING
       mapped_to: category.demat_shares
@@ -17052,7 +17053,7 @@ profiles:
       - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
       - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
       - instant@DetailsSharesHeldByIndividualsOrHUFAxis
-      filings: 26
+      filings: 27
       first_batch: '8'
       line_item_category: SHAREHOLDING
       mapped_to: shareholding_line_items.NumberOfFullyPaidUpEquityShares
@@ -17148,7 +17149,7 @@ profiles:
       - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
       - instant@DetailsOfSharesWhichRemainUnclaimedForPublicShareholdersAxis
       - instant@DetailsSharesHeldByIndividualsOrHUFAxis
-      filings: 26
+      filings: 27
       first_batch: '8'
       line_item_category: SHAREHOLDING
       mapped_to: category.holders
@@ -17184,7 +17185,7 @@ profiles:
       - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
       - instant@DetailsOfTheShareholdersActingAsPersonsInConcertForPublicAxis
       - instant@DetailsSharesHeldByIndividualsOrHUFAxis
-      filings: 26
+      filings: 27
       first_batch: B6
       line_item_category: SHAREHOLDING
       mapped_to: category.shares
@@ -17198,7 +17199,7 @@ profiles:
       - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
       - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
       - instant@DetailsSharesHeldByIndividualsOrHUFAxis
-      filings: 10
+      filings: 11
       first_batch: '8'
       line_item_category: SHAREHOLDING
       mapped_to: encumbrance.total
@@ -17236,7 +17237,7 @@ profiles:
       - instant@DetailsOfSharesHeldByOtherForeignShareholdersAxis
       - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
       - instant@DetailsSharesHeldByIndividualsOrHUFAxis
-      filings: 9
+      filings: 10
       first_batch: '8'
       line_item_category: SHAREHOLDING
       mapped_to: encumbrance.pledged
@@ -17270,7 +17271,7 @@ profiles:
       - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
       - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
       - instant@DetailsSharesHeldByIndividualsOrHUFAxis
-      filings: 25
+      filings: 26
       first_batch: '8'
       line_item_category: SHAREHOLDING
       mapped_to: shareholding_line_items.NumberOfSharesOnFullyDilutedBasisIncludingWarrantsESOPAndConvertibleSecurities
@@ -17319,7 +17320,7 @@ profiles:
       - instant@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
       - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
       - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
-      filings: 25
+      filings: 26
       first_batch: '8'
       line_item_category: SHAREHOLDING
       mapped_to: shareholding_line_items.NumberOfSharesUnderSubCategoryOne
@@ -17346,7 +17347,7 @@ profiles:
       - instant@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
       - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
       - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
-      filings: 25
+      filings: 26
       first_batch: '8'
       line_item_category: SHAREHOLDING
       mapped_to: shareholding_line_items.NumberOfSharesUnderSubCategoryThree
@@ -17373,7 +17374,7 @@ profiles:
       - instant@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
       - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
       - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
-      filings: 25
+      filings: 26
       first_batch: '8'
       line_item_category: SHAREHOLDING
       mapped_to: shareholding_line_items.NumberOfSharesUnderSubCategoryTwo
@@ -17466,7 +17467,7 @@ profiles:
       - instant@DetailsOfSharesHeldByOthersIndianShareholdersAxis
       - instant@DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis
       - instant@DetailsSharesHeldByIndividualsOrHUFAxis
-      filings: 5
+      filings: 6
       first_batch: '8'
       line_item_category: SHAREHOLDING
       mapped_to: shareholding_line_items.NumberOfTheLockedInShares
@@ -17501,7 +17502,7 @@ profiles:
       - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
       - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
       - instant@DetailsSharesHeldByIndividualsOrHUFAxis
-      filings: 26
+      filings: 27
       first_batch: '8'
       line_item_category: SHAREHOLDING
       mapped_to: category.voting_rights
@@ -17555,7 +17556,7 @@ profiles:
       - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
       - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
       - instant@DetailsSharesHeldByIndividualsOrHUFAxis
-      filings: 26
+      filings: 27
       first_batch: '8'
       line_item_category: SHAREHOLDING
       mapped_to: shareholding_line_items.NumberOfVotingRightsHeldBySameClassOfSecurities
@@ -17607,7 +17608,7 @@ profiles:
       context_kinds:
       - instant
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: '8'
       line_item_category: SHAREHOLDING
       mapped_to: shareholding_line_items.PercentageOfBoardApprovedLimits
@@ -17617,7 +17618,7 @@ profiles:
       context_kinds:
       - instant
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: '8'
       line_item_category: SHAREHOLDING
       mapped_to: shareholding_line_items.PercentageOfLimitsUtilized
@@ -17661,7 +17662,7 @@ profiles:
       - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
       - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
       - instant@DetailsSharesHeldByIndividualsOrHUFAxis
-      filings: 26
+      filings: 27
       first_batch: '8'
       line_item_category: SHAREHOLDING
       mapped_to: shareholding_line_items.PercentageOfTotalVotingRights
@@ -17699,7 +17700,7 @@ profiles:
       - duration_4m@DetailsOfSharesHeldByOtherForeignShareholdersAxis
       - duration_4m@DetailsOfSharesHeldByOthersIndianShareholdersAxis
       - duration_4m@DetailsSharesHeldByIndividualsOrHUFAxis
-      filings: 25
+      filings: 26
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -17731,7 +17732,7 @@ profiles:
       - duration_3m
       - duration_4m
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: sc
       mapped_to: meta.stated_scrip_code
       numeric: false
@@ -17779,7 +17780,7 @@ profiles:
       - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
       - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
       - instant@DetailsSharesHeldByIndividualsOrHUFAxis
-      filings: 25
+      filings: 26
       first_batch: '8'
       line_item_category: SHAREHOLDING
       mapped_to: shareholding_line_items.ShareholdingAsAPercentageAssumingFullConversionOfConvertibleSecuritiesWarrantsAndESOP
@@ -17813,7 +17814,7 @@ profiles:
       - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis
       - instant@DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalUpToRsTwoLakhAxis
       - instant@DetailsSharesHeldByIndividualsOrHUFAxis
-      filings: 26
+      filings: 27
       first_batch: '8'
       line_item_category: SHAREHOLDING
       mapped_to: category.pct
@@ -17823,7 +17824,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_4m
-      filings: 25
+      filings: 26
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -17833,7 +17834,7 @@ profiles:
       - duration_3m
       - duration_4m
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: sc
       mapped_to: meta.stated_symbol
       numeric: false
@@ -17857,7 +17858,7 @@ profiles:
       - duration_4m@DetailsOfSharesHeldByOtherForeignShareholdersAxis
       - duration_4m@DetailsOfSharesHeldByOthersIndianShareholdersAxis
       - duration_4m@DetailsSharesHeldByIndividualsOrHUFAxis
-      filings: 19
+      filings: 20
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -17866,7 +17867,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_4m
-      filings: 25
+      filings: 26
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -17895,7 +17896,7 @@ profiles:
       - duration_3m@DetailsOfSharesHeldByOtherInstitutionsForeignAxis
       - duration_3m@DetailsOfSharesHeldByOtherNonInstitutionsAxis
       - duration_4m@DetailsOfSharesHeldByOtherNonInstitutionsAxis
-      filings: 25
+      filings: 26
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -17903,7 +17904,7 @@ profiles:
     WhetherAnySharesHeldByPromotersAreEncumberedOtherThanByWayOfPledgeOrNDU:
       context_kinds:
       - instant
-      filings: 25
+      filings: 26
       first_batch: '8'
       mapped_to: meta.flag_other
       numeric: false
@@ -17911,7 +17912,7 @@ profiles:
     WhetherAnySharesHeldByPromotersAreEncumberedOtherThanByWayOfPledgeOrNDUForPromoterAndPromoterGroup:
       context_kinds:
       - instant
-      filings: 25
+      filings: 26
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -17919,7 +17920,7 @@ profiles:
     WhetherAnySharesHeldByPromotersAreEncumberedUnderNonDisposalUndertaking:
       context_kinds:
       - instant
-      filings: 25
+      filings: 26
       first_batch: '8'
       mapped_to: meta.flag_ndu
       numeric: false
@@ -17927,7 +17928,7 @@ profiles:
     WhetherAnySharesHeldByPromotersAreEncumberedUnderNonDisposalUndertakingForPromoterAndPromoterGroup:
       context_kinds:
       - instant
-      filings: 25
+      filings: 26
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -17935,7 +17936,7 @@ profiles:
     WhetherAnySharesHeldByPromotersAreEncumberedUnderPledged:
       context_kinds:
       - instant
-      filings: 25
+      filings: 26
       first_batch: '8'
       mapped_to: meta.flag_pledged
       numeric: false
@@ -17943,7 +17944,7 @@ profiles:
     WhetherAnySharesHeldByPromotersAreEncumberedUnderPledgedForPromoterAndPromoterGroup:
       context_kinds:
       - instant
-      filings: 25
+      filings: 26
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -17984,7 +17985,7 @@ profiles:
       context_kinds:
       - instant
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -17993,7 +17994,7 @@ profiles:
       context_kinds:
       - instant
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18002,7 +18003,7 @@ profiles:
       context_kinds:
       - instant
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18018,7 +18019,7 @@ profiles:
     WhetherCompanyHasEquitySharesWithDifferentialVotingRightsForPublicShareholder:
       context_kinds:
       - instant
-      filings: 25
+      filings: 26
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18026,7 +18027,7 @@ profiles:
     WhetherCompanyIsSME:
       context_kinds:
       - instant
-      filings: 25
+      filings: 26
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18035,7 +18036,7 @@ profiles:
       context_kinds:
       - instant
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18044,7 +18045,7 @@ profiles:
       context_kinds:
       - instant
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18053,7 +18054,7 @@ profiles:
       context_kinds:
       - instant
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18069,7 +18070,7 @@ profiles:
     WhetherTheListedEntityHasAnySharesAgainstWhichDepositoryReceiptsAreIssuedForPublicShareholder:
       context_kinds:
       - instant
-      filings: 25
+      filings: 26
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18078,7 +18079,7 @@ profiles:
       context_kinds:
       - instant
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18087,7 +18088,7 @@ profiles:
       context_kinds:
       - instant
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18096,7 +18097,7 @@ profiles:
       context_kinds:
       - instant
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18112,7 +18113,7 @@ profiles:
     WhetherTheListedEntityHasAnySharesInLockedInForPublicShareholder:
       context_kinds:
       - instant
-      filings: 25
+      filings: 26
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18121,7 +18122,7 @@ profiles:
       context_kinds:
       - instant
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18129,7 +18130,7 @@ profiles:
     WhetherTheListedEntityHasGrantedAnyESOPWhichAreOutstanding:
       context_kinds:
       - instant
-      filings: 25
+      filings: 26
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18137,7 +18138,7 @@ profiles:
     WhetherTheListedEntityHasGrantedAnyESOPWhichAreOutstandingForNonPromoterNonPublic:
       context_kinds:
       - instant
-      filings: 25
+      filings: 26
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18145,7 +18146,7 @@ profiles:
     WhetherTheListedEntityHasGrantedAnyESOPWhichAreOutstandingForPromoterAndPromoterGroup:
       context_kinds:
       - instant
-      filings: 25
+      filings: 26
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18153,7 +18154,7 @@ profiles:
     WhetherTheListedEntityHasGrantedAnyESOPWhichAreOutstandingForPublicShareholder:
       context_kinds:
       - instant
-      filings: 25
+      filings: 26
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18162,7 +18163,7 @@ profiles:
       context_kinds:
       - instant
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18171,7 +18172,7 @@ profiles:
       context_kinds:
       - instant
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18180,7 +18181,7 @@ profiles:
       context_kinds:
       - instant
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18196,7 +18197,7 @@ profiles:
     WhetherTheListedEntityHasIssuedAnyConvertibleSecuritiesForPublicShareholder:
       context_kinds:
       - instant
-      filings: 25
+      filings: 26
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18205,7 +18206,7 @@ profiles:
       context_kinds:
       - instant
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: '8'
       mapped_to: meta.has_partly_paid
       numeric: false
@@ -18214,7 +18215,7 @@ profiles:
       context_kinds:
       - instant
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18223,7 +18224,7 @@ profiles:
       context_kinds:
       - instant
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18239,7 +18240,7 @@ profiles:
     WhetherTheListedEntityHasIssuedAnyPartlyPaidUpSharesForPublicShareholder:
       context_kinds:
       - instant
-      filings: 25
+      filings: 26
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18248,7 +18249,7 @@ profiles:
       context_kinds:
       - instant
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18257,7 +18258,7 @@ profiles:
       context_kinds:
       - instant
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18266,7 +18267,7 @@ profiles:
       context_kinds:
       - instant
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18282,7 +18283,7 @@ profiles:
     WhetherTheListedEntityHasIssuedAnyWarrantsForPublicShareholder:
       context_kinds:
       - instant
-      filings: 25
+      filings: 26
       first_batch: '8'
       mapped_to: null
       numeric: false
@@ -18291,7 +18292,7 @@ profiles:
       context_kinds:
       - instant
       - undeclared
-      filings: 26
+      filings: 27
       first_batch: '8'
       mapped_to: null
       numeric: false

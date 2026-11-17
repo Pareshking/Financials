@@ -133,3 +133,30 @@ def test_g4_forgives_only_ttm_nulls_caused_by_the_c9_window():
     assert forgiven == {("A", "sales_ttm"), ("A", "pat_ttm")}
     rates = _null_rates([{**r, "close": 1, "market_cap": 1, "total_equity": 1} for r in now], forgiven)
     assert rates["sales_ttm"] == 0.5 and rates["pat_ttm"] == 0.0
+
+
+def test_g4_compares_only_securities_that_were_there_the_day_before():
+    """Live full materialize 2026-11-17: on 2026-04-20, 156 Permitted (BSE-listed) securities first traded on NSE with
+    no fundamentals, raising the market_cap null rate 30.1% -> 32.7% and aborting G4. Rule G4_NEW_ENTRANT: new
+    securities are not compared; a NULL that appears on a security present the day before still counts."""
+    from datetime import date as d
+
+    from financials.db import apply_schema, connect
+    from financials.features import _g4_compared_rows, _null_rates
+
+    con = connect()
+    apply_schema(con)
+    base = {"as_of_date": d(2026, 4, 17), "entity_id": "e", "symbol": "S", "series": "EQ", "sales_ttm": 1}
+    write_history(con, [{**base, "security_id": s} for s in ("A", "B")])
+    full = {"close": 1, "market_cap": 1, "total_equity": 1, "pat_ttm": 1}
+    now = [
+        {**full, "security_id": "A", "sales_ttm": 1},
+        {**full, "security_id": "B", "sales_ttm": None},  # lost coverage: still counted
+        {**full, "security_id": "N1", "sales_ttm": None, "market_cap": None},  # new entrants: not compared
+        {**full, "security_id": "N2", "sales_ttm": None, "market_cap": None},
+    ]
+    same = _g4_compared_rows(con, d(2026, 4, 17), now)
+    assert [r["security_id"] for r in same] == ["A", "B"]
+    rates = _null_rates(same)
+    assert rates["sales_ttm"] == 0.5 and rates["market_cap"] == 0.0
+    assert _g4_compared_rows(con, d(2026, 4, 16), now) == now  # no overlap (first day): every row counts

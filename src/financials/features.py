@@ -83,8 +83,9 @@ from financials.timeutil import ist_to_utc, utc_now
 # Reader version of materialised rows. Bump it whenever features.py, fundamentals.py (or another file pinned by
 # tests/test_incremental_materialize.py) changes any output: `materialize --incremental` refuses days built by another
 # version, because only a full run then reproduces the history.
-FEATURES_VERSION = "2026.11.17-21A"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
+FEATURES_VERSION = "2026.11.17-21B"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
 # -21A: core profit (fundamentals._core) quantized to the paisa (Arrow decimal256 on the expanded universe)
+# -21B: gate G4 compares only securities present on the previous day (rule G4_NEW_ENTRANT; output unchanged)
 # -3: QoQ sales / profit growth, NPM, interest coverage, OPM same quarter last year, dividend yield / payout,
 #     promoter holding QoQ change (owner_requirements items 1, 3, 4)
 # -4A: period P&L family (features_pl: quarter / fiscal-year lines, quarter YoY growth, result dates, history-gated
@@ -943,6 +944,16 @@ def _c9_expected_nulls(con, prev: date, rows: list[dict]) -> set[tuple[str, str]
     return out
 
 
+def _g4_compared_rows(con, prev: date, rows: list[dict]) -> list[dict]:
+    """Rule G4_NEW_ENTRANT: the null-rate gate compares like with like, the securities that also had a row on `prev`.
+    A security first trading today (an IPO, or 156 Permitted BSE-listed securities on 2026-04-20) brings its own NULLs
+    (no fundamentals yet); that is new coverage, not lost coverage. With no overlap at all, every row counts."""
+    before = {r[0] for r in con.execute(
+        "SELECT security_id FROM screener_features_history WHERE as_of_date = ?", [prev]
+    ).fetchall()}  # fmt: skip
+    return [r for r in rows if r["security_id"] in before] or rows
+
+
 def materialize(
     con,
     as_of: date,
@@ -985,7 +996,8 @@ def materialize(
         before = dict(zip(CRITICAL_COLUMNS, con.execute(
             f"SELECT {cols} FROM screener_features_history WHERE as_of_date = ?", [prev]
         ).fetchone(), strict=True))  # fmt: skip
-        now = _null_rates(merged, _c9_expected_nulls(con, prev, merged))
+        same = _g4_compared_rows(con, prev, merged)
+        now = _null_rates(same, _c9_expected_nulls(con, prev, same))
         spikes = {c: (before[c], now[c]) for c in CRITICAL_COLUMNS if now[c] - before[c] > G4_MAX_NULL_RISE}
         if spikes:
             return MaterializeResult("ABORTED", as_of, len(merged), "G4", f"null-rate spike vs {prev}: {spikes}")

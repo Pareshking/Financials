@@ -301,6 +301,7 @@ def _promote_market_day(con, stage_dir: Path, manifest: dict[str, Any]) -> Promo
     quarantined += _audit_gaps(con, exchange, trade_date, obs)
     resolve_market_moves(con)
     resolve_isin_changes(con, exchange)
+    resolve_rights_entitlement_gaps(con)
     closed = close_inactive_securities(con, exchange, trade_date)
     message = str(trade_date) + (f", {closed} inactive securities closed" if closed else "")
     return PromotionResult("PROMOTED", "market_day", message=message, quarantined=quarantined)
@@ -392,6 +393,38 @@ def resolve_market_moves(con) -> int:
                                                   AND g.d + INTERVAL {MARKET_MOVE_WINDOW_DAYS} DAY))
            RETURNING 1""",
         [utc_now()],
+    ).fetchall()
+    return len(rows)
+
+
+# X140 (live backfill 2024-10 .. 2026-11): 87 of the 104 gap findings left after CA12 / CA13 were rights entitlements
+# (RE): a temporary instrument that carries the right to subscribe a rights issue, traded for a few sessions and then
+# deactivated (SEBI circular SEBI/HO/CFD/DIL2/CIR/P/2020/13, 22 Jan 2020: separate ISIN, secondary-market trading,
+# ISIN permanently deactivated after allotment). NSE lists it with the parent's issuer code, security-type code 20
+# (ISIN chars 8-9) and symbol <prefix>-RE[n] (fixture: SHIVAM-RE1 INE637H20024 beside SHIVAMAUTO INE637H01024). No
+# split, bonus or other share-count event ever applies to an RE, so its gaps are market moves (worthless-or-not
+# pricing of a right with days to live, penny ticks: 0.02 -> 0.03 is +50%). Both markers and an equity listing of
+# the same issuer are required; nothing else is touched.
+RIGHTS_ENTITLEMENT_NOTE = "rights entitlement: no share-count event applies, market move [X140]"
+
+
+def resolve_rights_entitlement_gaps(con) -> int:
+    """Named rule X140: close open UNEXPLAINED_GAP findings of rights entitlements (ISIN security-type 20, symbol
+    ending -RE or -RE<n>, an equity ISIN of the same issuer with type 01 in the identifier history) as FIXED_BY_RULE.
+    One batched statement."""
+    rows = con.execute(
+        """UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ?
+           WHERE quarantine_id IN (
+             SELECT q.quarantine_id FROM quarantine_queue q
+             JOIN security_identifier_history h ON h.security_id = q.security_id
+                  AND h.valid_from <= CAST(json_extract_string(q.details, '$.trade_date') AS DATE)
+                  AND (h.valid_to IS NULL OR h.valid_to > CAST(json_extract_string(q.details, '$.trade_date') AS DATE))
+             WHERE q.stage = 'GAP' AND q.reason_code = 'UNEXPLAINED_GAP' AND q.resolved_at IS NULL
+               AND h.isin LIKE 'INE%' AND substr(h.isin, 8, 2) = '20' AND regexp_matches(h.symbol, '-RE[0-9]*$')
+               AND EXISTS (SELECT 1 FROM security_identifier_history p WHERE p.security_id <> h.security_id
+                           AND substr(p.isin, 1, 7) = substr(h.isin, 1, 7) AND substr(p.isin, 8, 2) = '01'))
+           RETURNING 1""",
+        [utc_now(), RIGHTS_ENTITLEMENT_NOTE],
     ).fetchall()
     return len(rows)
 

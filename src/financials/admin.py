@@ -179,9 +179,11 @@ RETRYABLE = ("UNKNOWN_ISIN", "UNKNOWN_SYMBOL", "AMBIGUOUS_ISIN", "AMBIGUOUS_SYMB
 
 def reprocess(con, stage_root) -> dict[str, Any]:
     """Promote again every batch with an open, retryable finding (identity not yet known, visibility not yet
-    derivable, a filing override recorded since). Each open finding is marked REPROCESSING first; promoting
-    the batch again reopens it if the problem is still there (same deterministic id), otherwise it is closed as
-    REPROCESSED. MISSING_FIN_INSTRM_ID bars are loaded when their ISIN belongs to exactly one security that day
+    derivable, a filing override recorded since). Each open finding whose batch is still staged is marked
+    REPROCESSING first; promoting the batch again reopens it if the problem is still there (same deterministic id),
+    otherwise it is closed as REPROCESSED. A finding whose batch is no longer staged is left open and listed under
+    `batch_not_staged` (restage it first) [X141]. The named market rules (CA12, CA13, X140) then re-run over every
+    open GAP finding. MISSING_FIN_INSTRM_ID bars are loaded when their ISIN belongs to exactly one security that day
     with the same symbol and series."""
     from pathlib import Path
 
@@ -200,6 +202,7 @@ def reprocess(con, stage_root) -> dict[str, Any]:
     )
     filing_ids = sorted({q["filing_id"] for q in open_q})
     stages: list[str] = []
+    staged: set[str] = set()
     if filing_ids:
         logged = [r[0] for r in con.execute("SELECT stage_path FROM promotion_log").fetchall()]
         files = [
@@ -209,11 +212,16 @@ def reprocess(con, stage_root) -> dict[str, Any]:
         ]
         if files:
             rows = con.execute(
-                "SELECT DISTINCT filename FROM read_parquet(?, filename = true) WHERE filing_id IN (SELECT unnest(?))",
+                "SELECT DISTINCT filename, filing_id FROM read_parquet(?, filename = true) "
+                "WHERE filing_id IN (SELECT unnest(?))",
                 [files, filing_ids],
             ).fetchall()
-            stages = sorted({Path(f).parent.relative_to(stage_root).as_posix() for (f,) in rows})
-    ids = [q["quarantine_id"] for q in open_q]
+            stages = sorted({Path(f).parent.relative_to(stage_root).as_posix() for f, _ in rows})
+            staged = {fid for _, fid in rows}
+    # Only a finding whose batch is promoted again can be re-checked. A finding whose staged batch is gone (staging
+    # pruned after promotion) stays open: closing it as REPROCESSED would claim a re-check that never ran [X141].
+    not_found = sorted(q["quarantine_id"] for q in open_q if q["filing_id"] not in staged)
+    ids = [q["quarantine_id"] for q in open_q if q["filing_id"] in staged]
     if ids:
         con.execute(
             "UPDATE quarantine_queue SET resolved_at = ?, resolution = ? WHERE quarantine_id IN (SELECT unnest(?))",
@@ -233,10 +241,21 @@ def reprocess(con, stage_root) -> dict[str, Any]:
         [REPROCESSING],
     ).fetchall()
     loaded = _load_missing_fin_instrm_id_bars(con)
-    out = {"batches": results, "cleared": [r[0] for r in fixed], "bars_loaded": loaded}
+    rules = _transaction(con, _market_rules)
+    out = {"batches": results, "cleared": [r[0] for r in fixed], "bars_loaded": loaded,
+           "batch_not_staged": not_found, "market_rules": rules}  # fmt: skip
     con.execute("INSERT INTO admin_log VALUES (?, 'REPROCESS', '{}', ?, NULL, ?)",
                 [stable_id("adm", "reprocess", now), json.dumps(out, default=str), now])  # fmt: skip
     return out
+
+
+def _market_rules(con) -> dict[str, int]:
+    """The named market-side rules that close open GAP findings (CA12, CA13, X140), re-run over every open finding:
+    the same statements market-day promotion runs, so a rule added later also reaches older findings."""
+    from financials.promoter import resolve_isin_changes, resolve_market_moves, resolve_rights_entitlement_gaps
+
+    return {"CA12": resolve_market_moves(con), "CA13": resolve_isin_changes(con, "NSE"),
+            "X140": resolve_rights_entitlement_gaps(con)}  # fmt: skip
 
 
 def _load_missing_fin_instrm_id_bars(con) -> int:
@@ -358,8 +377,12 @@ def inspect_quarantine(con, quarantine_id: str) -> dict[str, Any]:
                                        "'{\"action_type\": \"SPLIT\", \"ratio_num\": 2, \"ratio_den\": 10}'"],
         "ISIN_COLLISION": [f"{base} --action MERGE_SECURITIES --note '<evidence>'"],
         "UNPARSED_PURPOSE": [f"{base} --action REJECT --note '<not a price action>'",
+                             f"{base} --action ACCEPT --note '<source>' --payload-json "
+                             "'{\"action_type\": \"DIVIDEND\", \"cash_per_share\": \"0.50\"}'",
                              "resolve the day's GAP finding with --action CORP_ACTION (supersedes this record)"],
         "VERIFY_FAILED": [f"{base} --action REJECT --note '<wrong record>'",
+                          f"{base} --action ACCEPT --note '<evidence for the ratio>' --payload-json "
+                          "'{\"accept_recorded_factor\": true}'",
                           "resolve the day's GAP finding with --action CORP_ACTION (supersedes this record)"],
         "NO_VISIBILITY": [f"{base} --action OVERRIDE --note '<source>' --payload-json "
                           "'{\"field\": \"broadcast_ts\", \"value\": \"YYYY-MM-DDTHH:MM:SS (UTC)\"}'",
@@ -370,6 +393,9 @@ def inspect_quarantine(con, quarantine_id: str) -> dict[str, Any]:
         suggest[r] = [f"{base} --action OVERRIDE --note '<evidence>' --payload-json "
                       "'{\"field\": \"security_id\", \"value\": \"<sec_...>\"}'",
                       "python -m financials quarantine reprocess  (once the security is known)"]  # fmt: skip
+    for r in CA_IDENTITY_REASONS if q["stage"] == "CORP_ACTION" else ():
+        suggest[r] = [f"{base} --action ACCEPT --note '<evidence>' --payload-json '{{\"security_id\": \"<sec_...>\"}}'",
+                      f"{base} --action ACCEPT --note '<no action to record>'"]  # fmt: skip
     suggest.setdefault("MISSING_FIN_INSTRM_ID", ["python -m financials quarantine reprocess"])
     fallback = [f"{base} --action ACCEPT|REJECT --note '<why>'"]
     return {"quarantine": {**q, "details": d}, "context": ctx, "resolve_with": suggest.get(q["reason_code"], fallback)}
@@ -448,6 +474,9 @@ def _resolve(con, qid: str, action: str, note: str, payload: dict) -> dict:
         if q["stage"] != "GAP" or not q["security_id"]:
             raise AdminError("CORP_ACTION resolves GAP quarantines")
         effects.update(_add_corp_action(con, q, details, payload, entity, note))
+
+    elif action == "ACCEPT" and q["stage"] == "CORP_ACTION" and payload:
+        effects.update(_accept_corp_action(con, q, details, payload, entity, note))
 
     elif action == "REJECT" and q["stage"] == "CORP_ACTION" and details.get("action_id"):
         n = con.execute(
@@ -553,6 +582,126 @@ def _add_corp_action(con, q: dict, details: dict, payload: dict, entity: str, no
     ).fetchone()[0]
     return {"corp_action": action.action_id, "status": "VERIFIED_MANUAL", "superseded": superseded,
             "other_gaps_open_same_day": still_open}  # fmt: skip
+
+
+CA_IDENTITY_REASONS = ("STALE_ISIN_OTHER_ISSUER", "UNKNOWN_ISIN", "AMBIGUOUS_SECURITY")
+
+
+def _accept_corp_action(con, q: dict, details: dict, payload: dict, entity: str | None, note: str) -> dict:
+    """ACCEPT with a payload on a CORP_ACTION finding: the admin decides what the feed record means [X142].
+
+    - VERIFY_FAILED + {"accept_recorded_factor": true}: the recorded action (ratio proven by other evidence, e.g. the
+      Issue Size in NSE's PR mcap file) is accepted with its theoretical factor although the ex-date open is outside
+      the verification tolerance; the day is re-audited: a gap the accepted factors explain closes, a residual above
+      the threshold is (re)raised as UNEXPLAINED_GAP for its own decision.
+    - STALE_ISIN_OTHER_ISSUER / UNKNOWN_ISIN / AMBIGUOUS_SECURITY + {"security_id": ..., "face_value": optional}: the
+      record's purpose is parsed by the same rules and recorded for that security (same action id the promoter would
+      give it), then verified like any action. The security must have held the record's symbol.
+    - UNPARSED_PURPOSE + {"action_type": ..., ratio_num / ratio_den / issue_price / cash_per_share}: the UNKNOWN
+      record takes the stated parse (same action id) and is verified like any action.
+    """
+    from financials.corp_actions import ACTION_TYPES
+    from financials.parsers.nse_corp_actions import parse_purpose
+
+    reason, now = q["reason_code"], utc_now()
+    if reason == "VERIFY_FAILED":
+        if payload.get("accept_recorded_factor") is not True:
+            raise AdminError('VERIFY_FAILED: ACCEPT payload must be {"accept_recorded_factor": true}')
+        row = con.execute(
+            "SELECT security_id, ex_date, price_factor, status FROM corp_actions WHERE action_id = ?",
+            [details["action_id"]],
+        ).fetchone()
+        if row is None or row[3] != "QUARANTINED" or row[2] is None:
+            raise AdminError(f"{details['action_id']} is not a factorable QUARANTINED action")
+        sec, ex = row[0], row[1]
+        con.execute("UPDATE corp_actions SET status = 'VERIFIED_MANUAL', decided_at = ? WHERE action_id = ?",
+                    [now, details["action_id"]])  # fmt: skip
+        _override(con, entity, "accepted_corp_action", {"action_id": details["action_id"]}, ex, note)
+        return {"accepted_action": details["action_id"], **_reaudit_day(con, sec, ex, q["quarantine_id"])}
+    if reason == "UNPARSED_PURPOSE":
+        if "action_type" not in payload or not details.get("action_id"):
+            raise AdminError("UNPARSED_PURPOSE: ACCEPT payload needs action_type (and its ratios / amounts)")
+        dec = lambda k: None if payload.get(k) is None else Decimal(str(payload[k]))  # noqa: E731
+        if payload["action_type"] not in ACTION_TYPES or payload["action_type"] == "UNKNOWN":
+            raise AdminError(f"action_type must be one of {sorted(ACTION_TYPES - {'UNKNOWN'})}")
+        n = con.execute(
+            "UPDATE corp_actions SET action_type = ?, ratio_num = ?, ratio_den = ?, issue_price = ?, "
+            "cash_per_share = ?, status = 'PENDING', decided_at = NULL WHERE action_id = ? AND action_type = 'UNKNOWN' "
+            "AND status = 'QUARANTINED' RETURNING security_id, ex_date",
+            [payload["action_type"], dec("ratio_num"), dec("ratio_den"), dec("issue_price"), dec("cash_per_share"),
+             details["action_id"]],
+        ).fetchall()  # fmt: skip
+        if not n:
+            raise AdminError(f"{details['action_id']} is not a QUARANTINED UNKNOWN record")
+        verify_pending_actions(con, "NSE")
+        status = con.execute("SELECT status FROM corp_actions WHERE action_id = ?", [details["action_id"]]).fetchone()
+        _override(con, entity, "parsed_corp_action", {"action_id": details["action_id"], **payload}, n[0][1], note)
+        return {"parsed_action": details["action_id"], "status": status[0]}
+    if reason not in CA_IDENTITY_REASONS or "security_id" not in payload:
+        raise AdminError(f"ACCEPT with a payload resolves VERIFY_FAILED, UNPARSED_PURPOSE or {CA_IDENTITY_REASONS}")
+    sec, ex = payload["security_id"], date.fromisoformat(str(details["ex_date"])[:10])
+    held = con.execute(
+        "SELECT count(*) FROM security_identifier_history WHERE security_id = ? AND symbol = ?",
+        [sec, details["symbol"]],
+    ).fetchone()[0]
+    if not held:
+        raise AdminError(f"{sec} has never held the record's symbol {details['symbol']}")
+    fv = None if payload.get("face_value") is None else Decimal(str(payload["face_value"]))
+    status, why, comps = parse_purpose(details["subject"], fv)
+    if status != "PARSED" or not comps:
+        raise AdminError(f"purpose {details['subject']!r} is {status} ({why}): nothing to record; ACCEPT without "
+                         "a payload to close the finding")  # fmt: skip
+    entity = con.execute("SELECT entity_id FROM securities WHERE security_id = ?", [sec]).fetchone()[0]
+    ids = []
+    for i, c in enumerate(comps):
+        action = CorpAction(
+            action_id=stable_id("ca", "NSE", details["isin"], ex, details["subject"], i), security_id=sec,
+            action_type=c.action_type, ex_date=ex, ratio_num=c.ratio_num, ratio_den=c.ratio_den,
+            issue_price=c.issue_price, cash_per_share=c.cash_per_share,
+        )  # fmt: skip
+        record_corp_action(con, action, source_filing_id=q["filing_id"], entity_id=entity)
+        ids.append(action.action_id)
+    verify_pending_actions(con, "NSE")
+    statuses = dict(con.execute("SELECT action_id, status FROM corp_actions WHERE action_id IN (SELECT unnest(?))",
+                                [ids]).fetchall())  # fmt: skip
+    _override(con, entity, "corp_action_security", {"actions": ids, "security_id": sec, "isin": details["isin"]}, ex,
+              note)  # fmt: skip
+    return {"recorded_actions": statuses}
+
+
+def _reaudit_day(con, sec: str, ex: date, qid: str) -> dict:
+    """Gap audit of one security-day with its currently accepted actions (as verify_pending_actions does)."""
+    from financials.corp_actions import ACCEPTED_STATUSES
+
+    bar = con.execute("SELECT open, exchange FROM ohlcv WHERE security_id = ? AND trade_date = ?", [sec, ex]).fetchone()
+    if bar is None:
+        return {"reaudit": "no bar on the ex-date"}
+    prev = _prev_closes(con, bar[1], ex).get(sec)
+    accepted = [a for a in _actions(con, "security_id = ? AND ex_date = ?", [sec, ex]) if a.status in ACCEPTED_STATUSES]
+    gaps = [f for f in audit_day(sec, ex, bar[0], prev, accepted, False) if f.reason_code == "UNEXPLAINED_GAP"]
+    now = utc_now()
+    if any(a.action_type in ("SPLIT", "CONSOLIDATION") for a in accepted):
+        con.execute(
+            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ? "
+            "WHERE stage = 'GAP' AND reason_code = 'ISIN_CHANGE_WITHOUT_ACTION' AND security_id = ? "
+            "AND resolved_at IS NULL AND CAST(json_extract_string(details, '$.trade_date') AS DATE) = ?",
+            [now, "explained by recorded split/consolidation", sec, ex],
+        )
+    if not gaps:
+        con.execute(
+            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ? "
+            "WHERE stage = 'GAP' AND reason_code = 'UNEXPLAINED_GAP' AND security_id = ? AND resolved_at IS NULL "
+            "AND CAST(json_extract_string(details, '$.trade_date') AS DATE) = ?",
+            [now, "explained by " + ", ".join(f"{a.action_type} {a.action_id}" for a in accepted), sec, ex],
+        )
+        return {"residual_gap": None}
+    f = gaps[0]
+    gid = _quarantine(con, stage="GAP", reason_code=f.reason_code, security_id=sec,
+                      details={"trade_date": ex, "gap": f.gap, "prev_close": prev, "open": bar[0]})  # fmt: skip
+    combined = Decimal(1)
+    for a in accepted:
+        combined *= a.price_factor
+    return {"residual_gap": str(bar[0] / (prev * combined) - 1), "gap_finding": gid}
 
 
 def _merge_securities(con, q: dict, details: dict, note: str) -> dict:

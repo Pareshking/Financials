@@ -1486,6 +1486,8 @@ def screener_convention_ratios(book: FactBook, on_or_before: date) -> dict:
     pbt, interest = pl.rows["Profit before tax"].value, pl.rows["Interest"].value
     if prev is not None and None not in (pbt, interest):
         c0, c1 = capital(prev), capital(bs)
-        if c0 is not None and c1 is not None and c0 + c1 > 0:
+        # X194 ROCE_SCREENER_POSITIVE_CAPITAL: an average of a negative and a positive capital is not a capital base
+        # (AQYLON FY26: (-11.44 + 12.37) / 2 Cr gave ~2,185 %); NULL unless both ends are positive.
+        if c0 is not None and c1 is not None and c0 > 0 and c1 > 0:
             out["roce_screener"] = (pbt + interest) * 2 / (c0 + c1)
     return out

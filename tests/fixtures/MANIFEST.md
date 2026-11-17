@@ -412,6 +412,12 @@ Read by `tests/test_x180_annual_checks.py` (X181).
 | `annual_checks/INTEGRATED_FILING_INDAS_1426806_28042025073334_WEB.xml` | X181: GREENPLY Q4 FY25 standalone results. `FaceValueOfEquityShareCapital` 10 with paid-up 124,873,000: paid-up / face = 12,487,300 shares, 10x off | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1426806_28042025073334_WEB.xml` | `d69085d72a03656b59eb2c47b85406fb610a5e9786acd961a00f2511a8e023cc` |
 | `annual_checks/AR_XBRL_GREENPLY_24092025103040.xml` | X181: GREENPLY FY25 standalone Reg. 34 annual. `NumberOfSharesPaidUp` 124,873,295 at 31-Mar-2025 | `https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_GREENPLY_24092025103040.xml` | `b65488a3f0f05e6ea9b6c0b92e0380245cf9c664d677c3df3bf1d99c1524230a` |
 | `annual_checks/SHP_198395_1419898_19042025033622_WEB.xml` | X181: GREENPLY Reg. 31 shareholding as of 31-Mar-2025, total 124,873,295 shares (= the annual count) | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_198395_1419898_19042025033622_WEB.xml` | `dc519708ed76e862ea9b0ae21a992fd49209237b4914a0811448ffb2c2d163b9` |
+## Ratio rules, NEW members (QR; copied 2026-11-17 from the local vault blob, gunzipped, sha256 verified)
+
+| File | Why it is here | Source URL | SHA-256 |
+|---|---|---|---|
+| `ratio_rules/INTEGRATED_FILING_INDAS_1649412_11042026052716_WEB.xml` | X194: AQYLON (formerly SABTNL) Q4 FY26 standalone Integrated Filing. Capital employed at 31-Mar-2026 = 25.37 − 31.05 + 4.24 + 13.81 = 12.37 Cr; FY26 PBT 7.42 Cr, finance costs 2.80 Cr | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1649412_11042026052716_WEB.xml` | `2605d730644e9612b99c0c20e7ab6ae4d55595f2fccd46240d7ced8f3f9264fd` |
+| `ratio_rules/INTEGRATED_FILING_INDAS_1454104_28052025103044_WEB.xml` | X194: the same company's Q4 FY25 standalone filing: capital employed at 31-Mar-2025 = 25.37 − 36.81 + 0 + 0 = −11.44 Cr (both borrowings lines filed as nil) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1454104_28052025103044_WEB.xml` | `97e6d65028f35ffb7aa75254052627af746234c67848189a16f1afdce29d791b` |
 
 ## Screener goldens (local only, not committed)
 

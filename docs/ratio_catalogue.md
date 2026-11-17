@@ -98,7 +98,7 @@ context) and Reg. 34 FY25/FY26 comparatives. Due dates assumed: Q1-Q3 results wi
 | A2.2 | ROE preceding year | returns | FY(−1) owners' PAT / closing owners' equity at that FY end | BUILT | `roe_preceding_year` (closing owners' equity, as `roe`); batch C |
 | A2.3 | ★ Average return on equity 3/5Years; Average ROE 3/5/7/10Years | returns | mean of FY ROE over N FYs | WHEN HISTORY | ~May 2027 / 2029 / 2031 / 2034 |
 | A2.4 | ROE 5years growth | returns | ROE(FY) − ROE(FY−5) (definition UNVERIFIED) | WHEN HISTORY | ~May 2030 |
-| A2.5 | ★ Return on capital employed | returns | TTM ebit / closing (equity + debt) | BUILT | `roce`; Screener form (PBT + interest) / avg capital = `roce_screener` |
+| A2.5 | ★ Return on capital employed | returns | TTM ebit / closing (equity + debt) | BUILT | `roce`; Screener form (PBT + interest) / avg capital = `roce_screener` (NULL unless capital employed > 0 at both year ends, X194) |
 | A2.6 | ROCE preceding year | returns | FY(−1) ROCE | BUILT | `roce_preceding_year` (FY EBIT / closing debt + total equity, as `roce`); Screener average-capital form not built; batch C |
 | A2.7 | Average ROCE 3/5/7/10Years; Median ROCE 3/5/7/10Years | returns | mean / median of FY ROCE | WHEN HISTORY | closing form ~May 2027/2029/2031/2034; `roce_screener` form ~May 2028/2030/2032/2035 |
 | A2.8 | ★ Return on assets | returns | TTM owners' PAT / avg total assets (opening = BS 12 months earlier) | BUILT | `roa` now also for industrial books: TTM owners' profit / avg total assets over the 12 months to `bs_as_of` (NULL until the BS 12 months earlier is visible); batch C |

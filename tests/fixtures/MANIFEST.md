@@ -530,3 +530,10 @@ NSE listings fetched 2026-11-17 from the container (financials.fetch.http, >= 1.
 | File | Why it is here | Source URL | SHA-256 |
 |---|---|---|---|
 | `bse/bse_ListofScripData_GroupY_20261117.json` | X200 BSE2: BSE group Y list of securities, 2 rows, ISIN "" (A D S Diagnostics 523031) and "NA" (Pushpsons 531562) (fetched 2026-11-17T16:26:51Z on a runner) | `https://api.bseindia.com/BseIndiaAPI/api/ListofScripData/w?scripcode=&Group=Y&industry=&segment=Equity&status=Active` | `401abd920ffafe870716707ddb6883d60a5c1be5e491e21468816397990396e5` |
+## QY: YTD context copying the quarter (copied 2026-11-17 from the local vault blob, gunzipped, sha256 verified)
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `ytd_copy/INTEGRATED_FILING_INDAS_1624500_12022026071533_WEB.xml` | Ajax Engineering Q3 FY26 standalone: the Apr-Dec 2025 context repeats the Oct-Dec values to the rupee (revenue 4,335.48 Mn, PAT 382.41 Mn) (X173) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1624500_12022026071533_WEB.xml` | `e79b8dca9f3d341d3da59bf8181c1f6b72defb1360b9cc97d1f17c0cdfac991f` |
+| `ytd_copy/INTEGRATED_FILING_INDAS_1501178_02082025064022_WEB.xml` | Ajax Engineering Q1 FY26 standalone: revenue 4,665.15 Mn, the earlier quarter that proves the 9M a copy (X173) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1501178_02082025064022_WEB.xml` | `70274f378369b27f7a4d3a72e10080c3035af7d5a5fb2346fefe11ea39e810a5` |
+| `ytd_copy/INTEGRATED_FILING_INDAS_1573866_13112025063241_WEB.xml` | Ajax Engineering Q2 FY26 standalone: revenue 4,448.10 Mn and a genuine H1 YTD the rule leaves alone (X173) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1573866_13112025063241_WEB.xml` | `51643f65a7b2479351e9c40db18e2063d64ec4c54f6c5c16556ea53fcf9a2e23` |

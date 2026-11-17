@@ -43,6 +43,12 @@ TAX_COPY_WITHHELD_TAGS = frozenset(
 # (the TTM window plus the year-ago quarter it is compared with). Retired actions (SUPERSEDED, REJECTED) do not count.
 RESTATEMENT_QUARTERS = 5
 STRUCTURAL_ACTION_TYPES = ("MERGER", "DEMERGER")
+# X173 (rule YTD_COPIES_QUARTER): a YTD context that repeats its own quarter's values. AJAXENGG standalone Q3 FY26
+# files the Apr-Dec context with exactly the Oct-Dec values (revenue 433.548 Cr, PAT 38.241 Cr) while Q1 / Q2 were
+# 466.52 / 444.81 Cr. Evidence: total income, PBT and PAT all equal to the rupee and non-zero, and the year's earlier
+# quarters (all filed) carry more total income than the "YTD" itself, which no real YTD can (it would need a negative
+# quarter). The copied YTD values are withheld; the quarters stay, so TTM sums them instead of bridging on the copy.
+YTD_COPY_EVIDENCE_TAGS = ("total_income", "pbt", "pat")
 
 
 def _add_months(d: date, months: int) -> date:
@@ -68,6 +74,7 @@ class FactBook:
     fy_starts: frozenset[date] = frozenset()
 
     tax_copied: list[dict] = field(default_factory=list)  # X94 breaks found (and withheld) by load_factbook
+    ytd_copies: list[dict] = field(default_factory=list)  # X173 YTD contexts withheld by load_factbook
     # G68: (ex_date, action_type) of MERGER / DEMERGER ledger rows of this entity (as issuer or related entity),
     # ex-date on or before as_of. Loaded with the book; empty for a book built by hand.
     structural_actions: tuple[tuple[date, str], ...] = ()
@@ -96,6 +103,41 @@ class FactBook:
             p = (date.fromisoformat(b["period"][0]), date.fromisoformat(b["period"][1]))
             for tag in TAX_COPY_WITHHELD_TAGS:
                 self.durations.get(tag, {}).pop(p, None)
+
+    def ytd_copy_periods(self) -> list[dict]:
+        """X173: YTD periods (6 / 9 / 12 months from a fiscal-year start) whose total income, PBT and PAT equal those
+        of the quarter ending on the same day, to the rupee and non-zero, while the earlier quarters of that YTD are
+        all filed and their total income exceeds the YTD's. Such a YTD is a copy of the quarter context."""
+        ti = self.durations.get("total_income", {})
+        out = []
+        for (s, e), v in ti.items():
+            m = period_months(s, e)
+            if m is None or m not in (6, 9, 12) or not self.is_ytd_start(s):
+                continue
+            q = (_add_months(date(e.year, e.month, 1), -2), e)
+            if not all(
+                self.durations.get(t, {}).get((s, e)) == self.durations.get(t, {}).get(q) not in (None, Decimal(0))
+                for t in YTD_COPY_EVIDENCE_TAGS
+            ):
+                continue
+            earlier = [ti.get((_add_months(date(qe.year, qe.month, 1), -2), qe))
+                       for qe in (_add_months(e, -3 * i) for i in range(1, m // 3))]  # fmt: skip
+            if None in earlier or sum(earlier, Decimal(0)) <= v:
+                continue
+            out.append({"ytd_period": [str(s), str(e)], "total_income": str(v),
+                        "earlier_quarters_total_income": str(sum(earlier, Decimal(0)))})  # fmt: skip
+        return out
+
+    def withhold_ytd_copies(self) -> None:
+        """X173: drop every duration value of a copied YTD period that equals its quarter's value (the copied
+        context); values the quarter does not carry (YTD-only cash flow, X13) stay."""
+        self.ytd_copies = self.ytd_copy_periods()
+        for b in self.ytd_copies:
+            s, e = (date.fromisoformat(x) for x in b["ytd_period"])
+            q = (_add_months(date(e.year, e.month, 1), -2), e)
+            for d in self.durations.values():
+                if (s, e) in d and q in d and d[(s, e)] == d[q]:
+                    del d[(s, e)]
 
     def is_ytd_start(self, start: date) -> bool:
         return not self.fy_starts or start in self.fy_starts
@@ -377,6 +419,7 @@ def _build_book(entity_id: str, scope: str, rows, unit, fy_starts, structural=()
             book.instants.setdefault(tag, {})[end] = Decimal(value)
         else:
             book.durations.setdefault(tag, {})[(start, end)] = Decimal(value)
+    book.withhold_ytd_copies()
     jv = book.durations.get("share_of_associates_jv", {})
     if "pbt" in book.durations:
         book.durations[PBT_INCL_JV] = {p: v + jv.get(p, Decimal(0)) for p, v in book.durations["pbt"].items()}

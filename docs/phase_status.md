@@ -89,9 +89,10 @@ the full line-by-line audit of the PDF is `docs/master_backlog.md`; ratios are i
    count per class, and whether Reg. 31 counts DVR shares with the ordinary shares is unverified: no DVR issuer is in
    the Nifty 500 and no such pattern is committed or in the vault, (c) no fixture states a DVR voting-rights ratio or
    face value.
-4. **A half-yearly RPT view from the Reg. 23(9) rows: BLOCKED** on R13. The rows sit on the filing's quarter context and
-   NETWEB filed identical amounts under an Oct-Mar and a Jan-Mar context (X115), so whether they are quarter or
-   half-year amounts is unverified. Needs a Reg. 23(9) or results PDF to compare with the XBRL rows.
+4. **A half-yearly RPT view from the Reg. 23(9) rows: period settled** (R13 resolved 2026-11-17). The amounts cover
+   the half-year ending on the period end (X160; `disclosure_start` / `disclosure_months`, parser `reg23-2`), but a
+   few filers put financial-year-to-date amounts in Q4 with nothing in the filing to say so (X161), so the rows still
+   feed no ratio or feature; a view would need a cross-filing check (Q4 opening vs Q2 closing balances) first.
 5. **Penalty amounts (G118): BLOCKED** on an E12 content fixture (`penalties_90d` stays NULL). Reg. 30 acquisition
    events as a second G276 input: no acquisition event type is parsed and no such fixture is committed (G276 itself is
    built from the business-combination cash outflow, C26).

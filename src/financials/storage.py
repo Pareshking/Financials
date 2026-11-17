@@ -425,6 +425,13 @@ PRUNE_RULES: tuple[PruneRule, ...] = (
         "stays",
     ),
     PruneRule(
+        "reg23_related_party_transactions",
+        f"""{VK("t.parser_version")} < (SELECT max({VK("r.parser_version")}) FROM reg23_related_party_transactions r
+                                         WHERE r.filing_id = t.filing_id)""",
+        "no feature or ratio reader (X115, X160); backfill-rpt checks the current Reg. 23(9) version only: the latest "
+        "version per filing stays",
+    ),
+    PruneRule(
         "disclosure_facts",
         f"""{VK("t.parser_version")} < (SELECT max({VK("d.parser_version")}) FROM disclosure_facts d
                                          WHERE d.filing_id = t.filing_id)""",

@@ -55,8 +55,9 @@ def test_netweb_rows_and_balances():
 
 
 def test_context_dates_do_not_prove_the_disclosure_period():
-    """NETWEB filed the same six rows with the same amounts in an Oct-Mar and, re-filed, in a Jan-Mar context (R13):
-    the period is the filing's reporting-period context as tagged, never a verified half-year."""
+    """NETWEB filed the same six rows with the same amounts in an Oct-Mar and, re-filed, in a Jan-Mar context: the
+    tagged period is the filing's reporting-period context; the disclosure period is the half-year by HALF_YEAR_RULE
+    (X160, tests/test_reg23_period.py), the same for both."""
     _, _, first = _parse(NETWEB_OCT_MAR)
     _, _, refiled = _parse(NETWEB)
     assert {(r.period_start, r.period_months) for r in first} == {(date(2025, 10, 1), 6)}
@@ -66,6 +67,7 @@ def test_context_dates_do_not_prove_the_disclosure_period():
         return (r.row_member, r.counterparty_name, r.txn_type, r.amount, r.opening_balance, r.closing_balance)
 
     assert [key(r) for r in first] == [key(r) for r in refiled]
+    assert {(r.disclosure_start, r.disclosure_months) for r in first + refiled} == {(date(2025, 10, 1), 6)}
 
 
 def test_tmpv_subsidiary_transactions_on_the_consolidated_basis():

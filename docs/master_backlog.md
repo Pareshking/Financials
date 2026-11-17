@@ -89,7 +89,7 @@ M2 = A113, M3 = A94, M4 = A112, M5 = A114, M6 = B31, M7 = B51, M8 = G23.
 | G181 | Reg. 30 red-flag count | five separate 90-day counts; **no single "Reg 30 Red Flag Count" column** (L1271); `penalties_90d` always NULL | PARTLY NOT FOUND |
 | G187 | Saved custom ratios | `dsl.save_custom_ratio()` + `user_custom_ratios`; **no CLI command** to save one; not usable as output columns (M1) | PARTLY NOT FOUND |
 | G119 | Allotments / preferential / QIP / warrants | `corporate_events` ALLOTMENT rows; **no warrant-conversion tracker, no dilution column** (PDF L958-959) | PARTLY NOT FOUND (digest notes it) |
-| G99 | RPT from Reg. 23(9) | `rpt_total_amount`; per counterparty from the Reg. 34 annual schedule since batch J (`related_party_transactions`, X113); Reg. 23(9) rows per counterparty in `reg23_related_party_transactions` since 2026-11-16 (X115; data only, period coverage R13) | **FIXED 2026-11-16 (batch J + X115)** |
+| G99 | RPT from Reg. 23(9) | `rpt_total_amount`; per counterparty from the Reg. 34 annual schedule since batch J (`related_party_transactions`, X113); Reg. 23(9) rows per counterparty in `reg23_related_party_transactions` since 2026-11-16 (X115; data only; half-year amounts X160, FY-to-date exceptions X161) | **FIXED 2026-11-16 (batch J + X115)** |
 | G175 (new, e085eb5) | "OPM last year" | `opm_last_year_pct` = OPM of **the same quarter one year earlier**; Screener's "OPM last year" (the PDF's example `OPM > OPM last year`, L1254, L1267) and catalogue A4.20 = **FY** EBITDA / FY sales | BUILT WITH A DIFFERENT DEFINITION: rename to `opm_same_quarter_ly_pct` (it is the base of G204) and add the FY form. **FIXED 2026-11-15 (batch A)**: renamed `opm_preceding_year_quarter_pct` (DSL `opm same quarter last year`); `opm_last_year_pct` is now the FY OPM |
 
 Stale the other way (digest says open, code has it): G130 / G131 IN_PROGRESS (G131 set to DONE in the digest 2026-11-16), but segment and geography rows are
@@ -243,7 +243,7 @@ exists (file / column); Class.
 | B06 | 832-835, 911-913, 1156 | NSE 4-tier industry classification ("in the exchange equity master CSV") | G96 DONE, G334 | A1.19 note | not in EQUITY_L (IDX10); from the NSE quote API (F30, IC1-IC3): `fetch-classification`, `entity_classification_history` (batch H) | **BUILT** |
 | B07 | 837-841 | corporate-actions feed + Reg. 30 board-outcome XBRL | G97 DONE | — | F03; outcome XBRL vaulted raw (E2) | **BUILT** |
 | B08 | 843-847 | credit-rating disclosure XBRL | G98 DOC_PLANNED | A1.23, B8.9 NEW FREE SOURCE | F22 | **CATALOGUE** |
-| B09 | 857-861 | Reg. 23(9) RPT XBRL | G99 DONE | B1.19 | `rpt_total_amount`; per counterparty from the annual schedule (X113, batch J) and the Reg. 23(9) rows (`reg23_related_party_transactions`, X115) | **BUILT** (Reg. 23(9) rows data only, R13) |
+| B09 | 857-861 | Reg. 23(9) RPT XBRL | G99 DONE | B1.19 | `rpt_total_amount`; per counterparty from the annual schedule (X113, batch J) and the Reg. 23(9) rows (`reg23_related_party_transactions`, X115) | **BUILT** (Reg. 23(9) rows data only; half-year X160, exceptions X161) |
 | B10 | 864-867 | PIT Reg. 7(2) and SAST Reg. 29 XBRL | G100 DOC_PLANNED | B7.8 NEW FREE SOURCE | F11, F12 | **CATALOGUE** |
 | B11 | 869-873 | security-wise deliverable position CSV | G101 DONE | — | `raw_delivery` (F02) | **BUILT** |
 | B12 | 869-873 | bulk and block deals CSV | G102 DOC_PLANNED | B7.9 NEW FREE SOURCE | F14 | **CATALOGUE** |

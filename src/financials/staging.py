@@ -157,6 +157,7 @@ TABLE_ORDER = (
     "raw_results_listing",
     "raw_quote_classification",
     "raw_nse_mcap",
+    "raw_bse_securities",
     "stg_holidays",
     "stg_shp_meta",
     "stg_shp_categories",
@@ -1016,6 +1017,24 @@ def stage_equity_master(vault: Vault, stage_root: Path, *, data: bytes, source_u
         {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)],
          "raw_equity_master": [{**asdict(r), "filing_id": filing.filing_id, "snapshot_date": snap} for r in rows]},
         extra={"snapshot_date": snap.isoformat()},
+    )  # fmt: skip
+
+
+def stage_bse_securities(vault: Vault, stage_root: Path, *, data: bytes, source_url: str, fetched_at: datetime) -> Path:
+    """Vault + parse one BSE list-of-securities answer [A17, X169] (exchange BSE); observed on the IST fetch date."""
+    from financials.parsers.bse_securities import parse_list_securities
+    from financials.timeutil import utc_to_ist_date
+
+    rows = parse_list_securities(data)
+    blob = vault.put(data, ext="json", media_type="application/json", fetched_at=fetched_at)
+    filing = make_filing(blob, exchange="BSE", category="BSE_LIST_SECURITIES", source_url=source_url,
+                         fetched_at=fetched_at)  # fmt: skip
+    observed = utc_to_ist_date(fetched_at)
+    return write_stage(
+        stage_root, "bse_securities", f"{observed:%Y%m%d}-{blob.sha256[:12]}",
+        {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)],
+         "raw_bse_securities": [{**asdict(r), "filing_id": filing.filing_id, "observed_date": observed} for r in rows]},
+        extra={"snapshot_date": observed.isoformat()},
     )  # fmt: skip
 
 

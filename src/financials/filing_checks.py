@@ -112,3 +112,41 @@ def apply_bse_scrip_code(
             [code, exchange, isin, symbol, entity_id],
         )
     return conflicts
+
+
+BSE1_RULE = "BSE1"
+
+
+def apply_bse_scrip_codes_by_isin(con, filing_id: str) -> tuple[int, list[dict]]:
+    """Rule BSE1 [X169]: a BSE list-of-securities filing (raw_bse_securities) fills `bse_scrip_code` on every non-BSE
+    identifier row whose ISIN equals a listed row's ISIN and whose interval covers the list's observed date. An ISIN
+    listed with two codes in the filing is skipped; a different code already stored is kept and returned as a
+    conflict (IDENTIFIER / BSE_SCRIP_CODE_CONFLICT, as G79). Keyed on ISIN + scrip code, never on a ticker: works for a
+    BSE-only company too once it has identifier rows. Batched: one read, one update."""
+    rows = con.execute(
+        """WITH b AS (
+             SELECT isin, any_value(scrip_code) AS code, any_value(observed_date) AS d, count(DISTINCT scrip_code) AS n
+             FROM raw_bse_securities WHERE filing_id = ? GROUP BY isin)
+           SELECT h.security_id, h.exchange, h.valid_from, h.symbol, h.isin, h.bse_scrip_code, b.code
+           FROM b JOIN security_identifier_history h ON h.isin = b.isin AND h.exchange <> 'BSE'
+                AND h.valid_from <= b.d AND (h.valid_to IS NULL OR h.valid_to > b.d)
+           WHERE b.n = 1 ORDER BY h.security_id, h.valid_from""",
+        [filing_id],
+    ).fetchall()
+    conflicts = [
+        {"security_id": sec, "valid_from": str(vf), "stored": old, "filed": code, "isin": isin, "symbol": sym,
+         "rule": BSE1_RULE}
+        for sec, _ex, vf, sym, isin, old, code in rows if old is not None and old != code
+    ]  # fmt: skip
+    todo = sum(old is None for *_, old, _code in rows)
+    if todo:
+        con.execute(
+            """UPDATE security_identifier_history h SET bse_scrip_code = b.code
+               FROM (SELECT isin, any_value(scrip_code) AS code, any_value(observed_date) AS d
+                     FROM raw_bse_securities WHERE filing_id = ? GROUP BY isin
+                     HAVING count(DISTINCT scrip_code) = 1) b
+               WHERE h.isin = b.isin AND h.exchange <> 'BSE' AND h.bse_scrip_code IS NULL
+                 AND h.valid_from <= b.d AND (h.valid_to IS NULL OR h.valid_to > b.d)""",
+            [filing_id],
+        )
+    return todo, conflicts

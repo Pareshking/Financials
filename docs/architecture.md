@@ -9,7 +9,7 @@ UNVERIFIED there must not be hard-coded; code that depends on it quarantines on 
 
 - **Purpose:** personal, single-user research, screening and point-in-time (PIT) backtesting. No redistribution [C8].
 - **Universe v1:** NSE Mainboard `EQ`, `BE`, `BZ`, starting with the Nifty 500 [C7]. SME (`SM`, `ST`) out of scope. BSE is used only as a fallback and for historical Reg. 34 annual XBRL backfill.
-- **Filings universe `mcap500`** (owner 2026-11-17, rule U1 [X134], §11.12): every `EQ`/`BE`/`BZ` security listed on NSE (Category `Listed`; `Permitted` rows, listed elsewhere, never qualify) whose NSE market cap (PR-zip mcap file [X130]) is >= Rs 500 Cr on the last trading day of a week joins `universe_membership`; members never leave; SME series and the zip's SME file are never read for it; no share-class aggregation ("ignore DVR"). The Nifty 500 set the project started with is its seed. `discover-filings --universe mcap500` (or `mcap500-new`: members without financials yet) fetches their filings; `nifty500` keeps working. The feature universe is unchanged (every security with a recent bar, §4.1).
+- **Filings universe `mcap500`** (owner 2026-11-17, rule U1 [X134], §11.12): every `EQ`/`BE`/`BZ` row of NSE's mcap file, Category `Listed` or `Permitted` (rule U1-P, owner 2026-11-17; Permitted securities are listed on another exchange, mostly BSE, and file there [X166], §11.13), whose NSE market cap (PR-zip mcap file [X130]) is >= Rs 500 Cr on the last trading day of a week joins `universe_membership`; members never leave; SME series and the zip's SME file are never read for it; no share-class aggregation ("ignore DVR"). The Nifty 500 set the project started with is its seed. `discover-filings --universe mcap500` (or `mcap500-new`: members without financials yet) fetches their filings; `nifty500` keeps working. The feature universe is unchanged (every security with a recent bar, §4.1).
 - **Data scope (v1, CHOICE [C9]):** `trade_date >= 2024-10-01` for prices, delivery, corporate actions and index snapshots; `period_end >= 2025-03-31` for financials and shareholding (Q4 FY25, the first Integrated Filing quarter [X38]; `financials/scope.py`). As of Nov 2026 that is 7 quarters: TTM works, YoY-on-TTM is NULL until Q3 FY27 (Dec-2026) results are filed. Promotion returns `OUT_OF_SCOPE` for older inputs (vaulted, not parsed); `fetch-days` / `fetch-corp-actions` clamp start dates. Multi-year windows use `fundamentals.cagr(..., min_periods_required)` and stay NULL until enough in-scope quarters exist.
 - **Non-goals (v1):** multi-user, UI hosting, Cloudflare (R2/D1/Workers), real-time intraday prices, SME/Indian-GAAP corporates.
 
@@ -37,6 +37,7 @@ Operator commands (`python -m financials --data-dir data …`):
 | `drop-raw-xbrl [--spill DIR] [--no-compact] [--note N]` | one-shot, owner decision J: refuses unless the coverage check (`scripts/disclosure_coverage.py`) reports 0 uncaptured elements per profile, then drops `raw_xbrl_facts` with an `admin_log` entry in one transaction (idempotent) and compacts (§4.1) |
 | `run-day --date D` | holiday list, market days D−7..D (each with its PR-zip mcap file [X130]), corporate actions D−7..D+30, discovery for symbols with results in the day's RSS (A9) + Reg. 30 events, promote, rule U1 for the week ends in D−7..D (§11.12), `materialize --incremental --to D−1`, materialise D in full; idempotent |
 | `fetch-mcap START [END] [--weekly]` | the PR-zip mcap files of promoted trading days (`--weekly`: each ISO week's last trading day only, the universe backfill); vaulted zips are not downloaded again (`fetch-days` fetches each day's zip too) |
+| `import-bse DIR`, `bse-members [--as-of D]` | vault + stage a BSE runner ledger (then `promote`; rule BSE1 for the list of securities); list the Permitted members with ISIN and BSE scrip code (§11.13) |
 | `update-universe [--from D] [--to D]` | rule U1 over the week ends in the range (default 2024-10-01 → today) plus the one-time seed; sticky, idempotent, audited in `admin_log` (§11.12) |
 | `check-issue-size --as-of D [--all]` | read-only cross-check: NSE Issue Size vs Reg. 31 total per security on a quarter end, 0.5% tolerance [X133] |
 | `screen "QUERY" [--as-of D]` | runs a DSL screen on the live table or point-in-time on history (read-only connection) |
@@ -823,8 +824,8 @@ only because the pinned files changed).
   market cap DECIMAL); the file has no ISIN.
 - **Rule U1** (`financials/universe.py`, `RULE_VERSION`): a day is its ISO week's last trading day when every later
   day of that week is known not to trade (holiday master / CAL3 rows / weekend of a covered year). On it, every
-  EQ / BE / BZ row with Category `Listed` (part U1-L: `Permitted` securities are listed on another exchange and have
-  no NSE filings; their raw rows stay stored) and filed Market Cap >= Rs 500 Cr joins (`universe_membership`, MCAP_GE_500CR, visible from the
+  EQ / BE / BZ row with Category `Listed` or `Permitted` (U1-P; the row's category is kept as
+  `universe_membership.listing_category`) and filed Market Cap >= Rs 500 Cr joins (`universe_membership`, MCAP_GE_500CR, visible from the
   file's EOD broadcast time), resolving symbol + series on that date through `security_identifier_history`; an
   unresolved row is quarantined (UNIVERSE / UNRESOLVED_SYMBOL, one finding per symbol / series, closed by rule once it
   joins). Seed, once: EQ / BE / BZ securities with a bar of entities with financials, on their first bar date
@@ -833,7 +834,33 @@ only because the pinned files changed).
 - **PIT read**: `joined_date <= as_of` (`universe.members`). `discover-filings --universe mcap500` lists members
   joined by today; `mcap500-new` only those whose entity has no `filing_meta` yet.
 - **Backfill** (once): `fetch-days` for the scope, `promote`, `fetch-mcap 2024-10-01 <today> --weekly` (111 zips on
-  2026-11-17), `promote`, `update-universe`. Live result (rule U1-2026.11.17-L): 595 seeded + 1,352 joined = 1,947 members.
+  2026-11-17), `promote`, `update-universe`. Live result (rule U1-2026.11.17-L): 595 seeded + 1,352 joined = 1,947 members;
+  the next `update-universe` (U1-P) adds the Permitted joiners and fills `listing_category` (sticky, idempotent).
+
+## 11.13 BSE for Permitted members (owner 2026-11-17) [X165-X169, A16-A18]
+- **Who**: `universe.bse_members(as_of)` = members whose latest mcap row is `Permitted` (they file results, annual
+  reports and shareholding on BSE, not NSE [X166]); `mcap500-new` NSE discovery skips them. CLI `bse-members` prints
+  them with ISIN and BSE scrip code. Identity keys on **ISIN + BSE scrip code**, never on an NSE symbol or NSE bars,
+  so a BSE-only company (owner to-do 31) fits the same path once it has identifier rows.
+- **Identity, rule BSE1** [X169]: the BSE list of securities (`ListofScripData`, per group: scrip code, ISIN, ticker,
+  BSE market cap) is staged `bse_securities` -> `raw_bse_securities` (append-only); promotion fills
+  `security_identifier_history.bse_scrip_code` by ISIN on rows valid on the observed date; a different stored code is
+  a non-blocking BSE_SCRIP_CODE_CONFLICT. The in-filing ScripCode (G79, X111) keeps working beside it. The BSE
+  bhavcopy (UDiFF, FinInstrmId = scrip code [X165]) gives the same map and is reachable from the container; it is
+  parsed (`parse_udiff_cm(exchange="BSE")`) but not yet fetched or promoted.
+- **Fetching** [A16, A17]: the container is refused by `api.bseindia.com`; BSE is fetched only on GitHub-hosted runners
+  with the owner's method, ported as-is (`financials/fetch/bse.py`: BSE's headers, plain requests, 4-6 s apart, 3
+  retries on network / 5xx, hard stop on 401/403/429, then in-page XHR in headless Chrome; HTTP 400 ends that call
+  only). Workflows: `bse-reach` (probe) and `bse-fetch` (by hand, scrip codes from `bse-members`;
+  `scripts/bse_fetch.py`: every group's list of securities, per scrip announcements + `Result` attachments, shareholding
+  filings + inline XBRL). The runner writes only a **ledger** (bytes as sent in `blobs/<sha256>` + `ledger.jsonl`)
+  uploaded as a 1-day artifact; it never sees the database.
+- **Import** (owner's machine): `import-bse DIR` checks every blob against its ledger sha256, vaults it as a `filings`
+  row with exchange `BSE` (blob != filing: an NSE and a BSE filing may share one sha256), and stages it; `promote`
+  (single writer) promotes. The same ledger format is the owner-provided route (files fetched elsewhere by the same
+  client). Parsed today: the list of securities only. Announcements, PDFs and shareholding inline XBRL (same `in-bse-shp`
+  taxonomy as NSE's SHP XML, but inline XBRL [X167]) stay raw (vault + filing) until a parser is proven on a real BSE
+  file; no BSE results-XBRL endpoint is known (X168, R20), so BSE financial statements are BLOCKED on a source.
 
 ## 12. Promoter quality gates (in order)
 

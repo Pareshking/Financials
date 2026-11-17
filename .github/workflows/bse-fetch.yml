@@ -1,0 +1,41 @@
+name: bse-fetch
+
+# BSE side of the Permitted members of rule U1-P (owner 2026-11-17), on a GitHub-hosted runner with the ported BSE
+# client (financials.fetch.bse: plain requests with BSE's headers, 4-6 s apart, in-page XHR only after a refusal).
+# By hand only: the scrip codes come from `python -m financials --data-dir <dir> bse-members` on the owner's machine.
+# The ledger (bytes as sent + one JSON line per answer) is a workflow artifact for 1 day (the repository is public);
+# `import-bse` then vaults and stages it on the owner's machine and `promote` promotes it. No database here.
+on:
+  workflow_dispatch:
+    inputs:
+      scrips:
+        description: "comma-separated BSE scrip codes (bse-members)"
+        required: true
+      since:
+        description: "announcements from (YYYY-MM-DD)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -e ".[bse]"
+      - run: python scripts/bse_fetch.py --scrips "$SCRIPS" --since "$SINCE" --out bse_fetch
+        env:
+          SCRIPS: ${{ inputs.scrips }}
+          SINCE: ${{ inputs.since }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bse-fetch
+          path: bse_fetch/
+          retention-days: 1
+          if-no-files-found: warn

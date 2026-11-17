@@ -62,6 +62,11 @@ class Missing(Failed):
     """A filing's file answered 404: that file only, not a refusal."""
 
 
+class BadRequest(RuntimeError):
+    """HTTP 400: BSE rejected this call's parameters (probe run 2, A18). That call only, not a refusal: the run goes
+    on (a deviation from the source client, which stops on any status other than 200 / 404 / 5xx)."""
+
+
 def ymd(d: date) -> str:
     return d.strftime("%Y%m%d")
 
@@ -204,6 +209,8 @@ class BseClient:
                 continue
             if status == 404 and file:
                 raise Missing(f"HTTP 404 from {url}")
+            if status == 400:
+                raise BadRequest(f"HTTP 400 from {url} ({self.via}) params {params}")
             if status != 200:
                 raise Blocked(f"HTTP {status} from {url} ({self.via})")
             if self.ledger is not None:
@@ -292,8 +299,9 @@ def _ext(rec: dict) -> tuple[str, str]:
 
 def import_ledger(vault, stage_root: Path, ledger_dir: Path) -> tuple[list[Path], list[str]]:
     """Vault every 200 answer of a runner's ledger as a BSE filing (exchange BSE, the URL as asked, fetched_at as
-    recorded) and stage it raw only: nothing is parsed into canonical tables until a parser is proven on a real file
-    of that kind [A17]. Each blob's sha256 is checked against the ledger; a re-import adds nothing (idempotent ids)."""
+    recorded) and stage it: the list of securities is parsed (raw_bse_securities, rule BSE1 [X169]); everything else
+    raw only, until a parser is proven on a real file of that kind [A17]. Each blob's sha256 is checked against the
+    ledger; a re-import adds nothing (idempotent ids)."""
     from financials.staging import stage_raw_only
     from financials.timeutil import utc_now
 
@@ -313,6 +321,16 @@ def import_ledger(vault, stage_root: Path, ledger_dir: Path) -> tuple[list[Path]
             from datetime import UTC
 
             fetched = fetched.astimezone(UTC).replace(tzinfo=None)
+        if rec["dataset"] == "list_securities":  # parsed: the ISIN -> scrip code map of rule BSE1 [X169]
+            from financials.parsers import ParseError
+            from financials.staging import stage_bse_securities
+
+            try:
+                staged.append(stage_bse_securities(vault, stage_root, data=data, source_url=rec["url"],
+                                                   fetched_at=fetched))  # fmt: skip
+            except ParseError as exc:
+                errors.append(f"{rec['url']}: {exc}")
+            continue
         staged.append(stage_raw_only(vault, stage_root, data=data, ext=ext, media_type=media,
                                      category=CATEGORY[rec["dataset"]], source_url=rec["url"], fetched_at=fetched,
                                      exchange="BSE"))  # fmt: skip

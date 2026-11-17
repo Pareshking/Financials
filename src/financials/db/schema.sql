@@ -143,6 +143,24 @@ CREATE TABLE IF NOT EXISTS raw_equity_master (
     PRIMARY KEY (filing_id, symbol, series)
 );
 
+-- BSE list of securities (ListofScripData, one BSE group per filing) [A17, X169]: identifiers as sent; observed on the
+-- IST date of the fetch. Source of rule BSE1 (ISIN -> security_identifier_history.bse_scrip_code). L1, append-only.
+CREATE TABLE IF NOT EXISTS raw_bse_securities (
+    filing_id      VARCHAR NOT NULL REFERENCES filings(filing_id),
+    observed_date  DATE    NOT NULL,
+    scrip_code     VARCHAR NOT NULL,
+    isin           VARCHAR NOT NULL,
+    ticker         VARCHAR NOT NULL,
+    bse_group      VARCHAR NOT NULL,
+    status         VARCHAR NOT NULL,
+    segment        VARCHAR NOT NULL,
+    name           VARCHAR NOT NULL,
+    issuer_name    VARCHAR,
+    face_value     DECIMAL(18,4),
+    market_cap_inr DECIMAL(20,2),            -- Mktcap (Rs crore, as filed) x 1e7, exact
+    PRIMARY KEY (filing_id, scrip_code)
+);
+
 -- One row per Integrated Filing listing row (api/integrated-filing-results, vaulted as RESULTS_LISTING) [A7, X83].
 -- `creation_Date` is on every row; `broadcast_Date` is null on revised rows. Times are UTC (listing is IST).
 CREATE TABLE IF NOT EXISTS raw_results_listing (

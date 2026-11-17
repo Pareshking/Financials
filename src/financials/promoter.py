@@ -71,6 +71,7 @@ def promote(con: duckdb.DuckDBPyConnection, stage_dir: Path) -> PromotionResult:
         "equity_master": _promote_vault_and_raw,
         "classification": _promote_classification,
         "mcap_day": _promote_mcap_day,
+        "bse_securities": _promote_bse_securities,
     }.get(job)
     if handler is None:
         raise ValueError(f"unknown job {job!r}")
@@ -1913,6 +1914,24 @@ def _promote_mcap_day(con, stage_dir: Path, manifest: dict[str, Any]) -> Promoti
         raise GateFailure("G1", f"{n} EQ/BE/BZ mcap rows < {G1_MIN_RATIO} x median {statistics.median(prior)}")
     _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_nse_mcap"))
     return PromotionResult("PROMOTED", "mcap_day", message=f"{day}: {n} EQ/BE/BZ rows")
+
+
+def _promote_bse_securities(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
+    """BSE list of securities [A17, X169]: vault rows + raw_bse_securities (append-only), then rule BSE1 fills
+    `bse_scrip_code` by ISIN on the identifier rows valid on the observed date; a different stored code is a
+    non-blocking IDENTIFIER / BSE_SCRIP_CODE_CONFLICT finding, nothing is overwritten."""
+    from financials import filing_checks as fc
+
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_bse_securities"))
+    fid = read_table(con, stage_dir, "filings")[0]["filing_id"]
+    filled, conflicts = fc.apply_bse_scrip_codes_by_isin(con, fid)
+    q = _quarantine_many(con, [
+        _quarantine_row(stage="IDENTIFIER", reason_code=fc.SCRIP_CONFLICT_REASON, filing_id=fid,
+                        security_id=c["security_id"], details=c) for c in conflicts
+    ]) if conflicts else []  # fmt: skip
+    n = con.execute("SELECT count(*) FROM raw_bse_securities WHERE filing_id = ?", [fid]).fetchone()[0]
+    return PromotionResult("PROMOTED", "bse_securities", message=f"{manifest['snapshot_date']}: {n} securities, "
+                           f"{filled} identifier rows given a BSE scrip code (BSE1)", quarantined=q)  # fmt: skip
 
 
 def _promote_kpis(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:

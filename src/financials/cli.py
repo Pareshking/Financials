@@ -151,6 +151,12 @@ def build_parser() -> argparse.ArgumentParser:
     df.add_argument("--no-events", action="store_true")
     df.add_argument("--workers", type=int, default=1, help="threads (per-host limits still apply)")
     df.add_argument("--shp-from", type=_date, help="shareholding quarters from this date (default: latest only)")
+    df.add_argument("--symbols-file", type=Path, help="one NSE symbol per line (needs no market database)")
+    df.add_argument("--shard", help="K/N: only shard K (0-based) of N of the symbols (runner fan-out, fetch.replay)")
+    df.add_argument("--record-responses", action="store_true",
+                    help="also ledger listing answers in vault/responses.jsonl (for import-vault)")  # fmt: skip
+    iv = sub.add_parser("import-vault", help="merge runner vaults (blobs + url_index/responses ledgers) and stage them")
+    iv.add_argument("dirs", type=Path, nargs="+")
     rd = sub.add_parser("run-day", help="holidays, days, corporate actions, discovery, promote, universe, materialize")
     rd.add_argument("--date", type=_date, help="trading date to run (default: today in IST, for schedulers)")
     rd.add_argument("--lookback-days", type=int, default=7)
@@ -493,6 +499,19 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
         print(f"{len(ids)} YTD_QUARTER_MISMATCH findings over {len(pairs)} entity-scopes", file=out)
         print(f"{closed} share cross-check finding(s) closed on re-check [X103]", file=out)
         return 0
+    if args.cmd == "import-vault":
+        from financials.fetch.replay import ImportRefused, import_vault
+
+        try:
+            staged, errors, stats = import_vault(Vault(vault_dir), stage_root, args.dirs)
+        except ImportRefused as exc:
+            print(f"error: refused, nothing imported: {exc}", file=out)
+            return 1
+        for e in errors:
+            print(f"error: {e}", file=out)
+        print(" ".join(f"{k}={v}" for k, v in stats.items()), file=out)
+        print(f"staged {len(staged)} batch(es) from {len(args.dirs)} runner vault(s) (run promote)", file=out)
+        return 1 if errors else 0
     if args.cmd == "import-bse":
         from financials.fetch.bse import import_ledger
 
@@ -834,9 +853,17 @@ def run_fetch(args, jobs: Jobs, db_path: Path, out) -> tuple[list[Path], list[st
         staged_r, errors = jobs.discover(_symbols(args, db_path, args.symbols), ["results"], events=False)
         staged += staged_r
     elif args.cmd == "discover-filings":
+        from financials.fetch.replay import parse_shard, read_symbols_file, shard
+
         syms = _symbols(args, db_path, args.symbols)
+        if args.symbols_file:
+            syms += [s for s in read_symbols_file(args.symbols_file) if s not in syms]
         if args.from_rss:
             syms += [s for s in jobs.symbols_from_rss() if s not in syms]
+        if args.shard:
+            syms = shard(syms, *parse_shard(args.shard))
+            print(f"discover-filings: shard {args.shard}: {len(syms)} symbol(s)", file=out)
+        jobs.record_responses = args.record_responses
         jobs.shp_min_as_of = args.shp_from
         staged, errors = jobs.discover(syms, args.kinds, events=not args.no_events, workers=args.workers)
     return staged, errors

@@ -34,6 +34,7 @@ python -m financials --data-dir data update-universe [--from D --to D]          
 python -m financials --data-dir data discover-filings --universe mcap500-new     # filings of members without financials yet (mcap500 = all)
 python -m financials --data-dir data check-issue-size --as-of 2026-09-30         # NSE Issue Size vs Reg. 31 cross-check (read-only)
 python -m financials --data-dir data backfill-audit-opinions --workers 4         # audit_opinions from the vault (then full materialize on a version bump)
+python -m financials --data-dir data import-vault nse-fetch-0/ nse-fetch-1/ …        # runner vaults of the nse-fetch workflow (verified, staged; then promote)
 python -m financials --data-dir data run-day --date 2026-11-13                  # daily: fetch, discover (RSS hint), promote, materialize
 python -m financials --data-dir data rebuild-market --from 2025-09-23           # roll market state back to a date and replay (audited)
 python -m financials --data-dir data materialize --from 2024-10-01 --to 2026-11-13

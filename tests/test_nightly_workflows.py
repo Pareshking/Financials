@@ -83,7 +83,8 @@ def test_no_workflow_commits_pushes_or_uploads_data():
                         "${{ runner.temp }}/nightly-log/nightly-pipeline.log",
                         "bse_probe/",
                         "bse_fetch/",
-                    ), target  # bse_fetch/: the BSE runner ledger (A17)
+                        "nse_fetch/",
+                    ), target  # bse_fetch/: the BSE runner ledger (A17); nse_fetch/: an NSE runner vault (import-vault)
                     assert "data" not in target.replace("nightly", ""), target
         code = re.sub(r"(^|\s)#.*$", "", text, flags=re.M)  # comments may explain; code never names data/
         assert not re.search(r"(^|[\s\"'=/])data/", code, re.M), path.name

@@ -130,6 +130,7 @@ class Jobs:
         self.errors: list[str] = []  # per-file failures inside a listing (the rest of the listing goes on)
         self.shp_min_as_of: date | None = None  # discovery: shareholding quarters from this date (None = latest)
         self.workers = 1  # fetch-days threads (useful only with a host limit above one connection)
+        self.record_responses = False  # runner hand-back: also note listing / API answers (fetch.replay)
 
     def _file(self, url: str) -> bytes | None:
         try:
@@ -159,6 +160,10 @@ class Jobs:
             if data is not None:  # the blob is in the vault before the ledger says so (a killed run leaves no lie)
                 self.vault.put(data, ext=self._ext(url), media_type="application/octet-stream", fetched_at=utc_now())
             self.vault.record_fetch(url, 404 if data is None else 200, utc_now(), data, self._ext(url))
+        elif self.record_responses and data is not None:
+            from financials.fetch.replay import record_response
+
+            record_response(self.vault, url, data, "json" if accept == JSON else self._ext(url), utc_now())
         return data
 
     def is_done(self, url: str, job: str) -> bool:

@@ -437,7 +437,7 @@ None open. Decided 2026-11-15: no paid sources at all (G74, by the owner); E-H b
 7. **DONE (2026-11-15, batch G)** G256, G257, G258: A&P intensity, gross-margin expansion, marketing-efficiency proxy. Verify: the `ADVERTISING` label rule on the Batch 7 fixtures (X68).
 8. **DONE (2026-11-15, batch G)** G265, G266, G270: EV/GOV, ARPU/MTU growth, P/EV. Verify: a sample KPI CSV fixture for `load-kpis` with the new KPI names; P/EV reads `embedded_value`.
 9. **DONE (2026-11-15, batch G)** G278: standalone-to-consolidated profit leakage. Verify: a company with both scopes committed for the same quarter.
-10. G79: fill `bse_scrip_code` from the in-filing `ScripCode` (X7). Verify: corporate and bank fixtures; quarantine on disagreement.
+10. **DONE (X111, `filing_checks.apply_bse_scrip_code`)** G79: fill `bse_scrip_code` from the in-filing `ScripCode` (X7). Verify: corporate and bank fixtures; quarantine on disagreement.
 11. **DONE (2026-11-16)** G11, G39, G49, G59, G75, G77, G87 and the BRSR tag count / nine-RSS-feed list (G323) are UNVERIFIED rows R14-R22 in `docs/references.md`, each with what would verify it. G32 is OUT_OF_SCOPE_BY_DECISION (G74); G279 stays MISSING. No code.
 
 11a. **DONE (2026-11-15)** ~~the `restatement_suspected` flag (architecture §7.6).~~ YTD trigger (X106), discontinued operations (X108), logged merger / demerger (X109); Reg. 34 prior-year comparison as a finding (X110).
@@ -446,8 +446,8 @@ None open. Decided 2026-11-15: no paid sources at all (G74, by the owner); E-H b
 **Phase 2 completion**
 12. **DONE (2026-11-15, batch G; cash-flow element only, Reg. 30 acquisition events unparsed)** G276: organic vs inorganic perimeter flag. Verify: a Reg. 34 fixture with a business-combination cash-flow element and a Reg. 30 acquisition XBRL fixture.
 13. **DONE (2026-11-15, batch H)** ~~G112, G199: peer comparison and discount to industry median. Verify: a real fixture of NSE's industry classification feeding a point-in-time `entity_classification_history`.~~ NSE quote API fixtures (IC1-IC3), `features_peers.py`.
-14. G133: input-cost sensitivity columns (materials, power, freight as % of revenue). Verify: X50 fixtures (AIA, SRF).
-15. G117: Reg. 30 red-flag columns, kept separate (never summed). Verify: E3/E5/E7 fixtures; penalties wait for an E12 content fixture.
+14. **DONE (batch G)** G133: input-cost sensitivity columns (materials, power, freight as % of revenue). Verify: X50 fixtures (AIA, SRF).
+15. **DONE (batch G; penalties still wait for E12)** G117: Reg. 30 red-flag columns, kept separate (never summed). Verify: E3/E5/E7 fixtures; penalties wait for an E12 content fixture.
 16. **Dropped (2026-11-16)** ~~G115: order-book-to-sales.~~ No committed fixture or registry element tags an order book (CONFLICTS_WITH_EVIDENCE).
 17. **DONE (2026-11-15, batch D)** ~~G168: PEG. Define with `min_periods_required`; NULL until 3 years of in-scope EPS (C9).~~ Built on core profit growth and PE on core profit (docs/hidden_gems.md principle 6): quarter YoY now, TTM-on-TTM once 8 quarters exist.
 

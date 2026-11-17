@@ -32,7 +32,7 @@ UNIVERSES = ("nifty500", "active", "mcap500", "mcap500-new")
 
 JOB_ORDER = {"holidays": 0, "market_day": 1, "index_close": 2, "index_snapshot": 2, "mcap_day": 2, "corp_actions": 3,
              "results_xbrl": 4, "shareholding": 5, "raw_only": 6, "kpis": 7, "equity_master": 8,
-             "classification": 8}  # fmt: skip
+             "classification": 8, "bse_securities": 8}  # fmt: skip
 
 
 def _paths(data_dir: Path) -> tuple[Path, Path, Path]:
@@ -154,6 +154,12 @@ def build_parser() -> argparse.ArgumentParser:
     rd = sub.add_parser("run-day", help="holidays, days, corporate actions, discovery, promote, universe, materialize")
     rd.add_argument("--date", type=_date, help="trading date to run (default: today in IST, for schedulers)")
     rd.add_argument("--lookback-days", type=int, default=7)
+    bm = sub.add_parser("bse-members", help="Permitted members of rule U1-P (their filings are on BSE) [X166]")
+    bm.add_argument("--as-of", type=_date, help="default: today (IST)")
+    ib_ = sub.add_parser(
+        "import-bse", help="vault + stage a BSE runner ledger (blobs/ + ledger.jsonl) for promote [A17]"
+    )
+    ib_.add_argument("ledger_dir", type=Path)
     lk = sub.add_parser("load-kpis", help="stage a supplemental KPI file (CSV/JSON: parsers.kpis) for promote")
     lk.add_argument("path", type=Path)
     eb = sub.add_parser(
@@ -487,6 +493,14 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
         print(f"{len(ids)} YTD_QUARTER_MISMATCH findings over {len(pairs)} entity-scopes", file=out)
         print(f"{closed} share cross-check finding(s) closed on re-check [X103]", file=out)
         return 0
+    if args.cmd == "import-bse":
+        from financials.fetch.bse import import_ledger
+
+        staged, errors = import_ledger(Vault(vault_dir), stage_root, args.ledger_dir)
+        for e in errors:
+            print(f"error: {e}", file=out)
+        print(f"staged {len(staged)} BSE file(s) from {args.ledger_dir} (run promote)", file=out)
+        return 1 if errors else 0
     if args.cmd == "load-kpis":
         from financials.staging import stage_kpis
 
@@ -667,6 +681,16 @@ def write_command(args, db_path: Path, stage_root: Path, out) -> int:
             return 0
         if args.cmd == "lineage":
             return lineage.run_cli(con, args, out)
+        if args.cmd == "bse-members":
+            from financials.universe import bse_members
+
+            rows = bse_members(con, args.as_of or utc_to_ist_date(utc_now()))
+            for r in rows:
+                print(json.dumps(r, default=str), file=out)
+            codes = [r["bse_scrip_code"] for r in rows if r["bse_scrip_code"]]
+            print(f"{len(rows)} Permitted members, {len(codes)} with a BSE scrip code (rule BSE1); scrips: "
+                  + ",".join(codes), file=out)  # fmt: skip
+            return 0
         if args.cmd == "update-universe":
             from financials.universe import update_universe, weekly_growth
 

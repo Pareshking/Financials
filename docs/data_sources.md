@@ -2,7 +2,7 @@
 
 <!-- GENERATED from config/data_sources.yaml by `python -m financials.sources --write`. Do not edit. -->
 
-31 feeds: 14 VERIFIED, 9 OBSERVED, 6 UNVERIFIED, 2 PLANNED. Status meanings and runtime labels are defined in `config/data_sources.yaml`; evidence IDs point to `docs/references.md`.
+34 feeds: 16 VERIFIED, 9 OBSERVED, 7 UNVERIFIED, 2 PLANNED. Status meanings and runtime labels are defined in `config/data_sources.yaml`; evidence IDs point to `docs/references.md`.
 
 | ID | Feed | Phase | Status | Runtime | Evidence |
 |---|---|---|---|---|---|
@@ -37,6 +37,9 @@
 | F29 | Nifty 500 total-return index (TRI) | 1 | UNVERIFIED | UNKNOWN | — |
 | F30 | NSE 4-level industry classification (quote API) | 1 | VERIFIED | CONTAINER_DIRECT | IC1, IC2, IC3, A14 |
 | F31 | NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv) | 1 | VERIFIED | CONTAINER_DIRECT | X130, X131, X132, X133, X134, P18 |
+| F34 | BSE equity UDiFF bhavcopy | 1 | VERIFIED | CONTAINER_DIRECT | X165, A16 |
+| F35 | BSE list of securities (ListofScripData, per BSE group) | 1 | VERIFIED | GITHUB_RUNNER | X169, A17, A18 |
+| F36 | BSE announcements (+ AttachLive attachments) and shareholding filings (+ inline XBRL) | 1 | UNVERIFIED | GITHUB_RUNNER | — |
 
 ## F01 — UDiFF cash-market bhavcopy
 
@@ -564,3 +567,54 @@
 | verification_status | VERIFIED |
 | evidence | X130, X131, X132, X133, X134, P18 |
 | notes | Fetched by fetch-days / run-day with each trading day's bhavcopy; fetch-mcap START END --weekly backfills the week ends for the universe. No ISIN: rows resolve by symbol and series on the file date. Issue Size is not the market-cap share count (X133: 98.4% within 0.5% of Reg. 31, below the 99% bar); it is stored and used as a cross-check (check-issue-size). The zip's other files (corporate actions, price bands, SME, ...) are not parsed. |
+
+## F34 — BSE equity UDiFF bhavcopy
+
+| Field | Value |
+|---|---|
+| exchange_or_agency | BSE |
+| url_or_endpoint_pattern | https://www.bseindia.com/download/BhavCopy/Equity/BhavCopy_BSE_CM_0_0_0_<YYYYMMDD>_F_0000.CSV |
+| format | CSV (UDiFF, NSE's column set; Src BSE, FinInstrmId = BSE scrip code, SctySrs = BSE group) |
+| cadence | Daily, trading days |
+| fetch_runtime | CONTAINER_DIRECT |
+| join_keys | TradDt, FinInstrmId (scrip code), ISIN, TckrSymb |
+| target_tables | — |
+| unlocked_metrics | ISIN to BSE scrip code map, BSE prices for BSE-only companies (owner to-do 31) |
+| phase | 1 |
+| verification_status | VERIFIED |
+| evidence | X165, A16 |
+| notes | Plain HTTP answered 200 from the container and a GitHub runner (byte-identical, 2026-11-17). parse_udiff_cm(data, exchange='BSE') reads it; nothing fetches or promotes it yet (rule BSE1 uses F35). |
+
+## F35 — BSE list of securities (ListofScripData, per BSE group)
+
+| Field | Value |
+|---|---|
+| exchange_or_agency | BSE |
+| url_or_endpoint_pattern | https://api.bseindia.com/BseIndiaAPI/api/ListofScripData/w?scripcode=&Group=<G>&industry=&segment=Equity&status=Active |
+| format | JSON list (SCRIP_CD, ISIN_NUMBER, scrip_id, GROUP, FACE_VALUE, Status, Segment, Scrip_Name, Issuer_Name, Mktcap Rs crore) |
+| cadence | Snapshot (fetch day) |
+| fetch_runtime | GITHUB_RUNNER |
+| join_keys | ISIN_NUMBER, SCRIP_CD |
+| target_tables | raw_bse_securities, security_identifier_history.bse_scrip_code |
+| unlocked_metrics | BSE scrip code per ISIN (rule BSE1), BSE market cap (BSE-only universe, owner to-do 31) |
+| phase | 1 |
+| verification_status | VERIFIED |
+| evidence | X169, A17, A18 |
+| notes | Ported owner client (financials.fetch.bse) on a runner: group A answered 200 by plain requests with BSE's headers (probe run 2, 705 rows). Runner ledger -> import-bse -> promote (rule BSE1). The container gets 403/404 (A16). |
+
+## F36 — BSE announcements (+ AttachLive attachments) and shareholding filings (+ inline XBRL)
+
+| Field | Value |
+|---|---|
+| exchange_or_agency | BSE |
+| url_or_endpoint_pattern | TBD for our runs (owner client, A17: api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w, www.bseindia.com/xml-data/corpfiling/AttachLive/<name>, api.bseindia.com/BseIndiaAPI/api/Corp_Shareholding_ng/w, www.bseindia.com/XBRLFILES/SHPXBRLDataXML/<file>) |
+| format | JSON (Table / Table1 ROWCNT); attachments PDF; shareholding inline XBRL (in-bse-shp taxonomy) |
+| cadence | Per filing |
+| fetch_runtime | GITHUB_RUNNER |
+| join_keys | SCRIP_CD / FLD_ScripCode, NEWSID |
+| target_tables | filings (exchange BSE, raw only) |
+| unlocked_metrics | results and shareholding of the Permitted members of rule U1-P (once a parser is proven on BSE files) |
+| phase | 1 |
+| verification_status | UNVERIFIED |
+| evidence | — |
+| notes | References A17, X166, X167, X168. Shapes VERIFIED on the owner repo's fixtures (A17); not yet answered to our runner (run 2: strCat=Result with strScrip=500488 answered 400). bse-fetch workflow (scripts/bse_fetch.py) -> import-bse -> promote: vaulted raw only. No BSE results XBRL endpoint is known (X168). |

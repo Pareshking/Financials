@@ -79,7 +79,11 @@ def test_no_workflow_commits_pushes_or_uploads_data():
                     target = step["with"]["path"]
                     # Owner decision P (2026-11-17): exchange files fetched by a probe may be uploaded as artifacts;
                     # the database, Parquet and data/ never are (checked above and below).
-                    assert target in ("${{ runner.temp }}/nightly-log/nightly-pipeline.log", "bse_probe/"), target
+                    assert target in (
+                        "${{ runner.temp }}/nightly-log/nightly-pipeline.log",
+                        "bse_probe/",
+                        "bse_fetch/",
+                    ), target  # bse_fetch/: the BSE runner ledger (A17)
                     assert "data" not in target.replace("nightly", ""), target
         code = re.sub(r"(^|\s)#.*$", "", text, flags=re.M)  # comments may explain; code never names data/
         assert not re.search(r"(^|[\s\"'=/])data/", code, re.M), path.name

@@ -20,7 +20,7 @@ FIELDS = (
     "join_keys", "target_tables", "unlocked_metrics", "phase", "verification_status", "evidence", "notes",
 )  # fmt: skip
 STATUSES = ("VERIFIED", "OBSERVED", "UNVERIFIED", "PLANNED")
-RUNTIMES = ("CONTAINER_DIRECT", "SESSION_WARMED", "UNKNOWN")
+RUNTIMES = ("CONTAINER_DIRECT", "SESSION_WARMED", "GITHUB_RUNNER", "UNKNOWN")
 
 
 def load(path: Path = YAML_PATH) -> list[dict]:

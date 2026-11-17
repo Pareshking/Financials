@@ -204,3 +204,106 @@ def test_ledger_imports_as_bse_raw_filings(tmp_path):
     _, errors = bse.import_ledger(m.vault, m.stage_root, tmp_path / "led")
     assert len(errors) == 1 and "sha256" in errors[0]
     m.con.close()
+
+
+# ── X169: BSE list of securities (probe run 2, group A) and rule BSE1 ──
+
+LIST_A = BSE / "bse_ListofScripData_GroupA_20261117.json"
+LIST_A_URL = bse.API + "ListofScripData/w?scripcode=&Group=A&industry=&segment=Equity&status=Active"
+
+
+def test_x169_list_of_securities_group_a():
+    from decimal import Decimal
+
+    from financials.parsers.bse_securities import parse_list_securities
+
+    rows = parse_list_securities(LIST_A.read_bytes())
+    assert len(rows) == 705 and {(r.bse_group, r.status, r.segment) for r in rows} == {("A", "Active", "Equity")}
+    by = {r.scrip_code: r for r in rows}
+    a = by["500488"]
+    assert (a.isin, a.ticker, a.face_value, a.market_cap_inr) == (
+        "INE358A01014", "ABBOTINDIA", Decimal("10.00"), Decimal("552321400000.00"))  # Rs 55,232.14 Cr # fmt: skip
+    assert (by["532540"].isin, by["534091"].isin) == ("INE467B01029", "INE745G01043")  # TCS (X111), MCX
+    assert len({r.isin for r in rows}) == 705 and all(r.market_cap_inr for r in rows)
+    # every ISIN -> code of the list equals the BSE bhavcopy's (X165), so both sources agree
+    bhav = {r.isin: r for r in parse_udiff_cm((BSE / "BhavCopy_BSE_CM_0_0_0_20261113_F_0000.CSV").read_bytes(),
+                                              exchange="BSE")}  # fmt: skip
+    assert all(bhav[r.isin].fin_instrm_id == r.scrip_code and bhav[r.isin].symbol == r.ticker for r in rows)
+
+
+def test_rule_bse1_fills_scrip_codes_by_isin(tmp_path):
+    from datetime import datetime
+
+    from conftest import Market
+
+    from financials.promoter import promote
+
+    (tmp_path / "m").mkdir()
+    m = Market(tmp_path / "m")
+    assert promote(m.con, m.stage_day("20261112")).status == "PROMOTED"
+    # a code already stored differently is kept and raised, never overwritten
+    m.con.execute("UPDATE security_identifier_history SET bse_scrip_code = '999999' WHERE symbol = 'MCX'")
+    led = bse.Ledger(tmp_path / "led")
+    led.put(dataset="list_securities", url=LIST_A_URL, status=200, body=LIST_A.read_bytes(),
+            content_type="application/json; charset=utf-8", via="requests",
+            fetched_at=datetime.fromisoformat("2026-11-17T06:09:21.319543+00:00"))  # fmt: skip
+    staged, errors = bse.import_ledger(m.vault, m.stage_root, tmp_path / "led")
+    assert errors == [] and [p.parent.name for p in staged] == ["bse_securities"]
+    r = promote(m.con, staged[0])
+    assert r.status == "PROMOTED" and len(r.quarantined) == 1, r
+    code = dict(m.con.execute("SELECT symbol, bse_scrip_code FROM security_identifier_history "
+                              "WHERE symbol IN ('ABBOTINDIA', 'TCS', 'MCX', 'RELIANCE')").fetchall())  # fmt: skip
+    assert code == {"ABBOTINDIA": "500488", "TCS": "532540", "MCX": "999999", "RELIANCE": "500325"}
+    q = m.con.execute("SELECT stage, reason_code, details FROM quarantine_queue").fetchall()
+    assert [(s, c) for s, c, _ in q] == [("IDENTIFIER", "BSE_SCRIP_CODE_CONFLICT")]
+    assert json.loads(q[0][2])["filed"] == "534091" and json.loads(q[0][2])["rule"] == "BSE1"
+    n = m.con.execute("SELECT count(*) FROM raw_bse_securities").fetchone()[0]
+    assert n == 705 and m.con.execute("SELECT DISTINCT observed_date FROM raw_bse_securities").fetchall() == [
+        (date(2026, 11, 17),)
+    ]
+    assert promote(m.con, staged[0]).status == "PROMOTED"  # replay: nothing added
+    assert m.con.execute("SELECT count(*) FROM raw_bse_securities").fetchone()[0] == 705
+    assert m.con.execute("SELECT count(*) FROM quarantine_queue").fetchone()[0] == 1
+    m.con.close()
+
+
+def test_cli_import_bse_promote_and_bse_members(tmp_path):
+    """Owner's machine, in order: update-universe (U1-P) and import-bse + promote (BSE1), then bse-members prints
+    the Permitted members with their scrip codes for the bse-fetch workflow input."""
+    import io
+    from datetime import datetime
+
+    from conftest import FETCHED_AT
+    from test_mcap_universe import URL, raw
+
+    from financials.cli import main
+    from financials.staging import stage_holidays, stage_mcap_day
+    from financials.vault import Vault
+
+    data = tmp_path / "data"
+    assert main(["--data-dir", str(data), "init-db"], out=io.StringIO()) == 0
+    from conftest import Market
+
+    m = Market.__new__(Market)  # stage into the CLI's own vault / staging
+    m.vault, m.stage_root = Vault(data / "vault"), data / "staging"
+    Market.stage_day(m, "20261112")
+    hol = FIXTURES / "calendar" / "nse_holiday-master_trading_20261113.json"
+    stage_holidays(m.vault, m.stage_root, data=hol.read_bytes(), source_url="nse-hol", fetched_at=FETCHED_AT)
+    stage_mcap_day(m.vault, m.stage_root, data=raw("PR131126"), source_url=URL.format("PR131126"),
+                   fetched_at=FETCHED_AT)  # fmt: skip
+    led = bse.Ledger(tmp_path / "led")
+    led.put(dataset="list_securities", url=LIST_A_URL, status=200, body=LIST_A.read_bytes(),
+            content_type="application/json", via="requests",
+            fetched_at=datetime.fromisoformat("2026-11-17T06:09:21+00:00"))  # fmt: skip
+    out = io.StringIO()
+    assert main(["--data-dir", str(data), "import-bse", str(tmp_path / "led")], out=out) == 0
+    assert "staged 1 BSE file(s)" in out.getvalue()
+    assert main(["--data-dir", str(data), "promote"], out=io.StringIO()) == 0
+    assert main(["--data-dir", str(data), "update-universe", "--from", "2026-11-09", "--to", "2026-11-15"],
+                out=io.StringIO()) == 0  # fmt: skip
+    out = io.StringIO()
+    assert main(["--data-dir", str(data), "bse-members", "--as-of", "2026-11-13"], out=out) == 0
+    last = out.getvalue().strip().splitlines()[-1]
+    assert "500488" in last and "534091" in last and "Permitted members" in last
+    abbott = [json.loads(x) for x in out.getvalue().splitlines() if x.startswith("{") and "ABBOTINDIA" in x]
+    assert abbott[0]["bse_scrip_code"] == "500488" and abbott[0]["isin"] == "INE358A01014"

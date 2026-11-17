@@ -1,6 +1,6 @@
 """Indian equity research, screening and point-in-time backtesting engine."""
 
-# 0.10.5: X150-X155 quarantine rules (annual "Actual" rounding, undeclared pre-cutoff contexts, comparative stub
+# 0.10.5: X150-X156 quarantine rules (annual "Actual" rounding, undeclared pre-cutoff contexts, comparative stub
 #         periods, E&P face line, exchange-specific SHP taxonomy, insurer service-expense adjustments);
 # 0.10.4: SHP20 2022-09-30 SHP taxonomy mutual-fund member / holder axis (re-parses Q3-Q4 FY25 Reg. 31 files);
 # 0.10.3: X105 missing / zero NCI in the attribution rules;

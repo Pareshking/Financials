@@ -227,6 +227,7 @@ def parse_shareholding(data: bytes) -> ParsedShareholding:
         "stated_isin": isin,
         "stated_symbol": inst.first_text("Symbol"),
         "stated_scrip_code": inst.first_text("ScripCode"),
+        "company_name": inst.first_text("NameOfTheCompany"),  # X88 name test (X156)
         "has_partly_paid": _bool(inst.first_text("WhetherTheListedEntityHasIssuedAnyPartlyPaidUpShares")),
         "promoter_pledge_flag": flags["pledged"],
         "rules_applied": [SHP16_RULE] if shp16 else [],

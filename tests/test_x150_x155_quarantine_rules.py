@@ -191,3 +191,31 @@ def test_x155_insurance_service_other_adjustments():
     assert _value(r, "insurance_service_other_adjustments", *q) == Decimal("-9490800000")
     assert _value(r, "insurance_service_other_adjustments", *h1) == Decimal("-17899400000")
     assert _value(r, "insurance_service_expenses", *q) == Decimal("22481700000")
+
+
+# ── X156 ─────────────────────────────────────────────────────────────────────
+
+KIMS_JUN26 = XBRL_DIR / "SHP_1697747_21072026110424_WEB.xml"
+
+
+def test_x156_shp_company_name_lets_x88_resolve_a_garbled_isin(market):
+    """KIMS 2026-06-30 states ISIN INE007C01025 (no security has it; KIMS is INE967H01025, another issuer code).
+    The Reg. 31 parser now passes NameOfTheCompany, so X88's name test ("KRISHNA INSTITUTE OF MEDICAL SCIENCES
+    LIMITED" vs the exchange's "KRISHNA INST OF MED SCI L") applies to shareholding as it does to results."""
+    from financials.promoter import promote
+    from financials.staging import stage_shareholding
+
+    data = KIMS_JUN26.read_bytes()
+    assert b">INE007C01025<" in data
+    assert parse_shareholding(data).meta["company_name"] == "KRISHNA INSTITUTE OF MEDICAL SCIENCES LIMITED"
+    promote(market.con, market.stage_day("20250228"))
+    st = stage_shareholding(market.vault, market.stage_root, data=data,
+                            source_url="https://nsearchives.nseindia.com/corporate/xbrl/" + KIMS_JUN26.name,
+                            fetched_at=datetime(2026, 11, 14, 4, 8), broadcast_ts=datetime(2026, 7, 21, 5, 34),
+                            broadcast_ts_source="API_FIELD")  # fmt: skip
+    r = promote(market.con, st)
+    assert r.status == "PROMOTED", r
+    ent = market.con.execute("SELECT entity_id FROM shareholding_meta WHERE filing_id = ?", [r.message]).fetchone()
+    want = market.con.execute("SELECT entity_id FROM securities WHERE security_id = ?",
+                              [market.security_id("KIMS")]).fetchone()  # fmt: skip
+    assert ent == want

@@ -66,3 +66,24 @@ def test_materialization_and_dsl_latency(full_market):
         run_screen(con, q)
         median = timed(lambda q=q: run_screen(con, q), repeat=7)
         assert median < 0.2, f"{q!r} took {median * 1000:.0f} ms"
+
+
+def test_incremental_materialization_recomputes_a_subset_fast(full_market):
+    """`materialize --incremental` for 300 dirty entities on one day: one batched compute restricted to them (no
+    per-entity queries), then G5/G4 on the merged day; it must stay well below a full day's materialisation."""
+    from financials import dirty
+    from financials.features import materialize_incremental
+
+    con = full_market.con
+    day = date(2026, 11, 12)
+    full = timed(lambda: materialize(con, day))
+    ents = [e for (e,) in con.execute(
+        "SELECT DISTINCT entity_id FROM screener_features_history WHERE as_of_date = ? ORDER BY 1 LIMIT 300", [day]
+    ).fetchall()]  # fmt: skip
+    con.execute("DELETE FROM materialize_dirty")
+    dirty.mark_entities(con, ents, day, "BENCH")
+    t = time.perf_counter()
+    r = materialize_incremental(con)
+    elapsed = time.perf_counter() - t
+    assert r.status == "DONE" and [d.as_of_date for d in r.days] == [day], r
+    assert elapsed < 1.5, f"incremental (300 entities, 1 day) took {elapsed:.2f}s (full day {full:.2f}s)"

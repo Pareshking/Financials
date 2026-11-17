@@ -11,10 +11,38 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
+from financials.corp_actions import RETIRED_STATUSES
+from financials.db import version_key
+from financials.money import ROUNDING_UNITS
 from financials.parsers.indas_corp import period_months
 from financials.scope import financials_in_scope
 
 Period = tuple[date, date]
+# YTD identity (blueprint §3.2, [X80]): a filed YTD must equal the sum of its directly filed quarters within the
+# rounding of the filings (half a LevelOfRounding unit per term), but never tighter than this share of the YTD.
+# Design parameter (2026-11-14): on the live backfill 94% of 8,081 comparisons agree to the rupee, 4% within 0.5%.
+YTD_IDENTITY_REL_TOLERANCE = Decimal("0.005")
+YTD_GUARDED_TAGS = frozenset({"revenue_from_operations", "total_income", "pat", "pbt_incl_jv", "pat_owners"})
+# X102: PBT including the share of associates / JVs, per period = filed PBT + filed JV share. Integrated Filing XBRL
+# puts the JV share after PBT, but filers also book it inside PBT as an exceptional item with the JV element 0
+# (FINCABLES Q1 FY26 PBT 176.37 + JV 26.18 = 202.55; Q2 PBT 206.20 incl. 38.11 exceptional, JV 0). Filed PBT then
+# switches definition between quarters; PBT + JV does not. The YTD identity is checked on it, not on filed PBT.
+PBT_INCL_JV = "pbt_incl_jv"
+ATTRIBUTION_WITHHELD_TAG = "attribution_withheld"  # X86 marker (parsers.indas_corp)
+ATTRIBUTION_TAGS = frozenset({"pat_owners", "pat_nci"})
+# X94: tax lines copied from the comparative (prior-year) column. PBT is current, tax is last year's, so PAT and TCI
+# (= PBT - tax) are wrong while PBT - tax = PAT still holds (Muthoot standalone Q2 / H1 FY27). Withheld, not corrected:
+# the true tax is not in the file.
+TAX_COPY_COMPONENTS = ("current_tax", "deferred_tax")
+TAX_COPY_WITHHELD_TAGS = frozenset(
+    {"tax_expense", "current_tax", "deferred_tax", "pat", "pat_continuing", "pat_owners", "pat_nci",
+     "total_comprehensive_income"}
+)  # fmt: skip
+# Restatement triggers beyond the YTD identity (architecture §7.6, G67 / G68): a non-zero discontinued-operations
+# line, or a MERGER / DEMERGER in the corporate-action ledger, inside the last 5 quarters to the row's quarter end
+# (the TTM window plus the year-ago quarter it is compared with). Retired actions (SUPERSEDED, REJECTED) do not count.
+RESTATEMENT_QUARTERS = 5
+STRUCTURAL_ACTION_TYPES = ("MERGER", "DEMERGER")
 
 
 def _add_months(d: date, months: int) -> date:
@@ -34,6 +62,90 @@ class FactBook:
     scope: str
     durations: dict[str, dict[Period, Decimal]] = field(default_factory=dict)
     instants: dict[str, dict[date, Decimal]] = field(default_factory=dict)
+    rounding_unit: Decimal = Decimal(1)  # coarsest LevelOfRounding among this entity's visible filings (scope)
+    # X82: declared fiscal-year starts (filing_meta.fy_start). A >3-month duration is a YTD only when it starts on
+    # one; "Half Yearly"/"Yearly" filings put the Q4 figure in an Oct-Mar context (NETWEB Q4 FY26). Empty = no check.
+    fy_starts: frozenset[date] = frozenset()
+
+    tax_copied: list[dict] = field(default_factory=list)  # X94 breaks found (and withheld) by load_factbook
+    # G68: (ex_date, action_type) of MERGER / DEMERGER ledger rows of this entity (as issuer or related entity),
+    # ex-date on or before as_of. Loaded with the book; empty for a book built by hand.
+    structural_actions: tuple[tuple[date, str], ...] = ()
+
+    def tax_copy_breaks(self) -> list[dict]:
+        """X94: periods whose current and deferred tax both equal, to the rupee and non-zero, those of the same-length
+        period one year earlier while PBT differs. Two independent non-zero components matching exactly is a copied
+        comparative column, not a coincidence (a lone zero deferred tax with a round 1 Cr current tax is, DALBHARAT)."""
+        cur, dfd, pbt = (self.durations.get(t, {}) for t in (*TAX_COPY_COMPONENTS, "pbt"))
+        out = []
+        for (s, e), c in cur.items():
+            prior = (_add_months(s, -12), _add_months(e, -12))
+            d, pc, pd = dfd.get((s, e)), cur.get(prior), dfd.get(prior)
+            if not c or not d or c != pc or d != pd:
+                continue
+            if pbt.get((s, e)) is None or pbt.get((s, e)) == pbt.get(prior):
+                continue
+            out.append({"period": [str(s), str(e)], "prior_period": [str(prior[0]), str(prior[1])],
+                        "current_tax": str(c), "deferred_tax": str(d), "pbt": str(pbt[(s, e)]),
+                        "prior_pbt": str(pbt.get(prior))})  # fmt: skip
+        return out
+
+    def withhold_tax_copies(self) -> None:
+        self.tax_copied = self.tax_copy_breaks()
+        for b in self.tax_copied:
+            p = (date.fromisoformat(b["period"][0]), date.fromisoformat(b["period"][1]))
+            for tag in TAX_COPY_WITHHELD_TAGS:
+                self.durations.get(tag, {}).pop(p, None)
+
+    def is_ytd_start(self, start: date) -> bool:
+        return not self.fy_starts or start in self.fy_starts
+
+    def ytd_breaks(self, tag: str) -> list[dict]:
+        """Every filed YTD (> 3 months, from a fiscal-year start) whose quarters were all filed directly, and whose
+        value differs from their sum by more than the tolerance. A break means a restated or mis-filed quarter
+        (or YTD); which one is wrong cannot be told from the numbers, so nothing is corrected [X80]."""
+        d = self.durations.get(tag, {})
+        out = []
+        for (s, e), ytd in d.items():
+            m = period_months(s, e)
+            if m is None or m <= 3 or m > 12 or m % 3 or not self.is_ytd_start(s):
+                continue
+            ends = [_add_months(e, -3 * i) for i in range(m // 3)]
+            qs = [d.get((_add_months(date(qe.year, qe.month, 1), -2), qe)) for qe in ends]
+            if None in qs:
+                continue
+            total = sum(qs, Decimal(0))
+            tol = max(self.rounding_unit * (len(qs) + 1) / 2, abs(ytd) * YTD_IDENTITY_REL_TOLERANCE)
+            if abs(ytd - total) > tol:
+                out.append({"tag": tag, "ytd_period": [str(s), str(e)], "ytd": str(ytd), "quarters_sum": str(total),
+                            "quarters": len(qs), "tolerance": str(tol)})  # fmt: skip
+        return out
+
+    def restatement_suspected(self, end: date) -> bool:
+        """X106 / architecture §7.6: any restatement trigger holds for the row ending `end`."""
+        return bool(self.restatement_triggers(end))
+
+    def restatement_triggers(self, end: date) -> list[str]:
+        """YTD_IDENTITY: some guarded tag breaks the YTD identity inside the 4 quarters to `end` [X106].
+        DISCONTINUED_OPERATIONS: a filed period ending in the last 5 quarter ends carries a non-zero
+        `pat_discontinued` [G67, X108]. MERGER / DEMERGER: such a ledger action of the entity has its ex-date
+        inside the last 5 quarters [G68, X109]. Flags only: no number is changed by the last two."""
+        out = []
+        if any(not self._ytd_consistent(t, end) for t in YTD_GUARDED_TAGS):
+            out.append("YTD_IDENTITY")
+        ends = {_add_months(end, -3 * i) for i in range(RESTATEMENT_QUARTERS)}
+        if any(e in ends and v != 0 for (_, e), v in self.durations.get("pat_discontinued", {}).items()):
+            out.append("DISCONTINUED_OPERATIONS")
+        first = _add_months(end, -3 * RESTATEMENT_QUARTERS)  # exclusive: the window is (first, end]
+        out += sorted({t for d, t in self.structural_actions if first < d <= end})
+        return out
+
+    def _ytd_consistent(self, tag: str, end: date) -> bool:
+        """False when any YTD ending inside the 4 quarters to `end` breaks the identity (guarded tags only)."""
+        if tag not in YTD_GUARDED_TAGS:
+            return True
+        window = {_add_months(end, -3 * i) for i in range(4)}
+        return not any(date.fromisoformat(b["ytd_period"][1]) in window for b in self.ytd_breaks(tag))
 
     # ── flows ──
     def quarter(self, tag: str, end: date) -> Decimal | None:
@@ -44,12 +156,17 @@ class FactBook:
             return d[(q_start, end)]
         prev_end = _add_months(end, -3)
         for (s, e), v in d.items():
-            if e == end and (s, prev_end) in d and s < q_start:
+            if e == end and (s, prev_end) in d and s < q_start and self.is_ytd_start(s):
                 return v - d[(s, prev_end)]
         return None
 
     def ttm(self, tag: str, end: date) -> Decimal | None:
         """Sum of the 4 quarters ending `end`; falls back to the YTD bridge for H1/FY-only flows."""
+        if not self._ytd_consistent(tag, end):
+            # X106 (owner decision A, 2026-11-15): a restated quarter inside the window. Never sum mixed-basis
+            # quarters; use the company's latest YTD for the current year plus the prior year's FY - YTD as filed
+            # (Tata Motors FY26 standalone after the CV demerger: FY revenue 57,859 Cr as restated).
+            return self.ttm_from_ytd(tag, end)
         qs = [self.quarter(tag, _add_months(end, -3 * i)) for i in range(4)]
         if None not in qs:
             return sum(qs, Decimal(0))
@@ -64,7 +181,7 @@ class FactBook:
             m = period_months(s, e)
             if m == 12:
                 return v
-            if m is None or m > 12:
+            if m is None or m > 12 or not self.is_ytd_start(s):
                 continue
             fy_prev = (_add_months(s, -12), _prev_day_month_end(s))
             ytd_prev = (_add_months(s, -12), _add_months(e, -12))
@@ -82,7 +199,9 @@ class FactBook:
         if key not in self.durations:
             primary = self.durations.get(tag, {})
             base = self.durations.get(fallback, {}) if fallback else self.durations.get("revenue_from_operations", {})
-            out = {p: primary.get(p, base[p] if fallback else Decimal(0)) for p in base}
+            # X86: where the owners / NCI split is withheld, neither the split nor a fallback to PAT is used.
+            blocked = self.durations.get(ATTRIBUTION_WITHHELD_TAG, {}) if tag in ATTRIBUTION_TAGS else {}
+            out = {p: primary.get(p, base[p] if fallback else Decimal(0)) for p in base if p not in blocked}
             out.update(primary)
             self.durations[key] = out
         return key
@@ -116,24 +235,281 @@ def _prev_day_month_end(d: date) -> date:
     return date(prev.year, prev.month, calendar.monthrange(prev.year, prev.month)[1])
 
 
+_ROUNDING_CASE = " ".join(f"WHEN '{k}' THEN {int(v)}" for k, v in ROUNDING_UNITS.items())
+# X83: only each filing's latest parser version is read. A re-parse can move a filing's visibility later (listing
+# creation time instead of the board-meeting rule); the older version's rows must not stay visible earlier.
+CURRENT_VERSION = (
+    "parser_version = coalesce((SELECT arg_max(cv.parser_version, " + version_key("cv.parser_version") + ") "
+    "FROM filing_meta cv WHERE cv.filing_id = fact_observations.filing_id), parser_version)"
+)
+
+
+# Accounting basis of a profile (invariant 6: never combine profiles). Go Digit and Star Health moved from IRDAI
+# Indian-GAAP insurer filings to Ind AS in FY27; their Q1 IRDAI PBT and the Ind AS H1 cannot be combined [X90].
+_BASIS = (
+    "CASE accounting_profile WHEN 'IRDAI_GENERAL' THEN 'IRDAI' WHEN 'IRDAI_LIFE' THEN 'IRDAI' "
+    "WHEN 'IGAAP_BANK' THEN 'IGAAP_BANK' ELSE 'INDAS' END"
+)
+SAME_BASIS = (
+    "(NOT EXISTS (SELECT 1 FROM filing_meta b WHERE b.filing_id = fact_observations.filing_id) OR "
+    "(SELECT any_value(" + _BASIS + ") FROM filing_meta b WHERE b.filing_id = fact_observations.filing_id) = "
+    "coalesce((SELECT arg_max(" + _BASIS + ", (visible_from_ts, filing_id)) FROM filing_meta l WHERE l.entity_id = ? "
+    "AND l.scope = ? AND l.visible_from_ts <= ? AND l.accounting_profile <> 'REG34_ANNUAL'), 'INDAS'))"
+)
+
+
+# X100: for a period both cover, the quarterly results filing outranks the Reg. 34 annual report on income-statement
+# lines. The annual taxonomy books the JV share inside exceptional items / PBT (NTPC FY26 PBT 27,133.56 vs the Q4
+# filing's 24,269.46 Cr = + JV 2,864.10; Cummins, Eicher) and so breaks the YTD identity of the quarters; the annual
+# report still wins (latest) on cash-flow lines, line-item detail and everything the results filing does not state
+# (Eternal FY26 files cash-flow placeholders of 0 in its Q4 results).
+NOT_RESULTS_RANKED = (
+    "borrowings_proceeds", "borrowings_repayments", "capex_intangibles", "capex_ppe", "cash_generated_from_operations",
+    "cff", "cfi", "cfo", "dividends_paid", "dividends_received_investing", "dividends_received_operating",
+    "fx_effect_on_cash", "income_taxes_paid", "interest_paid_financing", "interest_paid_operating",
+    "interest_received_investing", "interest_received_operating", "lease_payments", "net_cash_flow",
+    "net_cash_flow_after_fx", "ppe_disposals", "share_based_payments_addback", "share_issue_proceeds",
+    "rpt_total_amount", "face_value_per_share", "paid_up_equity_capital",
+)  # fmt: skip
+_ANNUAL_LAST = (
+    "CASE WHEN period_type = 'DURATION' AND canonical_tag NOT LIKE 'cf\\_%' ESCAPE '\\' "
+    "AND canonical_tag NOT LIKE 'li\\_%' ESCAPE '\\' AND canonical_tag NOT LIKE 'asfiled\\_%' ESCAPE '\\' "
+    "AND canonical_tag NOT IN (" + ", ".join(f"'{t}'" for t in NOT_RESULTS_RANKED) + ") "
+    "AND filing_id IN (SELECT filing_id FROM filing_meta WHERE accounting_profile = 'REG34_ANNUAL') THEN 1 ELSE 0 END"
+)
+
+
+# Decision B: PDF-verified corrections ranked above the corrected filing's own row (same visibility).
+_CURRENT_FILING = (
+    "(SELECT filing_id, arg_max(visible_from_ts, "
+    + version_key()
+    + ") AS vis, arg_max(parser_version, "
+    + version_key()
+    + ") AS pv FROM filing_meta GROUP BY filing_id)"
+)
+
+
+def _fact_source(fact_where: str, corr_where: str) -> str:
+    """Candidate rows for the latest-value ranking: filed facts (current version, same basis) and corrections.
+    A per-share correction (EPS, face value) carries value_other like the filed fact, so it ranks the same way."""
+    return (
+        "(SELECT entity_id, scope, canonical_tag, period_type, period_start, period_end, value_inr, value_other, "
+        "visible_from_ts, parser_version, filing_id, 0 AS corrected FROM fact_observations WHERE "
+        + fact_where
+        + " AND visible_from_ts <= ? AND "
+        + CURRENT_VERSION
+        + " AND {basis} "
+        "UNION ALL SELECT c.entity_id, c.scope, c.canonical_tag, c.period_type, c.period_start, c.period_end, "
+        "c.value_inr, c.value_other, m.vis, m.pv, c.filing_id, 1 FROM fact_corrections c JOIN "
+        + _CURRENT_FILING
+        + " m USING (filing_id) WHERE c.revoked_at IS NULL AND "
+        + corr_where
+        + " AND m.vis <= ?)"
+    )
+
+
 def load_factbook(con, entity_id: str, scope: str, as_of: datetime) -> FactBook:
+    """Latest visible value per (tag, period), from filings on the accounting basis of the entity's latest
+    quarterly filing (X90): after a change of basis the older basis drops out, so quarters and TTM rebuild."""
+    cached = _PREFETCH.get((id(con), as_of))
+    if cached is not None:
+        unit, fy_starts = cached["meta"].get((entity_id, scope), (None, None))
+        return _build_book(entity_id, scope, cached["facts"].get((entity_id, scope), []), unit, fy_starts,
+                           cached["structural"].get(entity_id, ()))  # fmt: skip
+    source = _fact_source("entity_id = ? AND scope = ?", "c.entity_id = ? AND c.scope = ?").replace(
+        "{basis}", SAME_BASIS
+    )
     rows = con.execute(
         """SELECT canonical_tag, period_type, period_start, period_end, coalesce(value_inr, value_other)
            FROM (SELECT *, row_number() OVER (
                     PARTITION BY canonical_tag, period_start, period_end
-                    ORDER BY visible_from_ts DESC, parser_version DESC) AS rn
-                 FROM fact_observations
-                 WHERE entity_id = ? AND scope = ? AND visible_from_ts <= ?)
+                    ORDER BY """
+        + _ANNUAL_LAST
+        + """, visible_from_ts DESC, corrected DESC, """
+        + version_key()
+        + """ DESC, filing_id DESC) AS rn
+                 FROM """
+        + source
+        + """)
            WHERE rn = 1""",
-        [entity_id, scope, as_of],
+        [entity_id, scope, as_of, entity_id, scope, as_of, entity_id, scope, as_of],
     ).fetchall()
-    book = FactBook(entity_id, scope)
+    unit, fy_starts = con.execute(
+        "SELECT max(CASE level_of_rounding "
+        + _ROUNDING_CASE
+        + " ELSE 1 END), list(DISTINCT fy_start) FROM filing_meta WHERE entity_id = ? AND scope = ? "
+        "AND visible_from_ts <= ?",
+        [entity_id, scope, as_of],
+    ).fetchone()
+    structural = _structural_actions(con, as_of, " AND e = ?", [entity_id]).get(entity_id, ())
+    return _build_book(entity_id, scope, rows, unit, fy_starts, structural)
+
+
+def _structural_actions(con, as_of: datetime, where: str, params: list) -> dict[str, tuple[tuple[date, str], ...]]:
+    """G68: MERGER / DEMERGER ledger rows per entity, ex-date <= as_of, for the issuer's entity (the ledger's entity_id,
+    else the security's) and for the related entity (the other party). Retired rows (SUPERSEDED, REJECTED) do not
+    count; PENDING / QUARANTINED ones do: the scheme was announced, whatever its price verification says."""
+    types = ", ".join(f"'{t}'" for t in STRUCTURAL_ACTION_TYPES)
+    retired = ", ".join(f"'{t}'" for t in sorted(RETIRED_STATUSES))
+    rows = con.execute(
+        "SELECT e, ex_date, action_type FROM (SELECT coalesce(a.entity_id, s.entity_id) AS e, a.ex_date, "
+        "a.action_type, a.status FROM corp_actions a JOIN securities s USING (security_id) UNION ALL "
+        "SELECT related_entity_id, ex_date, action_type, status FROM corp_actions WHERE related_entity_id IS NOT NULL) "
+        f"WHERE action_type IN ({types}) AND status NOT IN ({retired}) AND ex_date <= CAST(? AS DATE)"
+        + where
+        + " GROUP BY ALL ORDER BY e, ex_date, action_type",
+        [as_of, *params],
+    ).fetchall()
+    out: dict[str, list[tuple[date, str]]] = {}
+    for e, d, t in rows:
+        out.setdefault(e, []).append((d, t))
+    return {e: tuple(v) for e, v in out.items()}
+
+
+def _build_book(entity_id: str, scope: str, rows, unit, fy_starts, structural=()) -> FactBook:
+    book = FactBook(entity_id, scope, fy_starts=frozenset(fy_starts or ()), structural_actions=tuple(structural))
+    if rows and unit is not None:
+        book.rounding_unit = Decimal(unit)
     for tag, ptype, start, end, value in rows:
+        if value is None:  # a correction withdrawing the tag for this period (decision B)
+            continue
         if ptype == "INSTANT":
             book.instants.setdefault(tag, {})[end] = Decimal(value)
         else:
             book.durations.setdefault(tag, {})[(start, end)] = Decimal(value)
+    jv = book.durations.get("share_of_associates_jv", {})
+    if "pbt" in book.durations:
+        book.durations[PBT_INCL_JV] = {p: v + jv.get(p, Decimal(0)) for p, v in book.durations["pbt"].items()}
+    book.withhold_tax_copies()
     return book
+
+
+# Batch reads for materialisation: per-entity queries scan fact_observations once per call (no index on entity), so
+# a day of the full universe ran ~1,700 full scans (~45 s/day, 2026-11-14). prefetch_fundamentals() reads every
+# entity's factbook rows, rounding / FY starts and scope anchors in one pass per as_of; load_factbook and
+# scope_policy read from it while it is active. The SQL is the per-entity query with entity and scope correlated
+# (same ranking, CURRENT_VERSION, SAME_BASIS and X100), checked equal on the live database and by a test.
+_PREFETCH: dict[tuple[int, datetime], dict] = {}
+_BATCH_SAME_BASIS = SAME_BASIS.replace(
+    "l.entity_id = ? AND l.scope = ?", "l.entity_id = fact_observations.entity_id AND l.scope = fact_observations.scope"
+)
+
+
+def in_list(column: str, values) -> tuple[str, list]:
+    """("column IN (...)", params) for a set of ids, bound as one comma-joined string: DuckDB binds a Python list
+    parameter element by element (~1 ms per 30 elements, with failed optional imports), which dominated a
+    300-entity incremental day. Ids (stable_id) never contain commas."""
+    if not values:
+        return "FALSE", []
+    return f"{column} IN (SELECT unnest(string_split(?, ',')))", [",".join(sorted(values))]
+
+
+def entity_filter(column: str, entities) -> tuple[str, list]:
+    """(" AND column IN (...)", params) for an entity subset (incremental materialisation); ("", []) for all."""
+    if entities is None:
+        return "", []
+    sql, params = in_list(column, entities)
+    return " AND " + sql, params
+
+
+def prefetch_fundamentals(con, as_of: datetime, entities=None) -> None:
+    """`entities`: restrict the pass to these entities (same rows for them as an unrestricted pass)."""
+    only, only_p = entity_filter("entity_id", entities)
+    only_c, only_c_p = entity_filter("c.entity_id", entities)
+    facts: dict[tuple[str, str], list] = {}
+    source = _fact_source("TRUE" + only, "TRUE" + only_c).replace("{basis}", _BATCH_SAME_BASIS)
+    for ent, scope, *row in con.execute(
+        """SELECT entity_id, scope, canonical_tag, period_type, period_start, period_end,
+                  coalesce(value_inr, value_other)
+           FROM (SELECT *, row_number() OVER (
+                    PARTITION BY entity_id, scope, canonical_tag, period_start, period_end
+                    ORDER BY """
+        + _ANNUAL_LAST
+        + """, visible_from_ts DESC, corrected DESC, """
+        + version_key()
+        + """ DESC, filing_id DESC) AS rn
+                 FROM """
+        + source
+        + """)
+           WHERE rn = 1""",
+        [*only_p, as_of, as_of, *only_c_p, as_of],
+    ).fetchall():
+        facts.setdefault((ent, scope), []).append(tuple(row))
+    meta = {
+        (e, s): (u, f)
+        for e, s, u, f in con.execute(
+            "SELECT entity_id, scope, max(CASE level_of_rounding "
+            + _ROUNDING_CASE
+            + " ELSE 1 END), list(DISTINCT fy_start) FROM filing_meta WHERE visible_from_ts <= ?"
+            + only
+            + " GROUP BY ALL",
+            [as_of, *only_p],
+        ).fetchall()
+    }
+    anchors: dict[str, list] = {}
+    for ent, months, scope, end in con.execute(
+        """SELECT entity_id, period_months, scope, period_end FROM fact_observations
+           WHERE canonical_tag = ? AND period_type = 'DURATION' AND period_months IN (3, 12)
+             AND visible_from_ts <= ?"""
+        + only
+        + " GROUP BY entity_id, period_months, scope, period_end",
+        [ANCHOR_TAG, as_of, *only_p],
+    ).fetchall():
+        anchors.setdefault(ent, []).append((months, scope, end))
+    overrides = {e: (q, a) for e, q, a in con.execute(
+        "SELECT entity_id, quarterly_scope, annual_scope FROM entity_scope_override").fetchall()}  # fmt: skip
+    structural = _structural_actions(con, as_of, only.replace("entity_id", "e"), only_p)
+    _PREFETCH[(id(con), as_of)] = {"facts": facts, "meta": meta, "anchors": anchors, "overrides": overrides,
+                                   "structural": structural}  # fmt: skip
+
+
+def clear_prefetch(con, as_of: datetime) -> None:
+    _PREFETCH.pop((id(con), as_of), None)
+
+
+SEGMENT_CURRENT_VERSION = CURRENT_VERSION.replace("fact_observations.", "segment_observations.")
+
+
+@dataclass(frozen=True)
+class SegmentRow:
+    axis_kind: str
+    axis: str
+    member: str
+    member_role: str
+    label: str | None
+    element: str
+    canonical_metric: str
+    period_type: str
+    period_start: date
+    period_end: date
+    period_months: int | None
+    value_inr: Decimal
+    filing_id: str
+    visible_from_ts: datetime
+
+
+def load_segments(
+    con, entity_id: str, scope: str, as_of: datetime, *, axis_kind: str | None = None
+) -> list[SegmentRow]:
+    """Segment / geography rows as known at `as_of` [X97]: each filing's current parser version only, visible_from_ts
+    <= as_of. Per (axis, element, period) every member of the latest visible filing that reports it, so a revision or
+    a restated comparative replaces the whole breakdown: members are per-filing ids (`ReportableSegments1Member` can
+    be a different business in another filing), so members of two filings are never mixed. Labels as filed.
+    A separate read: these rows never enter the factbook, a P&L line or a ratio (architecture §14b-1)."""
+    rows = con.execute(
+        """SELECT axis_kind, axis, member, member_role, label, element, canonical_metric, period_type, period_start,
+                  period_end, period_months, value_inr, filing_id, visible_from_ts
+           FROM segment_observations
+           WHERE entity_id = ? AND scope = ? AND visible_from_ts <= ? AND (? IS NULL OR axis_kind = ?) AND """
+        + SEGMENT_CURRENT_VERSION
+        + """
+           QUALIFY dense_rank() OVER (
+               PARTITION BY axis_kind, axis, element, period_start, period_end
+               ORDER BY visible_from_ts DESC, filing_id DESC) = 1
+           ORDER BY axis_kind, period_end, period_start, axis, member, element""",
+        [entity_id, scope, as_of, axis_kind, axis_kind],
+    ).fetchall()
+    return [SegmentRow(*r) for r in rows]
 
 
 SCOPES = ("CONSOLIDATED", "STANDALONE")
@@ -159,17 +535,24 @@ class ScopeDecision:
 
 
 def scope_policy(con, entity_id: str, as_of: datetime) -> ScopePolicy:
-    row = con.execute(
-        "SELECT quarterly_scope, annual_scope FROM entity_scope_override WHERE entity_id = ?", [entity_id]
-    ).fetchone()
+    cached = _PREFETCH.get((id(con), as_of))
+    if cached is not None:
+        row = cached["overrides"].get(entity_id)
+    else:
+        row = con.execute(
+            "SELECT quarterly_scope, annual_scope FROM entity_scope_override WHERE entity_id = ?", [entity_id]
+        ).fetchone()
     if row:
         return ScopePolicy(row[0], row[1], "OVERRIDE")
-    rows = con.execute(
-        """SELECT period_months, scope, period_end FROM fact_observations
-           WHERE entity_id = ? AND canonical_tag = ? AND period_type = 'DURATION' AND period_months IN (3, 12)
-             AND visible_from_ts <= ? GROUP BY period_months, scope, period_end""",
-        [entity_id, ANCHOR_TAG, as_of],
-    ).fetchall()
+    if cached is not None:
+        rows = cached["anchors"].get(entity_id, [])
+    else:
+        rows = con.execute(
+            """SELECT period_months, scope, period_end FROM fact_observations
+               WHERE entity_id = ? AND canonical_tag = ? AND period_type = 'DURATION' AND period_months IN (3, 12)
+                 AND visible_from_ts <= ? GROUP BY period_months, scope, period_end""",
+            [entity_id, ANCHOR_TAG, as_of],
+        ).fetchall()
     ends: dict[tuple[int, str], set[date]] = {}
     for months, scope, end in rows:
         ends.setdefault((months, scope), set()).add(end)
@@ -341,6 +724,7 @@ def building_blocks(book: FactBook, end: date) -> dict[str, Decimal | date | Non
         "core_continuing_profit": _core(t(book.continuing_owners()), t(book.coalesced("exceptional_items", None)), etr),
         "other_income": oth,
         "pbt": pbt,
+        "finance_costs": fin,
         "etr": etr,
         "nopat": nopat,
         "total_debt": debt,
@@ -764,6 +1148,39 @@ def yoy_growth(book: FactBook, tag: str, end: date) -> Decimal | None:
     return cur / prev - 1
 
 
+def quarter_rev_ops(book: FactBook, end: date) -> Decimal | None:
+    """Revenue from operations of the quarter ending `end`, net of labelled excise [X40] (as `rev_ops` in §8)."""
+    gross = book.quarter("revenue_from_operations", end)
+    excise = book.quarter(book.coalesced("excise_duty", None), end)
+    return None if gross is None or excise is None else gross - excise
+
+
+def quarter_opm(book: FactBook, end: date) -> Decimal | None:
+    """EBITDA / revenue of the single quarter ending `end`, with the TTM definitions of §8 applied to one quarter:
+    (profit before exceptional items and tax + finance costs + D&A - other income) / revenue net of excise."""
+    q = lambda tag: book.quarter(tag, end)  # noqa: E731
+    parts = (q("profit_before_exceptional_and_tax"), q("finance_costs"), q("depreciation_amortisation"),
+             q("other_income"))  # fmt: skip
+    if None in parts:
+        return None
+    pbeit, fin, dep, oth = parts
+    return safe_div(pbeit + fin + dep - oth, quarter_rev_ops(book, end))
+
+
+def qoq_growth(current: Decimal | None, previous: Decimal | None) -> Decimal | None:
+    """current / previous - 1; NULL when either is missing or the base is <= 0 (a loss base has no growth)."""
+    if current is None or previous is None or previous <= 0:
+        return None
+    return current / previous - 1
+
+
+def interest_coverage(pbt: Decimal | None, finance_costs: Decimal | None) -> Decimal | None:
+    """(PBT + finance costs) / finance costs over the same TTM window; NULL when finance costs <= 0."""
+    if pbt is None or finance_costs is None or finance_costs <= 0:
+        return None
+    return (pbt + finance_costs) / finance_costs
+
+
 def altman_z_double_prime(blocks: dict) -> Decimal | None:
     """Z'' = 3.25 + 6.56·X1 + 3.26·X2 + 6.72·X3 + 1.05·X4 (§10.2).
 
@@ -825,24 +1242,32 @@ def _year(book: FactBook, p: tuple[date, date]) -> dict[str, Decimal | None]:
         "ltd": _at(book, "borrowings_noncurrent", end), "rec": _at(book, "trade_receivables_current", end),
         "share_capital": _at(book, "equity_share_capital", end),
         "equity_owners": _at(book, "equity_attributable_to_owners", end) or _at(book, "total_equity", end),
-        "pat_owners": _fy(book, "pat_owners", p) or _fy(book, "pat", p),
+        "pat_owners": None if _fy(book, ATTRIBUTION_WITHHELD_TAG, p)
+        else (_fy(book, "pat_owners", p) or _fy(book, "pat", p)),
         "goodwill": _at(book, "goodwill", end), "intangibles": _at(book, "other_intangibles", end),
         "cwip": _at(book, "cwip", end), "gross_block": _at(book, "ppe_gross_block", end),
         "contingent": _at(book, "contingent_liabilities", end),
     }  # fmt: skip
 
 
-def piotroski_f(t: dict, p: dict) -> int | None:
-    """Piotroski (2000) F-score, 0..9. Assets are year-end, not beginning-of-year: the original needs the balance
-    sheet two years back, which is before the data cutoff for FY26 [C9, C23]. Every one of the nine signals needs
-    its inputs; one missing input makes the score NULL, never a partial score. LTD = non-current borrowings."""
+PIOTROSKI_SIGNALS = (
+    "roa_positive", "cfo_positive", "roa_up", "cfo_above_pat", "leverage_down", "current_ratio_up", "no_dilution",
+    "gross_margin_up", "asset_turnover_up",
+)  # fmt: skip
+
+
+def piotroski_signals(t: dict, p: dict) -> tuple[bool, ...] | None:
+    """The nine Piotroski (2000) binary tests, in PIOTROSKI_SIGNALS order (ratio catalogue B1.3). Assets are
+    year-end, not beginning-of-year: the original needs the balance sheet two years back, which is before the data
+    cutoff for FY26 [C9, C23]. Every signal needs its inputs; one missing input makes all of them NULL, never a
+    partial set. LTD = non-current borrowings."""
     need = ("pat", "cfo", "ta", "ltd", "ca", "cl", "share_capital", "gross_margin", "rev")
     if any(t[k] is None for k in need) or any(p[k] is None for k in need) or not t["ta"] or not p["ta"]:
         return None
     if not t["cl"] or not p["cl"]:
         return None
     roa_t, roa_p = t["pat"] / t["ta"], p["pat"] / p["ta"]
-    signals = (
+    return (
         roa_t > 0,
         t["cfo"] > 0,
         roa_t > roa_p,
@@ -853,14 +1278,20 @@ def piotroski_f(t: dict, p: dict) -> int | None:
         t["gross_margin"] > p["gross_margin"],
         t["rev"] / t["ta"] > p["rev"] / p["ta"],
     )
-    return sum(int(s) for s in signals)
 
 
-def beneish_m(t: dict, p: dict) -> Decimal | None:
-    """Beneish (1999) 8-variable M-score. SG&A proxy = Ind AS `OtherExpenses` (no SG&A line exists) [C23].
-    NULL when any ratio's inputs are missing or a denominator is zero."""
+def piotroski_f(t: dict, p: dict) -> int | None:
+    """Piotroski (2000) F-score, 0..9: the number of `piotroski_signals` passed (NULL when they are)."""
+    signals = piotroski_signals(t, p)
+    return None if signals is None else sum(int(s) for s in signals)
+
+
+def beneish_components(t: dict, p: dict) -> dict[str, Decimal] | None:
+    """The eight Beneish (1999) indices DSRI, GMI, AQI, SGI, DEPI, SGAI, TATA, LVGI (ratio catalogue B1.2). SG&A
+    proxy = Ind AS `OtherExpenses` (no SG&A line exists) [C23]. NULL when any index's inputs are missing or a
+    denominator is zero (all eight or none)."""
     try:
-        idx = {
+        return {
             "DSRI": (t["rec"] / t["rev"]) / (p["rec"] / p["rev"]),
             "GMI": p["gross_margin"] / t["gross_margin"],
             "AQI": (1 - (t["ca"] + t["ppe"]) / t["ta"]) / (1 - (p["ca"] + p["ppe"]) / p["ta"]),
@@ -872,7 +1303,12 @@ def beneish_m(t: dict, p: dict) -> Decimal | None:
         }
     except (TypeError, ZeroDivisionError, ArithmeticError):
         return None
-    return BENEISH["const"] + sum(BENEISH[k] * v for k, v in idx.items())
+
+
+def beneish_m(t: dict, p: dict) -> Decimal | None:
+    """Beneish (1999) 8-variable M-score on `beneish_components`; NULL when they are."""
+    idx = beneish_components(t, p)
+    return None if idx is None else BENEISH["const"] + sum(BENEISH[k] * v for k, v in idx.items())
 
 
 def annual_ratios(book: FactBook, on_or_before: date) -> dict:
@@ -911,6 +1347,9 @@ SCREENER_CONVENTION_COLUMNS = (
 )  # fmt: skip
 
 
+COGS_MIN_SHARE = Decimal("0.01")  # S23 CHOICE: below 1% of sales, inventory / payable days are not meaningful
+
+
 class _BookAsResult:
     """Lets the parity-tested statement builders (statements/*) read a FactBook: same rows, same definitions.
 
@@ -944,11 +1383,9 @@ def screener_convention_ratios(book: FactBook, on_or_before: date) -> dict:
     Working Capital = Other Assets - Other Liabilities (rupees). Kept beside our own ratios, not instead of them:
     `roce` excludes other income and uses closing capital.
 
-    Days ratios on the same Sales denominator as the export's Debtor Days [S23, our definitions; the website's
-    are UNVERIFIED]: Inventory Days = closing Inventory / (Sales / 365); Days Payable = closing trade payables /
-    (Sales / 365); Cash Conversion Cycle = Debtor + Inventory - Payable days (differs from the website for TCS:
-    72 vs 93, the website leaves inventory and payable days blank); Working Capital Days = (current assets - cash &
-    bank - current investments - current liabilities) / (Sales / 365), observed to match the website on TCS.
+    Days ratios as on the website [S23]: Inventory / Payable Days = closing inventory / trade payables over COGS / 365
+    (NULL when COGS < 1% of sales); Cash Conversion Cycle = Debtor + Inventory - Payable days (blanks as 0); Working
+    Capital Days = (current assets - cash & bank - current investments - current liabilities) / (Sales / 365).
     Schedule III omits nil lines, so a filed balance sheet without an inventory or payables line means 0 days
     [C23]."""
     from financials.statements.balance_sheet import balance_sheet
@@ -972,11 +1409,18 @@ def screener_convention_ratios(book: FactBook, on_or_before: date) -> dict:
         out["inventory_turnover"] = sales / stock if stock else None
         per_day = sales / 365
         payables = bs.rows["Other Liabilities"].parts.get("Trade payables")
-        out["inventory_days"] = stock / per_day if stock is not None else None
-        out["days_payable"] = payables / per_day if payables is not None else None
-        parts = (out["debtor_days"], out["inventory_days"], out["days_payable"])
-        if None not in parts:
-            out["cash_conversion_cycle"] = parts[0] + parts[1] - parts[2]
+        # S23: inventory and payable days are on COGS = materials consumed + purchases of stock-in-trade + change in
+        # inventories (ITC FY26 consolidated: 208.8 / 63.2 = the website's 209 / 63). With COGS under 1% of sales
+        # (services: TCS 41 Cr on 267,021 Cr) they are NULL, as the website leaves them blank (CHOICE threshold).
+        cogs = sum((_fy(book, t, fy) or Decimal(0) for t in _COGS), Decimal(0))
+        if cogs > 0 and cogs >= COGS_MIN_SHARE * sales:
+            cogs_day = cogs / 365
+            out["inventory_days"] = stock / cogs_day if stock is not None else None
+            out["days_payable"] = payables / cogs_day if payables is not None else None
+        if out["debtor_days"] is not None:  # blank inventory / payable days count as 0, as on the website
+            out["cash_conversion_cycle"] = (
+                out["debtor_days"] + (out["inventory_days"] or 0) - (out["days_payable"] or 0)
+            )
         ca, cl = (
             book.instants.get("current_assets", {}).get(fy[1]),
             book.instants.get("current_liabilities", {}).get(fy[1]),

@@ -7,7 +7,8 @@ to profiles ("Premium" is insurer revenue but a share-premium reserve in a corpo
 match wins. An unmapped numeric element that matches no rule is ``UNCLASSIFIED`` and fails test_docs_sync, so a
 new element can never be silently ignored: it must be mapped or given a rule here.
 
-Excluded elements are not lost: every fact is stored verbatim in ``raw_xbrl_facts`` (invariant 3).
+Excluded elements are not lost: every fact is kept verbatim in the vault blob, and in ``disclosure_facts`` when no
+other clean table holds it (X116, owner decision J).
 """
 
 from __future__ import annotations
@@ -29,8 +30,8 @@ REASONS = {
     "DISCONTINUED_DETAIL": "A detail of discontinued operations; pat_discontinued and discontinued_pbt are mapped.",
     "INSURANCE_SCHEDULE_DETAIL": "An IRDAI revenue/appropriation/fund-analysis schedule line under a mapped total.",
     # Reg. 34 annual-report notes (REG34_ANNUAL only) [X76]
-    "ANNUAL_ASSET_MOVEMENT": "A roll-forward line (additions, disposals, impairment, transfers) of a fixed-asset or "
-    "provision schedule whose closing balances are mapped.",
+    "ANNUAL_ASSET_MOVEMENT": "A roll-forward line (additions, disposals, impairment, transfers) or note disclosure "
+    "(revalued, idle, fully depreciated) of a fixed-asset or provision schedule whose closing balances are mapped.",
     "ANNUAL_TAX_NOTE": "An income-tax note line (rate reconciliation, current/deferred split) under mapped tax totals.",
     "ANNUAL_SHARE_CAPITAL_NOTE": "A share-capital note line (authorised/issued/called values, issues, holders).",
     "ANNUAL_SHARE_BASED_PAYMENT_NOTE": "An ESOP note line (options, exercise prices, fair values).",
@@ -116,7 +117,9 @@ RULES: tuple[tuple[str, str, frozenset | None], ...] = (
         r"|DecreaseThrough|^Writedowns|^ImpairmentLoss(?!Reversal.*TradeReceivables|OnNonFinancial|RecognisedInProfitOrLoss$)"
         r"|^ReversalOfImpairment|^Depreciation(PropertyPlant|RecognisedAs|RecognisedIn)|^AmortisationOtherIntangible"
         r"|^ProvisionUsed|^OtherProvisionsCreated|^NewProvisions|^UnusedProvisionReversed|^AdditionalProvisions"
-        r"|^IncreaseDecreaseInExistingProvisions|^DeductionsInEquityShareWarrants)",
+        r"|^IncreaseDecreaseInExistingProvisions|^DeductionsInEquityShareWarrants"
+        r"|^PropertyPlantAndEquipment(CarryingAmount|GrossCarryingAmountFullyDepreciated|TemporarilyIdle"
+        r"|RevaluationSurplus|ExpendituresRecognisedForConstructions))",
         "ANNUAL_ASSET_MOVEMENT",
         ANNUAL,
     ),
@@ -141,13 +144,13 @@ RULES: tuple[tuple[str, str, frozenset | None], ...] = (
         r"|^IncreaseDecreaseIn(EquityShareCapital|NumberOf)|^OtherDecreaseInAmountOfShares|^AggregateAmountOfIncrease"
         r"|PercentageOfCapitalReduction|UncalledLiability|(PaidUp|Share)CapitalHeldByForeign|PercentageOf(PaidUp|Share)"
         r"Capital|^AmountRaisedFrom|^AmountRemainingUnutilised|^AmountUtilisedTowards|SharePremium|BonusShares"
-        r"|BonusIssue|^AggregateNumberOf)",
+        r"|BonusIssue|^AggregateNumberOf|^OriginalPaidUpValueOfForfeitedShares)",
         "ANNUAL_SHARE_CAPITAL_NOTE",
         ANNUAL,
     ),
     (
         r"(KeyManagementPersonnel|Remuneration|DirectorsSittingFees|SalaryToDirectors|OtherBenefitsTo(Directors|Manager)"
-        r"|CommissionToDirectors|PercentageIncreaseInMedian|AveragePercentileIncrease)",
+        r"|CommissionToDirectors|PercentageIncreaseInMedian|AveragePercentileIncrease|^SalaryToManager$)",
         "ANNUAL_REMUNERATION_NOTE",
         ANNUAL,
     ),
@@ -156,7 +159,9 @@ RULES: tuple[tuple[str, str, frozenset | None], ...] = (
         r"|Appropriation|^AmountOfDividendsProposed|^PercentageOfProposedDividend|^DividendsProposed"
         r"|^TransferToRetainedEarnings|AdditionsToReserves|DeductionsToReserves|^OtherChangesInEquity"
         r"|^OtherEquityBalances|^IncreaseDecreaseThroughTransfersAndOtherChangesEquity"
-        r"|^IncreaseDecreaseThroughChangesInOwnershipInterests|^ChangesInEquity$|RelatingToItemsChargedOrCredited)",
+        r"|^IncreaseDecreaseThroughChangesInOwnershipInterests|^ChangesInEquity$|RelatingToItemsChargedOrCredited"
+        r"|^CorrectionOfPriorPeriodErrors$|^EffectOfChangesInAccountingPolicy$|^EquityBeforeRestatement$"
+        r"|^OtherUtilisationOfSecuritiesPremium)",
         "ANNUAL_EQUITY_NOTE",
         ANNUAL,
     ),
@@ -184,12 +189,14 @@ RULES: tuple[tuple[str, str, frozenset | None], ...] = (
         r"|ExpenseArisingFromExploration|ChangesInInventoriesOf|^ChangesInOtherInventories$|MaterialCostContract"
         r"|OverheadCosts|^ContractCost$|^NetProvisionsCharged$|DiscountIssueShares|OtherUnamortisedExpenses"
         r"|^EmployeeShareBased|ImpairmentLossOnNonFinancialAssets|^ImpairmentLossRecognisedInProfitOrLoss$"
-        r"|TreatedAsFinanceCosts)",
+        r"|TreatedAsFinanceCosts|DiscountIssueDebentures|ExpenditurePertainingToExploration|^LossesOn(Change|Litigation)"
+        r"|OverheadsApportioned|SiteLabour|SubscriptionsMembership)",
         "ANNUAL_EXPENSE_DETAIL",
         ANNUAL,
     ),
     (
         r"(^InterestIncome|^Interest(On|From)|^DividendIncome|^IncomeOnBrokerage|^Gains|^GainLoss|^GainOn|^LossOn"
+        r"|^OtherNetGainLossOnForeignCurrency"
         r"|^NetGainLoss|^Rental|^RevenueFrom(SaleOf|Construction|OtherFinancial|Operations(Finance|Other))"
         r"|^Domestic|^Export|^MiscellaneousOther|^OtherNonoperatingIncome|^OtherOperatingRevenues|ExcessProvisions"
         r"|^LiabilitiesWrittenOff|^Income(From|Insurance|Arising)|RevenueArisingFromExchanges"
@@ -262,6 +269,38 @@ OVERRIDES: dict[tuple[str, str], str] = {
     # Split of the mapped ShareOfProfitLossOfAssociatesAndJointVentures... line.
     ("REG34_ANNUAL", "ShareOfProfitLossOfAssociatesAccountedForUsingEquityMethod"): "DERIVED_SUBTOTAL",
     ("REG34_ANNUAL", "ShareOfProfitLossOfJointVenturesAccountedForUsingEquityMethod"): "DERIVED_SUBTOTAL",
+    # Seen first in the audit-opinion fixtures (batch 20A, X121); note lines under mapped totals.
+    (
+        "REG34_ANNUAL",
+        "AmountCreditedToProfitAndLossAsTransferFromRevaluationReserveOnAccountOfAdditionalDepreciation"
+        "ChargedOnRevaluedTangibleAssets",
+    ): "ANNUAL_EQUITY_NOTE",
+    ("REG34_ANNUAL", "ProposedEquityFinalDividend"): "ANNUAL_EQUITY_NOTE",
+    ("REG34_ANNUAL", "ProposedEquitySpecialDividend"): "ANNUAL_EQUITY_NOTE",
+    # MMTC FY25: the NBFC-style provisioning memo block (income reversal / NPAs, amounts provided and to be provided)
+    (
+        "REG34_ANNUAL",
+        "AmountOfProvisionsToBeMadeOnAccountOfIncomeReversalAndNonPerformingAssetsRemainingUnrealised",
+    ): "REGULATORY_MEMO",
+    ("REG34_ANNUAL", "AmountProvidedInCurrentYear"): "REGULATORY_MEMO",
+    ("REG34_ANNUAL", "BalanceAmountToBeProvided"): "REGULATORY_MEMO",
+    ("REG34_ANNUAL", "CumulativeAmountProvidedTillPreviousYear"): "REGULATORY_MEMO",
+    ("REG34_ANNUAL", "ArrearsOfFixedCumulativeDividendsOnPreferenceShares"): "ANNUAL_SHARE_CAPITAL_NOTE",
+    ("REG34_ANNUAL", "PercentageOfChangeInSharesHeldDuringYear"): "ANNUAL_SHARE_CAPITAL_NOTE",
+    ("REG34_ANNUAL", "PercentageOfTotalSharesHeld"): "ANNUAL_SHARE_CAPITAL_NOTE",
+    ("REG34_ANNUAL", "CurrentMaturitiesOfLongTermDebt"): "BALANCE_SHEET_DETAIL",
+    ("REG34_ANNUAL", "DepositRepaymentReserveAccountWithBanks"): "BALANCE_SHEET_DETAIL",
+    ("REG34_ANNUAL", "CustodialFees"): "ANNUAL_EXPENSE_DETAIL",
+    ("REG34_ANNUAL", "DiscountingCharges"): "ANNUAL_EXPENSE_DETAIL",
+    ("REG34_ANNUAL", "DividendOnPreferenceSharesTreatedAsDebt"): "ANNUAL_EXPENSE_DETAIL",
+    ("REG34_ANNUAL", "EntertainmentExpenses"): "ANNUAL_EXPENSE_DETAIL",
+    ("REG34_ANNUAL", "GuaranteeCommission"): "ANNUAL_EXPENSE_DETAIL",
+    ("REG34_ANNUAL", "ResearchDevelopmentExpenditure"): "ANNUAL_EXPENSE_DETAIL",
+    ("REG34_ANNUAL", "VoluntaryRetirementCompensation"): "ANNUAL_EXPENSE_DETAIL",
+    ("REG34_ANNUAL", "ExcessProvisionDiminutionInValueInvestmentWrittenBack"): "ANNUAL_INCOME_DETAIL",
+    ("REG34_ANNUAL", "IncomeExportIncentives"): "ANNUAL_INCOME_DETAIL",
+    ("REG34_ANNUAL", "RevenueFromInterest"): "ANNUAL_INCOME_DETAIL",
+    ("REG34_ANNUAL", "MATCreditRecognisedDuringYear"): "ANNUAL_TAX_NOTE",
 }
 
 

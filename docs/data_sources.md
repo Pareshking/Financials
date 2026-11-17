@@ -2,7 +2,7 @@
 
 <!-- GENERATED from config/data_sources.yaml by `python -m financials.sources --write`. Do not edit. -->
 
-26 feeds: 10 VERIFIED, 9 OBSERVED, 5 UNVERIFIED, 2 PLANNED. Status meanings and runtime labels are defined in `config/data_sources.yaml`; evidence IDs point to `docs/references.md`.
+30 feeds: 13 VERIFIED, 9 OBSERVED, 6 UNVERIFIED, 2 PLANNED. Status meanings and runtime labels are defined in `config/data_sources.yaml`; evidence IDs point to `docs/references.md`.
 
 | ID | Feed | Phase | Status | Runtime | Evidence |
 |---|---|---|---|---|---|
@@ -12,7 +12,7 @@
 | F04 | NSE trading holiday calendar | 1 | VERIFIED | CONTAINER_DIRECT | CAL1 |
 | F05 | Index constituents and rebalance notices | 1 | VERIFIED | CONTAINER_DIRECT | IDX1, IDX2, IDX4, IDX5, IDX6 |
 | F06 | Integrated Filing - Financials (Reg. 33 quarterly XBRL) | 1 | VERIFIED | CONTAINER_DIRECT | X1, X2, X4, X6, X32, X33, X34, X35, X38, A7, A9 |
-| F07 | Reg. 34(1) annual report XBRL (MCA Ind AS taxonomy) | 2 | VERIFIED | CONTAINER_DIRECT | X36, X37, A8, X69, X70, X71, X72, X73, X74, X75, X76 |
+| F07 | Reg. 34(1) annual report XBRL (MCA Ind AS taxonomy) | 2 | VERIFIED | CONTAINER_DIRECT | X36, X37, A8, X69, X70, X71, X72, X73, X74, X75, X76, X112, X113, X114 |
 | F08 | Reg. 31 shareholding pattern XBRL | 1 | VERIFIED | CONTAINER_DIRECT | SHP1, SHP2, SHP3, SHP4, SHP6, SHP7, SHP8, SHP9, SHP10, SHP11, SHP12, SHP13, SHP14, SHP15 |
 | F09 | Reg. 76 reconciliation of share capital audit XBRL | 2 | UNVERIFIED | UNKNOWN | — |
 | F10 | Reg. 23(9) related party transactions | 2 | VERIFIED | CONTAINER_DIRECT | X19 |
@@ -32,6 +32,10 @@
 | F24 | Reg. 34(2)(f) BRSR XBRL | 3 | UNVERIFIED | UNKNOWN | — |
 | F25 | Macro, yield and commodity feeds | 3 | PLANNED | UNKNOWN | — |
 | F26 | Per-AMC monthly portfolios and new-gen supplemental KPIs | 3 | PLANNED | UNKNOWN | — |
+| F27 | Daily index closes (all NSE price indices) | 1 | VERIFIED | CONTAINER_DIRECT | IDX9 |
+| F28 | NSE equity master (EQUITY_L.csv) | 1 | VERIFIED | CONTAINER_DIRECT | IDX10 |
+| F29 | Nifty 500 total-return index (TRI) | 1 | UNVERIFIED | UNKNOWN | — |
+| F30 | NSE 4-level industry classification (quote API) | 1 | VERIFIED | CONTAINER_DIRECT | IC1, IC2, IC3, A14 |
 
 ## F01 — UDiFF cash-market bhavcopy
 
@@ -128,7 +132,7 @@
 | cadence | Quarterly per company (standalone and consolidated filings) |
 | fetch_runtime | CONTAINER_DIRECT |
 | join_keys | ISIN, Symbol, ScripCode, NatureOfReportStandaloneConsolidated, period |
-| target_tables | raw_xbrl_facts, filing_meta, fact_observations |
+| target_tables | filing_meta, fact_observations, segment_observations, reg23_related_party_transactions, disclosure_facts |
 | unlocked_metrics | P&L, H1/FY balance sheet and cash flow, TTM, valuation ratios |
 | phase | 1 |
 | verification_status | VERIFIED |
@@ -145,12 +149,12 @@
 | cadence | Annual (post-AGM) |
 | fetch_runtime | CONTAINER_DIRECT |
 | join_keys | symbol in the NSE file name (resolved on broadcast date), CIN, FY end |
-| target_tables | raw_xbrl_facts, filing_meta, fact_observations |
-| unlocked_metrics | lease liabilities, gross block by class, CWIP, contingent liabilities, audit fees, R&D, royalty, geographic revenue, restated comparatives, Piotroski, Beneish, capex/depreciation, ROTE |
+| target_tables | filing_meta, fact_observations, group_structure, related_party_transactions, disclosure_facts |
+| unlocked_metrics | lease liabilities, gross block by class, CWIP, contingent liabilities, audit fees, R&D, royalty, geographic revenue, restated comparatives, Piotroski, Beneish, capex/depreciation, ROTE, RPT leak % per counterparty, year-end share counts |
 | phase | 2 |
 | verification_status | VERIFIED |
-| evidence | X36, X37, A8, X69, X70, X71, X72, X73, X74, X75, X76 |
-| notes | Parsed by REG34_ANNUAL (fetch-annual). No ISIN in the instance (X70). PPE schedule dimensional (X71). R&D 1/13, royalty 4/13 filings (X73). AOC-1 is a typed-axis schedule, inspected but not parsed (X75). |
+| evidence | X36, X37, A8, X69, X70, X71, X72, X73, X74, X75, X76, X112, X113, X114 |
+| notes | Parsed by REG34_ANNUAL (fetch-annual). No ISIN in the instance (X70). PPE schedule dimensional (X71). R&D 1/13, royalty 4/13 filings (X73). AOC-1 subsidiary / associate / JV schedule parsed into group_structure (X112; backfill-group-structure for filings promoted earlier). Ind AS 24 related-party schedule parsed per counterparty into related_party_transactions (X113; backfill-rpt for filings promoted earlier). Year-end share counts are facts, cross-checked against Reg. 31 (X114, ANNUAL_SHARE_COUNT_DIFFERS). |
 
 ## F08 — Reg. 31 shareholding pattern XBRL
 
@@ -184,7 +188,7 @@
 | phase | 2 |
 | verification_status | UNVERIFIED |
 | evidence | — |
-| notes | Not searched yet. |
+| notes | BLOCKED 2026-11-15 (references A15): no Reg. 76 file in the vault ledger, the announcements RSS or TCS's announcements API for Jul-Nov 2026; BSE answers 403. The Reg. 31 total x paid-up capital cross-check (X103) and the Reg. 34 year-end share counts cross-check (X114, annual stand-in; issued / subscribed / paid-up, not listed or demat) stand in. |
 
 ## F10 — Reg. 23(9) related party transactions
 
@@ -196,12 +200,12 @@
 | cadence | Half-yearly (with H1/FY filings) |
 | fetch_runtime | CONTAINER_DIRECT |
 | join_keys | filing_id, RelatedPartyTransactionAxis member |
-| target_tables | raw_xbrl_facts, (planned) rpt_observations |
+| target_tables | reg23_related_party_transactions, disclosure_facts |
 | unlocked_metrics | RPT leak % |
 | phase | 2 |
 | verification_status | VERIFIED |
 | evidence | X19 |
-| notes | Present in the corp and NBFC fixtures; per-counterparty tags not yet mapped. |
+| notes | Present in the corp and NBFC fixtures; the Reg. 23(9) per-counterparty rows (NameOfCounterParty, PANOfCounterParty, TypeOfRelatedPartyTransaction, AmountOfRelatedPartyTransactionDuringTheReportingPeriod) are not parsed yet (X113 OBSERVED: 25 committed Integrated Filings carry them). Per-counterparty RPT comes from the Reg. 34 annual schedule (F07, X113) for now. |
 
 ## F11 — SEBI PIT Reg. 7(2) insider trading disclosures
 
@@ -383,7 +387,7 @@
 | cadence | Intraday / event |
 | fetch_runtime | CONTAINER_DIRECT |
 | join_keys | company, broadcast time |
-| target_tables | raw_xbrl_facts, corporate_events |
+| target_tables | corporate_events, disclosure_facts |
 | unlocked_metrics | order_wins_90d, order_value_90d, kmp_resignations_90d, auditor_resignations_90d, fraud_or_default_90d |
 | phase | 2 |
 | verification_status | VERIFIED |
@@ -474,3 +478,71 @@
 | verification_status | PLANNED |
 | evidence | — |
 | notes | AMFI consolidated file not believed to exist (R8, UNVERIFIED). |
+
+## F27 — Daily index closes (all NSE price indices)
+
+| Field | Value |
+|---|---|
+| exchange_or_agency | NSE Indices via NSE archives |
+| url_or_endpoint_pattern | https://nsearchives.nseindia.com/content/indices/ind_close_all_DDMMYYYY.csv |
+| format | CSV |
+| cadence | Daily (trading days) |
+| fetch_runtime | CONTAINER_DIRECT |
+| join_keys | Index Name, Index Date |
+| target_tables | index_ohlcv |
+| unlocked_metrics | Nifty 500 / sector index levels, index P/E, P/B, dividend yield, relative strength |
+| phase | 1 |
+| verification_status | VERIFIED |
+| evidence | IDX9 |
+| notes | Fetched by fetch-days with each trading day's bhavcopy. Price indices only; no total-return rows (F29). |
+
+## F28 — NSE equity master (EQUITY_L.csv)
+
+| Field | Value |
+|---|---|
+| exchange_or_agency | NSE |
+| url_or_endpoint_pattern | https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv |
+| format | CSV |
+| cadence | Snapshot (current list) |
+| fetch_runtime | CONTAINER_DIRECT |
+| join_keys | SYMBOL, SERIES, ISIN NUMBER |
+| target_tables | raw_equity_master |
+| unlocked_metrics | listing date, face value, market lot, company legal name |
+| phase | 1 |
+| verification_status | VERIFIED |
+| evidence | IDX10 |
+| notes | fetch-equity-master. Current listings only; header fields carry a leading space after each comma. |
+
+## F29 — Nifty 500 total-return index (TRI)
+
+| Field | Value |
+|---|---|
+| exchange_or_agency | NSE Indices |
+| url_or_endpoint_pattern | endpoint TBD (not in ind_close_all; niftyindices.com historical TRI not probed) |
+| format | UNKNOWN |
+| cadence | Daily |
+| fetch_runtime | UNKNOWN |
+| join_keys | index name, date |
+| target_tables | (planned) index_ohlcv |
+| unlocked_metrics | benchmark total return for backtests |
+| phase | 1 |
+| verification_status | UNVERIFIED |
+| evidence | — |
+| notes | Per-stock total return is computed from prices and accepted dividends (financials.returns); the index TRI needs a verified source. |
+
+## F30 — NSE 4-level industry classification (quote API)
+
+| Field | Value |
+|---|---|
+| exchange_or_agency | NSE |
+| url_or_endpoint_pattern | https://www.nseindia.com/api/NextApi/apiClient/GetQuoteApi?functionName=getSymbolData&marketType=N&series=<SERIES>&symbol=<SYM> |
+| format | JSON (equityResponse[0].secInfo macro / sector / industryInfo / basicIndustry) |
+| cadence | Snapshot (as shown on the fetch day; no effective dates) |
+| fetch_runtime | CONTAINER_DIRECT |
+| join_keys | metaData.isinCode, metaData.symbol, fetch date (IST) |
+| target_tables | raw_quote_classification, entity_classification_history |
+| unlocked_metrics | macro sector, sector, industry, basic industry, industry / basic-industry median PE PB ROCE sales growth, premium to industry median, peer ranks |
+| phase | 1 |
+| verification_status | VERIFIED |
+| evidence | IC1, IC2, IC3, A14 |
+| notes | fetch-classification [SYMBOLS] --universe nifty500 (API host, 1 request/s). /api/quote-equity answers 403 from the container (A14). Point in time from the first fetch (C25): never backdated. |

@@ -1,50 +1,46 @@
-"""Ind AS 108 segment facts per entity and period, point in time, from the raw facts already in the database [X49].
+"""Ind AS 108 segment facts per entity and period, point in time, from `segment_observations` [X49].
 
-Segment rows are per-member dimensional records, so they are not zero-drop line items (C24); they stay verbatim in
-`raw_xbrl_facts`. This helper reads them back the way `parsers.segments` reads a file (same elements, label from
-`DescriptionOfReportableSegment`), for the filings of one entity visible at `as_of`, latest version per
-(scope, period end): one query, no file access.
+The quarterly business-segment rows (`ReportableSegment*Axis`, elements `parsers.segments.SEGMENT_ELEMENTS`) of the
+results filings of one entity visible at `as_of`, latest version per (scope, period end), each filing at its current
+parser version: one query, no file access. Before decision J this read `raw_xbrl_facts`; the clean table holds the
+same facts in the periods the filing's parser validated (pre-cutoff comparatives and opening balances are not
+parsed, C9; the vault blob keeps them).
 """
 
 from __future__ import annotations
 
-import json
 from datetime import date, datetime
 from decimal import Decimal
 
+from financials.db import version_key
 from financials.parsers.segments import SEGMENT_ELEMENTS
 
 
 def segment_facts(con, entity_id: str, as_of: datetime, *, scope: str | None = None) -> list[dict]:
-    """Rows {scope, period_end_of_filing, segment, member, element, period_start, period_end, value}."""
+    """Rows {scope, filing_period_end, segment, member, element, period_start, period_end, value}; period_start is
+    None for an instant. Each filing is read at its current parser version (the latest filing_meta version, X83)."""
     rows = con.execute(
-        """WITH f AS (
-             SELECT filing_id, scope, period_end, row_number() OVER (
-                      PARTITION BY scope, period_end ORDER BY visible_from_ts DESC, parser_version DESC) AS rn
+        f"""WITH f AS (
+             SELECT filing_id, parser_version, scope, period_end, row_number() OVER (
+                      PARTITION BY scope, period_end ORDER BY visible_from_ts DESC, {version_key()} DESC) AS rn
              FROM filing_meta
              WHERE entity_id = ? AND visible_from_ts <= ? AND accounting_profile <> 'REG34_ANNUAL'
-               AND (? IS NULL OR scope = ?))
-           SELECT f.scope, f.period_end, r.element_name, r.ctx_start, r.ctx_end, r.ctx_instant, r.dimensions,
-                  r.value_text
-           FROM f JOIN raw_xbrl_facts r USING (filing_id)
-           WHERE f.rn = 1 AND r.dimensions IS NOT NULL
-             AND r.element_name IN (SELECT unnest(?))""",
-        [entity_id, as_of, scope, scope, [*SEGMENT_ELEMENTS, "DescriptionOfReportableSegment"]],
+               AND (? IS NULL OR scope = ?)
+               AND {version_key()} = (SELECT max({version_key("x.parser_version")}) FROM filing_meta x
+                                      WHERE x.filing_id = filing_meta.filing_id))
+           SELECT f.scope, f.period_end, s.member, s.label, s.element, s.period_type, s.period_start, s.period_end,
+                  s.value_inr
+           FROM f JOIN segment_observations s USING (filing_id, parser_version)  -- the ranked version only
+           WHERE f.rn = 1 AND s.axis_kind = 'BUSINESS' AND regexp_replace(s.axis, '^.*:', '') LIKE 'ReportableSegment%'
+             AND s.element IN (SELECT unnest(?))""",
+        [entity_id, as_of, scope, scope, list(SEGMENT_ELEMENTS)],
     ).fetchall()
-    labels: dict[tuple, str] = {}
-    facts = []
-    for sc, filed_end, name, start, end, instant, dims, text in rows:
-        axis, member = next(iter(json.loads(dims).items()))
-        if not axis.split(":")[-1].startswith("ReportableSegment"):
-            continue
-        if name == "DescriptionOfReportableSegment":
-            labels.setdefault((sc, filed_end, member), text.strip())
-            continue
-        facts.append((sc, filed_end, member, name, None if instant else start, instant or end, Decimal(text.strip())))
+    facts = [(sc, fe, label or m, m, n, None if pt == "INSTANT" else ps, pe, v)
+             for sc, fe, m, label, n, pt, ps, pe, v in rows]  # fmt: skip
     return [
-        {"scope": sc, "filing_period_end": fe, "segment": labels.get((sc, fe, m), m), "member": m, "element": n,
+        {"scope": sc, "filing_period_end": fe, "segment": seg, "member": m, "element": n,
          "period_start": s, "period_end": e, "value": v}
-        for sc, fe, m, n, s, e, v in sorted(facts, key=lambda x: (x[0], x[1], x[3], x[2], str(x[4]), x[5]))
+        for sc, fe, seg, m, n, s, e, v in sorted(facts, key=lambda x: (x[0], x[1], x[4], x[3], str(x[5]), x[6]))
     ]  # fmt: skip
 
 

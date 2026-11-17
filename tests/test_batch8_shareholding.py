@@ -311,13 +311,13 @@ def test_screener_shareholding_parity(path):
 
 
 def test_raw_facts_of_every_shareholding_filing_are_saved(hdfc):
-    """Invariant 3: every fact, every context, as sent; the parser's canonical subset is derived from it."""
+    """Invariant 3: every fact, every context, as sent. Since decision J the vault blob is that record (no raw table):
+    each promoted filing's blob is the fixture byte for byte and parses to every fact."""
     con = hdfc.con
-    got = dict(
-        con.execute(
-            "SELECT f.source_url, count(*) FROM raw_xbrl_facts r JOIN filings f USING (filing_id) GROUP BY 1"
-        ).fetchall()
-    )
+    got = {url: hdfc.vault.read_path(path, sha) for url, path, sha in con.execute(
+        "SELECT f.source_url, b.storage_path, b.sha256 FROM filings f JOIN blobs b USING (sha256) "
+        "WHERE f.category = 'SHP_XBRL'").fetchall()}  # fmt: skip
     for path in (HDFC_JUN, HDFC_SEP):
-        n = len(parse_instance(path.read_bytes()).facts)
-        assert got["https://nsearchives.nseindia.com/corporate/xbrl/" + path.name] == n
+        blob = got["https://nsearchives.nseindia.com/corporate/xbrl/" + path.name]
+        assert blob == path.read_bytes()
+        assert len(parse_instance(blob).facts) == len(parse_instance(path.read_bytes()).facts) > 0

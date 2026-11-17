@@ -14,6 +14,7 @@ from financials.fetch.jobs import (
     corp_actions_url,
     delivery_url,
     holidays_url,
+    index_close_url,
     index_list_url,
     shp_master_url,
 )
@@ -167,7 +168,8 @@ def test_e2e_fetchers_never_touched_unlisted_urls(e2e):
     misses = {u for u, _ in t.calls if u not in routes}
     weekend = {bhavcopy_url(date(2025, 9, 20)), bhavcopy_url(date(2025, 9, 21)), "https://www.nseindia.com/"}
     no_delivery_fixture = {delivery_url(d) for d in DAYS if delivery_url(d) not in routes}
-    assert misses == weekend | no_delivery_fixture  # every other request was a known fixture URL
+    no_close_fixture = {index_close_url(d) for d in DAYS}  # each trading day also asks for its index closes [IDX9]
+    assert misses == weekend | no_delivery_fixture | no_close_fixture  # every other request was a fixture URL
 
 
 def test_e2e_promotion_order_and_idempotency(e2e):
@@ -197,3 +199,27 @@ def test_e2e_vault_holds_every_raw_file(e2e):
     data, _, _ = e2e
     blobs = [p for p in (data / "vault").rglob("*.*") if p.name != "url_index.jsonl"]
     assert len(blobs) == len(fixture_routes())  # each distinct response stored once
+
+
+def test_symbols_with_ampersand_are_url_encoded():
+    """'M&M' must reach the API as one symbol, not split the query string (5 Nifty 500 issuers had no results)."""
+    from financials.fetch.jobs import annual_listing_url, results_listing_url, shp_master_url
+
+    assert results_listing_url("M&M").endswith("symbol=M%26M")
+    assert results_listing_url("J&KBANK", page=2).endswith("symbol=J%26KBANK&page=2")
+    assert annual_listing_url("ARE&M").endswith("symbol=ARE%26M")
+    assert shp_master_url("GVT&D").endswith("symbol=GVT%26D")
+    assert results_listing_url("TCS").endswith("symbol=TCS")
+
+
+def test_archive_host_alias_is_canonicalised_in_listings():
+    """A13: the 15-Nov-2026 Coal India listing returns .in links; filing ids and the fetch ledger key on the URL."""
+    from _fixture_helpers import FIXTURES
+    from financials.parsers import canonical_archive_url
+    from financials.parsers.discovery import parse_integrated_filing_listing
+
+    raw = (FIXTURES / "discovery" / "nse_integrated-filing-results_equities_COALINDIA_20261115.json").read_bytes()
+    assert b"https://nsearchives.nseindia.in/corporate/xbrl/" in raw
+    entries = parse_integrated_filing_listing(raw)
+    assert entries and all(e.xbrl_url.startswith("https://nsearchives.nseindia.com/corporate/xbrl/") for e in entries)
+    assert canonical_archive_url("https://www.nseindia.com/api/x") == "https://www.nseindia.com/api/x"

@@ -15,6 +15,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
+from financials import dirty
 from financials.corp_actions import CorpAction, audit_day
 from financials.db import fetch_dicts, insert_rows
 from financials.ids import stable_id
@@ -36,9 +37,13 @@ class AdminError(ValueError):
 
 
 def _transaction(con, fn, *args, **kwargs):
+    """Run `fn` atomically. Every admin operation can change price-side feature inputs (a manual action, a resolved
+    gap, a merge, index membership), so the market state is diffed around it into materialize_dirty (dirty.py)."""
     con.execute("BEGIN TRANSACTION")
     try:
+        before = dirty.market_state(con)
         out = fn(con, *args, **kwargs)
+        dirty.mark_market_changes(con, before, "ADMIN" + fn.__name__.upper(), str(args[0]) if args else "")
     except BaseException:
         con.execute("ROLLBACK")
         raise
@@ -70,10 +75,18 @@ def backfill_index(
         ).fetchone()[0]
         if first is None:
             raise AdminError(f"no snapshot for {index_name}: promote a constituents snapshot first")
-        current = index_members(con, index_name, first)
+        # Members outside the equity universe (REITs, series RR, in the Nifty 500 since 2026-09-30 [IDX8]) count
+        # towards the index size but have no security in this database: virtual keys, never written as rows.
+        outside = {sym for (sym,) in con.execute(
+            "SELECT DISTINCT symbol FROM raw_index_snapshot WHERE index_name = ? AND isin LIKE 'IN%' "
+            "AND series NOT IN ('EQ', 'BE', 'BZ') AND snapshot_date = (SELECT max(snapshot_date) FROM "
+            "raw_index_snapshot WHERE index_name = ?)", [index_name, index_name]).fetchall()}  # fmt: skip
+        current = [*index_members(con, index_name, first), *(f"OUTSIDE:{s}" for s in sorted(outside))]
         intervals, steps = reconstruct_backward(
-            current, first, events, start, lambda s, d: resolve_symbol(con, s, d), expected_count=expected_count
-        )
+            current, first, events, start,
+            lambda s, d: f"OUTSIDE:{s}" if s in outside else resolve_symbol(con, s, d), expected_count=expected_count,
+        )  # fmt: skip
+        intervals = [iv for iv in intervals if not str(iv.key).startswith("OUTSIDE:")]
         con.execute(
             "DELETE FROM index_constituents_history WHERE index_name = ? AND source = 'MANUAL_BACKFILL'", [index_name]
         )
@@ -105,6 +118,7 @@ def rebuild_market(con, from_date: date, *, note: str = "rebuild-market") -> dic
     of `promotion_log` on/after the date are removed so `promote` replays them. Audited in `admin_log`."""
 
     def run(con):
+        from financials import features_store
         from financials.promoter import REBUILD_SUPERSEDED
 
         now = utc_now()
@@ -114,7 +128,7 @@ def rebuild_market(con, from_date: date, *, note: str = "rebuild-market") -> dic
             counts[key] = len(con.execute(sql + " RETURNING 1", params).fetchall())
 
         features_dates = [r[0] for r in con.execute(
-            "SELECT DISTINCT as_of_date FROM screener_features_history WHERE as_of_date >= ? ORDER BY 1", [from_date]
+            "SELECT DISTINCT as_of_date FROM features_daily WHERE as_of_date >= ? ORDER BY 1", [from_date]
         ).fetchall()]  # fmt: skip
         n("ohlcv", "DELETE FROM ohlcv WHERE trade_date >= ?", [from_date])
         n("calendar", "DELETE FROM trading_calendar WHERE cal_date >= ? "
@@ -134,10 +148,13 @@ def rebuild_market(con, from_date: date, *, note: str = "rebuild-market") -> dic
           "WHERE (resolved_at IS NULL OR resolution = 'FIXED_BY_RULE') AND stage IN ('GAP', 'IDENTIFIER', 'CALENDAR') "
           "AND CAST(json_extract_string(details, '$.trade_date') AS DATE) >= ?",
           [now, REBUILD_SUPERSEDED, f"rebuild-market --from {from_date}: {note}", from_date])  # fmt: skip
-        n("features", "DELETE FROM screener_features_history WHERE as_of_date >= ?", [from_date])
+        counts["features"] = features_store.delete_from(con, from_date)  # daily rows and intervals (§4.1)
+        con.execute("DELETE FROM features_meta WHERE as_of_date >= ?", [from_date])
+        con.execute("DELETE FROM market_breadth WHERE as_of_date >= ?", [from_date])
+        dirty.mark_all(con, from_date, "REBUILD_MARKET", str(from_date))
         con.execute("DELETE FROM screener_features")
-        con.execute("INSERT INTO screener_features SELECT * FROM screener_features_history WHERE as_of_date = "
-                    "(SELECT max(as_of_date) FROM screener_features_history)")  # fmt: skip
+        con.execute("INSERT INTO screener_features BY NAME SELECT * FROM screener_features_history WHERE as_of_date = "
+                    "(SELECT max(as_of_date) FROM features_daily)")  # fmt: skip
         logged = [r[0] for r in con.execute("SELECT stage_path FROM promotion_log WHERE job = 'market_day'").fetchall()]
         replay = [p for p in logged if p.split("/", 1)[-1][:8] >= f"{from_date:%Y%m%d}"]  # run id = YYYYMMDD-...
         if replay:
@@ -157,7 +174,7 @@ def rebuild_market(con, from_date: date, *, note: str = "rebuild-market") -> dic
 # ── reprocess [P1-9] ───────────────────────────────────────────────────────
 
 RETRYABLE = ("UNKNOWN_ISIN", "UNKNOWN_SYMBOL", "AMBIGUOUS_ISIN", "AMBIGUOUS_SYMBOL", "AMBIGUOUS_SECURITY",
-             "STALE_ISIN_OTHER_ISSUER", "NO_VISIBILITY")  # fmt: skip
+             "STALE_ISIN_OTHER_ISSUER", "NO_VISIBILITY", "UNPARSED_PURPOSE")  # fmt: skip
 
 
 def reprocess(con, stage_root) -> dict[str, Any]:
@@ -254,6 +271,7 @@ def _load_missing_fin_instrm_id_bars(con) -> int:
             "turnover_inr": r["turnover_inr"], "deliv_qty": None, "price_filing_id": r["filing_id"],
             "delivery_filing_id": None,
         }], or_ignore=True)  # fmt: skip
+        dirty.mark_securities(con, {sec: day}, "BAR_LOADED", q["quarantine_id"])  # bar and its gap findings
         prev = _prev_closes(con, r["exchange"], day).get(sec)
         for f in audit_day(
             sec, day, r["open"], prev, _actions(con, "security_id = ? AND ex_date = ?", [sec, day]), False
@@ -272,7 +290,8 @@ def _load_missing_fin_instrm_id_bars(con) -> int:
 # ── quarantine ─────────────────────────────────────────────────────────────
 
 RESOLUTIONS = {"ACCEPT": "ACCEPTED", "REJECT": "REJECTED", "OVERRIDE": "OVERRIDDEN", "CORP_ACTION": "OVERRIDDEN",
-               "MERGE_SECURITIES": "OVERRIDDEN"}  # fmt: skip
+               "MERGE_SECURITIES": "OVERRIDDEN", "CORRECT": "CORRECTED"}  # fmt: skip
+ATTRIBUTION_TAGS = ("pat_owners", "pat_nci")
 
 
 def list_quarantine(
@@ -575,14 +594,16 @@ def _merge_securities(con, q: dict, details: dict, note: str) -> dict:
         ).fetchone()[0]
         and drop_entity != keep_entity
     ):
-        for table in ("filing_meta", "fact_observations", "shareholding_meta", "shareholding_observations",
-                      "corp_actions", "company_overrides"):  # fmt: skip
+        for table in ("filing_meta", "fact_observations", "segment_observations", "shareholding_meta",
+                      "shareholding_observations", "corp_actions", "company_overrides"):  # fmt: skip
             con.execute(f"UPDATE {table} SET entity_id = ? WHERE entity_id = ?", [keep_entity, drop_entity])
         con.execute(
             "UPDATE entity_master SET status = 'MERGED', inactive_date = ?, exit_reason = ? WHERE entity_id = ?",
             [drop_start, f"duplicate of {keep_entity} (security merge)", drop_entity],
         )
     _override(con, keep_entity, "merged_security", {"merged": drop, "into": keep}, drop_start, note)
+    # Prices, identity and (when the entities merge) fundamentals move: both entities, every materialised day.
+    dirty.mark_entities(con, {keep_entity, drop_entity}, MIN_TRADE_DATE, "MERGE_SECURITIES", q["quarantine_id"])
 
     # Load the bar that collided, now that identity is unambiguous.
     raw = fetch_dicts(
@@ -654,6 +675,7 @@ def _set_scope(con, entity_id: str, quarterly: str | None, annual: str | None, r
                "recorded_at": now}  # fmt: skip
         insert_rows(con, "entity_scope_override", [row])
     body = value if isinstance(value, str) else json.dumps(value, sort_keys=True)
+    dirty.mark_entities(con, [entity_id], MIN_TRADE_DATE, "SCOPE_OVERRIDE", body)  # applies at every as-of
     insert_rows(con, "company_overrides", [{
         "override_id": stable_id("ovr", entity_id, "scope_policy", body, now), "entity_id": entity_id,
         "field": "scope_policy", "value": body, "valid_from": now.date(), "valid_to": None, "reason": reason,
@@ -683,9 +705,402 @@ def _set_archetype(con, entity_id: str, archetype: str | None, reason: str) -> d
         insert_rows(con, "entity_archetype_override", [{"entity_id": entity_id, "valuation_archetype": archetype,
                                                         "reason": reason, "recorded_at": now}])  # fmt: skip
     body = archetype or "CLEARED"
+    dirty.mark_entities(con, [entity_id], MIN_TRADE_DATE, "ARCHETYPE_OVERRIDE", body)  # applies at every as-of
     insert_rows(con, "company_overrides", [{
         "override_id": stable_id("ovr", entity_id, "valuation_archetype", body, now), "entity_id": entity_id,
         "field": "valuation_archetype", "value": body, "valid_from": now.date(), "valid_to": None, "reason": reason,
         "created_at": now,
     }])  # fmt: skip
     return {"entity_id": entity_id, "valuation_archetype": body}
+
+
+# ── PDF-verified corrections (owner decision B, 2026-11-15) ──
+
+# Batch K: tags the parsers file as INR_PER_SHARE (fact_observations.value_other). Their corrections carry
+# `value_other` (rupees per share, at most 4 decimals); every other tag is corrected in rupees (`value_inr`).
+PER_SHARE_TAGS = frozenset({
+    "eps_basic", "eps_basic_continuing", "eps_diluted", "eps_basic_before_extraordinary", "face_value_per_share",
+})  # fmt: skip
+
+
+def correct_from_pdf(
+    con,
+    filing_id: str,
+    corrections: list[dict],
+    *,
+    evidence_url: str,
+    evidence_page: int,
+    evidence_text: str,
+    reads: str,
+    note: str,
+    quarantine_id: str | None = None,
+) -> list[str]:
+    """Record values read from the filing's signed statutory results PDF, where the company's XBRL is wrong. Each
+    correction: {canonical_tag, period_start, period_end, value_inr} in rupees, or for a per-share tag
+    (PER_SHARE_TAGS: EPS, face value) {canonical_tag, period_start, period_end, value_other} in rupees per share.
+    Requires the evidence (URL, page, printed text) and at least two independent reads that agreed (`reads`, e.g.
+    "TEXT+HAIKU"). Correcting owners or NCI also withdraws the X86 attribution_withheld marker for that period. Raw
+    XBRL and fact_observations are never touched; readers rank a correction above the filing's own value
+    (fundamentals._fact_source). Resolves `quarantine_id` as CORRECTED when given. Returns the correction ids."""
+    if not corrections or not evidence_url or not evidence_text.strip() or not note.strip():
+        raise AdminError("corrections, evidence_url, evidence_text and note are required")
+    if "+" not in reads:
+        raise AdminError("a correction needs at least two independent reads that agreed, e.g. TEXT+HAIKU")
+    return _transaction(con, _correct, filing_id, corrections, evidence_url, int(evidence_page),
+                        evidence_text.strip(), reads, note.strip(), quarantine_id)  # fmt: skip
+
+
+def _correct(con, filing_id, corrections, url, page, text, reads, note, qid) -> list[str]:
+    meta = con.execute("SELECT entity_id, scope FROM filing_meta WHERE filing_id = ? LIMIT 1", [filing_id]).fetchone()
+    if meta is None:
+        raise AdminError(f"{filing_id} has no promoted filing_meta")
+    entity, scope = meta
+    rows, now = [], utc_now()
+    rows_in = list(corrections)
+    for c in corrections:
+        if c["canonical_tag"] in ATTRIBUTION_TAGS:
+            marker = {"canonical_tag": "attribution_withheld", "period_start": c["period_start"],
+                      "period_end": c["period_end"], "value_inr": None}  # fmt: skip
+            if marker not in rows_in:
+                rows_in.append(marker)
+    for c in rows_in:
+        start, end = date.fromisoformat(str(c["period_start"])), date.fromisoformat(str(c["period_end"]))
+        value_inr, value_other = _correction_values(c)
+        value = value_other if c["canonical_tag"] in PER_SHARE_TAGS else value_inr
+        cid = stable_id("corr", filing_id, c["canonical_tag"], start, end, value)
+        rows.append({
+            "correction_id": cid, "filing_id": filing_id, "entity_id": entity, "scope": scope,
+            "canonical_tag": c["canonical_tag"], "period_type": "INSTANT" if start == end else "DURATION",
+            "period_start": start, "period_end": end, "value_inr": value_inr, "evidence_url": url,
+            "evidence_page": page, "evidence_text": text, "reads": reads, "quarantine_id": qid, "note": note,
+            "created_at": now, "revoked_at": None, "value_other": value_other,
+        })  # fmt: skip
+    existing = {r[0] for r in con.execute("SELECT correction_id FROM fact_corrections").fetchall()}
+    new = [r for r in rows if r["correction_id"] not in existing]
+    if new:
+        insert_rows(con, "fact_corrections", new)
+        _mark_correction_dirty(con, filing_id, entity, "fact_correction")
+    if qid is not None:
+        q = con.execute("SELECT resolved_at FROM quarantine_queue WHERE quarantine_id = ?", [qid]).fetchone()
+        if q is None:
+            raise AdminError(f"unknown quarantine id {qid}")
+        if q[0] is None:
+            con.execute(
+                "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'CORRECTED', resolution_note = ? "
+                "WHERE quarantine_id = ?",
+                [now, f"{note} [PDF {url} p.{page}; reads {reads}]", qid],
+            )
+    return [r["correction_id"] for r in rows]
+
+
+def _correction_values(c: dict) -> tuple[Decimal | None, Decimal | None]:
+    """(value_inr, value_other) of one correction. A per-share tag takes `value_other` only (DECIMAL(18,4), as in
+    fact_observations it is never rupees); any other tag takes `value_inr` only (DECIMAL(20,2) rupees). None
+    withdraws the tag for that period either way."""
+    tag = c["canonical_tag"]
+    per_share = tag in PER_SHARE_TAGS
+    key, other = ("value_other", "value_inr") if per_share else ("value_inr", "value_other")
+    if key not in c or c.get(other) is not None:
+        unit = "rupees per share" if per_share else "rupees"
+        raise AdminError(f"{tag}: give `{key}` ({unit}), not `{other}`")
+    if c[key] is None:
+        return None, None
+    v = Decimal(str(c[key]))
+    places = Decimal("0.0001") if per_share else Decimal("0.01")
+    if v != v.quantize(places) or abs(v) >= Decimal(10) ** (14 if per_share else 18):
+        raise AdminError(f"{tag}: {v} does not fit {'DECIMAL(18,4)' if per_share else 'DECIMAL(20,2)'}")
+    # not quantized: the stable_id of a rupee correction recorded before batch K must not change
+    return (None, v) if per_share else (v, None)
+
+
+def revoke_correction(con, correction_id: str, note: str) -> None:
+    """Withdraw a correction (the filed value applies again); the row stays for the audit trail."""
+    if not note.strip():
+        raise AdminError("a note is required")
+    n = con.execute(
+        "UPDATE fact_corrections SET revoked_at = ?, note = note || ' | revoked: ' || ? "
+        "WHERE correction_id = ? AND revoked_at IS NULL RETURNING filing_id, entity_id",
+        [utc_now(), note.strip(), correction_id],
+    ).fetchall()
+    if not n:
+        raise AdminError(f"no active correction {correction_id}")
+    _mark_correction_dirty(con, n[0][0], n[0][1], "fact_correction_revoked")
+
+
+def _mark_correction_dirty(con, filing_id: str, entity_id: str, reason: str) -> None:
+    """Incremental materialisation: the entity's rows change from the corrected filing's earliest visibility."""
+    from financials.dirty import mark_visible
+
+    vis = con.execute("SELECT min(visible_from_ts) FROM filing_meta WHERE filing_id = ?", [filing_id]).fetchone()[0]
+    if vis is not None:
+        mark_visible(con, entity_id, vis, reason, filing_id)
+
+
+# ── corporate lineage (G37, G51, G56, G57; architecture §11.7) ────────────
+# Append-only edges in entity_lineage (financials.lineage). A merger marks the target MERGED with merged_into; it
+# never writes corp_actions, so neither the acquirer's nor the target's adjusted prices change (factor 1.0, G57).
+
+
+def _dec(x) -> str | None:
+    return None if x is None else f"{Decimal(x).normalize():f}"
+
+
+def _lineage_entity(con, ident: str) -> str:
+    """An entity id, an ISIN or an NSE symbol (any interval of the identifier history); must name one entity."""
+    ident = ident.strip()
+    if con.execute("SELECT 1 FROM entity_master WHERE entity_id = ?", [ident]).fetchone():
+        return ident
+    is_isin = len(ident) == 12 and ident[:2].isalpha() and ident[2:].isalnum() and ident[-1].isdigit()
+    col = "isin" if is_isin else "symbol"
+    rows = con.execute(
+        f"SELECT DISTINCT s.entity_id FROM security_identifier_history h JOIN securities s USING (security_id) "
+        f"WHERE h.{col} = ?",
+        [ident],
+    ).fetchall()
+    if len(rows) != 1:
+        raise AdminError(f"{col} {ident!r} names {len(rows)} entities; pass the entity id")
+    return rows[0][0]
+
+
+def _lineage_rows(con, where: str = "", params: list | None = None) -> list[dict]:
+    return fetch_dicts(con, f"SELECT * FROM entity_lineage {where}", params or [])
+
+
+def _current_lineage(con, lineage_id: str) -> dict:
+    rows = _lineage_rows(con, "WHERE lineage_id = ?", [lineage_id])
+    if not rows:
+        raise AdminError(f"no lineage row {lineage_id}")
+    if lineage_id not in {e.lineage_id for e in _lineage_edges(con)}:
+        raise AdminError(f"{lineage_id} is superseded or retired; amend the current row")
+    return rows[0]
+
+
+def _demerger_evidence(con, parent: str, effective: date) -> str:
+    """A DEMERGED_FROM edge needs the parent's accepted DEMERGER action on the effective date (its price factor)."""
+    from financials.corp_actions import ACCEPTED_STATUSES
+
+    row = con.execute(
+        "SELECT source_filing_id FROM corp_actions c JOIN securities s USING (security_id) WHERE s.entity_id = ? "
+        "AND c.action_type = 'DEMERGER' AND c.ex_date = ? AND c.status IN (SELECT unnest(?)) "
+        "ORDER BY c.action_id LIMIT 1",
+        [parent, effective, sorted(ACCEPTED_STATUSES)],
+    ).fetchone()
+    if row is None:
+        raise AdminError(f"{parent} has no accepted DEMERGER action with ex-date {effective}")
+    return row[0]
+
+
+def _insert_lineage(con, row: dict, *, action: str, note: str, reactivate: bool = False) -> dict:
+    """Validate, insert (deterministic id), apply the merger status, check the COA split and audit one edge row."""
+    from financials.lineage import MERGE_RELATIONS, LineageEdge, LineageError, coa_split, load_edges
+
+    keys = ("parent_entity_id", "child_entity_id", "relation", "effective_date", "swap_ratio_num", "swap_ratio_den",
+            "coa_pct", "parent_coa_pct", "state", "supersedes_lineage_id")  # fmt: skip
+    try:
+        edge = LineageEdge("new", *(row.get(k) for k in keys))
+    except LineageError as exc:
+        raise AdminError(str(exc)) from exc
+    lineage_id = stable_id("lin", edge.parent_entity_id, edge.child_entity_id, edge.relation, edge.effective_date,
+                           _dec(edge.swap_ratio_num), _dec(edge.swap_ratio_den), _dec(edge.coa_pct),
+                           _dec(edge.parent_coa_pct), edge.state, edge.supersedes_lineage_id)  # fmt: skip
+    if con.execute("SELECT 1 FROM entity_lineage WHERE lineage_id = ?", [lineage_id]).fetchone():
+        tip = _chain_tip(con, lineage_id)
+        if not reactivate or tip == lineage_id:
+            return {"lineage_id": lineage_id, "inserted": False}
+        if con.execute("SELECT state FROM entity_lineage WHERE lineage_id = ?", [tip]).fetchone()[0] != "RETIRED":
+            raise AdminError(f"edge exists as {tip}; use `lineage amend` or `lineage coa`")
+        # `lineage add` of an edge retired earlier: a new ACTIVE row supersedes the RETIRED one.
+        return _insert_lineage(con, {**row, "supersedes_lineage_id": tip}, action=action, note=note)
+    if edge.supersedes_lineage_id is None:
+        same = [e for e in load_edges(con) if (e.parent_entity_id, e.child_entity_id, e.relation, e.effective_date)
+                == (edge.parent_entity_id, edge.child_entity_id, edge.relation, edge.effective_date)]  # fmt: skip
+        if same:
+            raise AdminError(f"edge exists as {same[0].lineage_id}; use `lineage amend` or `lineage coa`")
+    now = utc_now()
+    insert_rows(con, "entity_lineage", [{**{k: row.get(k) for k in keys}, "lineage_id": lineage_id,
+                                         "evidence_filing_id": row.get("evidence_filing_id"),
+                                         "evidence_url": row.get("evidence_url"), "source": row["source"],
+                                         "note": note, "recorded_at": now}])  # fmt: skip
+
+    if edge.relation in MERGE_RELATIONS:
+        _apply_merger_status(con, edge, lineage_id)
+    elif edge.state == "ACTIVE":
+        try:
+            coa_split(load_edges(con), edge.parent_entity_id, edge.effective_date)
+        except LineageError as exc:
+            raise AdminError(str(exc)) from exc
+    value = {k: row.get(k) for k in keys if row.get(k) is not None} | {"lineage_id": lineage_id}
+    _override(con, edge.child_entity_id, "lineage", value, edge.effective_date, note)
+    con.execute(
+        "INSERT INTO admin_log VALUES (?, ?, ?, ?, ?, ?)",
+        [stable_id("adm", "lineage", action, lineage_id, now), "LINEAGE_" + action,
+         json.dumps(value, default=str, sort_keys=True), json.dumps({"lineage_id": lineage_id}), note, now],
+    )  # fmt: skip
+    return {"lineage_id": lineage_id, "inserted": True}
+
+
+def _chain_tip(con, lineage_id: str) -> str:
+    """The latest row of a supersession chain (append-only: each row is superseded at most once by design)."""
+    while True:
+        nxt = con.execute("SELECT lineage_id FROM entity_lineage WHERE supersedes_lineage_id = ? ORDER BY recorded_at "
+                          "DESC LIMIT 1", [lineage_id]).fetchone()  # fmt: skip
+        if nxt is None:
+            return lineage_id
+        lineage_id = nxt[0]
+
+
+def _apply_merger_status(con, edge, lineage_id: str) -> None:
+    """G56: the target of a current merger edge is MERGED into the acquirer from the effective date; a retired edge
+    reactivates it. Prices are never touched (G57)."""
+    status, merged_into = con.execute("SELECT status, merged_into FROM entity_master WHERE entity_id = ?",
+                                      [edge.child_entity_id]).fetchone()  # fmt: skip
+    if edge.state == "RETIRED":
+        if merged_into == edge.parent_entity_id:
+            con.execute("UPDATE entity_master SET status = 'ACTIVE', inactive_date = NULL, exit_reason = NULL, "
+                        "merged_into = NULL WHERE entity_id = ?", [edge.child_entity_id])  # fmt: skip
+        return
+    if status == "MERGED" and merged_into != edge.parent_entity_id:
+        raise AdminError(f"{edge.child_entity_id} is already MERGED ({merged_into or 'duplicate-security repair'})")
+    con.execute(
+        "UPDATE entity_master SET status = 'MERGED', inactive_date = ?, exit_reason = ?, merged_into = ? "
+        "WHERE entity_id = ?",
+        [edge.effective_date, f"{edge.relation} {edge.parent_entity_id} ({lineage_id})", edge.parent_entity_id,
+         edge.child_entity_id],
+    )  # fmt: skip
+
+
+def add_lineage(
+    con,
+    *,
+    parent: str,
+    child: str,
+    relation: str,
+    effective_date: date,
+    ratio_num: Decimal | None = None,
+    ratio_den: Decimal | None = None,
+    evidence_url: str,
+    note: str,
+) -> dict:
+    """Record one edge by hand (`lineage add`). Automatic merger parsing is BLOCKED: no merger purpose exists in the
+    NSE corporate-actions feed [CA14], so mergers come only from here, each with the URL of its evidence."""
+    if not evidence_url.strip() or not note.strip():
+        raise AdminError("an evidence URL and a note are required")
+
+    def run(con):
+        p, c = _lineage_entity(con, parent), _lineage_entity(con, child)
+        evidence = _demerger_evidence(con, p, effective_date) if relation == "DEMERGED_FROM" else None
+        return _insert_lineage(con, {
+            "parent_entity_id": p, "child_entity_id": c, "relation": relation, "effective_date": effective_date,
+            "swap_ratio_num": ratio_num, "swap_ratio_den": ratio_den, "state": "ACTIVE",
+            "evidence_filing_id": evidence, "evidence_url": evidence_url.strip(), "source": "ADMIN",
+        }, action="ADD", note=note.strip(), reactivate=True)  # fmt: skip
+
+    return _transaction(con, run)
+
+
+def amend_lineage(con, lineage_id: str, *, ratio_num: Decimal, ratio_den: Decimal, evidence_url: str, note: str):
+    """Set the swap / entitlement ratio of a current edge: a superseding row (the old row stays)."""
+    if not evidence_url.strip() or not note.strip():
+        raise AdminError("an evidence URL and a note are required")
+
+    def run(con):
+        old = _current_lineage(con, lineage_id)
+        new = {**old, "swap_ratio_num": ratio_num, "swap_ratio_den": ratio_den, "supersedes_lineage_id": lineage_id,
+               "evidence_url": evidence_url.strip(), "source": "ADMIN"}  # fmt: skip
+        return _insert_lineage(con, new, action="AMEND", note=note.strip())
+
+    return _transaction(con, run)
+
+
+def set_demerger_coa(
+    con,
+    *,
+    parent: str,
+    effective_date: date,
+    parent_pct: Decimal,
+    children: dict[str, Decimal],
+    evidence_url: str,
+    note: str,
+) -> dict:
+    """G51: the cost-of-acquisition split of one demerger, for every child of the scheme at once; parent + children
+    must sum to 100% (within 0.01 pp). Only from a figure an admin read at `evidence_url` (R7 stays UNVERIFIED)."""
+    from financials.lineage import COA_TOLERANCE, HUNDRED, load_edges
+
+    if not evidence_url.strip() or not note.strip():
+        raise AdminError("an evidence URL and a note are required")
+    total = Decimal(parent_pct) + sum((Decimal(v) for v in children.values()), Decimal(0))
+    if abs(total - HUNDRED) > COA_TOLERANCE:
+        raise AdminError(f"COA split sums to {total}%, not 100")
+
+    def run(con):
+        p = _lineage_entity(con, parent)
+        named = {_lineage_entity(con, c): Decimal(v) for c, v in children.items()}
+        scheme = {
+            e.child_entity_id: e
+            for e in load_edges(con)
+            if e.relation == "DEMERGED_FROM" and e.parent_entity_id == p and e.effective_date == effective_date
+        }
+        if set(named) != set(scheme):
+            raise AdminError(f"the scheme's children are {sorted(scheme)}; name each of them exactly once")
+        out = []
+        for child, pct in sorted(named.items()):
+            old = _current_lineage(con, scheme[child].lineage_id)
+            new = {**old, "coa_pct": pct, "parent_coa_pct": Decimal(parent_pct), "supersedes_lineage_id":
+                   old["lineage_id"], "evidence_url": evidence_url.strip(), "source": "ADMIN"}  # fmt: skip
+            out.append(_insert_lineage(con, new, action="COA", note=note.strip()))
+        return {"parent": p, "effective_date": effective_date, "total_pct": total, "rows": out}
+
+    return _transaction(con, run)
+
+
+def retire_lineage(con, lineage_id: str, *, note: str) -> dict:
+    """Withdraw an edge: a RETIRED row supersedes it; a merged target becomes ACTIVE again."""
+    if not note.strip():
+        raise AdminError("a note is required")
+
+    def run(con):
+        old = _current_lineage(con, lineage_id)
+        new = {**old, "state": "RETIRED", "supersedes_lineage_id": lineage_id, "source": "ADMIN"}
+        return _insert_lineage(con, new, action="RETIRE", note=note.strip())
+
+    return _transaction(con, run)
+
+
+def load_lineage_manifest(con, rows: list[dict], *, source: str = "entity_lineage.csv") -> dict:
+    """Load edges from a manifest whose rows are pinned to committed fixtures (`reference/entity_lineage.csv`, test
+    tests/test_lineage.py). Idempotent. A row whose entities are not in the database yet, or (DEMERGED_FROM) whose
+    parent has no accepted DEMERGER action on the date, is skipped with its reason and loads on a later run."""
+    from financials.lineage import parse_ratio
+
+    def run(con):
+        out: dict[str, Any] = {"inserted": [], "present": [], "skipped": []}
+        current = {(e.parent_entity_id, e.child_entity_id, e.relation, e.effective_date): e.lineage_id
+                   for e in _lineage_edges(con)}  # fmt: skip
+        for r in rows:
+            eff = date.fromisoformat(r["effective_date"])
+            try:
+                p, c = _lineage_entity(con, r["parent"]), _lineage_entity(con, r["child"])
+                evidence = _demerger_evidence(con, p, eff) if r["relation"] == "DEMERGED_FROM" else None
+            except AdminError as exc:
+                out["skipped"].append({"parent": r["parent"], "child": r["child"], "reason": str(exc)})
+                continue
+            if (p, c, r["relation"], eff) in current:  # loaded before (possibly amended since): leave it
+                out["present"].append(current[(p, c, r["relation"], eff)])
+                continue
+            num, den = parse_ratio(f"{r['ratio_num']}:{r['ratio_den']}" if r["ratio_num"] else None)
+            coa, pcoa = (Decimal(r[k]) if r[k] else None for k in ("coa_pct", "parent_coa_pct"))
+            res = _insert_lineage(con, {
+                "parent_entity_id": p, "child_entity_id": c, "relation": r["relation"], "effective_date": eff,
+                "swap_ratio_num": num, "swap_ratio_den": den, "coa_pct": coa, "parent_coa_pct": pcoa, "state": "ACTIVE",
+                "evidence_filing_id": evidence, "evidence_url": r["evidence_url"], "source": "MANIFEST",
+            }, action="LOAD", note=f"{source}: {r['evidence_fixture']}: {r['evidence_quote']}")  # fmt: skip
+            out["inserted" if res["inserted"] else "present"].append(res["lineage_id"])
+        return out
+
+    return _transaction(con, run)
+
+
+def _lineage_edges(con):
+    from financials.lineage import load_edges
+
+    return load_edges(con)

@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
 
-from financials.parsers import ParseError
+from financials.parsers import ParseError, canonical_archive_url
 from financials.parsers.xbrl import parse_instance
 
 FAMILIES = {
@@ -268,7 +268,7 @@ def parse_announcements_rss(data: bytes) -> list[AnnouncementItem]:
             AnnouncementItem(
                 company=" ".join((it.findtext("title") or "").split()),
                 subject=" ".join((it.findtext("description") or "").split()),
-                xbrl_url=link if "/corporate/xbrl/" in link else None,
+                xbrl_url=canonical_archive_url(link) if "/corporate/xbrl/" in link else None,
                 pub_ts_ist=_pub(pub),
             )
         )

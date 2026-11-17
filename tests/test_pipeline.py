@@ -31,6 +31,16 @@ def gap_quarantines(m, symbol, trade_date):
     ).fetchall()
 
 
+def vault_facts(m) -> int:
+    """Facts of the promoted results filing's vault blob, parsed on demand: the raw evidence since decision J (no raw
+    table; the blob is the source of truth)."""
+    from financials.parsers.xbrl import parse_instance
+
+    path, sha = m.con.execute("SELECT b.storage_path, b.sha256 FROM filings f JOIN blobs b USING (sha256) "
+                              "WHERE f.category = 'RESULTS_XBRL'").fetchone()  # fmt: skip
+    return len(parse_instance(m.vault.read_path(path, sha)).facts)
+
+
 def promote_day(m, d, **kw):
     return promote(m.con, m.stage_day(d, **kw))
 
@@ -198,7 +208,7 @@ def test_results_filing_with_broadcast_is_point_in_time(market):
     args = (entity, "STANDALONE", "revenue_from_operations", date(2026, 7, 1), date(2026, 9, 30))
     assert pit_fact(market.con, *args, as_of=datetime(2026, 11, 5, 9, 59)) is None
     assert pit_fact(market.con, *args, as_of=broadcast) == Decimal("2895440000.00")
-    assert count(market, "SELECT count(*) FROM raw_xbrl_facts") == 620
+    assert vault_facts(market) == 620
     assert count(market, "SELECT count(*) FROM fact_observations") > 90
     meta = market.con.execute("SELECT visible_from_source, interest_paid_cfo_class FROM filing_meta").fetchone()
     assert meta == ("BROADCAST", "FINANCING")
@@ -210,7 +220,7 @@ def test_results_filing_without_broadcast_or_calendar_is_quarantined(market):
     assert result.status == "QUARANTINED"
     assert market.con.execute("SELECT reason_code FROM quarantine_queue").fetchall() == [("NO_VISIBILITY",)]
     assert count(market, "SELECT count(*) FROM fact_observations") == 0
-    assert count(market, "SELECT count(*) FROM raw_xbrl_facts") == 620  # raw evidence is kept
+    assert vault_facts(market) == 620  # raw evidence is kept: blob + filing row
 
 
 def test_results_filing_board_meeting_rule(market):
@@ -249,7 +259,7 @@ def test_unknown_taxonomy_is_quarantined_with_raw_kept(market):
     result = promote(market.con, stage)
     assert result.status == "QUARANTINED"
     assert market.con.execute("SELECT reason_code FROM quarantine_queue").fetchall() == [("UNKNOWN_TAXONOMY",)]
-    assert count(market, "SELECT count(*) FROM raw_xbrl_facts") == 1527  # all raw facts kept
+    assert vault_facts(market) == 1527  # all raw facts kept: blob + filing row
 
 
 def test_nbfc_filing_is_parsed_then_stops_at_the_identity_gate(market):
@@ -269,4 +279,4 @@ def test_nbfc_filing_is_parsed_then_stops_at_the_identity_gate(market):
     assert market.con.execute("SELECT stage, reason_code FROM quarantine_queue").fetchall() == [
         ("IDENTITY", "UNKNOWN_ISIN")
     ]
-    assert count(market, "SELECT count(*) FROM raw_xbrl_facts") == 359
+    assert vault_facts(market) == 359

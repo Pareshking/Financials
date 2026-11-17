@@ -12,10 +12,16 @@ import duckdb
 import pyarrow as pa
 
 SCHEMA_SQL = files(__package__).joinpath("schema.sql").read_text(encoding="utf-8")
+VIEWS_MARKER = "-- views (after column upgrade)\n"  # schema.sql: views run after upgrade_columns
 
 
 def connect(path: str | Path = ":memory:", *, read_only: bool = False) -> duckdb.DuckDBPyConnection:
     return duckdb.connect(str(path), read_only=read_only)
+
+
+def version_key(column: str = "parser_version") -> str:
+    """SQL sort key for a dotted parser version: '0.10.0' sorts after '0.9.0' (a string sort would not)."""
+    return "(" + " || '.' || ".join(f"lpad(split_part({column}, '.', {i}), 9, '0')" for i in (1, 2, 3)) + ")"
 
 
 def apply_schema(con: duckdb.DuckDBPyConnection) -> list[str]:
@@ -23,10 +29,22 @@ def apply_schema(con: duckdb.DuckDBPyConnection) -> list[str]:
 
     Idempotent: a second run changes nothing. Only nullable, constraint-free columns are added automatically;
     a new NOT NULL / PRIMARY KEY / UNIQUE / REFERENCES column needs a deliberate migration and raises.
-    Returns the statements executed by the upgrade (empty for a fresh or current database).
+    Returns the statements executed by the upgrade (empty for a fresh or current database). Views (below
+    VIEWS_MARKER in schema.sql) are created last, so they may name columns the upgrade just added. A database whose
+    screener_features_history is still the wide table raises SchemaMigrationError: `migrate-sparse-history`
+    (features_store.migrate_legacy) converts it explicitly.
     """
-    con.execute(SCHEMA_SQL)
-    return upgrade_columns(con)
+    if con.execute(_LEGACY_HISTORY).fetchone()[0]:
+        raise SchemaMigrationError(
+            "screener_features_history is still the wide table: run `python -m financials --data-dir data "
+            "migrate-sparse-history` (event-sparse storage, architecture §4.1), then `compact`"
+        )
+    tables, _, views = SCHEMA_SQL.partition(VIEWS_MARKER)
+    con.execute(tables)
+    executed = upgrade_columns(con)
+    if views.strip():
+        con.execute(views)
+    return executed
 
 
 _TABLE_RE = re.compile(r"CREATE TABLE IF NOT EXISTS (\w+) \((.*?)\n\);", re.S)
@@ -36,6 +54,13 @@ _CONSTRAINED = re.compile(r"\b(NOT NULL|PRIMARY KEY|UNIQUE|REFERENCES)\b", re.I)
 
 class SchemaMigrationError(RuntimeError):
     pass
+
+
+# A database from before event-sparse storage (features_store.migrate_legacy converts it): the history is a table.
+_LEGACY_HISTORY = (
+    "SELECT count(*) FROM duckdb_tables() WHERE table_name = 'screener_features_history' AND schema_name = 'main' "
+    "AND database_name = current_database()"
+)
 
 
 def declared_columns(schema_sql: str | None = None) -> dict[str, list[tuple[str, str]]]:
@@ -54,9 +79,27 @@ def declared_columns(schema_sql: str | None = None) -> dict[str, list[tuple[str,
     return out
 
 
+# Deliberate migrations that relax a NOT NULL column of an existing database to the nullable declaration of schema.sql
+# (DuckDB: catalog-only, no rewrite): disclosure_facts.value_text is NULL for the pointer rows of parser disc-2
+# (owner decision M, X120).
+RELAXED_NOT_NULL = (("disclosure_facts", "value_text"),)
+
+
 def upgrade_columns(con: duckdb.DuckDBPyConnection) -> list[str]:
     executed = []
-    for table, cols in declared_columns().items():
+    declared = declared_columns()
+    for table, column in RELAXED_NOT_NULL:
+        definition = dict(declared[table])[column]
+        nullable = con.execute(
+            "SELECT is_nullable FROM information_schema.columns WHERE table_name = ? AND column_name = ? "
+            "AND table_schema = 'main' AND table_catalog = current_database()",
+            [table, column],
+        ).fetchone()
+        if nullable == ("NO",) and not _CONSTRAINED.search(definition):
+            stmt = f"ALTER TABLE {table} ALTER COLUMN {column} DROP NOT NULL"
+            con.execute(stmt)
+            executed.append(stmt)
+    for table, cols in declared.items():
         existing = set(table_columns(con, table))
         for name, definition in cols:
             if name in existing:

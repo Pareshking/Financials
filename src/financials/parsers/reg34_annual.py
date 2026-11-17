@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 
-from financials.parsers import ParseError
+from financials.parsers import ParseError, canonical_archive_url
 from financials.parsers.indas_corp import (
     DURATION_TAGS,
     INSTANT_TAGS,
@@ -35,6 +35,9 @@ from financials.parsers.indas_corp import (
     CanonicalFact,
     Issue,
     ParsedResults,
+    _apply_attribution_recovery_rules,
+    _apply_owners_tci_rule,
+    _apply_zero_attribution_rule,
     _check,
     _check_eps,
     _check_identities,
@@ -158,6 +161,9 @@ def parse_reg34_annual(data: bytes, file_name: str | None = None) -> ParsedResul
     _geographic(inst, result)
     _label_rules(inst, result)
     _apply_contingent_placeholder_rule(result)
+    _apply_zero_attribution_rule(result)  # X78: X48 / X56 per annual year, before withheld values are preserved
+    _apply_owners_tci_rule(result)
+    _apply_attribution_recovery_rules(result)
     preserve_withheld(inst, result, durations=set(result.meta["in_scope_periods"]),
                       instants=set(result.meta["in_scope_instants"]))  # fmt: skip
     enrich_line_items(result)
@@ -516,7 +522,7 @@ def parse_annual_listing(data: bytes) -> list[AnnualListingEntry]:
                     to_year=int(r["toYr"]),
                     submission_type=r["submission_type"],
                     broadcast_ts_ist=datetime.strptime(r["broadcast_dttm"], "%d-%b-%Y %H:%M:%S").replace(tzinfo=IST),
-                    xbrl_url=r["fileName"],
+                    xbrl_url=canonical_archive_url(r["fileName"]),
                 )
             )
         return out

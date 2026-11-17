@@ -4,7 +4,8 @@ Not for git: the repository is public and the data is NSE-derived (CLAUDE.md "No
 Parquet are gitignored). `export-bundle` writes `<out>/<table>/part-NNN.parquet` plus `manifest.json` (row count and
 an order-independent checksum per table); every shard stays under `max_file_mb` (re-split when a shard is larger) and
 the whole bundle under `max_total_mb`, else the export fails. `import-bundle` loads a bundle into a new database in
-schema order (foreign keys) and verifies counts and checksums.
+schema order (foreign keys) and verifies counts and checksums; a table of an older bundle that schema.sql no longer
+declares (raw_xbrl_facts of an `--include-raw` bundle from before decision J) is skipped.
 """
 
 from __future__ import annotations
@@ -16,15 +17,15 @@ from pathlib import Path
 
 from financials.db import apply_schema, connect, declared_columns
 
-RAW_TABLES = ("raw_xbrl_facts",)  # fact_observations keeps every numeric fact (C24); raw only with --include-raw
-
 
 class BundleError(RuntimeError):
     pass
 
 
-def tables(include_raw: bool = False) -> list[str]:
-    return [t for t in declared_columns() if include_raw or t not in RAW_TABLES]
+def tables() -> list[str]:
+    """Every table of schema.sql (raw market tables included). Raw XBRL facts are no table since decision J: the
+    vault blobs hold them and are not part of a bundle."""
+    return list(declared_columns())
 
 
 def table_checksum(con, table: str) -> tuple[int, str]:
@@ -32,15 +33,14 @@ def table_checksum(con, table: str) -> tuple[int, str]:
     return int(n), str(h)
 
 
-def export_bundle(con, out: Path, *, include_raw: bool = False, max_file_mb: float = 50,
-                  max_total_mb: float = 250, level: int = 9) -> dict:  # fmt: skip
+def export_bundle(con, out: Path, *, max_file_mb: float = 50, max_total_mb: float = 250, level: int = 9) -> dict:
     out = Path(out)
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
     manifest: dict = {"format": 1, "compression": f"zstd-{level}", "tables": {}}
     limit = max_file_mb * 1024 * 1024
-    for t in tables(include_raw):
+    for t in tables():
         rows, checksum = table_checksum(con, t)
         d = out / t
         d.mkdir()
@@ -78,15 +78,16 @@ def import_bundle(src: Path, db_path: Path) -> dict:
     try:
         apply_schema(con)
         con.execute("BEGIN TRANSACTION")
-        for t in declared_columns():  # schema order respects foreign keys
+        declared = declared_columns()
+        for t in declared:  # schema order respects foreign keys; a table no longer in schema.sql is skipped
             if t not in manifest["tables"] or not manifest["tables"][t]["rows"]:
                 continue
             con.execute(f"INSERT INTO {t} BY NAME SELECT * FROM read_parquet('{(src / t).as_posix()}/*.parquet')")
         con.execute("COMMIT")
         bad = {t: (v["rows"], v["checksum"], table_checksum(con, t)) for t, v in manifest["tables"].items()
-               if table_checksum(con, t) != (v["rows"], v["checksum"])}  # fmt: skip
+               if t in declared and table_checksum(con, t) != (v["rows"], v["checksum"])}  # fmt: skip
     finally:
         con.close()
     if bad:
         raise BundleError(f"round trip mismatch: {bad}")
-    return {t: v["rows"] for t, v in manifest["tables"].items()}
+    return {t: v["rows"] for t, v in manifest["tables"].items() if t in declared}

@@ -17,7 +17,7 @@ from datetime import date, datetime
 import pytest
 from conftest import FETCHED_AT, Market
 
-from _fixture_helpers import FIXTURES, XBRL_DIR
+from _fixture_helpers import AUDIT_OPINION_FIXTURES, FIXTURES, XBRL_DIR
 from financials.cli import promote_pending
 from financials.dsl import run_screen
 from financials.features import materialize
@@ -62,6 +62,8 @@ def unified(tmp_path_factory):
                          snapshot_date=date(2026, 11, 12),
                          data=(fx / "indices" / "ind_nifty500list_20261113.csv").read_bytes())  # fmt: skip
     for p in sorted(XBRL_DIR.glob("*.xml")):
+        if p.name in AUDIT_OPINION_FIXTURES:  # evidence for test_audit_opinions only
+            continue
         stage = stage_shareholding if p.name.startswith("SHP_") else stage_results_xbrl
         stage(m.vault, m.stage_root, data=p.read_bytes(), source_url=ARCHIVE + p.name, fetched_at=FETCHED_AT,
               broadcast_ts=FILED, broadcast_ts_source="API_FIELD")  # fmt: skip
@@ -89,9 +91,10 @@ def test_every_batch_promotes_with_only_the_documented_exceptions(unified):
     assert m.pending == 0
     assert Counter(tuple(x) for x in m.log) == {
         ("PROMOTED", "market_day"): 10, ("PROMOTED", "holidays"): 1, ("PROMOTED", "index_snapshot"): 1,
-        ("PROMOTED", "corp_actions"): 1, ("PROMOTED", "results_xbrl"): 61, ("PROMOTED", "shareholding"): 9,
+        ("PROMOTED", "corp_actions"): 1, ("PROMOTED", "results_xbrl"): 111, ("PROMOTED", "shareholding"): 15,
         ("PROMOTED", "reg30_event"): 8,
-        ("QUARANTINED", "results_xbrl"): 1,  # OLAELEC: owners + NCI identity fails in the filing itself
+        ("QUARANTINED", "results_xbrl"): 2,  # MRPL Q1 FY26 on the non-Ind AS template (UNKNOWN_TAXONOMY) [X89]
+        ("FIXED_BY_RULE", "results_xbrl"): 1,  # ... closed once its Ind AS re-filing is promoted [X89]
         ("OUT_OF_SCOPE", "results_xbrl"): 1,  # Star Health Q3 FY25 legacy GI file (period end before C9)
         ("QUARANTINED", "reg30_event"): 1,  # SHANTHALA fraud disclosure: SME series, outside the universe
     }  # fmt: skip
@@ -110,32 +113,39 @@ def test_quarantine_reasons_are_the_documented_ones(unified):
         "GAP/ISIN_CHANGE_WITHOUT_ACTION",  # mostly across those missing sessions
         "CORP_ACTION/STALE_ISIN_OTHER_ISSUER",  # PREMIERPOL changed issuer code [CA7]
         "IDENTIFIER/ISIN_COLLISION",  # SIGMA split + series change [P14]
-        "IDENTITY/OWNERS_PLUS_NCI",
+        "IDENTITY/ATTRIBUTION_WITHHELD",  # Coforge Q4 FY26: owners + NCI = TCI; split withheld, filing promoted (X86)
         "IDENTITY/UNKNOWN_SYMBOL",  # OLAELEC, SHANTHALA
         "INDEX/PLACEHOLDER_ISIN",
         "INDEX/UNKNOWN_ISIN",  # IDX2, IDX3
         "SHARES/CROSS_CHECK_FAILED",  # Reg. 31 vs paid-up 1.9% apart for one issuer (owner tolerance 0.5%)
+        "CONSISTENCY/TAX_COPIED_FROM_PRIOR_YEAR",  # Muthoot standalone Q2 / H1 FY27 repeat FY26's tax lines [X94]
+        "CONSISTENCY/YTD_QUARTER_MISMATCH",  # Tata Motors FY26 standalone: Q1 re-presented after the demerger [X80]
     }
+    ytd = unified.con.execute(
+        "SELECT DISTINCT h.symbol, json_extract_string(q.details, '$.tag') FROM quarantine_queue q "
+        "JOIN securities s USING (entity_id) JOIN security_identifier_history h ON h.security_id = s.security_id "
+        "WHERE q.reason_code = 'YTD_QUARTER_MISMATCH'").fetchall()  # fmt: skip
+    assert {t for _, t in ytd} == {"revenue_from_operations", "total_income", "pbt_incl_jv"}
+    assert {s for s, _ in ytd} >= {"TATAMOTORS"}
 
 
 def test_all_profiles_and_scopes_land_without_collisions(unified):
     con = unified.con
     assert dict(((p, s), n) for p, s, n in con.execute(
         "SELECT accounting_profile, scope, count(*) FROM filing_meta GROUP BY ALL").fetchall()) == {
-        ("INDAS_CORP", "CONSOLIDATED"): 24, ("INDAS_CORP", "STANDALONE"): 6, ("INDAS_NBFC", "CONSOLIDATED"): 5,
-        ("INDAS_NBFC", "STANDALONE"): 2, ("IGAAP_BANK", "CONSOLIDATED"): 5, ("IGAAP_BANK", "STANDALONE"): 5,
-        ("IRDAI_LIFE", "CONSOLIDATED"): 1, ("IRDAI_LIFE", "STANDALONE"): 3, ("IRDAI_GENERAL", "CONSOLIDATED"): 1,
-        ("IRDAI_GENERAL", "STANDALONE"): 3, ("INDAS_INSURANCE", "STANDALONE"): 2,
-        ("REG34_ANNUAL", "CONSOLIDATED"): 3, ("REG34_ANNUAL", "STANDALONE"): 1,
+        ("INDAS_CORP", "CONSOLIDATED"): 48, ("INDAS_CORP", "STANDALONE"): 20, ("INDAS_NBFC", "CONSOLIDATED"): 5,
+        ("INDAS_NBFC", "STANDALONE"): 5, ("IGAAP_BANK", "CONSOLIDATED"): 5, ("IGAAP_BANK", "STANDALONE"): 5,
+        ("IRDAI_LIFE", "CONSOLIDATED"): 2, ("IRDAI_LIFE", "STANDALONE"): 4, ("IRDAI_GENERAL", "CONSOLIDATED"): 1,
+        ("IRDAI_GENERAL", "STANDALONE"): 4, ("INDAS_INSURANCE", "STANDALONE"): 2,
+        ("REG34_ANNUAL", "CONSOLIDATED"): 7, ("REG34_ANNUAL", "STANDALONE"): 3,
     }  # fmt: skip
-    # one results profile per entity (Reg. 34 annual sits beside its company's quarterly profile)
-    assert (
-        con.execute(
-            "SELECT count(*) FROM (SELECT entity_id FROM filing_meta WHERE accounting_profile <> 'REG34_ANNUAL' "
-            "GROUP BY 1 HAVING count(DISTINCT accounting_profile) > 1)"
-        ).fetchone()[0]
-        == 0
-    )
+    # one results profile per entity (Reg. 34 annual sits beside its company's quarterly profile), except the
+    # documented change of basis of general insurers to Ind AS 117 in FY27 (Go Digit), which FactBook keeps apart [X90]
+    assert con.execute(
+        "SELECT list(DISTINCT p ORDER BY p) FROM (SELECT entity_id, list(DISTINCT accounting_profile "
+        "ORDER BY accounting_profile) AS p FROM filing_meta WHERE accounting_profile <> 'REG34_ANNUAL' "
+        "GROUP BY 1 HAVING count(DISTINCT accounting_profile) > 1)"
+    ).fetchone()[0] in (None, [["INDAS_INSURANCE", "IRDAI_GENERAL"]])
     # every filing's facts belong to the entity of that filing
     assert (
         con.execute(
@@ -144,6 +154,32 @@ def test_all_profiles_and_scopes_land_without_collisions(unified):
         ).fetchone()[0]
         == 0
     )
+
+
+def test_segment_rows_land_with_their_filings(unified):
+    """[X97-X99] Segment / geography rows of every promoted results and annual filing: same entity, scope, parser
+    version and visibility as the filing; no SEGMENT finding on any committed filing."""
+    con = unified.con
+    counts = dict(con.execute(
+        "SELECT m.accounting_profile || '/' || s.axis_kind, count(*) FROM segment_observations s "
+        "JOIN filing_meta m USING (filing_id, parser_version) GROUP BY 1").fetchall())  # fmt: skip
+    assert counts == SEGMENT_ROWS
+    assert (
+        con.execute(
+            "SELECT count(*) FROM segment_observations s JOIN filing_meta m USING (filing_id, parser_version) "
+            "WHERE s.entity_id <> m.entity_id OR s.scope <> m.scope OR s.visible_from_ts <> m.visible_from_ts"
+        ).fetchone()[0]
+        == 0
+    )
+    assert con.execute("SELECT count(*) FROM quarantine_queue WHERE stage = 'SEGMENT'").fetchone()[0] == 0
+
+
+# Rows per profile / axis kind: IRDAI_LIFE files segment assets and liabilities only; geography exists only in the
+# Reg. 34 annual filings (TCS, Eternal, SRF, and the 18D fixtures ELECON / INOXINDIA).
+SEGMENT_ROWS = {
+    "INDAS_CORP/BUSINESS": 930, "INDAS_NBFC/BUSINESS": 38, "IGAAP_BANK/BUSINESS": 332, "IRDAI_LIFE/BUSINESS": 176,
+    "REG34_ANNUAL/BUSINESS": 300, "REG34_ANNUAL/GEOGRAPHY": 78,
+}  # fmt: skip
 
 
 def test_materialised_universe_spans_every_archetype_and_screens_run(unified):
@@ -157,7 +193,11 @@ def test_materialised_universe_spans_every_archetype_and_screens_run(unified):
     def syms(q):
         return {r["symbol"] for r in run_screen(m.con, q)}
 
-    assert syms("Piotroski F score >= 0 AND ROCE screener > 0") == {"TCS", "ETERNAL"}  # Reg. 34 annual
+    # Reg. 34 annual; SPARC FY26 as filed: PBT 15,530,099,000 on revenue 18,791,683,000 (FY25 PBT -3,427,812,000);
+    # SRF FY26 consolidated (the segment fixture, X98) and Cummins FY26 (X100) have FY25 and FY26 in scope too, as do
+    # the 18D insider-receivable fixtures ELECON (standalone) and INOXINDIA (consolidated) [X117]
+    assert syms("Piotroski F score >= 0 AND ROCE screener > 0") == {"TCS", "ETERNAL", "SPARC", "SRF", "CUMMINSIND",
+                                                                     "ELECON", "INOXINDIA"}  # fmt: skip
     assert syms("Debtor days > 0") >= {"TCS", "ITC", "RELIANCE"}  # industrial, incl. excise FMCG
     assert syms("GNPA > 0") >= {"HDFCBANK", "PNB"}  # private + PSU banks
     assert syms("Solvency ratio > 0") >= {"HDFCLIFE", "SBILIFE", "ICICIGI"}  # life + general insurers
@@ -200,3 +240,178 @@ def test_bundle_round_trip_reproduces_every_table(unified, tmp_path):
         copy.close()
     with pytest.raises(BundleError, match="budget"):
         export_bundle(unified.con, tmp_path / "small", max_total_mb=0.1)
+
+
+def test_tax_copied_from_prior_year_is_raised_and_withheld(unified):
+    """X94 end to end: the audit raises one finding per copied period and readers never see the wrong PAT."""
+    from datetime import datetime
+
+    from financials.fundamentals import load_factbook
+
+    rows = unified.con.execute(
+        "SELECT entity_id, json_extract_string(details, '$.period') FROM quarantine_queue "
+        "WHERE reason_code = 'TAX_COPIED_FROM_PRIOR_YEAR' AND resolved_at IS NULL ORDER BY 2"
+    ).fetchall()
+    assert [p for _, p in rows] == ['["2026-04-01","2026-09-30"]', '["2026-07-01","2026-09-30"]']
+    book = load_factbook(unified.con, rows[0][0], "STANDALONE", datetime(9999, 12, 31))
+    from datetime import date
+
+    assert (date(2026, 7, 1), date(2026, 9, 30)) not in book.durations["pat"]
+    assert book.durations["pbt"][(date(2026, 7, 1), date(2026, 9, 30))] == 39925220000
+
+
+def test_restage_all_selects_every_parsed_or_open_results_filing(unified):
+    """`restage --category RESULTS_XBRL --all` (parser 0.10.0 adds segment rows to clean filings): every filing with
+    filing_meta or an open filing finding; the default keeps selecting only open findings."""
+    from financials.cli import restage_rows
+
+    con = unified.con
+    every = {r[0] for r in restage_rows(con, "RESULTS_XBRL", "ALL")}
+    default = {r[0] for r in restage_rows(con, "RESULTS_XBRL")}
+    parsed = {
+        u
+        for (u,) in con.execute(
+            "SELECT DISTINCT f.source_url FROM filings f JOIN filing_meta m USING (filing_id) "
+            "WHERE f.category = 'RESULTS_XBRL'"
+        ).fetchall()
+    }
+    assert parsed <= every and default <= every
+    assert len(every) == len(parsed | default)
+    assert len(every) > len(default)
+
+
+def test_restatement_flag_reaches_the_screener_rows(unified):
+    """X106: rows whose TTM window holds a restated quarter carry restatement_suspected; TTM is still published."""
+    rows = unified.con.execute(
+        "SELECT symbol, sales_ttm FROM screener_features_history WHERE restatement_suspected"
+    ).fetchall()
+    assert rows and all(sales is not None for _, sales in rows)
+
+
+def test_owner_items_qoq_npm_coverage_dividends_promoter_change(unified):
+    """Owner items 1, 3, 4 end to end on 13 Nov 2026. Expected values come from the fixtures' own facts."""
+
+    from _fixture_helpers import load_instance
+
+    con = unified.con
+    cur = con.execute(
+        "SELECT symbol, valuation_archetype, sales_growth_qoq_pct, profit_growth_qoq_pct, npm_pct, interest_coverage,"
+        " opm_preceding_year_quarter_pct, dividend_yield_pct, dividend_payout_pct, promoter_holding_change_qoq_pp,"
+        " close "
+        "FROM screener_features"
+    )
+    names = [d[0] for d in cur.description]
+    rows = {r[0]: dict(zip(names, r, strict=True)) for r in cur.fetchall()}
+    # Finolex Cables: Q2 FY26 vs Q1 FY26, consolidated (revenue 1,375.79 vs 1,395.52 Cr; owners 162.64 vs 162.62 Cr)
+    fin = rows["FINCABLES"]
+    assert fin["sales_growth_qoq_pct"] == pytest.approx(13757.9 / 13955.2 - 1)
+    assert fin["profit_growth_qoq_pct"] == pytest.approx(1626.4 / 1626.2 - 1)
+    # Glenmark FY26 consolidated (the Q4 filing's 12-month context is the TTM): coverage from PBT and finance costs
+    # as filed; NPM on owners' profit after the X95 owners / NCI swap (owners = PAT - 1.01 Cr NCI).
+    inst = load_instance(next(XBRL_DIR.glob("INTEGRATED_FILING_INDAS_1677062_*.xml")))
+    fy = {n: v for (n, c), v in inst.numeric.items() if not inst.contexts[c].has_dimensions
+          and inst.contexts[c].start == "2025-04-01"}  # fmt: skip
+    glen = rows["GLENMARK"]
+    pbt, fc = fy["ProfitBeforeTax"], fy["FinanceCosts"]
+    assert glen["interest_coverage"] == pytest.approx(float((pbt + fc) / fc))
+    owners = fy["ProfitLossForPeriod"] - fy["ProfitOrLossAttributableToOwnersOfParent"]
+    assert glen["npm_pct"] == pytest.approx(float(owners / fy["RevenueFromOperations"]))
+    # Lenders and insurers: no interest coverage (finance costs are their cost of funds), whatever their data.
+    assert all(r["interest_coverage"] is None for r in rows.values()
+               if r["valuation_archetype"] in ("FINANCIAL_LENDING", "INSURANCE"))  # fmt: skip
+    # No committed company has the same quarter a year apart in a non-lender book yet: the OPM of the preceding year
+    # quarter (named opm_last_year_pct before features 2026.11.15-4A) is NULL [C9].
+    assert all(r["opm_preceding_year_quarter_pct"] is None for r in rows.values())
+    # Reliance Reg. 31: 50.11% (2025-03-31) -> 50.07% (2025-06-30), the two latest visible, adjacent quarters.
+    assert rows["RELIANCE"]["promoter_holding_change_qoq_pp"] == pytest.approx(-0.04)
+    assert rows["HDFCBANK"]["promoter_holding_change_qoq_pp"] == 0.0  # no promoter in either quarter [SHP14]
+    # The committed corporate actions go ex in Sep-Oct 2025, outside the 365 days to 13 Nov 2026: yields are 0.
+    assert {r["dividend_yield_pct"] for r in rows.values()} <= {0.0, None}
+    assert sum(r["dividend_yield_pct"] == 0.0 for r in rows.values()) > 1000
+
+
+def test_batch_c_lenders_and_insurers_keep_only_capital_and_cash_flow_lines(unified):
+    """features_bs on every real profile: lenders and insurers get NULL industrial balance-sheet / cash-flow ratios
+    (NOT_FOR_LENDERS), industrial companies with a balance sheet get their liquidity ratios."""
+    from financials.features_bs import NOT_FOR_LENDERS
+
+    cur = unified.con.execute("SELECT * FROM screener_features WHERE scope_used IS NOT NULL")
+    names = [d[0] for d in cur.description]
+    rows = [dict(zip(names, r, strict=True)) for r in cur.fetchall()]
+    fin = [r for r in rows if r["valuation_archetype"] in ("FINANCIAL_LENDING", "INSURANCE")]
+    assert len({r["valuation_archetype"] for r in fin}) == 2
+    assert all(r[c] is None for r in fin for c in NOT_FOR_LENDERS)
+    assert any(r["equity_capital"] is not None for r in fin)
+    industrial = [r for r in rows if r["valuation_archetype"] == "INDUSTRIAL_SERVICES" and r["bs_as_of"]
+                  and r["is_lending_nbfc"] is None]  # fmt: skip
+    assert industrial and all(r["current_ratio"] is not None for r in industrial)
+    # A non-lending NBFC (J. Poly Investments, Division III book) is valued as industrial but its book is a
+    # lender's (interest earned, no current / non-current split): the industrial lines stay NULL, as `opm` does.
+    (jpoly,) = [r for r in rows if r["symbol"] == "JPOLYINVST"]
+    assert jpoly["is_lending_nbfc"] is not None and jpoly["opm"] is None
+    assert all(jpoly[c] is None for c in NOT_FOR_LENDERS)
+
+
+def test_saved_screens_run_and_match_the_hat_columns(unified):
+    """Batch D: every saved screen (reference/saved_screens.csv) compiles and runs on the real market and selects
+    exactly the rows its hat boolean marks; the cross-sectional columns are consistent on real data."""
+    from financials.dsl import load_saved_screens, run_saved_screen
+
+    con = unified.con
+    for s in load_saved_screens().values():
+        got = {r["symbol"] for r in run_saved_screen(con, s.name)}
+        want = {sym for (sym,) in con.execute(f"SELECT symbol FROM screener_features WHERE {s.hat_column}").fetchall()}
+        assert got == want, s.name
+    ranks = [r for (r,) in con.execute("SELECT magic_formula_rank FROM screener_features "
+                                       "WHERE magic_formula_rank IS NOT NULL ORDER BY 1").fetchall()]  # fmt: skip
+    assert ranks == list(range(1, len(ranks) + 1)) and len(ranks) >= 5
+    gated = con.execute(
+        "SELECT median(pe_core), median(market_cap), any_value(pe_core_universe_median), "
+        "any_value(market_cap_universe_median), count(*) FILTER (WHERE gem_score IS NOT NULL AND cyclical_flag) "
+        "FROM screener_features WHERE forensic_clean AND valuation_archetype NOT IN ('FINANCIAL_LENDING', 'INSURANCE')"
+    ).fetchone()
+    assert gated[0] == pytest.approx(gated[2]) and gated[1] == gated[3] and gated[4] == 0
+    hats = " + ".join(f"CAST(coalesce({c}, false) AS INTEGER)" for c in
+                      ("hat_hidden_compounder", "hat_quality_fair_price", "hat_magic_formula", "hat_garp",
+                       "hat_turnaround", "hat_under_owned", "hat_cash_machine", "hat_fallen_quality",
+                       "hat_capex_pay_off", "hat_cyclical", "hat_lender"))  # fmt: skip
+    assert con.execute(f"SELECT count(*) FROM screener_features WHERE hats_passed <> {hats}").fetchone()[0] == 0
+    # Glenmark FY26 consolidated (the Q4 filing's 12-month context is the TTM): a Rs 2,266 Cr exceptional loss
+    # halves the reported PE; PE on core profit = mcap / ((PBT - other income - exceptional) x (1 - ETR) x owners'
+    # share), owners after the X95 swap (PAT - the 1.01 Cr tagged as owners).
+    from _fixture_helpers import load_instance
+
+    inst = load_instance(next(XBRL_DIR.glob("INTEGRATED_FILING_INDAS_1677062_*.xml")))
+    fy = {n: v for (n, c), v in inst.numeric.items() if not inst.contexts[c].has_dimensions
+          and inst.contexts[c].start == "2025-04-01"}  # fmt: skip
+    pbt, pat = fy["ProfitBeforeTax"], fy["ProfitLossForPeriod"]
+    core = (pbt - fy["OtherIncome"] - fy["ExceptionalItemsBeforeTax"]) * (1 - fy["TaxExpense"] / pbt)
+    owners = pat - fy["ProfitOrLossAttributableToOwnersOfParent"]
+    mcap, pe, pe_core = con.execute(
+        "SELECT market_cap, pe, pe_core FROM screener_features WHERE symbol = 'GLENMARK'").fetchone()  # fmt: skip
+    assert pe_core == pytest.approx(float(mcap / (core * owners / pat))) and pe_core < pe / 1.5
+    flags = dict(con.execute("SELECT symbol, cyclical_flag FROM screener_features WHERE symbol IN "
+                             "('JSWSTEEL', 'RELIANCE', 'TCS', 'HDFCBANK')").fetchall())  # fmt: skip
+    assert flags == {"JSWSTEEL": True, "RELIANCE": True, "TCS": False, "HDFCBANK": False}
+
+
+def test_cli_lists_and_runs_saved_screens(unified, tmp_path):
+    import json
+    import shutil
+
+    from financials.cli import main
+
+    out = io.StringIO()
+    assert main(["--data-dir", str(tmp_path), "screens"], out=out) == 0
+    assert len(json.loads(out.getvalue())) == 11
+    unified.con.execute("CHECKPOINT")
+    shutil.copy(unified.stage_root.parent / "market.duckdb", tmp_path / "market.duckdb")
+    out = io.StringIO()
+    assert main(["--data-dir", str(tmp_path), "screen", "--saved", "Magic formula", "--columns", "Earnings yield"],
+                out=out) == 0, out.getvalue()  # fmt: skip
+    rows = json.loads(out.getvalue())
+    assert rows and [r["magic formula rank"] for r in rows] == sorted(r["magic formula rank"] for r in rows)
+    assert all("earnings yield" in r for r in rows) and len(rows) <= 15
+    out = io.StringIO()
+    assert main(["--data-dir", str(tmp_path), "screen", "--saved", "no such screen"], out=out) == 2
+    assert "unknown saved screen" in out.getvalue()

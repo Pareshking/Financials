@@ -1,0 +1,13 @@
+# User timer: systemctl --user enable --now financials-daily.timer (see docs/architecture.md §13).
+# 20:15 IST every day: bhavcopy and delivery files are on the archive host by then on a trading day; run-day decides
+# whether the day is a trading day (holidays and weekends only fetch filings / corporate actions).
+[Unit]
+Description=Financials daily run after the NSE close (IST)
+
+[Timer]
+OnCalendar=*-*-* 20:15:00 Asia/Kolkata
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

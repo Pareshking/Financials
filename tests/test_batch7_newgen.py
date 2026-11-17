@@ -81,11 +81,15 @@ def test_delhivery_second_owners_tci_observation():
     assert r.value("pat_owners", *H1) == r.value("pat", *H1)
 
 
-def test_ola_sign_flip_stays_quarantined():
-    """[X67] Ola Electric H1: owners' profit +698 Cr against PAT -698 Cr; a single observation: quarantined."""
+def test_ola_sign_flip_is_recovered_by_the_named_rule():
+    """[X67, X85] Ola Electric H1: owners' profit +698 Cr against PAT -698 Cr, NCI 0. Quarantined while it was a single
+    observation (X67); the live backfill showed ~20 more sign flips (Godrej Agrovet H1 FY27, HAL, PVR INOX), so
+    ATTRIBUTION_SIGN_FLIP now applies: flipping exactly one sign makes owners + NCI = PAT."""
     r = parse("OLAELEC")
-    assert {i.reason_code for i in r.issues} == {"OWNERS_PLUS_NCI"}
+    assert not r.issues
     assert r.value("pat", *H1) / CR == Decimal("-698")
+    assert r.value("pat_owners", *H1) == r.value("pat", *H1)
+    assert {"rule": "ATTRIBUTION_SIGN_FLIP", "periods": [[str(d) for d in H1]]} in r.meta["rules_applied"]
 
 
 def test_icici_prudential_parses_under_its_new_symbol():

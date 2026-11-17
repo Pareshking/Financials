@@ -34,7 +34,9 @@ ALIASES: dict[str, tuple[str, str]] = {
     "net profit": ("(pat_ttm / 10000000)", "INR crore, TTM"),
     "free cash flow": ("(fcf_ttm / 10000000)", "INR crore, TTM (H1/FY bridge)"),
     "net debt": ("(net_debt / 10000000)", "INR crore"),
-    "book value": ("(total_equity / 10000000)", "INR crore"),
+    "book value": ("book_value_per_share", "INR per share, owners' equity / shares (Screener's meaning)"),
+    "book value per share": ("book_value_per_share", "INR per share, owners' equity / shares"),
+    "net worth": ("(total_equity / 10000000)", "INR crore, total equity (latest H1/FY BS)"),
     "price to earning": ("pe", "x"),
     "pe": ("pe", "x"),
     "price to book value": ("pb", "x"),
@@ -62,7 +64,7 @@ ALIASES: dict[str, tuple[str, str]] = {
     "debtor days": ("debtor_days", "days (closing debtors)"),
     "inventory turnover": ("inventory_turnover", "x (sales / closing inventory)"),
     "working capital": ("(working_capital / 10000000)", "Rs Cr (Other Assets - Other Liabilities)"),
-    "inventory days": ("inventory_days", "days (closing inventory / sales)"),
+    "inventory days": ("inventory_days", "days (closing inventory / COGS)"),
     "vnb margin": ("(vnb_margin * 100)", "%, life insurers (supplemental KPI)"),
     "embedded value": ("(embedded_value / 10000000)", "Rs Cr, life insurers (supplemental KPI)"),
     "ape growth": ("(ape_growth * 100)", "%, life insurers (supplemental KPI)"),
@@ -72,8 +74,8 @@ ALIASES: dict[str, tuple[str, str]] = {
     "contribution margin": ("(contribution_margin * 100)", "% (supplemental KPI)"),
     "nrr": ("(nrr * 100)", "%, net revenue retention (supplemental KPI)"),
     "cac payback": ("cac_payback", "months (supplemental KPI)"),
-    "days payable": ("days_payable", "days (closing trade payables / sales)"),
-    "payable days": ("days_payable", "days (closing trade payables / sales)"),
+    "days payable": ("days_payable", "days (closing trade payables / COGS)"),
+    "payable days": ("days_payable", "days (closing trade payables / COGS)"),
     "cash conversion cycle": ("cash_conversion_cycle", "days (debtor + inventory - payable)"),
     "working capital days": ("working_capital_days", "days ((CA - cash - current investments - CL) / sales)"),
     "return on tangible equity": ("(rote * 100)", "%"),
@@ -163,7 +165,313 @@ ALIASES: dict[str, tuple[str, str]] = {
     "cash runway": ("cash_runway_months", "months (cash burners)"),
     "esop adjusted fcf": ("(esop_adj_fcf / 10000000)", "INR crore"),
     "liquid cash": ("(liquid_cash / 10000000)", "INR crore"),
+    "qoq sales": ("(sales_growth_qoq_pct * 100)", "% latest quarter vs previous quarter"),
+    "sales growth qoq": ("(sales_growth_qoq_pct * 100)", "% latest quarter vs previous quarter"),
+    "qoq profits": ("(profit_growth_qoq_pct * 100)", "% owners' profit, latest quarter vs previous (base > 0)"),
+    "profit growth qoq": ("(profit_growth_qoq_pct * 100)", "% owners' profit, latest quarter vs previous (base > 0)"),
+    "npm": ("(npm_pct * 100)", "% TTM owners' profit / TTM sales"),
+    "net profit margin": ("(npm_pct * 100)", "% TTM owners' profit / TTM sales"),
+    "interest coverage": ("interest_coverage", "x TTM (PBT + finance costs) / finance costs (not for lenders)"),
+    "interest coverage ratio": ("interest_coverage", "x TTM (PBT + finance costs) / finance costs (not for lenders)"),
+    "dividend yield": ("(dividend_yield_pct * 100)", "% trailing 365 days of ex-dates / close"),
+    "dividend payout": ("(dividend_payout_pct * 100)", "% trailing dividends per share / EPS TTM"),
+    "change in promoter holding": ("promoter_holding_change_qoq_pp", "percentage points, QoQ"),
+    "promoter holding qoq change": ("promoter_holding_change_qoq_pp", "percentage points, QoQ"),
+    # batch B (price/technicals): adjusted closes unless noted; NULL until the window's bars exist [C9]
+    "return over 1day": ("(return_1d * 100)", "%"),
+    "return 1d": ("(return_1d * 100)", "%"),
+    "return over 1week": ("(return_1w * 100)", "% (5 bars)"),
+    "return 1w": ("(return_1w * 100)", "% (5 bars)"),
+    "return over 1month": ("(return_1m * 100)", "% (21 bars)"),
+    "return over 3months": ("(return_3m * 100)", "% (63 bars)"),
+    "return over 6months": ("(return_6m * 100)", "% (126 bars)"),
+    "return over 1year": ("(return_12m * 100)", "% (252 bars)"),
+    "return over 3years": ("(return_3y * 100)", "% cumulative, not annualised (756 bars)"),
+    "return over 5years": ("(return_5y * 100)", "% cumulative, not annualised (1,260 bars)"),
+    "return over 7years": ("(return_7y * 100)", "% cumulative, not annualised (1,764 bars)"),
+    "return over 10years": ("(return_10y * 100)", "% cumulative, not annualised (2,520 bars)"),
+    "volume": ("volume", "shares traded today"),
+    "volume 1week average": ("volume_1w_avg", "shares/day, adjusted, 5 bars"),
+    "volume 1month average": ("volume_1m_avg", "shares/day, adjusted, 21 bars"),
+    "volume 1year average": ("volume_1y_avg", "shares/day, adjusted, 252 bars"),
+    "high price": ("high_52w", "INR, 52-week high of adjusted closes"),
+    "low price": ("low_52w", "INR, 52-week low of adjusted closes"),
+    "52w high": ("high_52w", "INR, adjusted closes"),
+    "52w low": ("low_52w", "INR, adjusted closes"),
+    "distance from 52w low": ("(dist_52w_low * 100)", "% (>= 0)"),
+    "high since data start": ("high_since_data_start", "INR, adjusted, since 2024-10-01 (not all-time)"),
+    "low since data start": ("low_since_data_start", "INR, adjusted, since 2024-10-01 (not all-time)"),
+    "dma 50": ("dma50", "INR"),
+    "dma 200": ("dma200", "INR"),
+    "dma 50 previous day": ("dma50_prev", "INR"),
+    "dma 200 previous day": ("dma200_prev", "INR"),
+    "rsi": ("rsi_14", "0-100, Wilder 14"),
+    "rsi previous day": ("rsi_14_prev", "0-100, Wilder 14"),
+    "macd": ("macd", "INR, EMA12 - EMA26"),
+    "macd signal": ("macd_signal", "INR, EMA9 of MACD"),
+    "macd previous day": ("macd_prev", "INR"),
+    "macd signal previous day": ("macd_signal_prev", "INR"),
+    "atr": ("(atr_14_pct * 100)", "% of close, Wilder 14"),
+    "relative strength 3m": ("(rs_nifty500_3m * 100)", "percentage points vs Nifty 500"),
+    "relative strength 6m": ("(rs_nifty500_6m * 100)", "percentage points vs Nifty 500"),
+    "relative strength 12m": ("(rs_nifty500_12m * 100)", "percentage points vs Nifty 500"),
+    "beta": ("beta_1y_nifty500", "x vs Nifty 500, 1 year of daily log returns"),
+    "median traded value 20d": ("(turnover_median_20d / 10000000)", "INR crore/day"),
+    "delivery percentage": ("(deliv_pct * 100)", "% of today's volume"),
+    "delivery percentage 20d": ("(deliv_pct_avg_20d * 100)", "%, mean of 20 days"),
+    "vwap": ("vwap", "INR, today"),
+    "vwap 20d": ("vwap_20d", "INR, adjusted"),
 }
+
+
+def _yyyymmdd(column: str) -> str:
+    return f"CAST(strftime({column}, '%Y%m%d') AS INTEGER)"
+
+
+# Batch 0: aliases for built columns that had none (ratio catalogue C2).
+ALIASES.update(
+    {
+        "shares": ("shares", "count (Reg. 31 total, else paid-up / face value)"),
+        "number of equity shares": ("shares", "count (Reg. 31 total, else paid-up / face value)"),
+        "restatement suspected": (
+            "CAST(restatement_suspected AS INTEGER)",
+            "1/0 (X106 YTD break in the TTM; X108 discontinued ops, X109 merger in 5 quarters)",
+        ),
+        "non promoter non public holding": ("(non_promoter_non_public_pct * 100)", "% (employee trusts, DRs)"),
+        "annual fy end": (_yyyymmdd("annual_fy_end"), "YYYYMMDD, fiscal year of the annual ratios"),
+        "fundamentals end": (_yyyymmdd("fundamentals_end"), "YYYYMMDD, latest quarter end of the TTM window"),
+        "balance sheet date": (_yyyymmdd("bs_as_of"), "YYYYMMDD"),
+        "cash flow date": (_yyyymmdd("cf_as_of"), "YYYYMMDD"),
+        "shareholding date": (_yyyymmdd("shp_as_of"), "YYYYMMDD, Reg. 31 as-of"),
+        "price date": (_yyyymmdd("price_date"), "YYYYMMDD, last bar on/before the as-of"),
+        "loans": ("(loans / 10000000)", "INR crore, lenders"),
+        "reverse dcf wacc": ("(reverse_dcf_wacc_used * 100)", "% used by reverse dcf growth"),
+        "reverse dcf terminal growth": ("(reverse_dcf_terminal_g * 100)", "% used by reverse dcf growth"),
+        "consolidated": ("CAST(scope_used = 'CONSOLIDATED' AS INTEGER)", "1/0, scope of this row's fundamentals"),
+        "trade to trade": ("CAST(is_trade_to_trade AS INTEGER)", "1/0, series BE or BZ (M6)"),
+        "is trade to trade": ("CAST(is_trade_to_trade AS INTEGER)", "1/0, series BE or BZ (M6)"),
+    }
+)
+
+
+def _period_aliases() -> dict[str, tuple[str, str]]:
+    """Batch 1 (period P&L family, features_pl): Screener's names, e.g. "Sales latest quarter", "Net profit preceding
+    year quarter", "OPM last year", "Sales growth 3Years". Money in INR crore, ratios in %."""
+    lines = {"sales": ["sales"], "operating_profit": ["operating profit"], "other_income": ["other income"],
+             "depreciation": ["depreciation"], "ebit": ["ebit"], "interest": ["interest"],
+             "pbt": ["profit before tax", "pbt"], "tax": ["tax"], "pat": ["profit after tax", "pat"],
+             "net_profit": ["net profit"],
+             "exceptional_items": ["extraordinary items", "exceptional items"]}  # fmt: skip
+    periods = {"latest_quarter": ["latest quarter"], "preceding_quarter": ["preceding quarter"],
+               "preceding_year_quarter": ["preceding year quarter"],
+               "2quarters_back": ["2quarters back", "2 quarters back"],
+               "3quarters_back": ["3quarters back", "3 quarters back"],
+               "last_year": ["last year"], "preceding_year": ["preceding year"]}  # fmt: skip
+    from financials.features_pl import EPS_COLUMNS, EQUITY_CAPITAL_COLUMNS, MARGIN_COLUMNS, MONEY_COLUMNS
+
+    out: dict[str, tuple[str, str]] = {}
+    for line, names in lines.items():
+        for period, pnames in periods.items():
+            if f"{line}_{period}" in MONEY_COLUMNS:
+                for n in names:
+                    for pn in pnames:
+                        out[f"{n} {pn}"] = (f"({line}_{period} / 10000000)", f"INR crore, {pn}")
+    for period, pnames in periods.items():
+        for pn in pnames:
+            if f"eps_{period}" in EPS_COLUMNS:
+                out[f"eps {pn}"] = (f"eps_{period}", f"INR per share, filed, today's share basis, {pn}")
+            if f"equity_capital_{period}" in EQUITY_CAPITAL_COLUMNS:
+                out[f"equity capital {pn}"] = (f"(equity_capital_{period} / 10000000)", f"INR crore, {pn}")
+            for m in ("opm", "npm", "gpm"):
+                if f"{m}_{period}_pct" in (*MARGIN_COLUMNS, "opm_last_year_pct", "opm_preceding_year_quarter_pct"):
+                    out[f"{m} {pn}"] = (f"({m}_{period}_pct * 100)", f"%, {pn}")
+    out["opm same quarter last year"] = ("(opm_preceding_year_quarter_pct * 100)", "%, the pre-4A 'opm last year'")
+    for name in ("yoy quarterly sales growth", "quarterly sales growth yoy"):
+        out[name] = ("(sales_growth_yoy_quarter_pct * 100)", "% latest quarter vs same quarter last year")
+    for name in ("yoy quarterly profit growth", "quarterly profit growth yoy"):
+        out[name] = ("(profit_growth_yoy_quarter_pct * 100)", "% owners' profit, latest quarter vs same quarter LY")
+    out["operating profit growth"] = ("(operating_profit_growth_yoy_quarter_pct * 100)",
+                                      "% EBITDA, latest quarter vs same quarter last year")  # fmt: skip
+    for name in ("sales ttm 1year back", "sales preceding 12months", "sales preceding 12 months"):
+        out[name] = ("(sales_ttm_1y_back / 10000000)", "INR crore, TTM ending a year before the latest quarter")
+    for n in (3, 5, 7, 10):
+        for key, names in (("sales", ["sales"]), ("profit", ["profit"]), ("eps", ["eps"]),
+                           ("operating_profit", ["operating profit", "ebitda"])):  # fmt: skip
+            for name in names:
+                for y in (f"{n}years", f"{n} years"):
+                    out[f"{name} growth {y}"] = (f"({key}_growth_{n}y_pct * 100)", f"% FY CAGR over {n} years")
+    for n in (5, 10):
+        for y in (f"{n}years", f"{n} years"):
+            out[f"sales growth {y} median"] = (f"(sales_growth_median_{n}y_pct * 100)", "% median yearly FY growth")
+        for y in (f"{n}year", f"{n}years", f"{n} years"):
+            out[f"average earnings {y}"] = (f"(avg_earnings_{n}y / 10000000)", "INR crore, mean FY owners' profit")
+            out[f"average ebit {y}"] = (f"(avg_ebit_{n}y / 10000000)", "INR crore, mean FY EBIT")
+            out[f"opm {y}"] = (f"(opm_{n}y_pct * 100)", f"% mean FY OPM over {n} years")
+    out["last result date"] = (_yyyymmdd("last_result_date"), "YYYYMMDD (IST), latest quarter's results")
+    out["last annual result date"] = (_yyyymmdd("last_annual_result_date"), "YYYYMMDD (IST), latest FY results")
+    out["days since last result"] = ("date_diff('day', last_result_date, as_of_date)", "days")
+    return out
+
+
+ALIASES.update(_period_aliases())
+
+
+def _balance_sheet_aliases() -> dict[str, tuple[str, str]]:
+    """Batches 2-3 (balance sheet, working capital, cash flow, capital allocation): features_bs.dsl_aliases."""
+    from financials.features_bs import dsl_aliases
+
+    return dsl_aliases()
+
+
+ALIASES.update(_balance_sheet_aliases())
+ALIASES["ev to ebitda percentile 20q"] = ("(ev_ebitda_percentile_20q * 100)", "percentile of the last 20 quarter-ends")
+ALIASES["roa"] = ("(roa * 100)", "%, TTM owners' profit / avg total assets (lenders: TTM to the quarter end)")
+
+
+def _gem_aliases() -> dict[str, tuple[str, str]]:
+    """Batch D (features_gems): ownership (ratio catalogue Batch 5, Screener's names) and the hidden-gem signals,
+    flags, ranks and hats of docs/hidden_gems.md. Fractions are shown x100; booleans as 1/0 (NULL when unknown)."""
+    from financials.features_gems import HATS
+
+    pp = "percentage points"
+    out: dict[str, tuple[str, str]] = {
+        "change in fii holding": ("(fii_holding_change_qoq_pct * 100)", f"{pp}, QoQ (adjacent quarters)"),
+        "change in dii holding": ("(dii_holding_change_qoq_pct * 100)", f"{pp}, QoQ (adjacent quarters)"),
+        "institutional holding": ("(inst_holding_pct * 100)", "%, FII + DII"),
+        "inst holding": ("(inst_holding_pct * 100)", "%, FII + DII"),
+        "change in institutional holding": ("(fii_dii_qoq_change_pct * 100)", f"{pp}, FII + DII QoQ"),
+        "unpledged promoter holding": ("(unpledged_promoter_holding_pct * 100)", "%, promoter x (1 - pledged share)"),
+        "mf holding": ("(mf_holding_pct * 100)", "%, mutual funds / UTI"),
+        "mutual fund holding": ("(mf_holding_pct * 100)", "%, mutual funds / UTI"),
+        "change in mf holding": ("(mf_holding_change_qoq_pct * 100)", f"{pp}, QoQ"),
+        "insurance holding": ("(insurance_holding_pct * 100)", "%, insurance companies"),
+        "retail holding": ("(retail_holding_pct * 100)", "%, resident individuals up to Rs 2 lakh"),
+        "number of shareholders": ("num_shareholders", "count, latest Reg. 31"),
+        "number of shareholders preceding quarter": ("num_shareholders_preceding_quarter", "count"),
+        "number of shareholders 1year back": ("num_shareholders_1y_back", "count, Reg. 31 12 months earlier"),
+        "change in number of shareholders": ("(num_shareholders_change_qoq_pct * 100)", "% QoQ"),
+        "sales yoy latest quarter": ("(sales_growth_yoy_quarter_pct * 100)", "% vs same quarter last year"),
+        "sales yoy preceding quarter": ("(sales_growth_yoy_preceding_quarter_pct * 100)", "% vs a year earlier"),
+        "profit yoy latest quarter": ("(profit_growth_yoy_quarter_pct * 100)", "% owners' profit vs a year earlier"),
+        "profit yoy preceding quarter": ("(profit_growth_yoy_preceding_quarter_pct * 100)", "% owners' profit"),
+        "core profit latest quarter": ("(core_profit_latest_quarter / 10000000)", "INR crore, PBT - OI - exceptional"),
+        "core profit growth": ("(core_profit_yoy_latest_q * 100)", "% YoY, latest quarter (PBT - OI - exceptional)"),
+        "core profit yoy latest quarter": ("(core_profit_yoy_latest_q * 100)", "% YoY, latest quarter"),
+        "core profit yoy preceding quarter": ("(core_profit_yoy_preceding_q * 100)", "% YoY, preceding quarter"),
+        "other income lift": ("(other_income_lift_pp * 100)", f"{pp}, profit YoY - core profit YoY"),
+        "pe core": ("pe_core", "x, market cap / TTM core profit after tax (owners)"),
+        "core pe": ("pe_core", "x, market cap / TTM core profit after tax (owners)"),
+        "growth sustained": ("CAST(growth_sustained AS INTEGER)", "1/0, sales YoY >= 12% in both quarters"),
+        "growth acceleration": ("(growth_acceleration_pp * 100)", f"{pp}, sales YoY latest - preceding quarter"),
+        "opm change yoy": ("(opm_change_yoy_pp * 100)", f"{pp}, quarter OPM vs same quarter last year"),
+        "operating leverage": ("operating_leverage", "x, core profit YoY / sales YoY"),
+        "peg": ("peg", "x, pe core / core profit growth"),
+        "earnings yield": ("(earnings_yield * 100)", "%, TTM EBIT / EV"),
+        "magic formula rank": ("magic_formula_rank", "1 = best, gated non-financial universe of the day"),
+        "under owned": ("CAST(under_owned AS INTEGER)", "1/0, inst <= 15%, promoter >= 50%, no pledge"),
+        "cyclical": ("CAST(cyclical_flag AS INTEGER)", "1/0, Metals & Mining, Oil Gas, curated shipping"),
+        "forensic clean": ("CAST(forensic_clean AS INTEGER)", "1/0, no measured red flag"),
+        "cash conversion ok": ("CAST(cash_conversion_ok AS INTEGER)", "1/0, CFO / EBITDA >= 0.7"),
+        "capex pay off signal": ("CAST(capex_pay_off_signal AS INTEGER)", "1/0, CWIP / gross block >= 25%, ..."),
+        "roce stability 5years": ("roce_stability_5y", "1 - std / mean of 5 FY ROCE (NULL until FY29)"),
+        "opm stability 5years": ("opm_stability_5y", "1 - std / mean of 5 FY OPM (NULL until FY29)"),
+        "pe vs own 5year median": ("pe_vs_own_5y_median", "x (NULL until 2029-10)"),
+        "pe core universe median": ("pe_core_universe_median", "x, the day's gated non-financial universe"),
+        "market cap universe median": ("(market_cap_universe_median / 10000000)", "INR crore, same universe"),
+        "gem score": ("gem_score", "z-score blend (docs/hidden_gems.md)"),
+        "hats passed": ("hats_passed", "count of hidden-gem screens passed"),
+        "financial": ("CAST(valuation_archetype IN ('FINANCIAL_LENDING', 'INSURANCE') AS INTEGER)",
+                      "1/0, lender or insurer"),
+        "lender": ("CAST(valuation_archetype = 'FINANCIAL_LENDING' AS INTEGER)", "1/0"),
+        "piotroski known": ("CAST(piotroski_f IS NOT NULL AS INTEGER)", "1/0"),
+        "gnpa known": ("CAST(gnpa_pct IS NOT NULL AS INTEGER)", "1/0"),
+    }  # fmt: skip
+    for h in HATS:
+        out[f"hat {h.replace('_', ' ')}"] = (f"CAST(hat_{h} AS INTEGER)", "1/0, docs/hidden_gems.md section B")
+    return out
+
+
+ALIASES.update(_gem_aliases())
+
+
+def _peer_aliases() -> dict[str, tuple[str, str]]:
+    """Batch H (features_peers, C25): NSE industry / basic-industry medians, premiums and peer ranks (Screener's
+    "Industry PE" / "Industry PBV"); the Nifty 500 industry-group fallback keeps its own names."""
+    out: dict[str, tuple[str, str]] = {
+        "industry pe": ("industry_pe_median", "median PE (> 0) of the NSE industry, >= 3 companies"),
+        "industry pbv": ("industry_pb_median", "median PB (> 0) of the NSE industry"),
+        "industry roce": ("(industry_roce_median * 100)", "%, median ROCE of the NSE industry"),
+        "industry sales growth": ("(industry_sales_growth_median * 100)", "%, median sales growth YoY"),
+        "basic industry pe": ("basic_industry_pe_median", "median PE (> 0) of the NSE basic industry"),
+        "basic industry pbv": ("basic_industry_pb_median", "median PB (> 0) of the NSE basic industry"),
+        "basic industry roce": ("(basic_industry_roce_median * 100)", "%"),
+        "basic industry sales growth": ("(basic_industry_sales_growth_median * 100)", "%"),
+        "pe premium to industry": ("(pe_premium_to_industry * 100)", "%, PE / industry median - 1 (< 0 = discount)"),
+        "pbv premium to industry": ("(pb_premium_to_industry * 100)", "%"),
+        "pe premium to basic industry": ("(pe_premium_to_basic_industry * 100)", "%"),
+        "pbv premium to basic industry": ("(pb_premium_to_basic_industry * 100)", "%"),
+        "peer count": ("peer_count", "companies in the NSE basic industry"),
+        "peer rank market cap": ("peer_rank_market_cap", "1 = largest in the basic industry"),
+        "peer rank pe": ("peer_rank_pe", "1 = lowest PE (> 0)"),
+        "peer rank roce": ("peer_rank_roce", "1 = highest ROCE"),
+        "peer rank profit growth": ("peer_rank_profit_growth", "1 = highest quarterly profit growth YoY"),
+        "industry group pe": ("industry_group_pe_median", "median PE over the Nifty 500 file's industry group"),
+        "industry group pbv": ("industry_group_pb_median", "median PB over the Nifty 500 file's industry group"),
+    }  # fmt: skip
+    return out
+
+
+ALIASES.update(_peer_aliases())
+
+
+def _extra_aliases() -> dict[str, tuple[str, str]]:
+    """Batch G (remaining Phase 2 ratios): features_extra.dsl_aliases."""
+    from financials.features_extra import dsl_aliases
+
+    return dsl_aliases()
+
+
+ALIASES.update(_extra_aliases())
+
+
+def _more_aliases() -> dict[str, tuple[str, str]]:
+    """Batch I (last catalogue rows): features_more.dsl_aliases."""
+    from financials.features_more import dsl_aliases
+
+    return dsl_aliases()
+
+
+ALIASES.update(_more_aliases())
+
+
+def _rpt_aliases() -> dict[str, tuple[str, str]]:
+    """Batch J (related-party leak): features_rpt.dsl_aliases."""
+    from financials.features_rpt import dsl_aliases
+
+    return dsl_aliases()
+
+
+ALIASES.update(_rpt_aliases())
+
+
+def _disclosure_aliases() -> dict[str, tuple[str, str]]:
+    """Batch 18D (disclosure_facts: insider receivables, subsidiary contribution): features_disclosures.dsl_aliases."""
+    from financials.features_disclosures import dsl_aliases
+
+    return dsl_aliases()
+
+
+ALIASES.update(_disclosure_aliases())
+
+
+def _audit_aliases() -> dict[str, tuple[str, str]]:
+    """Batch 20A (audit opinions from the report text, X121): features_audit.dsl_aliases."""
+    from financials.features_audit import dsl_aliases
+
+    return dsl_aliases()
+
+
+ALIASES.update(_audit_aliases())
 
 KEYWORDS = {"and", "or", "not"}
 COMPARATORS = {"<", "<=", ">", ">=", "=", "!="}
@@ -461,20 +769,103 @@ def compile_screen(query: str, custom: dict[str, str] | None = None) -> Compiled
     return CompiledScreen(where, c.params, sorted(c.refs))
 
 
-def run_screen(con, query: str, as_of: date | None = None, limit: int = 500) -> list[dict]:
-    """Run against the live table, or point-in-time against history when `as_of` is given."""
-    cs = compile_screen(query, load_custom_ratios(con))
-    extra = ", ".join(f'{ALIASES[m][0]} AS "{m}"' for m in cs.metrics)
+def compile_columns(columns: list[str], custom: dict[str, str] | None = None) -> list[tuple[str, str, list[Decimal]]]:
+    """Output columns (M1): each a DSL arithmetic expression (an alias, a saved custom ratio, or arithmetic over them),
+    compiled like a filter operand. Returns (label, SQL, params); the label is the normalised expression text."""
+    out = []
+    for text in columns:
+        if not text.strip():
+            continue
+        c = Compiler(custom)
+        out.append((normalise(text), c.compile(parse_arith(text)), c.params))
+    return out
+
+
+def split_columns(text: str | None) -> list[str]:
+    """`--columns "Sales latest quarter, OPM last year, Sales / Market cap"`: the grammar has no commas."""
+    return [c.strip() for c in (text or "").split(",") if c.strip()]
+
+
+def run_screen(
+    con,
+    query: str,
+    as_of: date | None = None,
+    limit: int = 500,
+    *,
+    columns: list[str] | None = None,
+    order_by: str | None = None,
+    descending: bool = False,
+) -> list[dict]:
+    """Run against the live table, or point-in-time against history when `as_of` is given. Each match carries the
+    metrics the query references plus `columns` (DSL expressions, custom ratios allowed); `order_by` (an expression)
+    sorts the matches, NULLs last, then by symbol."""
+    custom = load_custom_ratios(con)
+    cs = compile_screen(query, custom)
+    extra_cols = [(m, ALIASES[m][0], []) for m in cs.metrics]
+    seen = set(cs.metrics)
+    for label, sql, params in compile_columns(columns or [], custom):
+        if label not in seen:
+            seen.add(label)
+            extra_cols.append((label, sql, params))
+    select_params = [p for _, _, ps in extra_cols for p in ps]
+    extra = ", ".join(f'{sql} AS "{label}"' for label, sql, _ in extra_cols)
     select = "as_of_date, symbol, series, close" + (f", {extra}" if extra else "")
+    order, order_params = "symbol", []
+    if order_by:
+        ((_, order_sql, order_params),) = compile_columns([order_by], custom)
+        order = f"{order_sql} {'DESC' if descending else 'ASC'} NULLS LAST, symbol"
     if as_of is None:
-        sql = f"SELECT {select} FROM screener_features WHERE {cs.where_sql} ORDER BY symbol LIMIT {int(limit)}"
-        params = cs.params
+        sql = f"SELECT {select} FROM screener_features WHERE {cs.where_sql} ORDER BY {order} LIMIT {int(limit)}"
+        params = [*select_params, *cs.params, *order_params]
     else:
         sql = (
             f"SELECT {select} FROM screener_features_history WHERE as_of_date = ? AND {cs.where_sql} "
-            f"ORDER BY symbol LIMIT {int(limit)}"
+            f"ORDER BY {order} LIMIT {int(limit)}"
         )
-        params = [as_of, *cs.params]
+        params = [*select_params, as_of, *cs.params, *order_params]
     cur = con.execute(sql, params)
     names = [d[0] for d in cur.description]
     return [dict(zip(names, r, strict=True)) for r in cur.fetchall()]
+
+
+# ── saved screens (docs/hidden_gems.md section B; reference/saved_screens.csv) ─────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class SavedScreen:
+    name: str
+    hat_column: str  # the features_gems hat boolean computing the same rule ("" if none)
+    expression: str
+    order_by: str
+    descending: bool
+    limit: int
+    description: str
+
+
+def load_saved_screens() -> dict[str, SavedScreen]:
+    """The curated saved screens, keyed by normalised name (reference/saved_screens.csv, a reviewed file)."""
+    import csv
+
+    from financials.sources import ROOT
+
+    with (ROOT / "reference" / "saved_screens.csv").open(encoding="utf-8") as fh:
+        return {
+            normalise(r["name"]): SavedScreen(normalise(r["name"]), r["hat_column"], r["expression"], r["order_by"],
+                                              r["descending"] == "1", int(r["limit"]), r["description"])
+            for r in csv.DictReader(fh)
+        }  # fmt: skip
+
+
+def run_saved_screen(
+    con, name: str, as_of: date | None = None, *, columns: list[str] | None = None, limit: int | None = None
+) -> list[dict]:
+    """Run a saved screen with its own order and limit (`limit` overrides); the order-by expression is also returned
+    as a column."""
+    screens = load_saved_screens()
+    key = normalise(name)
+    if key not in screens:
+        raise DslError(f"unknown saved screen {name!r}; saved: {', '.join(sorted(screens))}")
+    s = screens[key]
+    n = s.limit if limit is None else limit
+    return run_screen(con, s.expression, as_of, n, columns=[s.order_by, *(columns or [])], order_by=s.order_by,
+                      descending=s.descending)  # fmt: skip

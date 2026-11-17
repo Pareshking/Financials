@@ -1,0 +1,16 @@
+# User unit: ~/.config/systemd/user/financials-daily.service (see docs/architecture.md §13).
+# Edit WorkingDirectory and the interpreter path to your checkout / virtualenv.
+[Unit]
+Description=Financials daily run: NSE fetch, discovery, promote, materialise (run-day + incremental catch-up)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/Financials
+# run-day takes today's IST date by itself, fetches every day (filings and corporate actions arrive on holidays too)
+# and publishes a feature day only for a trading day of the promoted calendar. It exits 1 when any fetch step
+# reported an error; the "-" prefix lets the incremental catch-up below run anyway.
+ExecStart=-%h/Financials/.venv/bin/python -m financials --data-dir data run-day
+ExecStart=%h/Financials/.venv/bin/python -m financials --data-dir data materialize --incremental
+Nice=10

@@ -7,7 +7,14 @@ Evidence (docs/references.md SHP1-SHP15):
 - percentages are fractions whose denominator excludes shares underlying depository receipts [SHP9];
 - encumbrance quantities sit on the promoter member; pledge is one of three encumbrance kinds [SHP10];
 - no promoter category at all for companies without promoters (rule NO_PROMOTER_CATEGORY) [SHP11];
-- named >1% public holders are rows on the per-category "Details..." axes [SHP12].
+- named >1% public holders are rows on the per-category "Details..." axes [SHP12];
+- the 2022-09-30 taxonomy (Q4 FY25 and earlier) never declares its entity contexts `OneD` / `OneI`; rule
+  SHP16_UNDECLARED_ENTITY_CONTEXTS reads them as period-less entity facts [SHP16];
+- pre-listing / allotment patterns date every category context on the declared DateOfListing / DateOfAllotment, not
+  on DateOfReport; rule SHP17_EVENT_DATED takes that event date as the as-of date [SHP17];
+- percentages are fractions in some filings and percent points in others, per filing even within one taxonomy;
+  the filing's own TOTAL percentage (1 or 100) decides, and rule SHP18_PERCENT_SCALE stores fractions [SHP18];
+- the 2022-09-30 taxonomy spells the mutual-fund member and its holder axis `…MutualFundsOrUti…` [SHP20].
 """
 
 from __future__ import annotations
@@ -17,8 +24,8 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
 
-from financials.parsers import ParseError
-from financials.parsers.xbrl import parse_instance
+from financials.parsers import ParseError, canonical_archive_url
+from financials.parsers.xbrl import Instance, parse_instance
 from financials.timeutil import IST
 
 SHP_NS_FRAGMENT = "/xbrl/shp/"
@@ -30,11 +37,13 @@ CATEGORIES = {
     "InstitutionsDomesticMember": "DII",
     "InstitutionsForeignMember": "FII",
     "MutualFundsOrUTIMember": "MUTUAL_FUNDS",
+    "MutualFundsOrUtiMember": "MUTUAL_FUNDS",  # 2022-09-30 taxonomy spelling [SHP20]
     "NonInstitutionsMember": "NON_INSTITUTIONS",
     "SharesHeldByNonPromoterNonPublicShareholdersMember": "NON_PROMOTER_NON_PUBLIC",
     "CustodianOrDRHolderMember": "DR_CUSTODIAN",
     "EmployeeBenefitsTrustsMember": "EMPLOYEE_TRUSTS",
     "InstitutionsForeignPortfolioInvestorCategoryOneMember": "FPI_CAT1",
+    "InstitutionsForeignPortfolioInvestorCatergoryOneMember": "FPI_CAT1",  # 2022-09-30 taxonomy spelling [SHP16]
     "InstitutionsForeignPortfolioInvestorCategoryTwoMember": "FPI_CAT2",
     "ForeignDirectInvestmentMember": "FDI",
     "OverseasDepositoriesMember": "OVERSEAS_DEPOSITORIES",
@@ -59,6 +68,7 @@ ENCUMBRANCE_FLAGS = {
 # sub-category totals (WhetherACategoryOrMoreThan1PercentageOfShareholding = "Category"), are excluded.
 PUBLIC_HOLDER_AXES = {
     "DetailsOfSharesHeldByMutualFundsOrUTIAxis": "MUTUAL_FUNDS",
+    "DetailsOfSharesHeldByMutualFundsOrUtiAxis": "MUTUAL_FUNDS",  # 2022-09-30 taxonomy spelling [SHP20]
     "DetailsOfSharesHeldByInsuranceCompaniesAxis": "INSURANCE",
     "DetailsOfSharesHeldByProvidentFundsOrPensionFundsAxis": "PENSION_FUNDS",
     "DetailsOfSharesHeldByAlternativeInvestmentFundsAxis": "AIF",
@@ -76,6 +86,10 @@ PUBLIC_HOLDER_AXES = {
     ),
 }
 SUBTOTAL_FLAG = "WhetherACategoryOrMoreThan1PercentageOfShareholding"  # "Category" rows are sub-totals
+HOLDER_NAME, HOLDER_SHARES, HOLDER_PCT = (
+    "NameOfTheShareholder", "NumberOfShares", "ShareholdingAsAPercentageOfTotalNumberOfShares",
+)  # fmt: skip
+HOLDER_ELEMENTS = frozenset({HOLDER_NAME, HOLDER_SHARES, HOLDER_PCT})  # kept verbatim in shareholding_major_holders
 NO_PROMOTER_RULE = "NO_PROMOTER_CATEGORY"
 MEASURES = {
     "NumberOfShares": "shares",
@@ -106,12 +120,79 @@ class ParsedShareholding:
         return not self.issues
 
 
+SHP16_RULE = "SHP16_UNDECLARED_ENTITY_CONTEXTS"
+SHP16_NS = b"http://www.bseindia.com/xbrl/shp/2022-09-30/in-bse-shp"
+SHP16_CONTEXTS = frozenset({"OneD", "OneI"})
+SHP17_RULE = "SHP17_EVENT_DATED"
+EVENT_DATE_TAGS = ("DateOfListing", "DateOfAllotment")
+SHP18_RULE = "SHP18_PERCENT_SCALE"
+HUNDRED = Decimal(100)
+
+
+def shp_instance(data: bytes) -> tuple[Instance, bool]:
+    """parse_instance with rule SHP16: only a 2022-09-30 SHP instance may leave exactly `OneD` / `OneI` undeclared."""
+    try:
+        return parse_instance(data), False
+    except ParseError:
+        if SHP16_NS not in data[:16384]:
+            raise
+    inst = parse_instance(data, undeclared_entity_contexts=SHP16_CONTEXTS)
+    return inst, True
+
+
 def _bool(text: str | None) -> bool | None:
     return {"true": True, "false": False}.get((text or "").strip().lower())
 
 
+def _percent_scale(out: ParsedShareholding) -> None:
+    """SHP18: TOTAL pct is exactly 1 (fractions) or exactly 100 (percent points; divide every stated percentage by
+    100). Any other TOTAL pct, or a missing one while percentages exist, is PCT_SCALE_UNKNOWN."""
+    total = out.categories.get("TOTAL", {}).get("pct")
+    has_pct = any("pct" in v for v in out.categories.values())
+    if total == 1 or (total is None and not has_pct):
+        return
+    if total != HUNDRED:
+        out.issues.append(ShpIssue("PARSE", "PCT_SCALE_UNKNOWN", {"total_pct": str(total)}))
+        return
+    for vals in out.categories.values():
+        if "pct" in vals:
+            vals["pct"] = vals["pct"] / HUNDRED
+    for h in out.major_holders:
+        if h["pct"] is not None:
+            h["pct"] = h["pct"] / HUNDRED
+    out.meta["rules_applied"].append(SHP18_RULE)
+
+
+def _category_instants(inst: Instance) -> set:
+    found = set()
+    for fact in inst.facts:
+        ctx = inst.contexts[fact.context_id]
+        if len(ctx.dimensions) != 1 or fact.name not in MEASURES:
+            continue
+        axis, member = (x.split(":")[-1] for x in ctx.dimensions[0])
+        if axis.endswith(CATEGORY_AXIS) and member in CATEGORIES:
+            found.add(ctx.instant)
+    return found
+
+
+def _event_date(inst: Instance, date_of_report: date):
+    """SHP17: every category measure sits on one instant that differs from DateOfReport and equals the filing's own
+    declared DateOfListing or DateOfAllotment -> that event date. Anything else returns None (CONTEXT_CONFLICT)."""
+    instants = _category_instants(inst)
+    if len(instants) != 1:
+        return None
+    (instant,) = instants
+    if instant is None or instant == date_of_report:
+        return None
+    for tag in EVENT_DATE_TAGS:
+        text = inst.first_text(tag)
+        if text and date.fromisoformat(text) == instant:
+            return instant
+    return None
+
+
 def parse_shareholding(data: bytes) -> ParsedShareholding:
-    inst = parse_instance(data)
+    inst, shp16 = shp_instance(data)
     out = ParsedShareholding()
     ns = next((u for u in inst.namespaces.values() if SHP_NS_FRAGMENT in u and u.endswith("/in-bse-shp")), None)
     if ns is None:
@@ -132,8 +213,13 @@ def parse_shareholding(data: bytes) -> ParsedShareholding:
         "stated_scrip_code": inst.first_text("ScripCode"),
         "has_partly_paid": _bool(inst.first_text("WhetherTheListedEntityHasIssuedAnyPartlyPaidUpShares")),
         "promoter_pledge_flag": flags["pledged"],
-        "rules_applied": [],
+        "rules_applied": [SHP16_RULE] if shp16 else [],
     }
+    event_date = _event_date(inst, as_of_date)
+    if event_date is not None:
+        as_of_date = out.meta["as_of_date"] = event_date
+        out.meta["stated_date_of_report"] = as_of
+        out.meta["rules_applied"].append(SHP17_RULE)
     encumbrance: dict[str, Decimal] = {}
     holders: dict[tuple[str, str], dict[str, str]] = {}
     for fact in inst.facts:
@@ -154,7 +240,11 @@ def parse_shareholding(data: bytes) -> ParsedShareholding:
             continue
         if ctx.instant is not None and ctx.instant != as_of_date:
             out.issues.append(
-                ShpIssue("PERIOD", "CONTEXT_CONFLICT", {"context": ctx.id, "instant": str(ctx.instant), "as_of": as_of})
+                ShpIssue(
+                    "PERIOD",
+                    "CONTEXT_CONFLICT",
+                    {"context": ctx.id, "instant": str(ctx.instant), "as_of": str(as_of_date)},
+                )
             )
             continue
         out.categories.setdefault(category, {})[measure] = fact.decimal()
@@ -175,10 +265,10 @@ def parse_shareholding(data: bytes) -> ParsedShareholding:
                                "unit": inst.unit_kind(fact.unit_ref)})  # fmt: skip
 
     for (axis, member), row in sorted(holders.items()):
-        name, shares = row.get("NameOfTheShareholder"), row.get("NumberOfShares")
+        name, shares = row.get(HOLDER_NAME), row.get(HOLDER_SHARES)
         if not name or shares is None or row.get(SUBTOTAL_FLAG) == "Category":
             continue
-        pct = row.get("ShareholdingAsAPercentageOfTotalNumberOfShares")
+        pct = row.get(HOLDER_PCT)
         out.major_holders.append(
             {
                 "holder_category": PUBLIC_HOLDER_AXES[axis],
@@ -189,6 +279,7 @@ def parse_shareholding(data: bytes) -> ParsedShareholding:
             }
         )
 
+    _percent_scale(out)
     _apply_no_promoter_rule(out, flags)
     for required in ("TOTAL", "PROMOTER", "PUBLIC"):
         if "shares" not in out.categories.get(required, {}):
@@ -278,7 +369,7 @@ def parse_shp_master(data: bytes) -> list[ShpMasterEntry]:
                     isin=r["isin"],
                     as_of_date=datetime.strptime(r["date"], "%d-%b-%Y").date(),
                     broadcast_ts_ist=datetime.strptime(r["broadcastDate"], "%d-%b-%Y %H:%M:%S").replace(tzinfo=IST),
-                    xbrl_url=r["xbrl"],
+                    xbrl_url=canonical_archive_url(r["xbrl"]),
                     revised=(r.get("revisedData") or "N").upper() == "Y",
                 )
             )

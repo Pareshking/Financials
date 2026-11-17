@@ -1,7 +1,8 @@
 # CLAUDE.md
 
 Personal, single-user Indian equity research, screening and point-in-time backtesting engine.
-Universe v1: NSE Mainboard `EQ`/`BE`/`BZ`, starting with the Nifty 500. SME excluded.
+Universe v1: NSE Mainboard `EQ`/`BE`/`BZ` listed companies: the Nifty 500 seed plus every company whose weekly NSE
+market cap reaches Rs 500 Cr (rule U1, sticky: members never leave). SME excluded.
 **Data starts** (CHOICE C9, `financials/scope.py`): market data, corporate actions and index snapshots
 `>= 2024-10-01` (`MIN_TRADE_DATE`, UDiFF era); financials and shareholding `period_end >= 2025-03-31`
 (`MIN_PERIOD_END_DATE`, Q4 FY25: first Integrated Filing quarter). No parsers or fallbacks for older formats.
@@ -28,6 +29,11 @@ python -m financials --data-dir data materialize 2026-11-12
 python -m financials --data-dir data screen "Market Cap > 500 AND ROE > 15"
 python -m financials --data-dir data quarantine list --reason ISIN_COLLISION    # then: quarantine inspect <id> / resolve --id … --action … --note … / reprocess
 python -m financials --data-dir data discover-filings --universe nifty500      # results, annual, shareholding listings + Reg. 30 RSS (new files only)
+python -m financials --data-dir data fetch-mcap 2024-10-01 2026-11-17 --weekly   # PR-zip mcap files (fetch-days fetches each day's too)
+python -m financials --data-dir data update-universe [--from D --to D]           # sticky Rs 500 Cr Listed universe, rule U1 (run-day does it weekly)
+python -m financials --data-dir data discover-filings --universe mcap500-new     # filings of members without financials yet (mcap500 = all)
+python -m financials --data-dir data check-issue-size --as-of 2026-09-30         # NSE Issue Size vs Reg. 31 cross-check (read-only)
+python -m financials --data-dir data backfill-audit-opinions --workers 4         # audit_opinions from the vault (then full materialize on a version bump)
 python -m financials --data-dir data run-day --date 2026-11-13                  # daily: fetch, discover (RSS hint), promote, materialize
 python -m financials --data-dir data rebuild-market --from 2025-09-23           # roll market state back to a date and replay (audited)
 python -m financials --data-dir data materialize --from 2024-10-01 --to 2026-11-13

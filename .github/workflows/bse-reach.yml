@@ -1,0 +1,42 @@
+name: bse-reach
+
+# Probe (owner 2026-11-17): can GitHub-hosted runners reach BSE, by plain HTTP and by headless Chrome? ~10 requests
+# per mode, >= 1.5 s apart. Saves the 200 bodies as a private workflow artifact (1 day; the repository is public) so real files can become
+# fixtures (scrip master, listing JSON, one XBRL file, one bhavcopy). Runs when this file or the probe changes, and by
+# hand. No database is read or written.
+on:
+  push:
+    paths:
+      - .github/workflows/bse-reach.yml
+      - scripts/probe_bse_reach.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -e . "playwright==1.48.0"
+      - run: python -m playwright install --with-deps chromium
+      - run: curl -s https://api.ipify.org; echo " (runner public IP)"
+      - name: plain curl (home page, scrip master)
+        run: |
+          curl -s -o /dev/null -w "%{http_code} %{size_download} https://www.bseindia.com/\n" -A "Mozilla/5.0" https://www.bseindia.com/ || true
+          sleep 2
+          curl -s -o /dev/null -w "%{http_code} %{size_download} scrip master\n" -A "Mozilla/5.0" -H "Referer: https://www.bseindia.com/" "https://api.bseindia.com/BseIndiaAPI/api/ListofScripData/w?Group=&Scripcode=&industry=&segment=Equity&status=Active" || true
+      - run: python scripts/probe_bse_reach.py --mode curl --out bse_probe/curl
+      - run: python scripts/probe_bse_reach.py --mode browser --out bse_probe/browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bse-probe
+          path: bse_probe/
+          retention-days: 1
+          if-no-files-found: warn

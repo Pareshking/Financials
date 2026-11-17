@@ -8,6 +8,9 @@
   `security_identifier_history.bse_scrip_code` of the NSE identifier rows that match the filing's own ISIN and
   symbol. A different code already on such a row is an IDENTIFIER / BSE_SCRIP_CODE_CONFLICT finding; nothing is
   overwritten.
+- Rule SC0 [X171]: an all-zero scrip code (`000000`, what a filer types when it states no BSE code) is no code: a
+  filed one fills nothing and raises nothing, and a stored one (written before SC0) counts as empty, so the next real
+  code fills it without a conflict.
 
 The promoter (single writer) owns the transaction; these helpers return findings for it to queue.
 """
@@ -68,6 +71,15 @@ def annual_prior_year_differences(
     return out
 
 
+SC0_RULE = "SC0"
+
+
+def scrip_code(text: str | None) -> str | None:
+    """Rule SC0 [X171]: a BSE scrip code as sent, or None when blank, not all digits, or all zeros (a placeholder)."""
+    code = (text or "").strip()
+    return code if code.isdigit() and code.strip("0") else None
+
+
 def filed_scrip_code(con, filing_id: str) -> str | None:
     """The filing's non-dimensional `ScripCode` as sent, when it is one all-digit value. Read from disclosure_facts
     (X116: no other clean table holds the element; the filing's highest disclosure parser version)."""
@@ -83,8 +95,7 @@ def filed_scrip_code(con, filing_id: str) -> str | None:
     vals.discard("")
     if len(vals) != 1:
         return None
-    code = vals.pop()
-    return code if code.isdigit() else None
+    return scrip_code(vals.pop())
 
 
 def apply_bse_scrip_code(
@@ -103,18 +114,20 @@ def apply_bse_scrip_code(
     conflicts = [
         {"security_id": sec, "valid_from": str(vf), "stored": old, "filed": code, "isin": isin, "symbol": symbol}
         for sec, vf, old in rows
-        if old is not None and old != code
+        if scrip_code(old) is not None and old != code
     ]
-    if any(old is None for _, _, old in rows):
+    if any(scrip_code(old) is None for _, _, old in rows):  # SC0: a stored all-zero code is empty
         con.execute(
             "UPDATE security_identifier_history SET bse_scrip_code = ? WHERE exchange = ? AND isin = ? AND symbol = ? "
-            "AND bse_scrip_code IS NULL AND security_id IN (SELECT security_id FROM securities WHERE entity_id = ?)",
+            f"AND {_EMPTY_CODE} AND security_id IN (SELECT security_id FROM securities WHERE entity_id = ?)",
             [code, exchange, isin, symbol, entity_id],
         )
     return conflicts
 
 
 BSE1_RULE = "BSE1"
+# SC0 in SQL: no code stored, or an all-zero placeholder (any length)
+_EMPTY_CODE = "(bse_scrip_code IS NULL OR NOT regexp_matches(bse_scrip_code, '[1-9]'))"
 
 
 def apply_bse_scrip_codes_by_isin(con, filing_id: str) -> tuple[int, list[dict]]:
@@ -136,16 +149,17 @@ def apply_bse_scrip_codes_by_isin(con, filing_id: str) -> tuple[int, list[dict]]
     conflicts = [
         {"security_id": sec, "valid_from": str(vf), "stored": old, "filed": code, "isin": isin, "symbol": sym,
          "rule": BSE1_RULE}
-        for sec, _ex, vf, sym, isin, old, code in rows if old is not None and old != code
+        for sec, _ex, vf, sym, isin, old, code in rows if scrip_code(old) is not None and old != code
     ]  # fmt: skip
-    todo = sum(old is None for *_, old, _code in rows)
+    todo = sum(scrip_code(old) is None for *_, old, _code in rows)
     if todo:
         con.execute(
             """UPDATE security_identifier_history h SET bse_scrip_code = b.code
                FROM (SELECT isin, any_value(scrip_code) AS code, any_value(observed_date) AS d
                      FROM raw_bse_securities WHERE filing_id = ? GROUP BY isin
                      HAVING count(DISTINCT scrip_code) = 1) b
-               WHERE h.isin = b.isin AND h.exchange <> 'BSE' AND h.bse_scrip_code IS NULL
+               WHERE h.isin = b.isin AND h.exchange <> 'BSE' AND (h.bse_scrip_code IS NULL
+                     OR NOT regexp_matches(h.bse_scrip_code, '[1-9]'))
                  AND h.valid_from <= b.d AND (h.valid_to IS NULL OR h.valid_to > b.d)""",
             [filing_id],
         )

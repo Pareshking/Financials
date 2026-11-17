@@ -358,13 +358,19 @@ def test_rows_are_promoted_with_their_filing_and_backfilled_from_the_vault(filed
     assert (r["rows"], r["error_count"]) == (0, 2) and "does not match" in r["errors"][0]
 
 
-def _entity(con, name_like: str) -> str:
-    return con.execute("SELECT entity_id FROM entity_master WHERE legal_name ILIKE ?", [name_like]).fetchone()[0]
+def _filer(con, file_name: str) -> str:
+    """The entity the promoter resolved for that fixture's filing (a name match is ambiguous: two EMAMI entities)."""
+    found = con.execute(
+        "SELECT DISTINCT a.entity_id FROM audit_opinions a JOIN filings f USING (filing_id) WHERE f.source_url = ?",
+        [ARCHIVE + file_name],
+    ).fetchall()
+    assert len(found) == 1, found
+    return found[0][0]
 
 
 def test_columns_are_point_in_time_and_feed_the_forensic_gate(filed):
     con = filed.con
-    rk, ri, em = (_entity(con, p) for p in ("%RAMKRISHNA%", "%RELIANCE INFRA%", "%EMAMI%"))
+    rk, ri, em = (_filer(con, FILED[i][0]) for i in (0, 1, 3))  # RKFORGE annual, RELINFRA annual, EMAMI Q1 FY27
     rows = [{"entity_id": e} for e in (rk, ri, em)]
     FA.add_columns(con, rows, ist_to_utc(date(2025, 10, 24), datetime.min.time()))
     assert all(r[c] is None for r in rows for c in FA.COLUMNS)  # nothing visible yet

@@ -6,10 +6,10 @@ Rule U1 (`RULE_VERSION`):
   of W's PR-zip mcap file (raw_nse_mcap [X130-X133]) with series EQ / BE / BZ (never SME SM / ST / SZ; the zip's sme
   file is not read) and filed Market Cap >= THRESHOLD_INR joins on W, reason MCAP_GE_500CR, visible from the file's
   broadcast time. Each row stands on its own (owner: "ignore DVR", no share-class aggregation).
-- Listed only (U1-L, coordinator 2026-11-17): only rows with Category `Listed` qualify (ELIGIBLE_CATEGORY).
-  `Permitted` securities are listed on another exchange and only permitted to trade on NSE; the project's universe
-  is NSE Mainboard listed companies and its filings pipeline is NSE-only (none of the 104 permitted rows >= Rs 500 Cr
-  on 2026-11-13 has NSE financials). Their raw rows stay in raw_nse_mcap as sent.
+- Listed and Permitted (U1-P, owner 2026-11-17, superseding U1-L): rows with Category `Listed` or `Permitted`
+  qualify (ELIGIBLE_CATEGORIES). `Permitted` securities are listed on another exchange (mostly BSE) and permitted to
+  trade on NSE; they file their results on that exchange, not on NSE [X166], so the membership row records the
+  qualifying row's category (`listing_category`) and `bse_members` lists the members that need BSE filings.
 - Seed, once (no SEED_EXISTING row yet): every security, in those series and with a bar, of an entity that already
   has financials (filing_meta) joins on its first bar date, reason SEED_EXISTING. The seed is a hindsight selection
   (the Nifty 500 set the project started with): survivorship bias as disclosed for the index backfill [L1].
@@ -30,8 +30,9 @@ from financials.ids import stable_id
 from financials.timeutil import ist_to_utc, utc_now
 
 UNIVERSE = "MCAP500"
-RULE_VERSION = "U1-2026.11.17-L"  # -L: Listed rows only
-ELIGIBLE_CATEGORY = "Listed"
+RULE_VERSION = "U1-2026.11.17-P"  # -P: Listed and Permitted rows (was -L: Listed only)
+ELIGIBLE_CATEGORIES = ("Listed", "Permitted")
+PERMITTED = "Permitted"
 THRESHOLD_INR = Decimal("5000000000")  # Rs 500 crore
 SEED = "SEED_EXISTING"
 JOIN = "MCAP_GE_500CR"
@@ -73,6 +74,7 @@ def update_universe(con, start: date, end: date, *, now: datetime | None = None)
     or security. Returns counts; audited in admin_log. The caller holds the write transaction."""
     now = now or utc_now()
     seeded = _seed(con, now)
+    categorised = _fill_listing_category(con)
     weeks, unknown = week_end_trading_days(con, start, end)
     have = {d for (d,) in con.execute(
         "SELECT DISTINCT trade_date FROM raw_nse_mcap WHERE trade_date IN (SELECT unnest(?))", [weeks]
@@ -85,16 +87,17 @@ def update_universe(con, start: date, end: date, *, now: datetime | None = None)
              SELECT m.trade_date, any_value(m.filing_id ORDER BY fi.fetched_at DESC, m.filing_id DESC) AS filing_id
              FROM raw_nse_mcap m JOIN filings fi USING (filing_id)
              WHERE m.trade_date IN (SELECT unnest(?)) GROUP BY 1)
-           SELECT m.trade_date, m.symbol, m.series, m.market_cap_inr, m.filing_id, fi.broadcast_ts,
+           SELECT m.trade_date, m.symbol, m.series, m.market_cap_inr, m.category, m.filing_id, fi.broadcast_ts,
                   h.security_id, s.entity_id
            FROM raw_nse_mcap m JOIN f USING (trade_date, filing_id) JOIN filings fi USING (filing_id)
            LEFT JOIN security_identifier_history h ON h.exchange = m.exchange AND h.symbol = m.symbol
                 AND h.series = m.series AND h.valid_from <= m.trade_date
                 AND (h.valid_to IS NULL OR h.valid_to > m.trade_date)
            LEFT JOIN securities s ON s.security_id = h.security_id
-           WHERE m.series IN (SELECT unnest(?)) AND m.market_cap_inr >= ? AND m.category = ?
+           WHERE m.series IN (SELECT unnest(?)) AND m.market_cap_inr >= ?
+             AND m.category IN (SELECT unnest(?))
            ORDER BY m.trade_date, m.symbol, m.series""",
-        [sorted(have), sorted(UNIVERSE_SERIES), THRESHOLD_INR, ELIGIBLE_CATEGORY],
+        [sorted(have), sorted(UNIVERSE_SERIES), THRESHOLD_INR, list(ELIGIBLE_CATEGORIES)],
     )
     first: dict[str, dict] = {}
     unresolved: dict[tuple[str, str], dict] = {}
@@ -117,7 +120,8 @@ def update_universe(con, start: date, end: date, *, now: datetime | None = None)
             con.execute(
                 "UPDATE universe_membership u SET joined_date = e.joined_date, reason = e.reason, "
                 "rule_version = e.rule_version, symbol = e.symbol, series = e.series, "
-                "market_cap_inr = e.market_cap_inr, evidence_filing_id = e.evidence_filing_id, "
+                "market_cap_inr = e.market_cap_inr, listing_category = e.listing_category, "
+                "evidence_filing_id = e.evidence_filing_id, "
                 "visible_from_ts = e.visible_from_ts, recorded_at = e.recorded_at FROM _earlier e "
                 "WHERE u.universe = e.universe AND u.security_id = e.security_id"
             )
@@ -127,7 +131,10 @@ def update_universe(con, start: date, end: date, *, now: datetime | None = None)
     closed = _close_resolved(con, now)
     total = con.execute("SELECT count(*) FROM universe_membership WHERE universe = ?", [UNIVERSE]).fetchone()[0]
     result = {"universe": UNIVERSE, "rule_version": RULE_VERSION, "seeded": seeded, "joined": len(new),
-              "moved_earlier": len(earlier), "members": total, "week_ends": len(weeks),
+              "moved_earlier": len(earlier), "members": total,
+              "permitted_members": con.execute(
+                  "SELECT count(*) FROM universe_membership WHERE universe = ? AND listing_category = ?",
+                  [UNIVERSE, PERMITTED]).fetchone()[0], "listing_category_filled": categorised, "week_ends": len(weeks),
               "week_ends_without_mcap_file": [str(w) for w in missing],
               "days_with_unknown_week_end": [str(d) for d in unknown], "unresolved": len(unresolved),
               "unresolved_findings": findings, "findings_closed": closed}  # fmt: skip
@@ -142,7 +149,8 @@ def update_universe(con, start: date, end: date, *, now: datetime | None = None)
 def _member(r: dict, now: datetime) -> dict:
     return {"universe": UNIVERSE, "security_id": r["security_id"], "entity_id": r["entity_id"],
             "joined_date": r["trade_date"], "reason": JOIN, "rule_version": RULE_VERSION, "symbol": r["symbol"],
-            "series": r["series"], "market_cap_inr": r["market_cap_inr"], "evidence_filing_id": r["filing_id"],
+            "series": r["series"], "market_cap_inr": r["market_cap_inr"], "listing_category": r["category"],
+            "evidence_filing_id": r["filing_id"],
             "visible_from_ts": r["broadcast_ts"], "recorded_at": now}  # fmt: skip
 
 
@@ -170,11 +178,50 @@ def _seed(con, now: datetime) -> int:
     insert_rows(con, "universe_membership", [
         {"universe": UNIVERSE, "security_id": r["security_id"], "entity_id": r["entity_id"],
          "joined_date": r["trade_date"], "reason": SEED, "rule_version": RULE_VERSION, "symbol": r["symbol"],
-         "series": r["series"], "market_cap_inr": None, "evidence_filing_id": None,
+         "series": r["series"], "market_cap_inr": None, "listing_category": None, "evidence_filing_id": None,
          "visible_from_ts": ist_to_utc(r["trade_date"], time(23, 59, 59)), "recorded_at": now}
         for r in rows
     ])  # fmt: skip
     return len(rows)
+
+
+def _fill_listing_category(con) -> int:
+    """Rows joined before the column existed (rule U1-L): the category of their own evidence row, as filed. Batched,
+    idempotent (only NULLs of MCAP_GE_500CR rows are filled; SEED_EXISTING rows have no evidence row)."""
+    n = con.execute(
+        "SELECT count(*) FROM universe_membership WHERE universe = ? AND listing_category IS NULL "
+        "AND evidence_filing_id IS NOT NULL", [UNIVERSE]).fetchone()[0]  # fmt: skip
+    if n:
+        con.execute(
+            "UPDATE universe_membership u SET listing_category = m.category FROM raw_nse_mcap m "
+            "WHERE u.universe = ? AND u.listing_category IS NULL AND m.filing_id = u.evidence_filing_id "
+            "AND m.symbol = u.symbol AND m.series = u.series", [UNIVERSE])  # fmt: skip
+    return n
+
+
+def bse_members(con, as_of: date) -> list[dict]:
+    """Members joined by `as_of` whose latest mcap row on or before `as_of` (by their identifier interval valid on
+    that file's date) is `Permitted`: listed elsewhere, their filings are on BSE [X166]. Each row carries the current
+    ISIN and BSE scrip code (security_identifier_history; NULL until rule BSE1 [X165] or a filing [X111] fills it).
+    Keyed on the security, never on an NSE symbol alone."""
+    return fetch_dicts(
+        con,
+        """WITH f AS (SELECT max(trade_date) AS d FROM raw_nse_mcap WHERE trade_date <= ?),
+           cat AS (
+             SELECT h.security_id, any_value(m.category ORDER BY fi.fetched_at DESC) AS category
+             FROM raw_nse_mcap m JOIN f ON m.trade_date = f.d JOIN filings fi USING (filing_id)
+             JOIN security_identifier_history h ON h.exchange = m.exchange AND h.symbol = m.symbol
+                  AND h.series = m.series AND h.valid_from <= m.trade_date
+                  AND (h.valid_to IS NULL OR h.valid_to > m.trade_date)
+             GROUP BY 1)
+           SELECT u.security_id, u.entity_id, h.symbol, h.series, h.isin, h.bse_scrip_code, u.joined_date,
+                  u.listing_category AS category_at_join, c.category AS latest_category
+           FROM universe_membership u JOIN cat c USING (security_id)
+           JOIN security_identifier_history h ON h.security_id = u.security_id AND h.valid_to IS NULL
+           WHERE u.universe = ? AND u.joined_date <= ? AND c.category = ?
+           ORDER BY h.symbol""",
+        [as_of, UNIVERSE, as_of, PERMITTED],
+    )
 
 
 def _quarantine_unresolved(con, rows, now: datetime) -> list[str]:
@@ -208,12 +255,16 @@ def _close_resolved(con, now: datetime) -> int:
 
 def members(con, as_of: date, *, new_only: bool = False) -> list[str]:
     """Current symbols (open identifier interval) of the members joined on or before `as_of`; `new_only` keeps
-    members whose entity has no financials yet (the first discovery for the new joiners)."""
+    members whose entity has no financials yet (the first NSE discovery for the new joiners), except members whose
+    latest mcap row is `Permitted`: they file on BSE, not on NSE [X166], so asking NSE again every day finds nothing
+    (`bse_members` lists them)."""
     extra = " AND u.entity_id NOT IN (SELECT entity_id FROM filing_meta)" if new_only else ""
+    skip = sorted(r["security_id"] for r in bse_members(con, as_of)) if new_only else []
     return [s for (s,) in con.execute(
         "SELECT DISTINCT h.symbol FROM universe_membership u JOIN security_identifier_history h "
         "ON h.security_id = u.security_id AND h.valid_to IS NULL WHERE u.universe = ? AND u.joined_date <= ?"
-        + extra + " ORDER BY 1", [UNIVERSE, as_of]).fetchall()]  # fmt: skip
+        " AND u.security_id NOT IN (SELECT unnest(?::VARCHAR[]))" + extra + " ORDER BY 1",
+        [UNIVERSE, as_of, skip]).fetchall()]  # fmt: skip
 
 
 def weekly_growth(con) -> list[tuple[date, str, int]]:

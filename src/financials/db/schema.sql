@@ -2220,6 +2220,7 @@ CREATE TABLE IF NOT EXISTS universe_membership (
     evidence_filing_id  VARCHAR REFERENCES filings(filing_id),  -- the mcap file; NULL for SEED_EXISTING
     visible_from_ts     TIMESTAMP NOT NULL,
     recorded_at         TIMESTAMP NOT NULL,
+    listing_category    VARCHAR,                -- the qualifying row's Category (Listed | Permitted); NULL for SEED_EXISTING
     PRIMARY KEY (universe, security_id),
     CHECK (reason IN ('SEED_EXISTING', 'MCAP_GE_500CR'))
 );

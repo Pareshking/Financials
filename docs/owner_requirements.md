@@ -464,6 +464,11 @@ None open. Decided 2026-11-15: no paid sources at all (G74, by the owner); E-H b
 27. G136: corporate bond / CP trade yields. Verify: a real debt-segment trade report fixture.
 28. G62: cost-of-acquisition / swap-ratio watcher. Blocked by decision 1; verify on a real COA announcement.
 
+**Last (owner, 2026-11-17: "add last in to do")**
+29. Automatic merger detection and the demerger cost-of-acquisition split (entitlement ratios, COA percentages). Today
+    both are admin-entered, audited edges (architecture §11.7); the terms are announced only in PDFs (R7 UNVERIFIED).
+30. Reg. 30 penalty amounts (G117 red flags carry the event, not the amount). Verify: an E12 content fixture.
+
 
 ## Decisions taken on the owner's behalf (2026-11-15)
 

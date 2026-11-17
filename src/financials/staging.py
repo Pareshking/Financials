@@ -86,6 +86,14 @@ CREATE TABLE stg_disclosures (
     value_bool BOOLEAN, value_text VARCHAR, text_len INTEGER, text_sha256 VARCHAR, text_snippet VARCHAR,
     PRIMARY KEY (filing_id, seq)
 );
+CREATE TABLE stg_audit_opinions (
+    audit_opinion_id VARCHAR NOT NULL, filing_id VARCHAR PRIMARY KEY, parser_version VARCHAR NOT NULL,
+    source_kind VARCHAR NOT NULL, scope VARCHAR NOT NULL, period_end DATE NOT NULL, audit_opinion VARCHAR,
+    opinion_rule VARCHAR NOT NULL, going_concern_uncertainty BOOLEAN, going_concern_component BOOLEAN,
+    emphasis_of_matter BOOLEAN,
+    checkbox_qualified BOOLEAN, opinion_conflict BOOLEAN, declaration VARCHAR, qualification_count INTEGER,
+    qualification_repetitive BOOLEAN, text_len INTEGER, text_sha256 VARCHAR
+);
 CREATE TABLE stg_corp_actions (
     filing_id VARCHAR NOT NULL, seq INTEGER NOT NULL, component INTEGER NOT NULL, exchange VARCHAR NOT NULL,
     symbol VARCHAR NOT NULL, series VARCHAR NOT NULL, isin VARCHAR NOT NULL, ex_date DATE NOT NULL,
@@ -159,6 +167,7 @@ TABLE_ORDER = (
     "stg_related_parties",
     "stg_reg23_rpt",
     "stg_disclosures",
+    "stg_audit_opinions",
     "stg_corp_actions",
     "stg_events",
     "stg_kpis",
@@ -447,7 +456,20 @@ def results_tables(fid: str, inst, data: bytes, source_url: str) -> dict[str, li
         scope=m["scope"],
         source_kind="ANNUAL" if parsed.profile == "REG34_ANNUAL" else "RESULTS",
     )
+    tables["stg_audit_opinions"] = audit_opinion_rows(fid, inst, parsed.profile, m["scope"], m["period_end"])
     return tables
+
+
+def audit_opinion_rows(fid: str, inst, profile: str, scope: str, period_end) -> list[dict[str, Any]]:
+    """The audit_opinions staging row of one parsed results / annual filing (parsers/audit_report.py; none when it
+    files none of the audit elements). Shared by results_tables and the vault backfill (audit_opinions.py)."""
+    from financials.parsers.audit_report import AUDIT_PARSER_VERSION, audit_row
+
+    row = audit_row(inst, annual=profile == "REG34_ANNUAL", scope=scope)
+    if row is None:
+        return []
+    return [{"audit_opinion_id": stable_id("audit", fid, AUDIT_PARSER_VERSION), "filing_id": fid,
+             "parser_version": AUDIT_PARSER_VERSION, "scope": scope, "period_end": period_end, **row}]  # fmt: skip
 
 
 def captured_elements(tables: dict[str, list[dict[str, Any]]]) -> frozenset[str]:

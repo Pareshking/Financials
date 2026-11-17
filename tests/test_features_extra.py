@@ -280,17 +280,25 @@ def test_institutional_absorption_and_pledge_change():
 
 
 def test_red_flags_are_separate_columns_never_summed():
-    row = {"auditor_resignations_90d": 1, "kmp_resignations_90d": 1, "fraud_or_default_90d": 0}
-    ev = {"litigations_90d": 2, "allotments_90d": 1, "fund_raising_events_90d": 0, "_audit": (False, "UNMODIFIED")}
+    row = {
+        "auditor_resignations_90d": 1,
+        "kmp_resignations_90d": 1,
+        "fraud_or_default_90d": 0,
+        "audit_opinion": "UNMODIFIED",
+        "audit_opinion_quarterly": None,
+    }
+    ev = {"litigations_90d": 2, "allotments_90d": 1, "fund_raising_events_90d": 0}
     v = X.event_columns(row, ev, {"promoter_pledge_change_qoq_pp": 0.01})
     assert v == {"litigations_90d": 2, "allotments_90d": 1, "fund_raising_events_90d": 0,
                  "rf_auditor_resignation_90d": True, "rf_kmp_resignations_90d": False,
                  "rf_fraud_or_default_90d": False, "rf_litigation_90d": True, "rf_audit_qualified": False,
                  "rf_pledge_increase_qoq": True}  # fmt: skip
     assert not any("score" in c or "count" in c for c in X.EVENT_COLUMNS)
-    assert X.audit_qualified(None, "Statement on impact of audit qualification: ...") is True  # [E8] verbatim
-    assert X.audit_qualified(True, None) is True and X.audit_qualified(None, None) is None
-    assert X.audit_qualified(None, "NOT_APPLICABLE") is False
+    # rf_audit_qualified = features_audit.modified_opinion: the text / results opinion, never the checkbox [X121]
+    rf = lambda **kw: X.event_columns({**row, **kw}, ev, {})["rf_audit_qualified"]  # noqa: E731
+    assert rf(audit_opinion=None, audit_opinion_quarterly="QUALIFIED") is True
+    assert rf(audit_opinion="DISCLAIMER") is True and rf(audit_opinion="ADVERSE") is True
+    assert rf(audit_opinion=None) is None and rf(audit_opinion=None, audit_opinion_quarterly="UNMODIFIED") is False
 
 
 # ── integration on the real pipeline ──────────────────────────────────────────────────────────────────────────────

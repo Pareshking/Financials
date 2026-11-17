@@ -48,8 +48,9 @@ Definitions (fractions as DOUBLE, `_pp` = fraction points, money DECIMAL rupees;
   shares now - the same a quarter earlier (fraction points).
 - Reg. 30 (G117, B8.2-B8.3): counts of litigation, allotment and fund-raising disclosures in 90 days, and red-flag
   booleans kept as separate columns, never summed into one score (architecture §10.2): auditor resignation, >= 2 KMP
-  / director resignations, fraud / default, litigation, a qualified audit opinion (latest Reg. 34
-  `auditor_qualified`, or an Integrated Filing statement on the impact of a qualification [E8]), a pledge increase.
+  / director resignations, fraud / default, litigation, a modified audit opinion (features_audit.modified_opinion:
+  the latest annual auditor's report text or the latest results audit opinion is qualified / adverse / disclaimer
+  [X121-X124]; the Reg. 34 checkbox is not read, owner decision 2026-11-17), a pledge increase.
 - raw numerator / denominator (G244) for pe, roe, roce, ev_ebitda and opm, exactly the inputs of those columns;
   NULL where the ratio does not apply (lenders / insurers for roce, ev_ebitda and opm).
 Industrial cost / margin / cash-conversion ratios are NULL for lenders and insurers (`INDUSTRIAL_ONLY`).
@@ -61,7 +62,7 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
-from financials import features_pl
+from financials import features_audit, features_pl
 from financials.db import version_key
 from financials.fundamentals import (
     _add_months,
@@ -441,8 +442,7 @@ def volume_medians(con, as_of: date, exchange: str = "NSE", securities=None) -> 
 
 
 def event_inputs(con, as_of: date, as_of_ts: datetime, entities=None) -> dict[str, dict]:
-    """Reg. 30 counts in the 90 days to as-of (disclosure date, as features._event_counts) and the latest audit
-    opinion signals (filing_meta). Two queries."""
+    """Reg. 30 counts in the 90 days to as-of (disclosure date, as features._event_counts). One query."""
     only, only_p = entity_filter("entity_id", entities)
     out: dict[str, dict] = defaultdict(dict)
     for ent, lit, allot, fund in con.execute(
@@ -454,27 +454,7 @@ def event_inputs(con, as_of: date, as_of_ts: datetime, entities=None) -> dict[st
         [as_of_ts, as_of - timedelta(days=90), as_of, *only_p],
     ).fetchall():
         out[ent] |= {"litigations_90d": lit, "allotments_90d": allot, "fund_raising_events_90d": fund}
-    for ent, annual, opinion in con.execute(
-        """SELECT entity_id,
-                  arg_max(auditor_qualified, (visible_from_ts, filing_id))
-                      FILTER (WHERE accounting_profile = 'REG34_ANNUAL' AND auditor_qualified IS NOT NULL),
-                  arg_max(audit_opinion, (visible_from_ts, filing_id)) FILTER (WHERE audit_opinion IS NOT NULL)
-           FROM filing_meta WHERE visible_from_ts <= ?"""
-        + only
-        + " GROUP BY entity_id",
-        [as_of_ts, *only_p],
-    ).fetchall():
-        out[ent]["_audit"] = (annual, opinion)
     return out
-
-
-def audit_qualified(annual: bool | None, opinion: str | None) -> bool | None:
-    """TRUE on a qualified Reg. 34 report or an Integrated Filing statement on the impact of a qualification (any
-    text other than the two observed declarations [E8]); FALSE when what is filed is clean; NULL when nothing is."""
-    modified = None if opinion is None else opinion not in ("UNMODIFIED", "NOT_APPLICABLE")
-    if annual is True or modified is True:
-        return True
-    return None if annual is None and modified is None else False
 
 
 def kpi_inputs(con, as_of_ts: datetime, entities=None) -> dict[str, dict[str, dict]]:
@@ -561,7 +541,7 @@ def event_columns(row: dict, ev: dict | None, flows: dict) -> dict:
         "rf_kmp_resignations_90d": None if kmp is None else kmp >= KMP_EXODUS_MIN,
         "rf_fraud_or_default_90d": None if row.get("fraud_or_default_90d") is None else row["fraud_or_default_90d"] > 0,
         "rf_litigation_90d": out["litigations_90d"] > 0,
-        "rf_audit_qualified": audit_qualified(*ev.get("_audit", (None, None))),
+        "rf_audit_qualified": features_audit.modified_opinion(row),
         "rf_pledge_increase_qoq": None if flows.get("promoter_pledge_change_qoq_pp") is None
         else flows["promoter_pledge_change_qoq_pp"] > 0,
     }  # fmt: skip

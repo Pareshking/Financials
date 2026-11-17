@@ -463,6 +463,16 @@ def _disclosure_aliases() -> dict[str, tuple[str, str]]:
 
 ALIASES.update(_disclosure_aliases())
 
+
+def _audit_aliases() -> dict[str, tuple[str, str]]:
+    """Batch 20A (audit opinions from the report text, X121): features_audit.dsl_aliases."""
+    from financials.features_audit import dsl_aliases
+
+    return dsl_aliases()
+
+
+ALIASES.update(_audit_aliases())
+
 KEYWORDS = {"and", "or", "not"}
 COMPARATORS = {"<", "<=", ">", ">=", "=", "!="}
 NAME_RE = re.compile(r"^[a-z][a-z0-9 ]{0,62}$")

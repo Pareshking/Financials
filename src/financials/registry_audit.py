@@ -269,6 +269,38 @@ OVERRIDES: dict[tuple[str, str], str] = {
     # Split of the mapped ShareOfProfitLossOfAssociatesAndJointVentures... line.
     ("REG34_ANNUAL", "ShareOfProfitLossOfAssociatesAccountedForUsingEquityMethod"): "DERIVED_SUBTOTAL",
     ("REG34_ANNUAL", "ShareOfProfitLossOfJointVenturesAccountedForUsingEquityMethod"): "DERIVED_SUBTOTAL",
+    # Seen first in the audit-opinion fixtures (batch 20A, X121); note lines under mapped totals.
+    (
+        "REG34_ANNUAL",
+        "AmountCreditedToProfitAndLossAsTransferFromRevaluationReserveOnAccountOfAdditionalDepreciation"
+        "ChargedOnRevaluedTangibleAssets",
+    ): "ANNUAL_EQUITY_NOTE",
+    ("REG34_ANNUAL", "ProposedEquityFinalDividend"): "ANNUAL_EQUITY_NOTE",
+    ("REG34_ANNUAL", "ProposedEquitySpecialDividend"): "ANNUAL_EQUITY_NOTE",
+    # MMTC FY25: the NBFC-style provisioning memo block (income reversal / NPAs, amounts provided and to be provided)
+    (
+        "REG34_ANNUAL",
+        "AmountOfProvisionsToBeMadeOnAccountOfIncomeReversalAndNonPerformingAssetsRemainingUnrealised",
+    ): "REGULATORY_MEMO",
+    ("REG34_ANNUAL", "AmountProvidedInCurrentYear"): "REGULATORY_MEMO",
+    ("REG34_ANNUAL", "BalanceAmountToBeProvided"): "REGULATORY_MEMO",
+    ("REG34_ANNUAL", "CumulativeAmountProvidedTillPreviousYear"): "REGULATORY_MEMO",
+    ("REG34_ANNUAL", "ArrearsOfFixedCumulativeDividendsOnPreferenceShares"): "ANNUAL_SHARE_CAPITAL_NOTE",
+    ("REG34_ANNUAL", "PercentageOfChangeInSharesHeldDuringYear"): "ANNUAL_SHARE_CAPITAL_NOTE",
+    ("REG34_ANNUAL", "PercentageOfTotalSharesHeld"): "ANNUAL_SHARE_CAPITAL_NOTE",
+    ("REG34_ANNUAL", "CurrentMaturitiesOfLongTermDebt"): "BALANCE_SHEET_DETAIL",
+    ("REG34_ANNUAL", "DepositRepaymentReserveAccountWithBanks"): "BALANCE_SHEET_DETAIL",
+    ("REG34_ANNUAL", "CustodialFees"): "ANNUAL_EXPENSE_DETAIL",
+    ("REG34_ANNUAL", "DiscountingCharges"): "ANNUAL_EXPENSE_DETAIL",
+    ("REG34_ANNUAL", "DividendOnPreferenceSharesTreatedAsDebt"): "ANNUAL_EXPENSE_DETAIL",
+    ("REG34_ANNUAL", "EntertainmentExpenses"): "ANNUAL_EXPENSE_DETAIL",
+    ("REG34_ANNUAL", "GuaranteeCommission"): "ANNUAL_EXPENSE_DETAIL",
+    ("REG34_ANNUAL", "ResearchDevelopmentExpenditure"): "ANNUAL_EXPENSE_DETAIL",
+    ("REG34_ANNUAL", "VoluntaryRetirementCompensation"): "ANNUAL_EXPENSE_DETAIL",
+    ("REG34_ANNUAL", "ExcessProvisionDiminutionInValueInvestmentWrittenBack"): "ANNUAL_INCOME_DETAIL",
+    ("REG34_ANNUAL", "IncomeExportIncentives"): "ANNUAL_INCOME_DETAIL",
+    ("REG34_ANNUAL", "RevenueFromInterest"): "ANNUAL_INCOME_DETAIL",
+    ("REG34_ANNUAL", "MATCreditRecognisedDuringYear"): "ANNUAL_TAX_NOTE",
 }
 
 

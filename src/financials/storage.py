@@ -432,6 +432,14 @@ PRUNE_RULES: tuple[PruneRule, ...] = (
         "the filing's highest version); the backfill checks the current version only: the latest version per filing "
         "stays",
     ),
+    PruneRule(
+        "audit_opinions",
+        f"""EXISTS (SELECT 1 FROM audit_opinions k WHERE k.filing_id = t.filing_id
+              AND {VK("k.parser_version")} > {VK("t.parser_version")} AND k.entity_id = t.entity_id
+              AND k.scope = t.scope AND k.period_end = t.period_end AND k.visible_from_ts = t.visible_from_ts)""",
+        "features_audit ranks rows per (entity, kind, scope) by period_end, visible_from_ts, filing, version: an old "
+        "row goes only when a newer version of the filing has the same period, visible from the same instant",
+    ),
 )
 
 # Kept whole, and why (docs/architecture.md §4.1): filing_meta and shareholding_meta are read across every

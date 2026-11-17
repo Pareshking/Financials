@@ -130,7 +130,9 @@ EVENT_COLUMNS = (
     "rpt_counterparties", "rpt_leak_pct", "rpt_purchases_to_sales", "rpt_royalty_to_sales",
     "rpt_loans_given_to_net_worth", "insider_receivables_as_of", "insider_receivables",
     "insider_receivables_to_receivables", "has_insider_receivables", "subsidiary_fy_end", "parent_profit_share",
-    "largest_subsidiary_profit_share", "largest_subsidiary_name", "consolidated_entities_count",
+    "largest_subsidiary_profit_share", "largest_subsidiary_name", "consolidated_entities_count", "audit_opinion",
+    "audit_opinion_fy_end", "audit_opinion_conflict", "going_concern_uncertainty", "emphasis_of_matter",
+    "audit_opinion_quarterly", "audit_opinion_quarter_end",
 )  # fmt: skip
 
 _DECLARED = declared_columns()

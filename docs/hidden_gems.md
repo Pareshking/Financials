@@ -27,7 +27,8 @@ exceptional line is 0); `pe_core` uses the TTM effective tax rate as NOPAT does 
 loss) and the owners' share of TTM PAT, and is NULL when core earnings are ≤ 0; core signals, `pe_core`,
 `earnings_yield` and `opm_change_yoy_pp` are NULL for lenders and insurers (their other income is fee income).
 `_pp` columns are fraction differences (0.08 = 8 pp), DSL x100. `forensic_clean` fails only on a measured flag (a
-NULL input passes, as the Beneish rule says), is NULL without fundamentals, and skips the other-income tests for
+NULL input passes, as the Beneish rule says; an audit opinion that was never filed, or a report filed as "As per
+attachment", is NULL and passes), is NULL without fundamentals, and skips the other-income tests for
 lenders and insurers. Universe of `magic_formula_rank`, the medians and `gem_score`: the day's rows with
 `forensic_clean` and a non-financial archetype (gem score also non-cyclical, with ROCE and earnings yield); `gem_score`
 clips each input (ROCE −25%..75%, sustained growth = min of the two quarters' sales YoY −50%..100%, earnings yield
@@ -54,7 +55,7 @@ or before the as-of that lists the company; shipping (GESHIP, SCI: industry "Ser
 | `inst_holding_change_qoq_pp` | change vs previous quarter (back-to-back quarters only) | Under-owned, flows | Reg. 31 | BUILT as `fii_dii_qoq_change_pct` (fraction points); FII / DII apart: `fii_holding_change_qoq_pct`, `dii_holding_change_qoq_pct` |
 | `under_owned` | inst <= 15% and promoter >= 50% and pledge = 0 | Under-owned | Reg. 31 | BUILT |
 | `cyclical_flag` | industry in a cyclical set (Metals & Mining; Oil, Gas & Consumable Fuels; shipping; refining) — exact list in code with the industry source | all (exclusion / own hat) | industry from the Nifty 500 snapshot (coarse; 4-level classification is a new free source) | BUILT (+ `industry`) |
-| `forensic_clean` | other_income_lift_pp < 8 (per quarter); not restatement_suspected; Beneish M < -1.78 or NULL; pledge < 5%; no auditor resignation / fraud-default event in 90 days; other income < 30% of PBT | all | built inputs | BUILT |
+| `forensic_clean` | other_income_lift_pp < 8 (per quarter); not restatement_suspected; Beneish M < -1.78 or NULL; pledge < 5%; no auditor resignation / fraud-default event in 90 days; other income < 30% of PBT; the latest visible annual auditor's report (text, `audit_opinion`) and the latest results audit opinion (`audit_opinion_quarterly`) not QUALIFIED / ADVERSE / DISCLAIMER; no material uncertainty related to going concern in the latest annual report (`going_concern_uncertainty`; a section about a component only does not count). `emphasis_of_matter` and `audit_opinion_conflict` are informational and never fail it | all | built inputs; audit opinions from the report text [X121-X124] | BUILT (audit rules: features `2026.11.17-20A`) |
 | `cash_conversion_ok` | CFO/EBITDA >= 0.7 | Core, Quality | built | BUILT |
 | `dist_52w_low`, `drawdown_from_52w_high` | price vs 52-week low / high | Contrarian | prices | BUILT: `dist_52w_low`, `dist_52w_high` (batch B) |
 | `capex_pay_off_signal` | CWIP / gross block >= 25% and capex / depreciation >= 2 and D/E <= 1 | Capex cycle | Reg. 34 / half-year balance sheet | BUILT |

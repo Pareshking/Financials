@@ -1103,7 +1103,7 @@ CREATE TABLE IF NOT EXISTS features_events (
     unquoted_investments                     DECIMAL(24,2),   -- book value, non-current + current, last FY end (A6.12)
     quoted_investments_market_value          DECIMAL(24,2),   -- market value, non-current + current (A6.13)
     revaluation_reserve                      DECIMAL(24,2),   -- PPE revaluation surplus (A6.14)
-    rf_audit_qualified                       BOOLEAN,         -- qualified Reg. 34 report or IF qualification statement [E8] (B1.16)
+    rf_audit_qualified                       BOOLEAN,         -- latest annual report text / results opinion modified [X121] (B1.16)
     pe_denominator                           DECIMAL(24,2),   -- continuing owners' TTM profit
     roe_numerator                            DECIMAL(24,2),   -- owners' TTM profit
     roe_denominator                          DECIMAL(24,2),   -- owners' equity
@@ -1164,6 +1164,14 @@ CREATE TABLE IF NOT EXISTS features_events (
     largest_subsidiary_profit_share          DOUBLE,          -- largest subsidiary row / consolidated PAT
     largest_subsidiary_name                  VARCHAR,
     consolidated_entities_count              INTEGER,         -- distinct subsidiaries + associates + joint ventures
+    -- 20A: audit opinions (features_audit.py, audit_opinions) [X121-X124]; latest visible annual report text / results
+    audit_opinion                            VARCHAR,         -- UNMODIFIED | QUALIFIED | ADVERSE | DISCLAIMER (most severe scope)
+    audit_opinion_fy_end                     DATE,
+    audit_opinion_conflict                   BOOLEAN,         -- report text vs the Reg. 34 checkbox
+    going_concern_uncertainty                BOOLEAN,         -- material uncertainty related to going concern (entity / group)
+    emphasis_of_matter                       BOOLEAN,         -- informational
+    audit_opinion_quarterly                  VARCHAR,         -- latest results filing stating an opinion
+    audit_opinion_quarter_end                DATE,
     PRIMARY KEY (security_id, valid_from_date)
 );
 
@@ -1747,7 +1755,7 @@ CREATE TABLE IF NOT EXISTS screener_features (
     rf_kmp_resignations_90d                  BOOLEAN,         -- >= 2 KMP / director resignations in 90 days
     rf_fraud_or_default_90d                  BOOLEAN,
     rf_litigation_90d                        BOOLEAN,
-    rf_audit_qualified                       BOOLEAN,         -- qualified Reg. 34 report or IF qualification statement [E8] (B1.16)
+    rf_audit_qualified                       BOOLEAN,         -- latest annual report text / results opinion modified [X121] (B1.16)
     rf_pledge_increase_qoq                   BOOLEAN,         -- promoter_pledge_change_qoq_pp > 0
     pe_numerator                             DECIMAL(24,2),   -- G244 raw inputs: market cap
     pe_denominator                           DECIMAL(24,2),   -- continuing owners' TTM profit
@@ -1846,6 +1854,14 @@ CREATE TABLE IF NOT EXISTS screener_features (
     largest_subsidiary_profit_share          DOUBLE,          -- largest subsidiary row / consolidated PAT
     largest_subsidiary_name                  VARCHAR,
     consolidated_entities_count              INTEGER,         -- distinct subsidiaries + associates + joint ventures
+    -- 20A: audit opinions (features_audit.py, audit_opinions) [X121-X124]; latest visible annual report text / results
+    audit_opinion                            VARCHAR,         -- UNMODIFIED | QUALIFIED | ADVERSE | DISCLAIMER (most severe scope)
+    audit_opinion_fy_end                     DATE,
+    audit_opinion_conflict                   BOOLEAN,         -- report text vs the Reg. 34 checkbox
+    going_concern_uncertainty                BOOLEAN,         -- material uncertainty related to going concern (entity / group)
+    emphasis_of_matter                       BOOLEAN,         -- informational
+    audit_opinion_quarterly                  VARCHAR,         -- latest results filing stating an opinion
+    audit_opinion_quarter_end                DATE,
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -2082,6 +2098,40 @@ CREATE TABLE IF NOT EXISTS reg23_related_party_transactions (
     visible_from_ts     TIMESTAMP NOT NULL,
     PRIMARY KEY (filing_id, parser_version, row_member)
 );
+-- Audit-opinion flags per results / annual filing (parsers/audit_report.py, owner decision 2026-11-17) [X121-X124]:
+-- derived from the auditor's report text (Reg. 34 `DisclosureInAuditorsReportExplanatory`, read whole from the vault
+-- blob) and the Integrated Filing audit fields, never from the checkbox, which is recorded next to it
+-- (`checkbox_qualified` = filing_meta.auditor_qualified for annual filings; the declaration for results) with
+-- `opinion_conflict`. Promoted with the filing (same entity, scope, visibility) and by `backfill-audit-opinions`; one
+-- row per filing and AUDIT_PARSER_VERSION; a filing filing none of the elements has no row.
+CREATE TABLE IF NOT EXISTS audit_opinions (
+    audit_opinion_id          VARCHAR NOT NULL,          -- stable_id('audit', filing_id, parser_version)
+    filing_id                 VARCHAR NOT NULL REFERENCES filings(filing_id),
+    parser_version            VARCHAR NOT NULL,          -- parsers.audit_report.AUDIT_PARSER_VERSION
+    entity_id                 VARCHAR NOT NULL REFERENCES entity_master(entity_id),
+    source_kind               VARCHAR NOT NULL,          -- ANNUAL (Reg. 34) | RESULTS (Integrated Filing)
+    scope                     VARCHAR NOT NULL,          -- the filing's scope
+    period_end                DATE NOT NULL,             -- annual: FY end; results: the quarter end
+    visible_from_ts           TIMESTAMP NOT NULL,        -- the filing's visibility (filing_meta)
+    audit_opinion             VARCHAR,                   -- UNMODIFIED | QUALIFIED | ADVERSE | DISCLAIMER; NULL = none filed
+    opinion_rule              VARCHAR NOT NULL,          -- OPINION_HEADING | OPINION_PARAGRAPH | NO_REPORT | DECLARATION |
+                                                         -- OPINION_OF_AUDITORS | TYPE_OF_QUALIFICATION | NO_OPINION
+    going_concern_uncertainty BOOLEAN,                   -- annual: a Material Uncertainty Related to Going Concern section
+                                                         -- about the reporting entity / group; NULL for results
+    going_concern_component   BOOLEAN,                   -- annual consolidated: such a section about a component only
+    emphasis_of_matter        BOOLEAN,                   -- annual: an Emphasis of Matter section (informational)
+    checkbox_qualified        BOOLEAN,                   -- annual: WhetherAuditorsReportHasBeenQualified...; results:
+                                                         -- the declaration (statement on impact = true)
+    opinion_conflict          BOOLEAN,                   -- (audit_opinion is modified) <> checkbox_qualified
+    declaration               VARCHAR,                   -- results: UNMODIFIED | NOT_APPLICABLE | STATEMENT | as filed
+    qualification_count       INTEGER,                   -- results: AuditQualificationAxis members with a type
+    qualification_repetitive  BOOLEAN,                   -- results: any FrequencyOfAuditQualification "Repetitive"
+    text_len                  INTEGER,                   -- annual: characters of the report text read
+    text_sha256               VARCHAR,                   -- annual: sha256 of that text (UTF-8)
+    PRIMARY KEY (filing_id, parser_version),
+    CHECK (source_kind IN ('ANNUAL', 'RESULTS')),
+    CHECK (audit_opinion IS NULL OR audit_opinion IN ('UNMODIFIED', 'QUALIFIED', 'ADVERSE', 'DISCLAIMER'))
+);
 -- Every XBRL fact whose element no other clean table holds per element, as filed (parsers/disclosures.py) [X116]: one
 -- row per fact of a parsed, in-scope results / annual / shareholding / Reg. 30 filing, promoted with it (same entity,
 -- scope, visibility) and by `backfill-disclosures`. Parser disc-2 (owner decision M, X120) leaves three kinds of fact
@@ -2247,7 +2297,9 @@ SELECT d.as_of_date, d.security_id, d.entity_id, d.symbol, d.series, d.price_dat
        d.industry_earnings_breadth_n, e.rpt_fy_end, e.rpt_counterparties, e.rpt_leak_pct, e.rpt_purchases_to_sales, e.rpt_royalty_to_sales,
        e.rpt_loans_given_to_net_worth, e.insider_receivables_as_of, e.insider_receivables, e.insider_receivables_to_receivables, e.has_insider_receivables, d.has_warrants, d.has_convertibles,
        d.has_partly_paid, d.has_locked_in, d.has_dvr_shares, d.has_sbo, d.is_psu, e.subsidiary_fy_end,
-       e.parent_profit_share, e.largest_subsidiary_profit_share, e.largest_subsidiary_name, e.consolidated_entities_count
+       e.parent_profit_share, e.largest_subsidiary_profit_share, e.largest_subsidiary_name, e.consolidated_entities_count,
+       e.audit_opinion, e.audit_opinion_fy_end, e.audit_opinion_conflict, e.going_concern_uncertainty, e.emphasis_of_matter,
+       e.audit_opinion_quarterly, e.audit_opinion_quarter_end
 FROM features_daily d
 LEFT JOIN features_events e ON e.security_id = d.security_id AND e.valid_from_date <= d.as_of_date
      AND d.as_of_date < coalesce(e.valid_to_date, DATE '9999-12-31');  -- open interval; an OR here is ~400x slower

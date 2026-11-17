@@ -14,6 +14,7 @@ from financials import features_rpt as R
 from financials.cli import build_parser
 from financials.db import declared_columns
 from financials.dsl import ALIASES, compile_screen
+from financials.features_audit import COLUMNS as AUDIT_COLUMNS
 from financials.features_disclosures import COLUMNS as DISCLOSURE_COLUMNS
 from financials.parsers.reg34_annual import parse_reg34_annual
 from financials.parsers.rpt import CATEGORY_VALUES, TXN_TYPES, nature_type, parse_related_parties
@@ -178,7 +179,7 @@ def test_columns_without_a_schedule_or_with_a_non_positive_denominator():
 def test_every_column_is_appended_in_both_tables_and_has_an_alias():
     for t in ("screener_features",):  # the history view has its columns (test_features_store)
         names = [c for c, _ in declared_columns()[t]]
-        tail = len(DISCLOSURE_COLUMNS)  # batch J, then only the 18D block (features_disclosures)
+        tail = len(DISCLOSURE_COLUMNS) + len(AUDIT_COLUMNS)  # batch J, then the 18D and 20A blocks
         assert names[-len(R.RPT_COLUMNS) - tail : -tail] == list(R.RPT_COLUMNS), t
     used = " ".join(sql for sql, _ in ALIASES.values())
     assert [c for c in R.RPT_COLUMNS if c not in used] == ["rpt_fy_end"]  # a date, shown with `screen --columns`

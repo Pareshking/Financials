@@ -1278,6 +1278,7 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     insert_rows(con, "reg23_related_party_transactions", [{**r, "entity_id": entity_id, "visible_from_ts": visible}
                                                           for r in reg23], or_ignore=True)  # fmt: skip
     _insert_disclosures(con, stage_dir, entity_id, visible)  # X116: every element no other clean table holds
+    _insert_audit_opinions(con, stage_dir, entity_id, visible)  # X121: audit-opinion flags from the report text
     # Non-blocking parse findings (X86 ATTRIBUTION_WITHHELD): the filing is promoted, the finding stays open.
     finding_rows = [
         _quarantine_row(stage=i["stage"], reason_code=i["reason_code"], filing_id=fid, entity_id=entity_id,
@@ -1300,6 +1301,14 @@ def _insert_disclosures(con, stage_dir: Path, entity_id: str, visible: datetime)
     deterministic keys, so a replay inserts nothing twice."""
     rows = read_table(con, stage_dir, "stg_disclosures")
     insert_rows(con, "disclosure_facts", [{**r, "entity_id": entity_id, "visible_from_ts": visible} for r in rows],
+                or_ignore=True)  # fmt: skip
+
+
+def _insert_audit_opinions(con, stage_dir: Path, entity_id: str, visible: datetime) -> None:
+    """The audit_opinions row of a promoted results / annual filing [X121]: same entity and visibility as its other
+    clean rows; deterministic id and key, so a replay inserts nothing twice."""
+    rows = read_table(con, stage_dir, "stg_audit_opinions")
+    insert_rows(con, "audit_opinions", [{**r, "entity_id": entity_id, "visible_from_ts": visible} for r in rows],
                 or_ignore=True)  # fmt: skip
 
 

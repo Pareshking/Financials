@@ -20,8 +20,11 @@ one-off. Booleans are three-valued like SQL: a NULL input gives NULL, except `fo
 
 `forensic_clean` (hidden_gems.md section A) is TRUE unless a measured red flag fails: other-income lift >= 8 pp in
 the latest quarter, a suspected restatement [X106], Beneish M >= -1.78, promoter pledge >= 5%, an auditor resignation
-or a fraud / default disclosure in 90 days [E5], or other income >= 30% of TTM PBT (industrial books only). A flag
-that cannot be measured (NULL) does not fail it; it is NULL only for rows without fundamentals.
+or a fraud / default disclosure in 90 days [E5], other income >= 30% of TTM PBT (industrial books only), a modified
+audit opinion (the latest visible annual auditor's report text or the latest results audit opinion is QUALIFIED /
+ADVERSE / DISCLAIMER; features_audit, X121-X124), or a material uncertainty related to going concern in the latest
+annual report (an emphasis of matter does not fail it). A flag that cannot be measured (NULL) does not fail it; it is
+NULL only for rows without fundamentals.
 
 History-gated (C9, NULL until the window is in scope, then on by themselves): `roce_stability_5y` and
 `opm_stability_5y` (1 - population std / mean over 5 fiscal years; FY25-FY29, ~May 2029), `pe_vs_own_5y_median`
@@ -37,7 +40,7 @@ from collections import defaultdict
 from datetime import date, datetime
 from decimal import Decimal
 
-from financials import features_pl
+from financials import features_audit, features_pl
 from financials.db import version_key
 from financials.fundamentals import (
     _add_months,
@@ -434,6 +437,8 @@ def forensic_clean(r: dict) -> bool | None:
         r.get("promoter_pledge_pct") is not None and r["promoter_pledge_pct"] >= PLEDGE_MAX,
         bool(r.get("auditor_resignations_90d")),
         bool(r.get("fraud_or_default_90d")),
+        features_audit.modified_opinion(r) is True,  # [X121-X124]: text / results opinion, never the checkbox
+        r.get("going_concern_uncertainty") is True,  # emphasis_of_matter is informational only
         not financial and _ge(r.get("other_income_lift_pp"), LIFT_MAX) is True,
         not financial and _ge(r.get("other_income_to_pbt"), OTHER_INCOME_TO_PBT_MAX) is True,
     )

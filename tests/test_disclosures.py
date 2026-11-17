@@ -543,10 +543,11 @@ def test_dsl_aliases_compile():
 
 def test_columns_are_appended_and_split_event_daily():
     from financials.db import declared_columns
+    from financials.features_audit import COLUMNS as AUDIT_COLUMNS
     from financials.features_store import DAILY_COLUMNS, EVENT_COLUMNS
 
     names = [c for c, _ in declared_columns()["screener_features"]]
-    assert names[-len(F.COLUMNS) :] == list(F.COLUMNS)
+    assert names[-len(F.COLUMNS) - len(AUDIT_COLUMNS) : -len(AUDIT_COLUMNS)] == list(F.COLUMNS)  # then 20A
     assert {*F.INSIDER_COLUMNS, *F.SUBSIDIARY_COLUMNS} <= set(EVENT_COLUMNS)  # annual filings: in the cache key
     assert set(F.SHP_DECLARATION_COLUMNS) <= set(DAILY_COLUMNS)  # shareholding is outside the key
 

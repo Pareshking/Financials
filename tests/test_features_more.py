@@ -21,6 +21,7 @@ from financials import features_more as M
 from financials.db import apply_schema, connect, declared_columns, table_columns
 from financials.dsl import ALIASES, compile_screen
 from financials.features import compute_rows
+from financials.features_audit import COLUMNS as AUDIT_COLUMNS
 from financials.features_disclosures import COLUMNS as DISCLOSURE_COLUMNS
 from financials.features_rpt import RPT_COLUMNS
 from financials.features_store import write_rows as write_history
@@ -373,7 +374,7 @@ def test_every_column_is_appended_in_both_tables_and_has_an_alias():
         assert names[start : start + len(M.MORE_COLUMNS)] == list(M.MORE_COLUMNS), t
         end = start + len(M.MORE_COLUMNS) + len(RPT_COLUMNS)
         assert names[start + len(M.MORE_COLUMNS) : end] == list(RPT_COLUMNS), t
-        assert names[end:] == list(DISCLOSURE_COLUMNS), t
+        assert names[end:] == [*DISCLOSURE_COLUMNS, *AUDIT_COLUMNS], t
     used = " ".join(sql for sql, _ in ALIASES.values())
     text = {"next_ex_date_action", "fastest_growing_segment"}  # labels, shown with `screen --columns`
     assert [c for c in M.MORE_COLUMNS if c not in used and c not in text] == []

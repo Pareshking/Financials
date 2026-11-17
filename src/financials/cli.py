@@ -185,6 +185,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     bd.add_argument("--limit", type=int)
     bd.add_argument("--workers", type=int, help="parse processes (default: os.cpu_count())")
+    ba = sub.add_parser(
+        "backfill-audit-opinions",
+        help="audit_opinions rows (audit-opinion flags from the auditor's report text) for promoted results / annual "
+        "filings, from the vault (parallel parse to staging Parquet, one insert by the single writer; audited, "
+        "resumable) [X121]",
+    )
+    ba.add_argument("--limit", type=int)
+    ba.add_argument("--workers", type=int, help="parse processes (default: os.cpu_count())")
     sub.add_parser("audit-ytd", help="raise YTD_QUARTER_MISMATCH findings for every entity and scope [X80]")
     sub.add_parser("promote", help="apply all pending staged batches (single writer)")
     rb = sub.add_parser("rebuild-market", help="roll market-derived state back to a date and replay it (audited)")
@@ -433,6 +441,17 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
         try:
             apply_schema(con)
             r = backfill_disclosures(con, Vault(vault_dir), stage_root, limit=args.limit, workers=args.workers)
+        finally:
+            con.close()
+        print(json.dumps(r, indent=1), file=out)
+        return 1 if r["error_count"] else 0
+    if args.cmd == "backfill-audit-opinions":
+        from financials.audit_opinions import backfill_audit_opinions
+
+        con = connect(db_path)
+        try:
+            apply_schema(con)
+            r = backfill_audit_opinions(con, Vault(vault_dir), stage_root, limit=args.limit, workers=args.workers)
         finally:
             con.close()
         print(json.dumps(r, indent=1), file=out)

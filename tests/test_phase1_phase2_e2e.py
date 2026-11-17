@@ -17,7 +17,7 @@ from datetime import date, datetime
 import pytest
 from conftest import FETCHED_AT, Market
 
-from _fixture_helpers import AUDIT_OPINION_FIXTURES, FIXTURES, XBRL_DIR
+from _fixture_helpers import E2E_EXCLUDED_FIXTURES, FIXTURES, XBRL_DIR
 from financials.cli import promote_pending
 from financials.dsl import run_screen
 from financials.features import materialize
@@ -62,7 +62,7 @@ def unified(tmp_path_factory):
                          snapshot_date=date(2026, 11, 12),
                          data=(fx / "indices" / "ind_nifty500list_20261113.csv").read_bytes())  # fmt: skip
     for p in sorted(XBRL_DIR.glob("*.xml")):
-        if p.name in AUDIT_OPINION_FIXTURES:  # evidence for test_audit_opinions only
+        if p.name in E2E_EXCLUDED_FIXTURES:  # evidence for the audit / quarantine-rule tests only
             continue
         stage = stage_shareholding if p.name.startswith("SHP_") else stage_results_xbrl
         stage(m.vault, m.stage_root, data=p.read_bytes(), source_url=ARCHIVE + p.name, fetched_at=FETCHED_AT,

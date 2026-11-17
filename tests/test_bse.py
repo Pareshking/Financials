@@ -432,3 +432,16 @@ def test_bse_shareholding_promotes_for_the_nse_security(tmp_path):
 
     assert [(r[1], r[2], r[3]) for r in row] == [(21249302, datetime(2026, 10, 14, 10, 49), "BSE")]
     m.con.close()
+
+
+def test_bse2_rows_without_an_isin_are_skipped_and_other_defects_still_reject():
+    """Rule BSE2 [X200]: BSE group Y (2026-11-17) lists two securities with ISIN "" and "NA"; they are skipped."""
+    from financials.parsers import ParseError
+    from financials.parsers.bse_securities import parse_list_securities
+
+    data = (FIXTURES / "bse" / "bse_ListofScripData_GroupY_20261117.json").read_bytes()
+    assert b'"ISIN_NUMBER":""' in data and b'"ISIN_NUMBER":"NA"' in data
+    assert parse_list_securities(data) == []
+    bad = data.replace(b'"ISIN_NUMBER":"NA"', b'"ISIN_NUMBER":"INE12"')
+    with pytest.raises(ParseError, match="malformed"):
+        parse_list_securities(bad)

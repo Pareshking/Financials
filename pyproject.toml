@@ -11,6 +11,7 @@ dependencies = ["duckdb==1.5.6", "pyarrow>=17", "pyyaml>=6"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.12"]
+bse = ["requests>=2.32,<3", "selenium>=4.35,<5"]  # financials.fetch.bse, GitHub runners only
 
 [tool.setuptools.packages.find]
 where = ["src"]

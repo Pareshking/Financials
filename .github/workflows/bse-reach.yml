@@ -1,14 +1,17 @@
 name: bse-reach
 
-# Probe (owner 2026-11-17): can GitHub-hosted runners reach BSE, by plain HTTP and by headless Chrome? ~10 requests
-# per mode, >= 1.5 s apart. Saves the 200 bodies as a private workflow artifact (1 day; the repository is public) so real files can become
-# fixtures (scrip master, listing JSON, one XBRL file, one bhavcopy). Runs when this file or the probe changes, and by
-# hand. No database is read or written.
+# Probe (owner 2026-11-17: "I need exact same way our BSE working"): the ported BSE client (financials.fetch.bse,
+# from Pareshking/NSE-BSE-Insider-Tracker collectors/bse/client.py) on a GitHub-hosted runner: plain requests with
+# BSE's own headers, 4-6 s apart, in-page XHR in headless Chrome only after a refusal; 5-7 calls (list of securities,
+# ABBOTINDIA results announcements + one attachment, its shareholding filings + one inline XBRL). The ledger
+# (bytes as sent + one JSON line per answer) is a workflow artifact for 1 day (the repository is public), which
+# `import-bse` vaults and stages on the owner's machine. No database is read or written.
 on:
   push:
     paths:
       - .github/workflows/bse-reach.yml
       - scripts/probe_bse_reach.py
+      - src/financials/fetch/bse.py
   workflow_dispatch:
 
 permissions:
@@ -23,16 +26,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: python -m pip install -e . "playwright==1.48.0"
-      - run: python -m playwright install --with-deps chromium
+      - run: python -m pip install -e ".[bse]"
       - run: curl -s https://api.ipify.org; echo " (runner public IP)"
-      - name: plain curl (home page, scrip master)
-        run: |
-          curl -s -o /dev/null -w "%{http_code} %{size_download} https://www.bseindia.com/\n" -A "Mozilla/5.0" https://www.bseindia.com/ || true
-          sleep 2
-          curl -s -o /dev/null -w "%{http_code} %{size_download} scrip master\n" -A "Mozilla/5.0" -H "Referer: https://www.bseindia.com/" "https://api.bseindia.com/BseIndiaAPI/api/ListofScripData/w?Group=&Scripcode=&industry=&segment=Equity&status=Active" || true
-      - run: python scripts/probe_bse_reach.py --mode curl --out bse_probe/curl
-      - run: python scripts/probe_bse_reach.py --mode browser --out bse_probe/browser
+      - run: python scripts/probe_bse_reach.py --out bse_probe
       - uses: actions/upload-artifact@v4
         if: always()
         with:

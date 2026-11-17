@@ -179,6 +179,38 @@ def test_week_ends_need_the_rest_of_the_week_known(umarket):
     assert ends == [date(2026, 11, 13)] and unknown == [date(2025, 10, 14)]
 
 
+def test_rule_u1p_adds_permitted_joiners_to_a_u1l_database(umarket, monkeypatch):
+    """A database built with U1-L (Listed only, before the listing_category column was filled) gains the Permitted
+    joiners on the next update-universe; nobody leaves, the old rows get their category from their evidence row."""
+    con = umarket.con
+    monkeypatch.setattr(universe, "ELIGIBLE_CATEGORIES", ("Listed",))
+    monkeypatch.setattr(universe, "RULE_VERSION", "U1-2026.11.17-L")
+    con.execute("BEGIN")
+    old = universe.update_universe(con, date(2025, 10, 1), date(2026, 11, 15), now=datetime(2026, 11, 16))
+    con.execute("UPDATE universe_membership SET listing_category = NULL")  # as written before the column existed
+    con.execute("COMMIT")
+    monkeypatch.undo()
+    before = dict(con.execute("SELECT security_id, joined_date FROM universe_membership").fetchall())
+    assert old["permitted_members"] == 0 and len(before) == old["members"]
+    con.execute("BEGIN")
+    new = universe.update_universe(con, date(2025, 10, 1), date(2026, 11, 15), now=datetime(2026, 11, 17))
+    con.execute("COMMIT")
+    after = dict(con.execute("SELECT security_id, joined_date FROM universe_membership").fetchall())
+    assert all(after[s] == d for s, d in before.items())  # sticky: every U1-L member stays, same join date
+    assert new["listing_category_filled"] == old["members"] - 1  # every MCAP_GE_500CR row; the seed has none
+    assert new["joined"] == new["permitted_members"] > 90 and new["members"] == old["members"] + new["joined"]
+    assert not con.execute("SELECT 1 FROM universe_membership WHERE listing_category IS NULL "
+                           "AND reason = 'MCAP_GE_500CR'").fetchall()  # fmt: skip
+    con.execute("BEGIN")
+    again = universe.update_universe(con, date(2025, 10, 1), date(2026, 11, 15), now=datetime(2026, 11, 18))
+    con.execute("COMMIT")
+    assert (again["joined"], again["moved_earlier"], again["listing_category_filled"]) == (0, 0, 0)
+    # leave the module database as the next test expects it (empty universe)
+    con.execute("DELETE FROM universe_membership")
+    con.execute("DELETE FROM quarantine_queue WHERE stage = 'UNIVERSE'")
+    con.execute("DELETE FROM admin_log WHERE action = 'UPDATE_UNIVERSE'")
+
+
 def test_rule_u1_seed_join_sticky_and_unresolved(umarket, monkeypatch):
     con = umarket.con
     con.execute("BEGIN")
@@ -188,27 +220,41 @@ def test_rule_u1_seed_join_sticky_and_unresolved(umarket, monkeypatch):
     seed = con.execute("SELECT symbol, joined_date, reason, market_cap_inr FROM universe_membership "
                        "WHERE reason = 'SEED_EXISTING'").fetchall()  # fmt: skip
     assert seed == [("ELIN", date(2025, 10, 14), "SEED_EXISTING", None)]  # ELIN is below Rs 500 Cr: seed only
-    # every qualifying Listed row of the week end joins or is quarantined, never guessed (1,823 = 1,718 Listed + 105
-    # Permitted rows >= Rs 500 Cr; Permitted rows never qualify, rule U1-L)
-    assert r["joined"] + r["unresolved"] == 1718 and r["joined"] == r["members"] - 1
+    # every qualifying row of the week end joins or is quarantined, never guessed: 1,823 = 1,718 Listed + 105
+    # Permitted rows >= Rs 500 Cr (rule U1-P, owner 2026-11-17: Permitted securities join too)
+    assert r["joined"] + r["unresolved"] == 1823 and r["joined"] == r["members"] - 1
     assert (
         r["unresolved"]
         == con.execute(
             "SELECT count(*) FROM quarantine_queue WHERE stage = 'UNIVERSE' AND reason_code = 'UNRESOLVED_SYMBOL'"
         ).fetchone()[0]
     )
-    assert r["unresolved"] <= 0.01 * 1718
-    # ABBOTINDIA: Rs 56,183 Cr on a Permitted row, resolvable to a security, yet not a member; its raw row is kept
+    assert r["unresolved"] <= 0.01 * 1823
+    # ABBOTINDIA: Rs 56,183 Cr on a Permitted row joins, and its row says it is Permitted (filings on BSE, X166)
     abbott = rows("PR131126")[("ABBOTINDIA", "EQ")]
     assert (abbott.category, abbott.market_cap_inr) == ("Permitted", Decimal("561831544880.00"))
-    assert con.execute("SELECT count(*) FROM security_identifier_history WHERE symbol = 'ABBOTINDIA'").fetchone()[0]
-    assert not con.execute("SELECT 1 FROM universe_membership WHERE symbol = 'ABBOTINDIA'").fetchall()
-    assert con.execute("SELECT category FROM raw_nse_mcap WHERE symbol = 'ABBOTINDIA' AND trade_date = '2026-11-13'"
-                       ).fetchone() == ("Permitted",)  # fmt: skip
+    assert con.execute("SELECT listing_category, reason, market_cap_inr, rule_version FROM universe_membership "
+                       "WHERE symbol = 'ABBOTINDIA'").fetchone() == (
+        "Permitted", "MCAP_GE_500CR", Decimal("561831544880.00"), "U1-2026.11.17-P")  # fmt: skip
+    cats = dict(con.execute("SELECT coalesce(listing_category, reason), count(*) FROM universe_membership "
+                            "GROUP BY 1").fetchall())  # fmt: skip
+    assert cats["Permitted"] == r["permitted_members"] and cats["SEED_EXISTING"] == 1
+    assert cats["Listed"] + cats["Permitted"] == r["joined"]
+    unresolved_permitted = 105 - cats["Permitted"]
+    assert 0 <= unresolved_permitted <= r["unresolved"]
+    # the category on the row is the evidence row's, as filed
     assert not con.execute(
         "SELECT 1 FROM universe_membership u JOIN raw_nse_mcap m ON m.filing_id = u.evidence_filing_id "
-        "AND m.symbol = u.symbol AND m.series = u.series WHERE m.category <> 'Listed'"
+        "AND m.symbol = u.symbol AND m.series = u.series WHERE m.category <> u.listing_category"
     ).fetchall()
+    bse = universe.bse_members(con, date(2026, 11, 13))
+    assert len(bse) == cats["Permitted"] and "ABBOTINDIA" in {b["symbol"] for b in bse}
+    assert {b["latest_category"] for b in bse} == {"Permitted"} and all(b["isin"] for b in bse)
+    assert universe.bse_members(con, date(2026, 11, 12)) == []  # joined on 13 Nov
+    # NSE discovery for new members skips the Permitted ones (no NSE filings, X166)
+    new = universe.members(con, date(2026, 11, 13), new_only=True)
+    assert "ABBOTINDIA" not in new and "RELIANCE" in new
+    assert "ABBOTINDIA" in universe.members(con, date(2026, 11, 13))
     rel = con.execute("SELECT joined_date, reason, market_cap_inr, series FROM universe_membership "
                       "WHERE symbol = 'RELIANCE'").fetchone()  # fmt: skip
     assert rel == (date(2026, 11, 13), "MCAP_GE_500CR", Decimal("18129542125863.40"), "EQ")

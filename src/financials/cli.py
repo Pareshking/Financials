@@ -228,6 +228,8 @@ def build_parser() -> argparse.ArgumentParser:
     ba.add_argument("--workers", type=int, help="parse processes (default: os.cpu_count())")
     sub.add_parser("audit-annual", help="re-run the Reg. 34 prior-year and share-count checks on every annual [X180]")
     sub.add_parser("audit-ytd", help="raise YTD_QUARTER_MISMATCH findings for every entity and scope [X80]")
+    ls = sub.add_parser("rescale-level-slips", help="X201: rescale filings that declared the wrong LevelOfRounding")
+    ls.add_argument("--dry-run", action="store_true", help="list the filings and their proof, write nothing")
     sub.add_parser("promote", help="apply all pending staged batches (single writer)")
     rb = sub.add_parser("rebuild-market", help="roll market-derived state back to a date and replay it (audited)")
     rb.add_argument("--from", dest="from_date", type=_date, required=True)
@@ -519,6 +521,19 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
             con.close()
         print(f"{len(ids)} YTD_QUARTER_MISMATCH findings over {len(pairs)} entity-scopes", file=out)
         print(f"{closed} share cross-check finding(s) closed on re-check [X103]", file=out)
+        return 0
+    if args.cmd == "rescale-level-slips":
+        from financials.admin import rescale_level_slips
+
+        con = connect(db_path, read_only=args.dry_run)
+        try:
+            slips = rescale_level_slips(con, dry_run=args.dry_run)
+        finally:
+            con.close()
+        for x in slips:
+            print(f"{x['filing_id']} {x['scope']} {x['period_end']} {x['source_url'].rsplit('/', 1)[-1]} "
+                  f"corrections={x.get('corrections', '-')} {x['verdict'].evidence()}", file=out)  # fmt: skip
+        print(f"{len(slips)} filing(s) {'found' if args.dry_run else 'rescaled'} [X201]", file=out)
         return 0
     if args.cmd == "import-vault":
         from financials.fetch.replay import ImportRefused, import_vault

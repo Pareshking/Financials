@@ -17,9 +17,10 @@ from typing import Any
 
 from financials import dirty
 from financials.corp_actions import CorpAction, audit_day
-from financials.db import fetch_dicts, insert_rows
+from financials.db import fetch_dicts, insert_rows, version_key
 from financials.ids import stable_id
 from financials.index_changes import IndexEvent, reconstruct_backward
+from financials.level_slip import level_slip, rescaled, usual_level
 from financials.promoter import (
     _actions,
     _prev_closes,
@@ -924,6 +925,15 @@ def _correct(con, filing_id, corrections, url, page, text, reads, note, qid) -> 
             "evidence_page": page, "evidence_text": text, "reads": reads, "quarantine_id": qid, "note": note,
             "created_at": now, "revoked_at": None, "value_other": value_other,
         })  # fmt: skip
+    # X201: a value read from the PDF replaces the rule's rescaled value of the same filing, tag and period
+    for r in rows:
+        con.execute(
+            "UPDATE fact_corrections SET revoked_at = ?, note = note || ' | revoked: replaced by a PDF correction' "
+            "WHERE filing_id = ? AND canonical_tag = ? AND period_start = ? AND period_end = ? AND revoked_at IS NULL "
+            "AND reads LIKE ? AND correction_id <> ?",
+            [now, filing_id, r["canonical_tag"], r["period_start"], r["period_end"], SLIP_READS_PREFIX + "%",
+             r["correction_id"]],
+        )  # fmt: skip
     existing = {r[0] for r in con.execute("SELECT correction_id FROM fact_corrections").fetchall()}
     new = [r for r in rows if r["correction_id"] not in existing]
     if new:
@@ -940,6 +950,120 @@ def _correct(con, filing_id, corrections, url, page, text, reads, note, qid) -> 
                 [now, f"{note} [PDF {url} p.{page}; reads {reads}]", qid],
             )
     return [r["correction_id"] for r in rows]
+
+
+# ── X201 rule LEVEL_OF_ROUNDING_SLIP (level_slip.py) ──
+# A results filing that declares the wrong LevelOfRounding has every rupee amount off by the unit ratio. The rule's
+# corrections sit in fact_corrections like a PDF correction (same ranking, revocable, raw facts untouched), with the
+# XBRL as evidence_url and `reads` naming the agreeing checks; a later PDF correction of the same value replaces it.
+SLIP_READS_PREFIX = "RULE_X201"
+SLIP_SHARE_COUNT_TAGS = ("shares_from_paid_up",)  # value_other derived from paid-up / face value: off by the ratio
+VK = version_key()
+
+
+def find_level_slips(con) -> list[dict]:
+    """Every quarterly results filing (current parser version) the X201 rule rescales, with its proof."""
+    meta = con.execute(
+        "SELECT m.filing_id, m.entity_id, m.scope, m.level_of_rounding, m.period_end, f.source_url FROM filing_meta m "
+        "JOIN filings f USING (filing_id) WHERE f.category = 'RESULTS_XBRL' AND m.accounting_profile <> 'REG34_ANNUAL' "
+        "QUALIFY row_number() OVER (PARTITION BY m.filing_id ORDER BY " + version_key("m.parser_version") + " DESC) = 1"
+    ).fetchall()
+    quarter = {}
+    for fid, tag, v in con.execute(
+        "SELECT o.filing_id, o.canonical_tag, any_value(coalesce(o.value_inr, o.value_other)) FROM fact_observations o "
+        f"JOIN (SELECT filing_id, arg_max(parser_version, {VK}) AS pv, arg_max(period_end, {VK}) AS pe "
+        "FROM filing_meta GROUP BY filing_id) m ON m.filing_id = o.filing_id "
+        "AND m.pv = o.parser_version AND m.pe = o.period_end "
+        "WHERE o.period_type = 'DURATION' AND o.period_months = 3 AND o.canonical_tag IN "
+        "('paid_up_equity_capital', 'face_value_per_share', 'eps_basic', 'pat', 'pat_owners') GROUP BY ALL"
+    ).fetchall():
+        quarter.setdefault(fid, {})[tag] = v
+    shp: dict[str, list] = {}
+    for ent, as_of, shares in con.execute(
+        "SELECT entity_id, as_of_date, max(shares) FROM shareholding_observations WHERE category = 'TOTAL' "
+        "AND shares > 0 GROUP BY ALL"
+    ).fetchall():
+        shp.setdefault(ent, []).append((as_of, shares))
+    by_pair: dict[tuple[str, str], list] = {}
+    for row in meta:
+        by_pair.setdefault((row[1], row[2]), []).append(row)
+    out = []
+    for (ent, scope), rows in by_pair.items():
+        if len({r[3] for r in rows}) < 2:
+            continue
+        for fid, _, _, level, end, url in rows:
+            others = [r for r in rows if r[0] != fid]
+            near = [s for s in shp.get(ent, []) if abs((s[0] - end).days) <= 92]
+            shares = min(near, key=lambda s: (abs((s[0] - end).days), s[0]))[1] if near else None
+            q = quarter.get(fid, {})
+            usual = usual_level([r[3] for r in others])
+            v = level_slip(
+                level, [r[3] for r in others], paid_up=q.get("paid_up_equity_capital"),
+                neighbour_paid_ups=[quarter.get(r[0], {}).get("paid_up_equity_capital") for r in others
+                                    if r[3] == usual],
+                face_value=q.get("face_value_per_share"), shp_shares=shares, eps_basic=q.get("eps_basic"),
+                profit=q.get("pat_owners") or q.get("pat"),
+            )  # fmt: skip
+            if v is not None:
+                out.append({"filing_id": fid, "entity_id": ent, "scope": scope, "period_end": end,
+                            "source_url": url, "verdict": v})  # fmt: skip
+    return sorted(out, key=lambda x: (x["entity_id"], x["scope"], x["period_end"], x["filing_id"]))
+
+
+def rescale_level_slips(con, *, dry_run: bool = False) -> list[dict]:
+    """X201: record, for every filing `find_level_slips` proves, each rupee amount (and the share count derived from
+    paid-up capital) times the unit ratio as a correction; (tag, period)s already corrected are left alone. Then the
+    YTD audit of the affected entity-scopes closes the findings the slip caused. Idempotent (stable ids)."""
+    slips = find_level_slips(con)
+    if dry_run or not slips:
+        return slips
+    return _transaction(con, _rescale, slips)
+
+
+def _rescale(con, slips: list[dict]) -> list[dict]:
+    from financials.promoter import audit_ytd_identity
+
+    now = utc_now()
+    existing = {r[0] for r in con.execute("SELECT correction_id FROM fact_corrections").fetchall()}
+    for s in slips:
+        v = s["verdict"]
+        taken = {tuple(r) for r in con.execute(
+            "SELECT canonical_tag, period_start, period_end FROM fact_corrections WHERE filing_id = ? "
+            "AND revoked_at IS NULL", [s["filing_id"]]).fetchall()}  # fmt: skip
+        facts = con.execute(
+            "SELECT canonical_tag, period_type, period_start, period_end, value_inr, value_other "
+            f"FROM fact_observations o WHERE filing_id = ? AND parser_version = (SELECT arg_max(parser_version, {VK}) "
+            "FROM filing_meta m WHERE m.filing_id = o.filing_id) "
+            "AND (value_inr IS NOT NULL OR canonical_tag IN (SELECT unnest(?))) "
+            "ORDER BY ALL",
+            [s["filing_id"], list(SLIP_SHARE_COUNT_TAGS)],
+        ).fetchall()
+        rows, seen = [], set()
+        for tag, ptype, start, end, inr, other in facts:
+            if (tag, start, end) in taken or (tag, start, end) in seen:
+                continue
+            seen.add((tag, start, end))
+            value_inr = rescaled(inr, v.factor) if inr is not None else None
+            value_other = (Decimal(other) * v.factor).quantize(Decimal("0.0001")) if inr is None else None
+            cid = stable_id("corr", s["filing_id"], tag, start, end, value_inr if inr is not None else value_other)
+            if cid in existing:
+                continue
+            existing.add(cid)
+            rows.append({
+                "correction_id": cid, "filing_id": s["filing_id"], "entity_id": s["entity_id"], "scope": s["scope"],
+                "canonical_tag": tag, "period_type": ptype, "period_start": start, "period_end": end,
+                "value_inr": value_inr, "evidence_url": s["source_url"], "evidence_page": 0,
+                "evidence_text": v.evidence(), "reads": SLIP_READS_PREFIX + "+" + "+".join(
+                    c.name for c in v.checks if c.verdict == "SLIP"),
+                "quarantine_id": None, "created_at": now, "revoked_at": None, "value_other": value_other,
+                "note": f"X201 {v.declared} declared, filed in {v.usual}: as filed x {v.factor:f}",
+            })  # fmt: skip
+        if rows:
+            insert_rows(con, "fact_corrections", rows)
+            _mark_correction_dirty(con, s["filing_id"], s["entity_id"], "level_of_rounding_slip")
+        s["corrections"] = len(rows)
+    audit_ytd_identity(con, sorted({(s["entity_id"], s["scope"]) for s in slips}))
+    return slips
 
 
 def _correction_values(c: dict) -> tuple[Decimal | None, Decimal | None]:

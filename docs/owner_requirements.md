@@ -469,6 +469,13 @@ None open. Decided 2026-11-15: no paid sources at all (G74, by the owner); E-H b
     both are admin-entered, audited edges (architecture §11.7); the terms are announced only in PDFs (R7 UNVERIFIED).
 30. Reg. 30 penalty amounts (G117 red flags carry the event, not the amount). Verify: an E12 content fixture.
 
+**Later (owner, 2026-11-17: "Companies listed only on BSE but having market cap > 500 Cr must be also added in our
+Universe, this will be later, not right now. Companies like NSE are listed on BSE and we miss such companies.")**
+31. BSE-only companies with market cap >= Rs 500 Cr join the universe (same sticky weekly rule as U1). Needs: a
+    verified BSE market-cap / share-count source (fetched with headless Chrome on a GitHub runner, as for the
+    permitted securities), identity without an NSE symbol (BSE scrip code + ISIN), BSE price history (no NSE
+    bhavcopy rows exist for them), and BSE filings. Not started.
+
 
 ## Decisions taken on the owner's behalf (2026-11-15)
 

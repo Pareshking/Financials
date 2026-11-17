@@ -13,6 +13,13 @@ subscribed = fully + partly paid, paid-up) is within SHARE_CROSS_CHECK_TOLERANCE
 legitimately include trust / forfeited shares that subscribed or paid-up exclude (SRF FY26: issued 300,481,580,
 subscribed 296,424,825; SPARC: paid-up 324,521,588 vs subscribed 324,530,000). A disagreement is a non-blocking
 finding ANNUAL_SHARE_COUNT_DIFFERS (stage SHARES): the annual filing is promoted, nothing is corrected.
+
+X181 (Reg. 31 precedence): when a Reg. 31 total exists for the FY end it alone decides. Paid-up / face value is a
+derived count that breaks on a mistyped face value or a stale / rounded paid-up line of one results filing
+(GREENPLY Q4 FY25: face value 10 filed, paid-up 12.49 Cr, so 12,487,300 shares, while the annual report and the Reg. 31
+filing both state 124,873,295 shares of Re 1); that disagreement is the results filing's own SHARES /
+CROSS_CHECK_FAILED finding against the same Reg. 31 total, not evidence against the annual report. Paid-up / face
+value decides only when no Reg. 31 total of that date is stored; both references stay in the details.
 """
 
 from __future__ import annotations
@@ -100,7 +107,8 @@ def annual_share_disagreement(con, filing_id: str, entity_id: str, fy_end: date)
         diffs["reg31_total"] = min(rel(v) for v in refs["reg31_total"])
     if "paid_up_over_face_value" in refs:  # every results filing of that date must agree
         diffs["paid_up_over_face_value"] = max(rel(v) for v in refs["paid_up_over_face_value"])
-    if max(diffs.values()) <= SHARE_CROSS_CHECK_TOLERANCE:
+    decided_by = "reg31_total" if "reg31_total" in diffs else "paid_up_over_face_value"  # X181
+    if diffs[decided_by] <= SHARE_CROSS_CHECK_TOLERANCE:
         return None
     return {
         "as_of": fy_end,
@@ -108,5 +116,6 @@ def annual_share_disagreement(con, filing_id: str, entity_id: str, fy_end: date)
         "annual_counts": {k: _count(v) for k, v in sorted(counts.items())},
         "references": {k: [_count(v) for v in vs] for k, vs in sorted(refs.items())},
         "relative_diff": {k: str(v) for k, v in sorted(diffs.items())},
+        "decided_by": decided_by,
         "shp_filing": shp_filing,
     }

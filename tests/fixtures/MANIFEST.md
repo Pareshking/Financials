@@ -402,6 +402,16 @@ Inspected for Batch 10 but not committed: the other Reg. 30 files listed in docs
 | `xbrl/IF_INS_COM_IND_AS_19757_WebXMLFile_20261104_181240292.xml` | X155: Niva Bupa Q2 FY27 standalone Ind AS insurance Integrated Filing; `OtherAdjustments` inside insurance service expenses (fetched 2026-11-14T04:18:59Z) | `https://nsearchives.nseindia.com/corporate/xbrl/IF_INS_COM_IND_AS_19757_WebXMLFile_20261104_181240292.xml` | `3d75086dedbdd71d8365adf2f4be51faffd02b319ef56d9b8195ea01fab79405` |
 | `xbrl/SHP_1697747_21072026110424_WEB.xml` | X156: KIMS Reg. 31 as of 2026-06-30 stating ISIN INE007C01025 (KIMS is INE967H01025); resolved by the X88 name test once the SHP parser passes NameOfTheCompany (fetched 2026-11-14T04:08:24Z) | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_1697747_21072026110424_WEB.xml` | `9811034d0a377dc5dbe4c0c8ee88b4e9fa13a78502d1a4acf132e265be346aa8` |
 | `xbrl/INTEGRATED_FILING_INDAS_1502813_05082025045022_WEB.xml` | X171 SC0: United Polyfab Gujarat (UNITEDPOLY, INE368U01029) Integrated Filing with `ScripCode` 000000 (fetched 2026-11-17T07:07:23Z on a runner) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1502813_05082025045022_WEB.xml` | `45d2ed8f8f97ef37a4d222e9d540392b6eaa284da8dc164573b12e9b2c2407f2` |
+## QA X180-X182 annual checks (copied 2026-11-17 from the local vault blob, gunzipped, sha256 verified)
+
+Kept in `annual_checks/`, outside `xbrl/`, so the end-to-end fixture market and its pinned counts do not see them.
+Read by `tests/test_x180_annual_checks.py` (X181).
+
+| File | Why it is here | Source URL | SHA-256 |
+|---|---|---|---|
+| `annual_checks/INTEGRATED_FILING_INDAS_1426806_28042025073334_WEB.xml` | X181: GREENPLY Q4 FY25 standalone results. `FaceValueOfEquityShareCapital` 10 with paid-up 124,873,000: paid-up / face = 12,487,300 shares, 10x off | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1426806_28042025073334_WEB.xml` | `d69085d72a03656b59eb2c47b85406fb610a5e9786acd961a00f2511a8e023cc` |
+| `annual_checks/AR_XBRL_GREENPLY_24092025103040.xml` | X181: GREENPLY FY25 standalone Reg. 34 annual. `NumberOfSharesPaidUp` 124,873,295 at 31-Mar-2025 | `https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_GREENPLY_24092025103040.xml` | `b65488a3f0f05e6ea9b6c0b92e0380245cf9c664d677c3df3bf1d99c1524230a` |
+| `annual_checks/SHP_198395_1419898_19042025033622_WEB.xml` | X181: GREENPLY Reg. 31 shareholding as of 31-Mar-2025, total 124,873,295 shares (= the annual count) | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_198395_1419898_19042025033622_WEB.xml` | `dc519708ed76e862ea9b0ae21a992fd49209237b4914a0811448ffb2c2d163b9` |
 
 ## Screener goldens (local only, not committed)
 

@@ -22,7 +22,12 @@ from financials.dsl import run_screen
 from financials.features import materialize_days, materialize_incremental, materialize_run, settle_full_run
 from financials.fetch.http import PoliteFetcher, Transport
 from financials.fetch.jobs import WARMUP, Jobs
-from financials.promoter import close_resolved_share_findings, close_wrong_template_duplicates, promote
+from financials.promoter import (
+    close_resolved_annual_share_findings,
+    close_resolved_share_findings,
+    close_wrong_template_duplicates,
+    promote,
+)
 from financials.scope import MIN_TRADE_DATE
 from financials.staging import read_manifest
 from financials.timeutil import utc_now, utc_to_ist_date
@@ -87,6 +92,9 @@ def promote_pending(con, stage_root: Path, out=sys.stdout, vault: Vault | None =
         print(
             f"{'FIXED_BY_RULE':16s} {'shares':14s} {n} share cross-check finding(s) agree on re-check [X103]", file=out
         )
+    if n := close_resolved_annual_share_findings(con):
+        print(f"{'FIXED_BY_RULE':16s} {'shares':14s} {n} annual share-count finding(s) agree on re-check [X181]",
+              file=out)  # fmt: skip
     return pending
 
 
@@ -218,6 +226,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ba.add_argument("--limit", type=int)
     ba.add_argument("--workers", type=int, help="parse processes (default: os.cpu_count())")
+    sub.add_parser("audit-annual", help="re-run the Reg. 34 prior-year and share-count checks on every annual [X180]")
     sub.add_parser("audit-ytd", help="raise YTD_QUARTER_MISMATCH findings for every entity and scope [X80]")
     sub.add_parser("promote", help="apply all pending staged batches (single writer)")
     rb = sub.add_parser("rebuild-market", help="roll market-derived state back to a date and replay it (audited)")
@@ -484,6 +493,18 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
             con.close()
         print(json.dumps(r, indent=1), file=out)
         return 1 if r["error_count"] else 0
+    if args.cmd == "audit-annual":
+        from financials.promoter import audit_annual_checks
+
+        con = connect(db_path)
+        try:
+            con.execute("BEGIN")
+            r = audit_annual_checks(con)
+            con.execute("COMMIT")
+        finally:
+            con.close()
+        print(json.dumps(r, indent=1), file=out)
+        return 0
     if args.cmd == "audit-ytd":
         from financials.promoter import audit_ytd_identity
 

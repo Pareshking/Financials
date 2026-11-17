@@ -4,6 +4,9 @@
   fiscal year (what a point-in-time reader saw just before the annual report became visible). A difference beyond
   the rounding of the two filings is a non-blocking CONSISTENCY / ANNUAL_PRIOR_YEAR_DIFFERS finding: the restated
   comparative is kept as filed (it is that filing's fact, visible from its broadcast), nothing is corrected.
+  X182: every such finding carries a deterministic class for triage (`prior_year_class`): SCALE (a line differs by
+  an exact power of ten: a unit error in one of the two filings), RESTATED (a statement total differs), else
+  REGROUPED (the totals agree; detail lines moved between captions, Schedule III "regrouped / reclassified").
 - G79 [X111]: the BSE scrip code stated inside a results filing (`ScripCode`, X7; from disclosure_facts) fills
   `security_identifier_history.bse_scrip_code` of the NSE identifier rows that match the filing's own ISIN and
   symbol. A different code already on such a row is an IDENTIFIER / BSE_SCRIP_CODE_CONFLICT finding; nothing is
@@ -28,6 +31,13 @@ SCRIP_CONFLICT_REASON = "BSE_SCRIP_CODE_CONFLICT"
 # `oth_*` tags are free-text "Others" rows keyed by per-filing member ids (`…Subsidiaries16Member` is another company
 # in another year's report), so the same tag is not the same line across two filings; never compared.
 _NOT_COMPARABLE_PREFIX = "oth\\_%"
+# X182: the statement totals whose change makes a comparative a restatement rather than a regrouping.
+PRIOR_YEAR_TOTALS = frozenset({
+    "total_assets", "total_equity_and_liabilities", "total_equity", "total_income", "total_expenses", "pbt", "pat",
+    "cfo", "cfi", "cff", "net_cash_flow",
+})  # fmt: skip
+_SCALE_FACTORS = tuple(Decimal(10) ** k for k in range(1, 8))
+_SCALE_SLACK = Decimal("0.001")  # relative: 40,197,100,000 vs 401,971,000 is exactly 100x (KUANTUM FY26 vs FY25)
 
 
 def annual_prior_year_differences(
@@ -78,6 +88,23 @@ def scrip_code(text: str | None) -> str | None:
     """Rule SC0 [X171]: a BSE scrip code as sent, or None when blank, not all digits, or all zeros (a placeholder)."""
     code = (text or "").strip()
     return code if code.isdigit() and code.strip("0") else None
+
+
+def _is_scale(annual: Decimal, stored: Decimal) -> bool:
+    if not annual or not stored or (annual > 0) != (stored > 0):
+        return False
+    big, small = max(abs(annual), abs(stored)), min(abs(annual), abs(stored))
+    return any(abs(big / small - f) <= _SCALE_SLACK * f for f in _SCALE_FACTORS)
+
+
+def prior_year_class(differences: list[dict]) -> dict:
+    """X182: triage class of one ANNUAL_PRIOR_YEAR_DIFFERS finding, from its own differences only. SCALE when any
+    line differs by an exact power of ten (10..10^7), RESTATED when a statement total (PRIOR_YEAR_TOTALS) differs,
+    else REGROUPED. The tags behind the class are listed; nothing is suppressed."""
+    scale = sorted({d["tag"] for d in differences if _is_scale(Decimal(d["annual"]), Decimal(d["stored"]))})
+    totals = sorted({d["tag"] for d in differences if d["tag"] in PRIOR_YEAR_TOTALS})
+    cls = "SCALE" if scale else "RESTATED" if totals else "REGROUPED"
+    return {"class": cls, "scale_lines": scale, "totals_differ": totals}
 
 
 def filed_scrip_code(con, filing_id: str) -> str | None:

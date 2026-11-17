@@ -1359,7 +1359,7 @@ def _filing_check_rows(con, fid: str, exchange: str, entity_id: str, meta: dict,
             fy_start=meta["fy_start"], level_of_rounding=meta["level_of_rounding"], visible_from_ts=visible,
         )  # fmt: skip
         if diffs:
-            details = {"scope": meta["scope"], "differences": diffs}
+            details = {"scope": meta["scope"], "differences": diffs, **fc.prior_year_class(diffs)}  # X182
             rows.append(_quarantine_row(stage="CONSISTENCY", reason_code=fc.PRIOR_YEAR_REASON, filing_id=fid,
                                         entity_id=entity_id, details=details))  # fmt: skip
     conflicts = fc.apply_bse_scrip_code(con, exchange=exchange, entity_id=entity_id, isin=meta["stated_isin"],
@@ -1649,6 +1649,85 @@ def close_resolved_share_findings(con) -> int:
             "'share cross-check agrees on re-check (X103 employee trust shares)' "
             "WHERE quarantine_id IN (SELECT unnest(?))",
             [utc_now(), fixed],
+        )
+    return len(fixed)
+
+
+ANNUAL_RECHECK_NOTE = "annual re-check [X180]: "
+
+
+def audit_annual_checks(con) -> dict[str, int]:
+    """X180: re-run the two Reg. 34 annual checks (G328 prior-year columns [X110, X182]; G93 year-end share counts
+    [X114, X181]) for every promoted annual filing on the data now stored. Both run only at promotion, so their
+    outcome depended on what had been promoted before (an FY26 annual promoted before the FY25 annual or the FY-end
+    Reg. 31 filing of the same company compared against less, and annuals promoted before the checks existed were
+    never checked). The checks are point-in-time (prior year: what a reader had one microsecond before the annual
+    became visible), so a re-run gives the answer promotion in broadcast order would have given. New findings are
+    queued (deterministic ids: an unchanged finding, or one a human resolved, is kept as it is); an open finding of
+    the same reason and filing that the re-run no longer produces is closed FIXED_BY_RULE. Returns counts."""
+    from financials import filing_checks as fc
+    from financials.share_capital import REASON as SHARE_REASON
+    from financials.share_capital import annual_share_disagreement
+
+    metas = con.execute(
+        "SELECT filing_id, parser_version, entity_id, scope, fy_start, fy_end, level_of_rounding, visible_from_ts "
+        "FROM filing_meta WHERE accounting_profile = 'REG34_ANNUAL' QUALIFY row_number() OVER (PARTITION BY "
+        "filing_id ORDER BY " + version_key() + " DESC) = 1 ORDER BY filing_id"
+    ).fetchall()
+    rows = []
+    for fid, pv, ent, scope, fy_start, fy_end, lor, visible in metas:
+        diffs = fc.annual_prior_year_differences(
+            con, filing_id=fid, parser_version=pv, entity_id=ent, scope=scope, fy_start=fy_start,
+            level_of_rounding=lor, visible_from_ts=visible,
+        )  # fmt: skip
+        if diffs:
+            rows.append(_quarantine_row(stage="CONSISTENCY", reason_code=fc.PRIOR_YEAR_REASON, filing_id=fid,
+                                        entity_id=ent, details={"scope": scope, "differences": diffs,
+                                                                **fc.prior_year_class(diffs)}))  # fmt: skip
+        share = annual_share_disagreement(con, fid, ent, fy_end)
+        if share is not None:
+            rows.append(_quarantine_row(stage="SHARES", reason_code=SHARE_REASON, entity_id=ent, filing_id=fid,
+                                        details=share))  # fmt: skip
+    keep = [r["quarantine_id"] for r in rows]
+    if rows:
+        _quarantine_many(con, rows)
+    closed = con.execute(
+        "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ? || "
+        "CASE WHEN reason_code = ? THEN 'prior-year comparison re-run: none, or the current finding of this filing'"
+        " ELSE 'share counts re-run: they agree, or the current finding of this filing' END "
+        "WHERE resolved_at IS NULL AND reason_code IN (?, ?) AND filing_id IN (SELECT unnest(?)) "
+        "AND quarantine_id NOT IN (SELECT unnest(?)) RETURNING reason_code",
+        [utc_now(), ANNUAL_RECHECK_NOTE, fc.PRIOR_YEAR_REASON, fc.PRIOR_YEAR_REASON, SHARE_REASON,
+         [m[0] for m in metas], keep],
+    ).fetchall()  # fmt: skip
+    open_now = dict(con.execute(
+        "SELECT reason_code, count(*) FROM quarantine_queue WHERE resolved_at IS NULL AND reason_code IN (?, ?) "
+        "GROUP BY 1", [fc.PRIOR_YEAR_REASON, SHARE_REASON]).fetchall())  # fmt: skip
+    return {"annual_filings": len(metas), "findings": len(rows), "closed": len(closed),
+            "open_prior_year": open_now.get(fc.PRIOR_YEAR_REASON, 0),
+            "open_share_counts": open_now.get(SHARE_REASON, 0)}  # fmt: skip
+
+
+def close_resolved_annual_share_findings(con) -> int:
+    """X180 / X181: re-run the annual share-count check for every open ANNUAL_SHARE_COUNT_DIFFERS finding and close
+    those that now agree (typically the FY-end Reg. 31 filing was promoted after the annual). Cheap: open findings
+    only; run after every promote batch like close_resolved_share_findings."""
+    from financials.share_capital import REASON as SHARE_REASON
+    from financials.share_capital import annual_share_disagreement
+
+    rows = con.execute(
+        "SELECT quarantine_id, filing_id, entity_id, CAST(json_extract_string(details, '$.as_of') AS DATE) "
+        "FROM quarantine_queue WHERE reason_code = ? AND resolved_at IS NULL",
+        [SHARE_REASON],
+    ).fetchall()
+    fixed = [
+        q for q, fid, ent, as_of in rows if ent and fid and annual_share_disagreement(con, fid, ent, as_of) is None
+    ]
+    if fixed:
+        con.execute(
+            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ? "
+            "WHERE quarantine_id IN (SELECT unnest(?))",
+            [utc_now(), ANNUAL_RECHECK_NOTE + "annual share counts agree on re-check (X181)", fixed],
         )
     return len(fixed)
 

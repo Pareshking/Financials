@@ -166,6 +166,9 @@ def build_parser() -> argparse.ArgumentParser:
     rs.add_argument("--all", action="store_true",
                     help="RESULTS_XBRL: re-parse every results / annual filing (after a parser change that adds "
                          "output to clean filings, e.g. segment rows in 0.10.0)")  # fmt: skip
+    rs.add_argument("--open-findings", action="store_true",
+                    help="SHP_XBRL / CORP_ACTIONS: re-parse only filings with open parse / identity / period findings "
+                         "(RESULTS_XBRL does this by default)")  # fmt: skip
     evidence_help = "stage raw_results_listing rows from vaulted RESULTS_LISTING blobs (then promote) [X83]"
     sub.add_parser("backfill-listing-evidence", help=evidence_help)
     bg = sub.add_parser(
@@ -296,7 +299,8 @@ def restage_rows(con, category: str, mode: str = "OPEN_FINDINGS") -> list[tuple]
     """Vaulted filings to re-parse: (source_url, fetched_at, storage_path, sha256, broadcast_ts, broadcast_ts_source,
     exchange). RESULTS_XBRL: OPEN_FINDINGS (default) = filings with open parse / identity / period findings;
     VISIBILITY = promoted filings whose visibility rule now gives a later time [X83]; ALL = every results and annual
-    filing that has filing_meta (parsed, not OUT_OF_SCOPE) or an open finding. Other categories: every filing."""
+    filing that has filing_meta (parsed, not OUT_OF_SCOPE) or an open finding. Other categories: every filing, or
+    with OPEN_FINDINGS_ONLY (`restage --open-findings`) only those with open findings."""
     from financials.promoter import FILING_FINDING_STAGES
 
     where, params = "", [category]
@@ -310,7 +314,7 @@ def restage_rows(con, category: str, mode: str = "OPEN_FINDINGS") -> list[tuple]
         where, params = "AND f.filing_id IN (SELECT unnest(?)) ", [category, filings_with_later_visibility(con)]
     elif category == "RESULTS_XBRL" and mode == "ALL":
         where = "AND (f.filing_id IN (SELECT filing_id FROM filing_meta) OR " + open_findings + ") "
-    elif category == "RESULTS_XBRL":
+    elif category == "RESULTS_XBRL" or mode == "OPEN_FINDINGS_ONLY":
         where = "AND " + open_findings
     return con.execute(
         "SELECT f.source_url, f.fetched_at, b.storage_path, b.sha256, f.broadcast_ts, f.broadcast_ts_source, "
@@ -369,6 +373,8 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
         con = connect(db_path, read_only=True)
         try:
             mode = "VISIBILITY" if args.visibility else "ALL" if args.all else "OPEN_FINDINGS"
+            if args.open_findings and args.category != "RESULTS_XBRL":
+                mode = "OPEN_FINDINGS_ONLY"
             rows = restage_rows(con, args.category, mode)
         finally:
             con.close()

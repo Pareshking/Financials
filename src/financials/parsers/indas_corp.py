@@ -907,6 +907,19 @@ def _check_critical(result: ParsedResults, spec: ProfileSpec | None = None) -> N
         result.issues.append(Issue("PARSE", "MISSING_CRITICAL", {"tags": missing}))
 
 
+EP_FACE_LINE_RULE = "EP_EXPENDITURE_FACE_LINE"
+
+
+def _record_rule(result: ParsedResults, rule: str, detail: dict) -> None:
+    """EP_EXPENDITURE_FACE_LINE [X153]: the annual taxonomy's `ExpenditureOnProductionTransportationAndOther
+    ExpenditurePertainingToExplorationAndProductionActivities` is a separate face-of-P&L expense line for some
+    filers (ONGC, IOC, Premier Energies FY25-FY26: the EXPENSE_COMPONENTS gap equals it to the rupee) and a note
+    inside other expenses for others (Coal India, Hindustan Zinc: the identity holds without it). The identity
+    therefore holds when either the seven components alone, or the seven plus the filed element, tie to Expenses;
+    nothing is added to any stored value."""
+    result.meta.setdefault("rules_applied", []).append({"rule": rule, **detail})
+
+
 def _check(result: ParsedResults, name: str, lhs: Decimal, rhs: Decimal, n_terms: int, period: Any) -> None:
     tol = identity_tolerance(result.meta["level_of_rounding"], n_terms)
     if abs(lhs - rhs) > tol:
@@ -959,7 +972,13 @@ def _check_identities(result: ParsedResults, spec: ProfileSpec | None = None) ->
         if spec.missing_component_is_zero:  # Division III: every component is filed, absent = not applicable
             comps = [c or Decimal(0) for c in comps]
         if exp is not None and None not in comps:
-            _check(result, "EXPENSE_COMPONENTS", sum(comps, Decimal(0)), exp, len(comps) + 1, p)
+            total = sum(comps, Decimal(0))
+            ep = v("ep_expenditure")  # annual taxonomy only [X153]
+            tol = identity_tolerance(result.meta["level_of_rounding"], len(comps) + 1)
+            if ep is not None and abs(total - exp) > tol and abs(total + ep - exp) <= tol:
+                _record_rule(result, EP_FACE_LINE_RULE, {"period": [str(x) for x in p], "ep_expenditure": str(ep)})
+            else:
+                _check(result, "EXPENSE_COMPONENTS", total, exp, len(comps) + 1, p)
         if spec.revenue_components:
             rev = v("revenue_from_operations")
             parts = [v(t) or Decimal(0) for t in spec.revenue_components]

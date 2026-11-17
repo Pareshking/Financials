@@ -39,6 +39,7 @@ from financials.parsers.shareholding import (
     MEASURES,
     PUBLIC_HOLDER_AXES,
     SHP_NS_FRAGMENT,
+    exchange_specific_ns,
     parse_shareholding,
     shp_instance,
 )
@@ -110,6 +111,7 @@ def inspect(path: Path, dump_dir: Path | None) -> dict:
     data = path.read_bytes()
     inst = shp_instance(data)[0]  # plain parse_instance, plus rule SHP16 for the 2022-09-30 SHP taxonomy
     is_shp = any(SHP_NS_FRAGMENT in u and u.endswith("/in-bse-shp") for u in inst.namespaces.values())
+    is_shp = is_shp or exchange_specific_ns(inst) is not None  # BSE Ltd's own Reg. 31 [X154]
     ent_ns = next((u for u in inst.namespaces.values() if u.endswith("/in-capmkt-ent")), "")
     is_event = any(f"/{seg}/" in ent_ns for seg in EVENT_FAMILIES)
     is_shp = is_shp or is_event  # both dimensional: register every element with its axes

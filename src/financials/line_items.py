@@ -82,7 +82,7 @@ _CURATED = (
      r"|dividends_received_operating|cf_adjustments_total|cash_cf_statement)", "CASH_FLOW", "net_cash_flow"),
     (r"^(cost_of_materials|purchases_of_stock|changes_in_inventories|employee_benefit|finance_costs"
      r"|depreciation_amortisation|other_expenses|excise_duty|power_and_fuel|freight|advertising|rnd_expense"
-     r"|royalty_expense|audit_fees)", "PNL_EXPENSE", "total_expenses"),
+     r"|royalty_expense|audit_fees|ep_expenditure)", "PNL_EXPENSE", "total_expenses"),
     (r"^(revenue_from_operations|other_income)", "PNL_INCOME", "total_income"),
     (r"^(total_income|total_expenses|profit_before|pbt|tax_expense|current_tax|deferred_tax$|pat|exceptional"
      r"|share_of_associates|discontinued|regulatory_deferral)", "PNL", "pat"),

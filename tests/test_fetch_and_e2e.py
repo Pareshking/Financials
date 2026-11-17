@@ -74,6 +74,28 @@ def test_retries_with_backoff_then_success():
     assert len(backoffs) == 2 and 1.0 <= backoffs[0] <= 3.0 and 2.0 <= backoffs[1] <= 6.0
 
 
+def test_a_truncated_body_is_retried_like_a_network_error():
+    """nse-fetch run 44034365638 shard 2: http.client.IncompleteRead (24,909 bytes read, 1 more expected) escaped the
+    retry loop and ended the whole shard. It is a network error: retried with backoff, then a FetchError."""
+    import http.client
+
+    class Flaky(FakeTransport):
+        def __init__(self, fails):
+            super().__init__({"https://a.example/x": Response(200, b"ok")})
+            self.fails = fails
+
+        def get(self, url, headers, timeout):
+            if self.fails:
+                self.fails -= 1
+                raise http.client.IncompleteRead(b"x" * 10, 1)
+            return super().get(url, headers, timeout)
+
+    clock = FakeClock()
+    assert fetcher(Flaky(1), clock).get("https://a.example/x") == b"ok"
+    with pytest.raises(FetchError):
+        fetcher(Flaky(99), FakeClock(), max_attempts=2).get("https://a.example/x")
+
+
 def test_gives_up_and_does_not_retry_client_errors():
     clock = FakeClock()
     t = FakeTransport({"https://a.example/x": Response(403, b"")})

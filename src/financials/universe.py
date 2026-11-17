@@ -6,6 +6,10 @@ Rule U1 (`RULE_VERSION`):
   of W's PR-zip mcap file (raw_nse_mcap [X130-X133]) with series EQ / BE / BZ (never SME SM / ST / SZ; the zip's sme
   file is not read) and filed Market Cap >= THRESHOLD_INR joins on W, reason MCAP_GE_500CR, visible from the file's
   broadcast time. Each row stands on its own (owner: "ignore DVR", no share-class aggregation).
+- Listed only (U1-L, coordinator 2026-11-17): only rows with Category `Listed` qualify (ELIGIBLE_CATEGORY).
+  `Permitted` securities are listed on another exchange and only permitted to trade on NSE; the project's universe
+  is NSE Mainboard listed companies and its filings pipeline is NSE-only (none of the 104 permitted rows >= Rs 500 Cr
+  on 2026-11-13 has NSE financials). Their raw rows stay in raw_nse_mcap as sent.
 - Seed, once (no SEED_EXISTING row yet): every security, in those series and with a bar, of an entity that already
   has financials (filing_meta) joins on its first bar date, reason SEED_EXISTING. The seed is a hindsight selection
   (the Nifty 500 set the project started with): survivorship bias as disclosed for the index backfill [L1].
@@ -26,7 +30,8 @@ from financials.ids import stable_id
 from financials.timeutil import ist_to_utc, utc_now
 
 UNIVERSE = "MCAP500"
-RULE_VERSION = "U1-2026.11.17"
+RULE_VERSION = "U1-2026.11.17-L"  # -L: Listed rows only
+ELIGIBLE_CATEGORY = "Listed"
 THRESHOLD_INR = Decimal("5000000000")  # Rs 500 crore
 SEED = "SEED_EXISTING"
 JOIN = "MCAP_GE_500CR"
@@ -87,9 +92,9 @@ def update_universe(con, start: date, end: date, *, now: datetime | None = None)
                 AND h.series = m.series AND h.valid_from <= m.trade_date
                 AND (h.valid_to IS NULL OR h.valid_to > m.trade_date)
            LEFT JOIN securities s ON s.security_id = h.security_id
-           WHERE m.series IN (SELECT unnest(?)) AND m.market_cap_inr >= ?
+           WHERE m.series IN (SELECT unnest(?)) AND m.market_cap_inr >= ? AND m.category = ?
            ORDER BY m.trade_date, m.symbol, m.series""",
-        [sorted(have), sorted(UNIVERSE_SERIES), THRESHOLD_INR],
+        [sorted(have), sorted(UNIVERSE_SERIES), THRESHOLD_INR, ELIGIBLE_CATEGORY],
     )
     first: dict[str, dict] = {}
     unresolved: dict[tuple[str, str], dict] = {}

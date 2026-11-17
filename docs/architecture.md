@@ -9,7 +9,7 @@ UNVERIFIED there must not be hard-coded; code that depends on it quarantines on 
 
 - **Purpose:** personal, single-user research, screening and point-in-time (PIT) backtesting. No redistribution [C8].
 - **Universe v1:** NSE Mainboard `EQ`, `BE`, `BZ`, starting with the Nifty 500 [C7]. SME (`SM`, `ST`) out of scope. BSE is used only as a fallback and for historical Reg. 34 annual XBRL backfill.
-- **Filings universe `mcap500`** (owner 2026-11-17, rule U1 [X134], §11.12): every `EQ`/`BE`/`BZ` security whose NSE market cap (PR-zip mcap file [X130]) is >= Rs 500 Cr on the last trading day of a week joins `universe_membership`; members never leave; SME series and the zip's SME file are never read for it; no share-class aggregation ("ignore DVR"). The Nifty 500 set the project started with is its seed. `discover-filings --universe mcap500` (or `mcap500-new`: members without financials yet) fetches their filings; `nifty500` keeps working. The feature universe is unchanged (every security with a recent bar, §4.1).
+- **Filings universe `mcap500`** (owner 2026-11-17, rule U1 [X134], §11.12): every `EQ`/`BE`/`BZ` security listed on NSE (Category `Listed`; `Permitted` rows, listed elsewhere, never qualify) whose NSE market cap (PR-zip mcap file [X130]) is >= Rs 500 Cr on the last trading day of a week joins `universe_membership`; members never leave; SME series and the zip's SME file are never read for it; no share-class aggregation ("ignore DVR"). The Nifty 500 set the project started with is its seed. `discover-filings --universe mcap500` (or `mcap500-new`: members without financials yet) fetches their filings; `nifty500` keeps working. The feature universe is unchanged (every security with a recent bar, §4.1).
 - **Data scope (v1, CHOICE [C9]):** `trade_date >= 2024-10-01` for prices, delivery, corporate actions and index snapshots; `period_end >= 2025-03-31` for financials and shareholding (Q4 FY25, the first Integrated Filing quarter [X38]; `financials/scope.py`). As of Nov 2026 that is 7 quarters: TTM works, YoY-on-TTM is NULL until Q3 FY27 (Dec-2026) results are filed. Promotion returns `OUT_OF_SCOPE` for older inputs (vaulted, not parsed); `fetch-days` / `fetch-corp-actions` clamp start dates. Multi-year windows use `fundamentals.cagr(..., min_periods_required)` and stay NULL until enough in-scope quarters exist.
 - **Non-goals (v1):** multi-user, UI hosting, Cloudflare (R2/D1/Workers), real-time intraday prices, SME/Indian-GAAP corporates.
 
@@ -823,7 +823,8 @@ only because the pinned files changed).
   market cap DECIMAL); the file has no ISIN.
 - **Rule U1** (`financials/universe.py`, `RULE_VERSION`): a day is its ISO week's last trading day when every later
   day of that week is known not to trade (holiday master / CAL3 rows / weekend of a covered year). On it, every
-  EQ / BE / BZ row with filed Market Cap >= Rs 500 Cr joins (`universe_membership`, MCAP_GE_500CR, visible from the
+  EQ / BE / BZ row with Category `Listed` (part U1-L: `Permitted` securities are listed on another exchange and have
+  no NSE filings; their raw rows stay stored) and filed Market Cap >= Rs 500 Cr joins (`universe_membership`, MCAP_GE_500CR, visible from the
   file's EOD broadcast time), resolving symbol + series on that date through `security_identifier_history`; an
   unresolved row is quarantined (UNIVERSE / UNRESOLVED_SYMBOL, one finding per symbol / series, closed by rule once it
   joins). Seed, once: EQ / BE / BZ securities with a bar of entities with financials, on their first bar date
@@ -832,7 +833,7 @@ only because the pinned files changed).
 - **PIT read**: `joined_date <= as_of` (`universe.members`). `discover-filings --universe mcap500` lists members
   joined by today; `mcap500-new` only those whose entity has no `filing_meta` yet.
 - **Backfill** (once): `fetch-days` for the scope, `promote`, `fetch-mcap 2024-10-01 <today> --weekly` (111 zips on
-  2026-11-17), `promote`, `update-universe`. Live result: 595 seeded + 1,475 joined = 2,070 members.
+  2026-11-17), `promote`, `update-universe`. Live result (rule U1-2026.11.17-L): 595 seeded + 1,352 joined = 1,947 members.
 
 ## 12. Promoter quality gates (in order)
 

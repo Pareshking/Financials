@@ -533,14 +533,15 @@ The owner asked the assistant to take these with its recommendation. Each is rev
   caching in front of R2. DuckDB runs only on the writer (GitHub runner or PC).
 - **O. Market-cap universe (owner, 2026-11-17: "Add all the companies having market cap of 500 Cr and above. Every
   week download marketcap from bhavcopy file and add companies qualified for 500 cr and above. Companies which are
-  already in universe will not go out. No SME. Ignore DVR."):** rule U1 (`financials/universe.py`, X134, architecture
+  already in universe will not go out. No SME. Ignore DVR."):** rule U1 (version `U1-2026.11.17-L`) (`financials/universe.py`, X134, architecture
   §11.12). Source: the `mcapddmmyyyy.csv` of NSE's daily `PRddmmyy.zip` (X130-X132), fetched with every market day
   and backfilled weekly from 2024-10-01. On each week's last trading day every EQ / BE / BZ row with Market Cap >=
-  Rs 500 Cr joins `universe_membership`; members never leave; SME series and the zip's SME file are not used; each
+  Rs 500 Cr and Category `Listed` joins `universe_membership`; members never leave; SME series and the zip's SME file are not used; each
   row stands on its own (no DVR aggregation). Seed: the ~595 companies that already have financials. Live
-  2026-11-17: 595 seeded + 1,475 joined = 2,070 members; `discover-filings --universe mcap500-new` fetches the new
-  members' filings. Rows of `Permitted` securities (listed on another exchange, permitted to trade on NSE: 128 of
-  the joiners) are admitted as the rule reads; they may have no NSE filings.
+  2026-11-17: 595 seeded + 1,352 joined = 1,947 members; `discover-filings --universe mcap500-new` fetches the new
+  members' filings. `Permitted` rows (listed on another exchange, only permitted to trade on NSE) never qualify
+  (coordinator 2026-11-17: the universe is NSE Mainboard listed companies and the filings pipeline is NSE-only;
+  none of them had NSE financials); their raw rows stay stored.
 - **Share count (owner, 2026-11-17: "check bhavcopy zip, everything is inside it"):** the same mcap file carries NSE's
   Issue Size. Evaluated against Reg. 31 (X133): 98.4% of 4,035 pairs within 0.5%, under the 99% bar set for a
   switch, with the disagreements explained (listing lag, buy-backs, partly-paid, bonus timing). Decision C stands

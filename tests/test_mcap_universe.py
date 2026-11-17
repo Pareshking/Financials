@@ -188,15 +188,27 @@ def test_rule_u1_seed_join_sticky_and_unresolved(umarket, monkeypatch):
     seed = con.execute("SELECT symbol, joined_date, reason, market_cap_inr FROM universe_membership "
                        "WHERE reason = 'SEED_EXISTING'").fetchall()  # fmt: skip
     assert seed == [("ELIN", date(2025, 10, 14), "SEED_EXISTING", None)]  # ELIN is below Rs 500 Cr: seed only
-    # every qualifying row of the week end joins or is quarantined, never guessed
-    assert r["joined"] + r["unresolved"] == 1823 and r["joined"] == r["members"] - 1
+    # every qualifying Listed row of the week end joins or is quarantined, never guessed (1,823 = 1,718 Listed + 105
+    # Permitted rows >= Rs 500 Cr; Permitted rows never qualify, rule U1-L)
+    assert r["joined"] + r["unresolved"] == 1718 and r["joined"] == r["members"] - 1
     assert (
         r["unresolved"]
         == con.execute(
             "SELECT count(*) FROM quarantine_queue WHERE stage = 'UNIVERSE' AND reason_code = 'UNRESOLVED_SYMBOL'"
         ).fetchone()[0]
     )
-    assert r["unresolved"] <= 0.01 * 1823
+    assert r["unresolved"] <= 0.01 * 1718
+    # ABBOTINDIA: Rs 56,183 Cr on a Permitted row, resolvable to a security, yet not a member; its raw row is kept
+    abbott = rows("PR131126")[("ABBOTINDIA", "EQ")]
+    assert (abbott.category, abbott.market_cap_inr) == ("Permitted", Decimal("561831544880.00"))
+    assert con.execute("SELECT count(*) FROM security_identifier_history WHERE symbol = 'ABBOTINDIA'").fetchone()[0]
+    assert not con.execute("SELECT 1 FROM universe_membership WHERE symbol = 'ABBOTINDIA'").fetchall()
+    assert con.execute("SELECT category FROM raw_nse_mcap WHERE symbol = 'ABBOTINDIA' AND trade_date = '2026-11-13'"
+                       ).fetchone() == ("Permitted",)  # fmt: skip
+    assert not con.execute(
+        "SELECT 1 FROM universe_membership u JOIN raw_nse_mcap m ON m.filing_id = u.evidence_filing_id "
+        "AND m.symbol = u.symbol AND m.series = u.series WHERE m.category <> 'Listed'"
+    ).fetchall()
     rel = con.execute("SELECT joined_date, reason, market_cap_inr, series FROM universe_membership "
                       "WHERE symbol = 'RELIANCE'").fetchone()  # fmt: skip
     assert rel == (date(2026, 11, 13), "MCAP_GE_500CR", Decimal("18129542125863.40"), "EQ")

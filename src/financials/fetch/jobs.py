@@ -1,6 +1,6 @@
 """Fetch jobs: download → vault → staging. Each returns the stage directories it wrote.
 
-URLs below are the ones verified in docs/references.md (P1, P10, A6, A7, P12, CAL1, SHP6).
+URLs below are the ones verified in docs/references.md (P1, P10, A6, A7, P12, CAL1, SHP6, X130).
 
 Never re-download a vaulted blob (CLAUDE.md): every fetch is recorded in the vault's URL index; an archive file
 (bhavcopy, delivery, filing XBRL) that is already vaulted is read back from the vault, and a 404 that was observed
@@ -31,6 +31,7 @@ from financials.staging import (
     stage_index_closes,
     stage_index_snapshot,
     stage_market_day,
+    stage_mcap_day,
     stage_raw_only,
     stage_reg30_event,
     stage_results_listing,
@@ -46,7 +47,8 @@ JSON = "application/json"
 WARMUP = {"www.nseindia.com": "https://www.nseindia.com/"}  # session cookies for the API host [A1]
 CORP_ACTION_CHUNK_DAYS = 30  # the API answer was verified on a one-month window [P12]
 IMMUTABLE_PREFIXES = (f"{ARCHIVE}/content/cm/BhavCopy_", f"{ARCHIVE}/products/content/sec_bhavdata_full_",
-                      f"{ARCHIVE}/corporate/xbrl/", f"{ARCHIVE}/content/indices/ind_close_all_")  # fmt: skip
+                      f"{ARCHIVE}/corporate/xbrl/", f"{ARCHIVE}/content/indices/ind_close_all_",
+                      f"{ARCHIVE}/archives/equities/bhavcopy/pr/")  # fmt: skip
 EQUITY_MASTER_URL = f"{ARCHIVE}/content/equities/EQUITY_L.csv"  # [IDX10]
 NOT_FOUND_SETTLE_DAYS = 2  # a 404 counts as final only when observed this long after the requested date [P11]
 
@@ -61,6 +63,11 @@ def delivery_url(d: date) -> str:
 
 def index_close_url(d: date) -> str:
     return f"{ARCHIVE}/content/indices/ind_close_all_{d:%d%m%Y}.csv"  # [IDX9]
+
+
+def pr_zip_url(d: date) -> str:
+    """NSE's daily PRddmmyy.zip; its mcapddmmyyyy.csv is the market-cap file [X130]."""
+    return f"{ARCHIVE}/archives/equities/bhavcopy/pr/PR{d:%d%m%y}.zip"
 
 
 def corp_actions_url(start: date, end: date) -> str:
@@ -174,14 +181,14 @@ class Jobs:
         """None when no bhavcopy exists (holiday/weekend): nothing is staged. A bhavcopy staged without delivery
         is staged again once the delivery file appears [P0-2]; a fully fetched day is not fetched again."""
         b_url, d_url = bhavcopy_url(d), delivery_url(d)
-        closes = self._index_closes(d) if self.is_vaulted(b_url) else []
+        closes = self._index_closes(d) + self.mcap_day(d) if self.is_vaulted(b_url) else []
         if self.is_vaulted(b_url) and self.is_vaulted(d_url):
             return closes
         bhav = self._get(b_url, allow_404=True, asked_for=d)
         if bhav is None:
             return None
         if not closes:
-            closes = self._index_closes(d)
+            closes = self._index_closes(d) + self.mcap_day(d)
         deliv = self._get(d_url, allow_404=True, asked_for=d)
         stage = stage_market_day(
             self.vault, self.stage_root, bhavcopy=bhav, bhavcopy_url=b_url, delivery=deliv,
@@ -202,6 +209,30 @@ class Jobs:
         if data is None:
             return []
         return [stage_index_closes(self.vault, self.stage_root, data=data, source_url=url, fetched_at=utc_now())]
+
+    def mcap_day(self, d: date) -> list[Path]:
+        """The day's PRddmmyy.zip mcap file [X130], for a date with a bhavcopy. A vaulted zip is not downloaded again;
+        one vaulted but not staged (a parse failure since fixed) is staged again from the vault."""
+        url = pr_zip_url(d)
+        last = self.vault.last_fetch(url)
+        vaulted = bool(last and last["status"] == 200 and self.vault.exists(last["storage_path"]))
+        if vaulted and any((self.stage_root / "mcap_day").glob(f"*-{last['sha256'][:12]}")):
+            return []
+        data = self._get(url, allow_404=True, asked_for=d)
+        if data is None:
+            return []
+        return [stage_mcap_day(self.vault, self.stage_root, data=data, source_url=url, fetched_at=utc_now())]
+
+    def mcap_days(self, days: Iterable[date]) -> tuple[list[Path], list[str]]:
+        """fetch-mcap: the PR zips of the given trading days (e.g. the week ends of a backfill); a failure on one
+        day is reported and the rest continues."""
+        staged, errors = [], []
+        for d in days:
+            try:
+                staged += self.mcap_day(d)
+            except (FetchError, ParseError) as exc:
+                errors.append(f"{d} mcap: {exc}")
+        return staged, errors
 
     def equity_master(self) -> list[Path]:
         data = self._get(EQUITY_MASTER_URL)

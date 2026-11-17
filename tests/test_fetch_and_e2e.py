@@ -16,6 +16,7 @@ from financials.fetch.jobs import (
     holidays_url,
     index_close_url,
     index_list_url,
+    pr_zip_url,
     shp_master_url,
 )
 
@@ -169,7 +170,8 @@ def test_e2e_fetchers_never_touched_unlisted_urls(e2e):
     weekend = {bhavcopy_url(date(2025, 9, 20)), bhavcopy_url(date(2025, 9, 21)), "https://www.nseindia.com/"}
     no_delivery_fixture = {delivery_url(d) for d in DAYS if delivery_url(d) not in routes}
     no_close_fixture = {index_close_url(d) for d in DAYS}  # each trading day also asks for its index closes [IDX9]
-    assert misses == weekend | no_delivery_fixture | no_close_fixture  # every other request was a fixture URL
+    no_mcap_fixture = {pr_zip_url(d) for d in DAYS}  # ... and its PR-zip market-cap file [X130]
+    assert misses == weekend | no_delivery_fixture | no_close_fixture | no_mcap_fixture  # the rest: fixture URLs
 
 
 def test_e2e_promotion_order_and_idempotency(e2e):

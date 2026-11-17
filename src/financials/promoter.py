@@ -70,6 +70,7 @@ def promote(con: duckdb.DuckDBPyConnection, stage_dir: Path) -> PromotionResult:
         "index_close": _promote_vault_and_raw,
         "equity_master": _promote_vault_and_raw,
         "classification": _promote_classification,
+        "mcap_day": _promote_mcap_day,
     }.get(job)
     if handler is None:
         raise ValueError(f"unknown job {job!r}")
@@ -1857,6 +1858,28 @@ def _promote_vault_and_raw(con, stage_dir: Path, manifest: dict[str, Any]) -> Pr
     tables = {"index_close": "index_ohlcv", "equity_master": "raw_equity_master"}
     _insert_vault_rows(con, stage_dir, ("blobs", "filings", tables[manifest["job"]]))
     return PromotionResult("PROMOTED", manifest["job"], message=manifest.get("trade_date") or manifest["snapshot_date"])
+
+
+def _promote_mcap_day(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
+    """NSE PR-zip mcap file [X130-X133]: vault rows + raw_nse_mcap, append-only. Out of scope before MIN_TRADE_DATE
+    (C9). G1: the file's EQ / BE / BZ rows must be at least G1_MIN_RATIO x the median of the previous G1_LOOKBACK_DAYS
+    promoted files (the parser has already checked the rows against the file's own summary sums)."""
+    day = date.fromisoformat(manifest["trade_date"])
+    if not market_in_scope(day):
+        return _out_of_scope(con, stage_dir, "mcap_day", f"trade_date {day} < {MIN_TRADE_DATE}")
+    path = (Path(stage_dir) / "raw_nse_mcap.parquet").as_posix()
+    n = con.execute(
+        "SELECT count(*) FROM read_parquet(?) WHERE series IN (SELECT unnest(?))", [path, list(UNIVERSE_SERIES)]
+    ).fetchone()[0]
+    prior = [c for (c,) in con.execute(
+        "SELECT count(DISTINCT (symbol, series)) FROM raw_nse_mcap WHERE trade_date < ? "
+        "AND series IN (SELECT unnest(?)) GROUP BY trade_date ORDER BY trade_date DESC LIMIT ?",
+        [day, list(UNIVERSE_SERIES), G1_LOOKBACK_DAYS],
+    ).fetchall()]  # fmt: skip
+    if prior and Decimal(n) < G1_MIN_RATIO * Decimal(statistics.median(prior)):
+        raise GateFailure("G1", f"{n} EQ/BE/BZ mcap rows < {G1_MIN_RATIO} x median {statistics.median(prior)}")
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_nse_mcap"))
+    return PromotionResult("PROMOTED", "mcap_day", message=f"{day}: {n} EQ/BE/BZ rows")
 
 
 def _promote_kpis(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:

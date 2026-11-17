@@ -451,3 +451,16 @@ warm-up, 1.5 s apart). URL: `https://www.nseindia.com/api/NextApi/apiClient/GetQ
 | `classification/GetQuoteApi_getSymbolData_TCS.json` | TCS, INE467B01029 | Information Technology / Information Technology / IT - Software / Computers - Software & Consulting | `b41b0ebba524f5534a267243d8f91e4aaa7bc9a40fcdbe8e7337a8a2109a81df` |
 | `classification/GetQuoteApi_getSymbolData_HDFCBANK.json` | HDFCBANK, INE040A01034 | Financial Services / Financial Services / Banks / Private Sector Bank | `aba013aa625e0dc3776a753946b9587efb9e4dcf971567af5830cd934b4e72e9` |
 | `classification/GetQuoteApi_getSymbolData_M_M.json` | M&M, INE101A01026 | Consumer Discretionary / Automobile and Auto Components / Automobiles / Passenger Cars & Utility Vehicles | `9ad18793098f4a29b454ff8a7e08337c505ef32a427298841526ef5ab1e293bf` |
+
+## NSE daily PR zip (market-cap file; fetched 2026-11-17, one request each, >= 1.2 s apart)
+
+`PRddmmyy.zip` from `https://nsearchives.nseindia.com/archives/equities/bhavcopy/pr/` (HTTP 200, curl with a browser
+User-Agent, no warm-up). Read by `tests/test_mcap_universe.py` [X130-X134]. 114 further zips (every week end
+2024-10-04 .. 2026-11-08 and six quarter ends) were fetched for the live analysis and are not committed.
+
+| File | Why it is here | Source URL | SHA-256 |
+|---|---|---|---|
+| `pr_zip/PR011024.zip` | First in-scope trading day (C9); member `MCAP01102024.csv` (upper case); RELIANCE before its 1:1 bonus, ADANIPOWER before its 1:5 split; ELIN Issue Size = X114 FY25 issued | `https://nsearchives.nseindia.com/archives/equities/bhavcopy/pr/PR011024.zip` | `45bf29c9ff8eb49fe4e79c624c260b60e7c23c523c8d17496becf6871aa85956` |
+| `pr_zip/PR300625.zip` | Mid-2025 quarter end: same header and layout | `https://nsearchives.nseindia.com/archives/equities/bhavcopy/pr/PR300625.zip` | `68212caa54a45112b30b2adb85e20ce86dce48807efce25c9be792d58946b6e3` |
+| `pr_zip/PR300926.zip` | Quarter end of the ELIN Reg. 31 fixture (`xbrl/SHP_1739151_15102026054406_WEB.xml`): Issue Size = Reg. 31 total | `https://nsearchives.nseindia.com/archives/equities/bhavcopy/pr/PR300926.zip` | `d82bcd64f2f0b78540dd40b705c9f8297485e13622def4f6f83b6a1a97223307` |
+| `pr_zip/PR131126.zip` | Latest file; member `mcap13112026.csv` (lower case), 14 members | `https://nsearchives.nseindia.com/archives/equities/bhavcopy/pr/PR131126.zip` | `c0eebe6666cd64ea4096be7589c740e050f189289f2760a5ac66c60146ec6377` |

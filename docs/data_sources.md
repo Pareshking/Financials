@@ -2,7 +2,7 @@
 
 <!-- GENERATED from config/data_sources.yaml by `python -m financials.sources --write`. Do not edit. -->
 
-30 feeds: 13 VERIFIED, 9 OBSERVED, 6 UNVERIFIED, 2 PLANNED. Status meanings and runtime labels are defined in `config/data_sources.yaml`; evidence IDs point to `docs/references.md`.
+31 feeds: 14 VERIFIED, 9 OBSERVED, 6 UNVERIFIED, 2 PLANNED. Status meanings and runtime labels are defined in `config/data_sources.yaml`; evidence IDs point to `docs/references.md`.
 
 | ID | Feed | Phase | Status | Runtime | Evidence |
 |---|---|---|---|---|---|
@@ -36,6 +36,7 @@
 | F28 | NSE equity master (EQUITY_L.csv) | 1 | VERIFIED | CONTAINER_DIRECT | IDX10 |
 | F29 | Nifty 500 total-return index (TRI) | 1 | UNVERIFIED | UNKNOWN | — |
 | F30 | NSE 4-level industry classification (quote API) | 1 | VERIFIED | CONTAINER_DIRECT | IC1, IC2, IC3, A14 |
+| F31 | NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv) | 1 | VERIFIED | CONTAINER_DIRECT | X130, X131, X132, X133, X134, P18 |
 
 ## F01 — UDiFF cash-market bhavcopy
 
@@ -188,7 +189,7 @@
 | phase | 2 |
 | verification_status | UNVERIFIED |
 | evidence | — |
-| notes | BLOCKED 2026-11-15 (references A15): no Reg. 76 file in the vault ledger, the announcements RSS or TCS's announcements API for Jul-Nov 2026; BSE answers 403. The Reg. 31 total x paid-up capital cross-check (X103) and the Reg. 34 year-end share counts cross-check (X114, annual stand-in; issued / subscribed / paid-up, not listed or demat) stand in. |
+| notes | BLOCKED 2026-11-15 (references A15): no Reg. 76 file in the vault ledger, the announcements RSS or TCS's announcements API for Jul-Nov 2026; BSE answers 403. The Reg. 31 total x paid-up capital cross-check (X103) and the Reg. 34 year-end share counts cross-check (X114, annual stand-in; issued / subscribed / paid-up) stand in. Since 2026-11-17 the listed side is daily: NSE Issue Size from the PR zip (F31, X133), cross-checked against Reg. 31 by check-issue-size; the audit report itself (demat vs physical, Reg. 76) is still unsourced. |
 
 ## F10 — Reg. 23(9) related party transactions
 
@@ -546,3 +547,20 @@
 | verification_status | VERIFIED |
 | evidence | IC1, IC2, IC3, A14 |
 | notes | fetch-classification [SYMBOLS] --universe nifty500 (API host, 1 request/s). /api/quote-equity answers 403 from the container (A14). Point in time from the first fetch (C25): never backdated. |
+
+## F31 — NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv)
+
+| Field | Value |
+|---|---|
+| exchange_or_agency | NSE |
+| url_or_endpoint_pattern | https://nsearchives.nseindia.com/archives/equities/bhavcopy/pr/PR<DDMMYY>.zip |
+| format | ZIP of 14 files (15 in Oct 2024); only mcapddmmyyyy.csv is parsed (fixed-width values between commas, summary rows Listed / Permitted / Total) |
+| cadence | Daily (trading days) |
+| fetch_runtime | CONTAINER_DIRECT |
+| join_keys | Trade Date, Symbol, Series |
+| target_tables | raw_nse_mcap, universe_membership |
+| unlocked_metrics | NSE market cap per security, NSE Issue Size (shares listed on NSE), Rs 500 Cr universe (rule U1), Issue Size vs Reg. 31 cross-check |
+| phase | 1 |
+| verification_status | VERIFIED |
+| evidence | X130, X131, X132, X133, X134, P18 |
+| notes | Fetched by fetch-days / run-day with each trading day's bhavcopy; fetch-mcap START END --weekly backfills the week ends for the universe. No ISIN: rows resolve by symbol and series on the file date. Issue Size is not the market-cap share count (X133: 98.4% within 0.5% of Reg. 31, below the 99% bar); it is stored and used as a cross-check (check-issue-size). The zip's other files (corporate actions, price bands, SME, ...) are not parsed. |

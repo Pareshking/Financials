@@ -1,0 +1,432 @@
+[
+ {
+  "symbol": "ASMS",
+  "scope": "STANDALONE",
+  "filing_id": "fil_140bae518508fa357ab85fe5",
+  "corrections": [
+   {
+    "canonical_tag": "revenue_from_operations",
+    "period_start": "2026-04-01",
+    "period_end": "2026-09-30",
+    "value_inr": "248964000.00"
+   },
+   {
+    "canonical_tag": "total_income",
+    "period_start": "2026-04-01",
+    "period_end": "2026-09-30",
+    "value_inr": "268890000.00"
+   },
+   {
+    "canonical_tag": "pbt",
+    "period_start": "2026-04-01",
+    "period_end": "2026-09-30",
+    "value_inr": "22697000.00"
+   },
+   {
+    "canonical_tag": "tax_expense",
+    "period_start": "2026-04-01",
+    "period_end": "2026-09-30",
+    "value_inr": "760000.00"
+   },
+   {
+    "canonical_tag": "pat",
+    "period_start": "2026-04-01",
+    "period_end": "2026-09-30",
+    "value_inr": "21937000.00"
+   }
+  ],
+  "evidence_url": "https://nsearchives.nseindia.com/corporate/BARTRONICS1_15112026174059_Outcome_of_Board_Meeting.pdf",
+  "evidence_page": 5,
+  "evidence_text": "Standalone statement (Rs lakh), col 'Period Ended 30th September 2026': Revenue from Operations 2,489.64 | Total Income 2,688.90 | Profit/(Loss) Before Tax 226.97 | Tax 7.60 | Net Profit 219.37 (quarters 1,292.81 + 1,196.83 revenue)",
+  "reads": "PDF_TEXT+PDF_IMAGE",
+  "note": "ASMS standalone H1 FY27: XBRL files the Apr-Sep 2026 context with the Apr-Jun values (revenue 1,196.83 lakh); PDF H1 column.",
+  "quarantine_ids": [
+   "q_1ab2150eeb1fde2827cca138",
+   "q_33cefd7158a6426acb1b0294",
+   "q_676b5a310b018afc3bd32c52",
+   "q_a927a103ae3f158c86880c6a"
+  ]
+ },
+ {
+  "symbol": "ASMS",
+  "scope": "CONSOLIDATED",
+  "filing_id": "fil_011c8aaedb207fe0f99fdd96",
+  "corrections": [
+   {
+    "canonical_tag": "revenue_from_operations",
+    "period_start": "2026-04-01",
+    "period_end": "2026-09-30",
+    "value_inr": "258589000.00"
+   },
+   {
+    "canonical_tag": "total_income",
+    "period_start": "2026-04-01",
+    "period_end": "2026-09-30",
+    "value_inr": "278515000.00"
+   },
+   {
+    "canonical_tag": "pbt",
+    "period_start": "2026-04-01",
+    "period_end": "2026-09-30",
+    "value_inr": "22831000.00"
+   },
+   {
+    "canonical_tag": "share_of_associates_jv",
+    "period_start": "2026-04-01",
+    "period_end": "2026-09-30",
+    "value_inr": "-8924000.00"
+   },
+   {
+    "canonical_tag": "tax_expense",
+    "period_start": "2026-04-01",
+    "period_end": "2026-09-30",
+    "value_inr": "760000.00"
+   },
+   {
+    "canonical_tag": "pat",
+    "period_start": "2026-04-01",
+    "period_end": "2026-09-30",
+    "value_inr": "13147000.00"
+   }
+  ],
+  "evidence_url": "https://nsearchives.nseindia.com/corporate/BARTRONICS1_15112026174059_Outcome_of_Board_Meeting.pdf",
+  "evidence_page": 12,
+  "evidence_text": "Consolidated statement (Rs lakh), col 'Period Ended 30th September 2026': Revenue 2,585.89 | Total Income 2,785.15 | Profit before share of associates 228.31 | Share of associates (89.24) | Profit Before Tax 139.07 | Tax 7.60 | Net Profit 131.47",
+  "reads": "PDF_TEXT+PDF_IMAGE",
+  "note": "ASMS consolidated H1 FY27: XBRL Apr-Sep 2026 context = the Apr-Jun values (revenue 1,196.83, PBT before share 122.75, share (58.06) lakh); PDF H1 column.",
+  "quarantine_ids": [
+   "q_06f3f05117e9bfd2e43fef5e",
+   "q_728f4ef58a411fa06508d0ce",
+   "q_7d3dae00d6c3109f7923a242",
+   "q_ffb63b88888020f4dc26fdb3"
+  ]
+ },
+ {
+  "symbol": "BHARATRAS",
+  "scope": "CONSOLIDATED",
+  "filing_id": "fil_d2952f292ac4e347731716f1",
+  "corrections": [
+   {
+    "canonical_tag": "share_of_associates_jv",
+    "period_start": "2025-07-01",
+    "period_end": "2025-09-30",
+    "value_inr": "17200000.00"
+   },
+   {
+    "canonical_tag": "pat",
+    "period_start": "2025-07-01",
+    "period_end": "2025-09-30",
+    "value_inr": "278800000.00"
+   },
+   {
+    "canonical_tag": "share_of_associates_jv",
+    "period_start": "2025-04-01",
+    "period_end": "2025-09-30",
+    "value_inr": "-22800000.00"
+   },
+   {
+    "canonical_tag": "pat",
+    "period_start": "2025-04-01",
+    "period_end": "2025-09-30",
+    "value_inr": "675400000.00"
+   }
+  ],
+  "evidence_url": "https://nsearchives.nseindia.com/corporate/BHARATRAS_11112025173943_UFR_30_09_2025__BHARATRAS.pdf",
+  "evidence_page": 9,
+  "evidence_text": "Consolidated statement (Rs lakh) cols 30.09.2025 | 30.06.2025 | ... | six months 30.09.2025: V profit before JV and exceptional 3,456 | 7,270 | 10,726; VI Share of (Profit) of a joint venture (172) | 400 | 228; VIII Exceptional - | 1,478 | 1,478; IX Profit before tax 3,628 | 5,392 | 9,020; XI Profit for the period 2,788 | 3,966 | 6,754",
+  "reads": "PDF_TEXT+PDF_IMAGE",
+  "note": "BHARATRAS consolidated Q2 FY26: XBRL JV share -1.72 Cr is a profit of 1.72 Cr (PBT 3,456 + 172 = 3,628 lakh), H1 PBT 122.04 Cr adds the exceptional 1,478 lakh instead of deducting it, PAT Q2 24.44 / H1 101.66 Cr vs printed 27.88 / 67.54 Cr. The Q3 statement reprints Q2 PAT 2,788 and the 9M 10,757 lakh (= 39.66 + 27.88 + 40.03 Cr).",
+  "quarantine_ids": [
+   "q_7ba4f4b4cc5fef1fd63ab0a2",
+   "q_9b289c670cacead60170af61",
+   "q_b41fa0c912977a2783997244",
+   "q_dfd8526c0db388d485159c7b",
+   "q_e007ee69c46b928613284053",
+   "q_faaad16446574701dddcc124"
+  ]
+ },
+ {
+  "symbol": "BHARATRAS",
+  "scope": "CONSOLIDATED",
+  "filing_id": "fil_d2952f292ac4e347731716f1",
+  "corrections": [
+   {
+    "canonical_tag": "pbt",
+    "period_start": "2025-04-01",
+    "period_end": "2025-09-30",
+    "value_inr": "924800000.00"
+   }
+  ],
+  "evidence_url": "https://nsearchives.nseindia.com/corporate/BHARATRAS_11112025173943_UFR_30_09_2025__BHARATRAS.pdf",
+  "evidence_page": 9,
+  "evidence_text": "Consolidated statement (Rs lakh) cols 30.09.2025 | 30.06.2025 | ... | six months 30.09.2025: V profit before JV and exceptional 3,456 | 7,270 | 10,726; VI Share of (Profit) of a joint venture (172) | 400 | 228; VIII Exceptional - | 1,478 | 1,478; IX Profit before tax 3,628 | 5,392 | 9,020; XI Profit for the period 2,788 | 3,966 | 6,754 (pbt before JV = 10,726 - 1,478)",
+  "reads": "PDF_TEXT+PDF_IMAGE",
+  "note": "BHARATRAS consolidated Q2 FY26: XBRL JV share -1.72 Cr is a profit of 1.72 Cr (PBT 3,456 + 172 = 3,628 lakh), H1 PBT 122.04 Cr adds the exceptional 1,478 lakh instead of deducting it, PAT Q2 24.44 / H1 101.66 Cr vs printed 27.88 / 67.54 Cr. The Q3 statement reprints Q2 PAT 2,788 and the 9M 10,757 lakh (= 39.66 + 27.88 + 40.03 Cr).",
+  "quarantine_ids": []
+ },
+ {
+  "symbol": "DHANBANK",
+  "scope": "STANDALONE",
+  "filing_id": "fil_f4cd56425ee1c063f5c4aa44",
+  "corrections": [
+   {
+    "canonical_tag": "total_income",
+    "period_start": "2025-04-01",
+    "period_end": "2025-09-30",
+    "value_inr": "8252200000.00"
+   },
+   {
+    "canonical_tag": "pbt",
+    "period_start": "2025-04-01",
+    "period_end": "2025-09-30",
+    "value_inr": "353800000.00"
+   }
+  ],
+  "evidence_url": "https://nsearchives.nseindia.com/corporate/DHANBANK_29102025180714_Results.pdf",
+  "evidence_page": 4,
+  "evidence_text": "Rs lakh, cols 30.09.25 | 30.06.25 | 30.09.24 | half year 30.09.25: 3. Total Income 41816 | 40706 | 38064 | 82522 (p.4); 10. Profit from ordinary activities before tax 2320 | 1218 | .. | 3538 (p.4); 12./14. Net Profit 2320 | 1218 | 2581 | 3538 (p.5)",
+  "reads": "PDF_IMAGE+SUM_OF_PRINTED_QUARTERS",
+  "note": "DHANBANK H1 FY26: XBRL files the half-year context with the Q2 values (total income 418.16, PBT = PAT 23.20 Cr); printed H1 total income 825.22, PBT = PAT 35.38 Cr = Q1 + Q2. The text layer garbles the PAT row (3338), so read 2 is the sum of the printed quarters.",
+  "quarantine_ids": [
+   "q_5aa0204dc908cc2cdf6168b6",
+   "q_bbf04ac52b7914a3735522db",
+   "q_e3e5a09472533b47c8818c82",
+   "q_e96efd62d056432cea7d982d"
+  ]
+ },
+ {
+  "symbol": "DHANBANK",
+  "scope": "STANDALONE",
+  "filing_id": "fil_f4cd56425ee1c063f5c4aa44",
+  "corrections": [
+   {
+    "canonical_tag": "pat",
+    "period_start": "2025-04-01",
+    "period_end": "2025-09-30",
+    "value_inr": "353800000.00"
+   },
+   {
+    "canonical_tag": "pat_owners",
+    "period_start": "2025-04-01",
+    "period_end": "2025-09-30",
+    "value_inr": "353800000.00"
+   }
+  ],
+  "evidence_url": "https://nsearchives.nseindia.com/corporate/DHANBANK_29102025180714_Results.pdf",
+  "evidence_page": 5,
+  "evidence_text": "Rs lakh, cols 30.09.25 | 30.06.25 | 30.09.24 | half year 30.09.25: 3. Total Income 41816 | 40706 | 38064 | 82522 (p.4); 10. Profit from ordinary activities before tax 2320 | 1218 | .. | 3538 (p.4); 12./14. Net Profit 2320 | 1218 | 2581 | 3538 (p.5)",
+  "reads": "PDF_IMAGE+SUM_OF_PRINTED_QUARTERS",
+  "note": "DHANBANK H1 FY26: XBRL files the half-year context with the Q2 values (total income 418.16, PBT = PAT 23.20 Cr); printed H1 total income 825.22, PBT = PAT 35.38 Cr = Q1 + Q2. The text layer garbles the PAT row (3338), so read 2 is the sum of the printed quarters.",
+  "quarantine_ids": []
+ },
+ {
+  "symbol": "DHANBANK",
+  "scope": "STANDALONE",
+  "filing_id": "fil_a49e5eb71e1ff6794abb941f",
+  "corrections": [
+   {
+    "canonical_tag": "total_income",
+    "period_start": "2025-04-01",
+    "period_end": "2025-09-30",
+    "value_inr": "8252200000.00"
+   },
+   {
+    "canonical_tag": "pbt",
+    "period_start": "2025-04-01",
+    "period_end": "2025-09-30",
+    "value_inr": "353800000.00"
+   }
+  ],
+  "evidence_url": "https://nsearchives.nseindia.com/corporate/DHANBANK_29102025180714_Results.pdf",
+  "evidence_page": 4,
+  "evidence_text": "Rs lakh, cols 30.09.25 | 30.06.25 | 30.09.24 | half year 30.09.25: 3. Total Income 41816 | 40706 | 38064 | 82522 (p.4); 10. Profit from ordinary activities before tax 2320 | 1218 | .. | 3538 (p.4); 12./14. Net Profit 2320 | 1218 | 2581 | 3538 (p.5)",
+  "reads": "PDF_IMAGE+SUM_OF_PRINTED_QUARTERS",
+  "note": "DHANBANK H1 FY26: XBRL files the half-year context with the Q2 values (total income 418.16, PBT = PAT 23.20 Cr); printed H1 total income 825.22, PBT = PAT 35.38 Cr = Q1 + Q2. The text layer garbles the PAT row (3338), so read 2 is the sum of the printed quarters.",
+  "quarantine_ids": []
+ },
+ {
+  "symbol": "DHANBANK",
+  "scope": "STANDALONE",
+  "filing_id": "fil_a49e5eb71e1ff6794abb941f",
+  "corrections": [
+   {
+    "canonical_tag": "pat",
+    "period_start": "2025-04-01",
+    "period_end": "2025-09-30",
+    "value_inr": "353800000.00"
+   },
+   {
+    "canonical_tag": "pat_owners",
+    "period_start": "2025-04-01",
+    "period_end": "2025-09-30",
+    "value_inr": "353800000.00"
+   }
+  ],
+  "evidence_url": "https://nsearchives.nseindia.com/corporate/DHANBANK_29102025180714_Results.pdf",
+  "evidence_page": 5,
+  "evidence_text": "Rs lakh, cols 30.09.25 | 30.06.25 | 30.09.24 | half year 30.09.25: 3. Total Income 41816 | 40706 | 38064 | 82522 (p.4); 10. Profit from ordinary activities before tax 2320 | 1218 | .. | 3538 (p.4); 12./14. Net Profit 2320 | 1218 | 2581 | 3538 (p.5)",
+  "reads": "PDF_IMAGE+SUM_OF_PRINTED_QUARTERS",
+  "note": "DHANBANK H1 FY26: XBRL files the half-year context with the Q2 values (total income 418.16, PBT = PAT 23.20 Cr); printed H1 total income 825.22, PBT = PAT 35.38 Cr = Q1 + Q2. The text layer garbles the PAT row (3338), so read 2 is the sum of the printed quarters.",
+  "quarantine_ids": []
+ },
+ {
+  "symbol": "STALLION",
+  "scope": "STANDALONE",
+  "filing_id": "fil_a9c32dcbe95808707a30697a",
+  "corrections": [
+   {
+    "canonical_tag": "revenue_from_operations",
+    "period_start": "2025-04-01",
+    "period_end": "2025-09-30",
+    "value_inr": "2160360000.00"
+   },
+   {
+    "canonical_tag": "total_income",
+    "period_start": "2025-04-01",
+    "period_end": "2025-09-30",
+    "value_inr": "2163031000.00"
+   },
+   {
+    "canonical_tag": "pbt",
+    "period_start": "2025-04-01",
+    "period_end": "2025-09-30",
+    "value_inr": "291027000.00"
+   },
+   {
+    "canonical_tag": "tax_expense",
+    "period_start": "2025-04-01",
+    "period_end": "2025-09-30",
+    "value_inr": "73227000.00"
+   },
+   {
+    "canonical_tag": "pat",
+    "period_start": "2025-04-01",
+    "period_end": "2025-09-30",
+    "value_inr": "217800000.00"
+   }
+  ],
+  "evidence_url": "https://nsearchives.nseindia.com/corporate/STALLION_13102025231857_FinancialsofQ2FY26Signed.pdf",
+  "evidence_page": 4,
+  "evidence_text": "Rs lakh (statement is an image), cols Sep 30 2025 | Jun 30 2025 | Sep 30 2024 | half year Sep 30 2025: Revenue from operations 10,556.41 | 11,047.19 | 6,756.47 | 21,603.60; Total Income 10,575.75 | 11,054.55 | .. | 21,630.31; Profit before tax 1,524.13 | 1,386.14 | 55.07 | 2,910.27; Total tax 382.45 | 349.82 | .. | 732.27; Profit for the period 1,141.67 | 1,036.31 | 85.12 | 2,178.00",
+  "reads": "PDF_IMAGE+SUM_OF_PRINTED_QUARTERS",
+  "note": "STALLION H1 FY26: XBRL Apr-Sep 2025 context = the Apr-Jun values (revenue 110.47 Cr); printed H1 column (= Q1 + Q2).",
+  "quarantine_ids": [
+   "q_3984c735d40304f4e5e4d80d",
+   "q_8346f735fb33b7d1791ca408",
+   "q_b9f74c7e957f569c9f5bec98",
+   "q_c67ab40640a094f07dd36515"
+  ]
+ },
+ {
+  "symbol": "SHIVAMAUTO",
+  "scope": "STANDALONE",
+  "filing_id": "fil_eaaaeaa116579bb955e19311",
+  "corrections": [
+   {
+    "canonical_tag": "pbt",
+    "period_start": "2025-04-01",
+    "period_end": "2025-09-30",
+    "value_inr": "-274722000.00"
+   },
+   {
+    "canonical_tag": "pat",
+    "period_start": "2025-04-01",
+    "period_end": "2025-09-30",
+    "value_inr": "-300793000.00"
+   }
+  ],
+  "evidence_url": "https://nsearchives.nseindia.com/corporate/SHIVAMAUTO_12112025184716_Outcome.pdf",
+  "evidence_page": 6,
+  "evidence_text": "Rs lakh, Half Year Ended 30.09.2025: Profit before tax (2,747.22); Net Profit / (Loss) after tax (3,007.93)",
+  "reads": "PDF_TEXT+ORIGINAL_XBRL_SENDS",
+  "note": "SHIVAMAUTO H1 FY26: the re-send 1630432 files H1 PBT +136.71 / PAT +134.10 Cr; the statement and both original sends (1572564, 1572574) carry (27.47) / (30.08) Cr = Q1 (16.35) + Q2 (11.12) PBT.",
+  "quarantine_ids": [
+   "q_d69a8f752d240df3d5882f9c",
+   "q_f517c3cf9abb3a2abbbc5023"
+  ]
+ },
+ {
+  "symbol": "SILINV",
+  "scope": "STANDALONE",
+  "filing_id": "fil_fd58f8389191f4d2965bfda1",
+  "corrections": [
+   {
+    "canonical_tag": "revenue_from_operations",
+    "period_start": "2025-04-01",
+    "period_end": "2025-06-30",
+    "value_inr": "79900000.00"
+   }
+  ],
+  "evidence_url": "https://nsearchives.nseindia.com/corporate/SILINV_12112025184353_Outcome_12112025.pdf",
+  "evidence_page": 2,
+  "evidence_text": "Rs lakh, Q2 FY26 statement, col 30.06.2025: standalone (p.2) Interest 304 | Dividend 7 | Net gain on fair value 488 | Other income 98 | Total Income 897; consolidated (p.6) Interest 382 | Dividend 62 | Net gain on fair value 813 | Other income 110 | Total Income 1,367",
+  "reads": "PDF_TEXT_LINES_SUM+TOTAL_INCOME_LESS_OTHER_INCOME",
+  "note": "SILINV Q1 FY26: XBRL revenue from operations = total income (8.97 / 13.67 Cr) and other income 0; the statement's Q1 column prints revenue lines 304 + 7 + 488 = 799 (consolidated 1,257) and other income 98 (110) lakh; H1 / 9M / FY revenue then tie.",
+  "quarantine_ids": [
+   "q_bbf25affe528643d9850021e",
+   "q_d0c5a2cef127ab46fd010434",
+   "q_ee0b3a00498e85c27ba38016"
+  ]
+ },
+ {
+  "symbol": "SILINV",
+  "scope": "STANDALONE",
+  "filing_id": "fil_fd58f8389191f4d2965bfda1",
+  "corrections": [
+   {
+    "canonical_tag": "other_income",
+    "period_start": "2025-04-01",
+    "period_end": "2025-06-30",
+    "value_inr": "9800000.00"
+   }
+  ],
+  "evidence_url": "https://nsearchives.nseindia.com/corporate/SILINV_12112025184353_Outcome_12112025.pdf",
+  "evidence_page": 2,
+  "evidence_text": "Rs lakh, Q2 FY26 statement, col 30.06.2025: standalone (p.2) Interest 304 | Dividend 7 | Net gain on fair value 488 | Other income 98 | Total Income 897; consolidated (p.6) Interest 382 | Dividend 62 | Net gain on fair value 813 | Other income 110 | Total Income 1,367",
+  "reads": "PDF_TEXT+TOTAL_INCOME_LESS_REVENUE_LINES",
+  "note": "SILINV Q1 FY26: XBRL revenue from operations = total income (8.97 / 13.67 Cr) and other income 0; the statement's Q1 column prints revenue lines 304 + 7 + 488 = 799 (consolidated 1,257) and other income 98 (110) lakh; H1 / 9M / FY revenue then tie.",
+  "quarantine_ids": []
+ },
+ {
+  "symbol": "SILINV",
+  "scope": "CONSOLIDATED",
+  "filing_id": "fil_e47ccb69b147d223d4b51e49",
+  "corrections": [
+   {
+    "canonical_tag": "revenue_from_operations",
+    "period_start": "2025-04-01",
+    "period_end": "2025-06-30",
+    "value_inr": "125700000.00"
+   }
+  ],
+  "evidence_url": "https://nsearchives.nseindia.com/corporate/SILINV_12112025184353_Outcome_12112025.pdf",
+  "evidence_page": 6,
+  "evidence_text": "Rs lakh, Q2 FY26 statement, col 30.06.2025: standalone (p.2) Interest 304 | Dividend 7 | Net gain on fair value 488 | Other income 98 | Total Income 897; consolidated (p.6) Interest 382 | Dividend 62 | Net gain on fair value 813 | Other income 110 | Total Income 1,367",
+  "reads": "PDF_TEXT_LINES_SUM+TOTAL_INCOME_LESS_OTHER_INCOME",
+  "note": "SILINV Q1 FY26: XBRL revenue from operations = total income (8.97 / 13.67 Cr) and other income 0; the statement's Q1 column prints revenue lines 304 + 7 + 488 = 799 (consolidated 1,257) and other income 98 (110) lakh; H1 / 9M / FY revenue then tie.",
+  "quarantine_ids": [
+   "q_0d42abf1307f93d47d4ac1dd",
+   "q_1fb98ad03dac768f3ad68930",
+   "q_d6025d89a98e4f51f0029d9e"
+  ]
+ },
+ {
+  "symbol": "SILINV",
+  "scope": "CONSOLIDATED",
+  "filing_id": "fil_e47ccb69b147d223d4b51e49",
+  "corrections": [
+   {
+    "canonical_tag": "other_income",
+    "period_start": "2025-04-01",
+    "period_end": "2025-06-30",
+    "value_inr": "11000000.00"
+   }
+  ],
+  "evidence_url": "https://nsearchives.nseindia.com/corporate/SILINV_12112025184353_Outcome_12112025.pdf",
+  "evidence_page": 6,
+  "evidence_text": "Rs lakh, Q2 FY26 statement, col 30.06.2025: standalone (p.2) Interest 304 | Dividend 7 | Net gain on fair value 488 | Other income 98 | Total Income 897; consolidated (p.6) Interest 382 | Dividend 62 | Net gain on fair value 813 | Other income 110 | Total Income 1,367",
+  "reads": "PDF_TEXT+TOTAL_INCOME_LESS_REVENUE_LINES",
+  "note": "SILINV Q1 FY26: XBRL revenue from operations = total income (8.97 / 13.67 Cr) and other income 0; the statement's Q1 column prints revenue lines 304 + 7 + 488 = 799 (consolidated 1,257) and other income 98 (110) lakh; H1 / 9M / FY revenue then tie.",
+  "quarantine_ids": []
+ }
+]

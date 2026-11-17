@@ -307,6 +307,7 @@ def import_ledger(vault, stage_root: Path, ledger_dir: Path) -> tuple[list[Path]
 
     led = Ledger(ledger_dir)
     staged, errors = [], []
+    shp_broadcast = _shp_broadcast_times(led)
     for rec in led.records():
         if rec["status"] != 200 or rec["dataset"] not in CATEGORY:
             continue
@@ -331,7 +332,36 @@ def import_ledger(vault, stage_root: Path, ledger_dir: Path) -> tuple[list[Path]
             except ParseError as exc:
                 errors.append(f"{rec['url']}: {exc}")
             continue
+        if rec["dataset"] == "shareholding_xbrl":  # parsed: inline XBRL -> the shareholding tables [X170]
+            from financials.staging import stage_shareholding
+
+            ts = shp_broadcast.get(rec["url"].split("?", 1)[0])
+            staged.append(stage_shareholding(vault, stage_root, data=data, source_url=rec["url"], fetched_at=fetched,
+                                             broadcast_ts=ts, broadcast_ts_source="API_FIELD" if ts else "UNKNOWN",
+                                             exchange="BSE"))  # fmt: skip
+            continue
         staged.append(stage_raw_only(vault, stage_root, data=data, ext=ext, media_type=media,
                                      category=CATEGORY[rec["dataset"]], source_url=rec["url"], fetched_at=fetched,
                                      exchange="BSE"))  # fmt: skip
     return staged, errors
+
+
+def _shp_broadcast_times(led: Ledger) -> dict[str, datetime]:
+    """XBRL file URL -> broadcast time (UTC) from the shareholding filings answers in the same ledger: `D` is the
+    broadcast time in IST to the minute (`broadcastTime` "Oct 14 2026  4:19PM" = `D` 2026-10-14T16:19:00, A18)."""
+    from financials.timeutil import ist_to_utc
+
+    out: dict[str, datetime] = {}
+    for rec in led.records():
+        if rec["dataset"] != "shareholding_filings" or rec["status"] != 200:
+            continue
+        try:
+            rows = json.loads(led.read(rec["sha256"]).decode("utf-8")).get("Table") or []
+        except (OSError, ValueError, AttributeError):
+            continue
+        for r in rows:
+            path, d = r.get("XBRLAttachment"), r.get("D")
+            if path and d:
+                ts = datetime.fromisoformat(d)
+                out[HOME.rstrip("/") + path] = ist_to_utc(ts.date(), ts.time())
+    return out

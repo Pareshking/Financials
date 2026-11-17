@@ -741,9 +741,11 @@ def stage_shareholding(
     """Vault + parse one Reg. 31 shareholding XBRL. Broadcast time comes from the NSE master JSON.
     `run_suffix` (restage) gives a re-parse its own batch next to the first one, so it promotes as a new
     parser_version instead of being taken for the batch already promoted."""
+    from financials.parsers.ixbrl import is_inline
     from financials.parsers.shareholding import shp_instance
 
-    blob = vault.put(data, ext="xml", media_type="application/xml", fetched_at=fetched_at)
+    ext, media = ("html", "text/html") if is_inline(data) else ("xml", "application/xml")  # BSE inline XBRL [X170]
+    blob = vault.put(data, ext=ext, media_type=media, fetched_at=fetched_at)
     filing = make_filing(
         blob,
         exchange=exchange,

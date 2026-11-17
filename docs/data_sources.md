@@ -2,7 +2,7 @@
 
 <!-- GENERATED from config/data_sources.yaml by `python -m financials.sources --write`. Do not edit. -->
 
-34 feeds: 16 VERIFIED, 9 OBSERVED, 7 UNVERIFIED, 2 PLANNED. Status meanings and runtime labels are defined in `config/data_sources.yaml`; evidence IDs point to `docs/references.md`.
+34 feeds: 17 VERIFIED, 9 OBSERVED, 6 UNVERIFIED, 2 PLANNED. Status meanings and runtime labels are defined in `config/data_sources.yaml`; evidence IDs point to `docs/references.md`.
 
 | ID | Feed | Phase | Status | Runtime | Evidence |
 |---|---|---|---|---|---|
@@ -39,7 +39,7 @@
 | F31 | NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv) | 1 | VERIFIED | CONTAINER_DIRECT | X130, X131, X132, X133, X134, P18 |
 | F34 | BSE equity UDiFF bhavcopy | 1 | VERIFIED | CONTAINER_DIRECT | X165, A16 |
 | F35 | BSE list of securities (ListofScripData, per BSE group) | 1 | VERIFIED | GITHUB_RUNNER | X169, A17, A18 |
-| F36 | BSE announcements (+ AttachLive attachments) and shareholding filings (+ inline XBRL) | 1 | UNVERIFIED | GITHUB_RUNNER | — |
+| F36 | BSE announcements (+ AttachLive attachments) and shareholding filings (+ inline XBRL) | 1 | VERIFIED | GITHUB_RUNNER | A17, A18, X166, X167, X168, X170 |
 
 ## F01 — UDiFF cash-market bhavcopy
 
@@ -607,14 +607,14 @@
 | Field | Value |
 |---|---|
 | exchange_or_agency | BSE |
-| url_or_endpoint_pattern | TBD for our runs (owner client, A17: api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w, www.bseindia.com/xml-data/corpfiling/AttachLive/<name>, api.bseindia.com/BseIndiaAPI/api/Corp_Shareholding_ng/w, www.bseindia.com/XBRLFILES/SHPXBRLDataXML/<file>) |
+| url_or_endpoint_pattern | https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=<N>&strCat=-1&strPrevDate=<YYYYMMDD>&strScrip=<code>&strSearch=P&strToDate=<YYYYMMDD>&strType=C&subcategory=-1; https://www.bseindia.com/xml-data/corpfiling/AttachLive/<ATTACHMENTNAME>; https://api.bseindia.com/BseIndiaAPI/api/Corp_Shareholding_ng/w?scripcode=<code>&flag=<1-6>&indtype=; https://www.bseindia.com/XBRLFILES/SHPXBRLDataXML/<code>_<ts>_SP.html |
 | format | JSON (Table / Table1 ROWCNT); attachments PDF; shareholding inline XBRL (in-bse-shp taxonomy) |
 | cadence | Per filing |
 | fetch_runtime | GITHUB_RUNNER |
-| join_keys | SCRIP_CD / FLD_ScripCode, NEWSID |
-| target_tables | filings (exchange BSE, raw only) |
-| unlocked_metrics | results and shareholding of the Permitted members of rule U1-P (once a parser is proven on BSE files) |
+| join_keys | SCRIP_CD / FLD_ScripCode, NEWSID, ISIN inside the shareholding file |
+| target_tables | filings (exchange BSE), shareholding_meta, shareholding_observations (inline XBRL, X170) |
+| unlocked_metrics | Reg. 31 shareholding of the Permitted members of rule U1-P; their results as PDF only (no XBRL source, X168) |
 | phase | 1 |
-| verification_status | UNVERIFIED |
-| evidence | — |
-| notes | References A17, X166, X167, X168. Shapes VERIFIED on the owner repo's fixtures (A17); not yet answered to our runner (run 2: strCat=Result with strScrip=500488 answered 400). bse-fetch workflow (scripts/bse_fetch.py) -> import-bse -> promote: vaulted raw only. No BSE results XBRL endpoint is known (X168). |
+| verification_status | VERIFIED |
+| evidence | A17, A18, X166, X167, X168, X170 |
+| notes | bse-fetch workflow (scripts/bse_fetch.py) -> import-bse -> promote. Shareholding inline XBRL is parsed into the shareholding tables (X170); announcements and PDFs are vaulted raw. strCat=Result with strScrip answered 400 (A18): ask strCat=-1 and pick Result rows by CATEGORYNAME. |

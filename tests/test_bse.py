@@ -173,27 +173,32 @@ def test_client_moves_to_in_page_xhr_after_a_refusal(tmp_path):
     assert len(c.session.calls) == 1
 
 
-def test_ledger_imports_as_bse_raw_filings(tmp_path):
+def test_ledger_imports_as_bse_filings(tmp_path):
+    from datetime import datetime
+
     from conftest import Market
 
     from financials.promoter import promote
 
-    shp = (BSE / "shp_542910_20260930.html.gz").read_bytes()
-    c, _ = client([Resp(200, b'{"Table": []}'), Resp(200, shp, "text/html")], tmp_path)
-    c.shareholding_filings(6)
-    url = "/XBRLFILES/SHPXBRLDataXML/542910_12102026182749_SP.html"
+    shp = (BSE / "500488_14102026161949_SP.html").read_bytes()
+    listing = (BSE / "bse_Corp_Shareholding_ng_500488_flag6_20261117.json").read_bytes()
+    c, _ = client([Resp(200, listing), Resp(200, shp, "text/html")], tmp_path)
+    c.shareholding_filings(6, scrip="500488")
+    url = "/XBRLFILES/SHPXBRLDataXML/500488_14102026161949_SP.html"
     assert c.shareholding_xbrl(url) == shp
     (tmp_path / "m").mkdir()
     m = Market(tmp_path / "m")
     staged, errors = bse.import_ledger(m.vault, m.stage_root, tmp_path / "led")
-    assert errors == [] and len(staged) == 2
-    for s in staged:
-        assert promote(m.con, s).status == "PROMOTED"
-    got = m.con.execute(
-        "SELECT exchange, category, source_url FROM filings WHERE exchange = 'BSE' ORDER BY 2"
-    ).fetchall()
-    assert got == [("BSE", "BSE_SHP_LISTING", bse.API + "Corp_Shareholding_ng/w?scripcode=&flag=6&indtype="),
-                   ("BSE", "BSE_SHP_XBRL", bse.HOME.rstrip("/") + url)]  # fmt: skip
+    assert errors == [] and [p.parent.name for p in staged] == ["raw_only", "shareholding"]
+    assert promote(m.con, staged[0]).status == "PROMOTED"
+    # no NSE identifier rows in this database: the pattern parses but its ISIN resolves to nothing (quarantined)
+    r = promote(m.con, staged[1])
+    assert r.status == "QUARANTINED", r
+    q = "SELECT exchange, category, source_url, broadcast_ts FROM filings WHERE exchange = 'BSE' ORDER BY 2"
+    got = m.con.execute(q).fetchall()
+    assert got == [("BSE", "BSE_SHP_LISTING", bse.API + "Corp_Shareholding_ng/w?scripcode=500488&flag=6&indtype=",
+                    None),
+                   ("BSE", "SHP_XBRL", bse.HOME.rstrip("/") + url, datetime(2026, 10, 14, 10, 49))]  # fmt: skip
     again, _ = bse.import_ledger(m.vault, m.stage_root, tmp_path / "led")
     for s in again:
         promote(m.con, s)
@@ -307,3 +312,123 @@ def test_cli_import_bse_promote_and_bse_members(tmp_path):
     assert "500488" in last and "534091" in last and "Permitted members" in last
     abbott = [json.loads(x) for x in out.getvalue().splitlines() if x.startswith("{") and "ABBOTINDIA" in x]
     assert abbott[0]["bse_scrip_code"] == "500488" and abbott[0]["isin"] == "INE358A01014"
+
+
+# ── A18: probe run 3 answers (plain requests from a GitHub runner, 2026-11-17) ──
+
+
+def test_a18_announcements_have_no_xbrl_link_and_attachment_is_the_pdf():
+    one = json.loads((BSE / "bse_AnnSubCategoryGetData_500488_20261015_20261117.json").read_bytes())
+    day = json.loads((BSE / "bse_AnnSubCategoryGetData_all_20261113_p1.json").read_bytes())
+    assert one["Table1"] == [{"ROWCNT": 4}] and len(one["Table"]) == 4
+    assert {r["SCRIP_CD"] for r in one["Table"]} == {500488}  # strScrip narrows to the scrip
+    assert len(day["Table"]) == 50 and day["Table1"] == [{"ROWCNT": 2704}]  # 50 a page, BSE's count for the day
+    res = [r for r in one["Table"] if r["CATEGORYNAME"] == "Result"]
+    assert [(r["SUBCATNAME"], r["ATTACHMENTNAME"], r["Fld_Attachsize"]) for r in res] == [
+        ("Financial Results", "e334e776-71a5-4afd-adf3-ad10a11505cf.pdf", 1884669)
+    ]
+    pdf = (BSE / "AttachLive_e334e776-71a5-4afd-adf3-ad10a11505cf.pdf").read_bytes()
+    assert pdf[:5] == b"%PDF-" and len(pdf) == res[0]["Fld_Attachsize"]  # the attachment is the results PDF
+    # No field of any row links an XBRL / XML file: XML_NAME is ANN_<scrip>_<NEWSID upper>, not a file (X168)
+    for r in one["Table"] + day["Table"]:
+        assert r["XML_NAME"] == f"ANN_{r['SCRIP_CD']}_{r['NEWSID'].upper()}"
+        others = {k: v for k, v in r.items() if k not in ("XML_NAME", "NSURL")}
+        assert "xbrl" not in json.dumps(others).lower() and ".xml" not in json.dumps(others).lower()
+    assert all(r["ATTACHMENTNAME"].endswith(".pdf") for r in one["Table"] + day["Table"] if r["ATTACHMENTNAME"])
+
+
+def test_a18_list_of_securities_one_scrip_and_shareholding_listing():
+    from financials.parsers.bse_securities import parse_list_securities
+
+    (a,) = parse_list_securities((BSE / "bse_ListofScripData_A_500488_20261117.json").read_bytes())
+    assert (a.scrip_code, a.isin, a.ticker, str(a.market_cap_inr)) == ("500488", "INE358A01014", "ABBOTINDIA",
+                                                                       "552321400000.00")  # fmt: skip
+    shp = json.loads((BSE / "bse_Corp_Shareholding_ng_500488_flag6_20261117.json").read_bytes())["Table"]
+    assert [(r["EndDate"][:10], r["D"], r["XBRLAttachment"].rsplit("/", 1)[-1]) for r in shp][:2] == [
+        ("2026-09-30", "2026-10-14T16:19:00", "500488_14102026161949_SP.html"),
+        ("2026-06-30", "2026-07-17T10:47:00", "500488_1772026104730_SP.html"),
+    ]
+    assert len(shp) == 4 and all(r["IsXBRL"] == 1 and r["FLD_ScripCode"] == 500488 for r in shp)
+
+
+# ── X170: BSE inline-XBRL shareholding through the existing parser ──
+
+
+def _shp_files() -> dict[str, bytes]:
+    out = {"500488": (BSE / "500488_14102026161949_SP.html").read_bytes()}
+    for c in ("500014", "542117", "542910"):
+        out[c] = gzip.decompress((BSE / f"shp_{c}_20260930.html.gz").read_bytes())
+    return out
+
+
+def test_x170_inline_shareholding_reaches_the_shareholding_parser():
+    from decimal import Decimal
+
+    from financials.parsers.ixbrl import inline_to_instance, is_inline
+    from financials.parsers.pr_mcap import parse_pr_mcap
+    from financials.parsers.shareholding import parse_shareholding, shp_instance
+
+    files = _shp_files()
+    for code, data in files.items():
+        assert is_inline(data)
+        p = parse_shareholding(data)
+        assert p.ok, (code, p.issues)
+        assert p.meta["stated_scrip_code"] == code and p.meta["stated_symbol"] == "NOTLISTED"
+        assert p.meta["as_of_date"] == date(2026, 9, 30) and p.categories["TOTAL"]["pct"] == 1  # fractions
+        assert p.meta["rules_applied"][:2] == ["IXBRL_INLINE_SHP", "IXBRL1_BOOLEAN_TEXT"]
+    inst = shp_instance(files["500488"])[0]
+    assert len(inst.facts) == 707 + 64 and len(inst.contexts) == 68
+    assert is_inline(inline_to_instance(files["500488"])) is False
+    p = parse_shareholding(files["500488"])
+    assert p.meta["stated_isin"] == "INE358A01014" and p.categories["PROMOTER"]["pct"] == Decimal("0.7499")
+    # the BSE pattern's total equals NSE's Issue Size for ABBOTINDIA on the same date (mcap file, X133)
+    mcap = {(r.symbol, r.series): r for r in parse_pr_mcap((FIXTURES / "pr_zip" / "PR300926.zip").read_bytes())}
+    assert p.categories["TOTAL"]["shares"] == mcap[("ABBOTINDIA", "EQ")].issue_size == 21249302
+    assert (p.meta["has_partly_paid"], p.meta["promoter_pledge_flag"]) == (False, False)  # "No" -> false (IXBRL1)
+    # IXBRL1: "Yes" is true where the figures say so (542910 locked-in shares)
+    lock = shp_instance(files["542910"])[0]
+    assert lock.first_text("WhetherTheListedEntityHasAnySharesInLockedIn") == "true"
+    assert lock.first_text("WhetherTheListedEntityHasIssuedAnyPartlyPaidUpShares") == "false"
+
+
+def test_x170_inline_reader_refuses_what_it_does_not_know():
+    from financials.parsers import ParseError
+    from financials.parsers.ixbrl import inline_to_instance
+
+    data = _shp_files()["500488"]
+    with pytest.raises(ParseError, match="neither Yes nor No"):
+        inline_to_instance(data.replace(b">No<", b">Maybe<", 1))
+    with pytest.raises(ParseError, match="unsupported number format"):
+        inline_to_instance(data.replace(b"decimals='INF'", b"decimals='INF' format='ixt:numcommadecimal'", 1)
+                           if b"decimals='INF'" in data else data.replace(b'decimals="INF"',
+                           b'decimals="INF" format="ixt:numcommadecimal"', 1))  # fmt: skip
+
+
+def test_bse_shareholding_promotes_for_the_nse_security(tmp_path):
+    """A Permitted member's BSE pattern lands in the shareholding tables of the security NSE trades (by ISIN),
+    visible from BSE's broadcast time."""
+    from conftest import Market
+
+    from financials.promoter import promote
+
+    (tmp_path / "m").mkdir()
+    m = Market(tmp_path / "m")
+    assert promote(m.con, m.stage_day("20261112")).status == "PROMOTED"
+    c, _ = client([Resp(200, (BSE / "bse_Corp_Shareholding_ng_500488_flag6_20261117.json").read_bytes()),
+                   Resp(200, (BSE / "500488_14102026161949_SP.html").read_bytes(), "text/html")], tmp_path)  # fmt: skip
+    c.shareholding_filings(6, scrip="500488")
+    c.shareholding_xbrl("/XBRLFILES/SHPXBRLDataXML/500488_14102026161949_SP.html")
+    staged, errors = bse.import_ledger(m.vault, m.stage_root, tmp_path / "led")
+    assert errors == []
+    results = [promote(m.con, s) for s in staged]
+    assert [r.status for r in results] == ["PROMOTED", "PROMOTED"], results
+    row = m.con.execute(
+        "SELECT s.entity_id, o.shares, o.visible_from_ts, f.exchange FROM shareholding_observations o "
+        "JOIN filings f USING (filing_id) JOIN securities s ON s.entity_id = o.entity_id "
+        "JOIN security_identifier_history h ON h.security_id = s.security_id AND h.symbol = 'ABBOTINDIA' "
+        "WHERE o.category = 'TOTAL'"
+    ).fetchall()
+    from datetime import datetime
+
+    assert [(r[1], r[2], r[3]) for r in row] == [(21249302, datetime(2026, 10, 14, 10, 49), "BSE")]
+    m.con.close()

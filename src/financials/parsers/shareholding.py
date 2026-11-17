@@ -131,7 +131,12 @@ HUNDRED = Decimal(100)
 
 
 def shp_instance(data: bytes) -> tuple[Instance, bool]:
-    """parse_instance with rule SHP16: only a 2022-09-30 SHP instance may leave exactly `OneD` / `OneI` undeclared."""
+    """parse_instance with rule SHP16: only a 2022-09-30 SHP instance may leave exactly `OneD` / `OneI` undeclared.
+    A BSE inline XBRL file [X170] is read through the instance it denotes (parsers.ixbrl); the vault keeps the HTML."""
+    from financials.parsers.ixbrl import inline_to_instance, is_inline
+
+    if is_inline(data):
+        data = inline_to_instance(data)
     try:
         return parse_instance(data), False
     except ParseError:
@@ -206,7 +211,13 @@ def _event_date(inst: Instance, date_of_report: date):
     return None
 
 
+IXBRL_RULE = "IXBRL_INLINE_SHP"  # X170: BSE inline XBRL read as the instance it denotes
+
+
 def parse_shareholding(data: bytes) -> ParsedShareholding:
+    from financials.parsers.ixbrl import IXBRL1_RULE, is_inline
+
+    inline = is_inline(data)
     inst, shp16 = shp_instance(data)
     out = ParsedShareholding()
     ns = next((u for u in inst.namespaces.values() if SHP_NS_FRAGMENT in u and u.endswith("/in-bse-shp")), None)
@@ -230,7 +241,7 @@ def parse_shareholding(data: bytes) -> ParsedShareholding:
         "company_name": inst.first_text("NameOfTheCompany"),  # X88 name test (X156)
         "has_partly_paid": _bool(inst.first_text("WhetherTheListedEntityHasIssuedAnyPartlyPaidUpShares")),
         "promoter_pledge_flag": flags["pledged"],
-        "rules_applied": [SHP16_RULE] if shp16 else [],
+        "rules_applied": ([SHP16_RULE] if shp16 else []) + ([IXBRL_RULE, IXBRL1_RULE] if inline else []),
     }
     if exchange_specific:
         out.meta["rules_applied"].append(EXCHANGE_SPECIFIC_RULE)

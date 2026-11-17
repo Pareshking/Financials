@@ -1787,11 +1787,13 @@ def _promote_shareholding(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
         [fid, meta["parser_version"]],
     ).fetchone()[0]:
         return PromotionResult("ALREADY_PROMOTED", "shareholding", message=fid)
-    secs = resolve_security_by_isin(con, filing["exchange"], meta["stated_isin"], meta["as_of_date"])
+    # A BSE filing (Permitted member, X166) resolves by ISIN through the NSE identifier rows of the same security:
+    # identifier history holds NSE rows only (a BSE-only company needs its own rows first, owner to-do 31).
+    ix = "NSE" if filing["exchange"] == "BSE" else filing["exchange"]
+    secs = resolve_security_by_isin(con, ix, meta["stated_isin"], meta["as_of_date"])
     if not secs:
-        secs = resolve_isin_typo(con, filing["exchange"], meta["stated_isin"], meta["stated_symbol"],
-                                 meta["as_of_date"], fid)  # fmt: skip
-        secs = secs or resolve_unregistered_isin(con, filing["exchange"], meta["stated_isin"], meta["stated_symbol"],
+        secs = resolve_isin_typo(con, ix, meta["stated_isin"], meta["stated_symbol"], meta["as_of_date"], fid)
+        secs = secs or resolve_unregistered_isin(con, ix, meta["stated_isin"], meta["stated_symbol"],
                                                  meta.get("company_name"), meta["as_of_date"], fid)  # fmt: skip
     entities = sorted(
         {con.execute("SELECT entity_id FROM securities WHERE security_id = ?", [s_]).fetchone()[0] for s_ in secs}

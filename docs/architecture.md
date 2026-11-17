@@ -858,9 +858,11 @@ only because the pinned files changed).
 - **Import** (owner's machine): `import-bse DIR` checks every blob against its ledger sha256, vaults it as a `filings`
   row with exchange `BSE` (blob != filing: an NSE and a BSE filing may share one sha256), and stages it; `promote`
   (single writer) promotes. The same ledger format is the owner-provided route (files fetched elsewhere by the same
-  client). Parsed today: the list of securities only. Announcements, PDFs and shareholding inline XBRL (same `in-bse-shp`
-  taxonomy as NSE's SHP XML, but inline XBRL [X167]) stay raw (vault + filing) until a parser is proven on a real BSE
-  file; no BSE results-XBRL endpoint is known (X168, R20), so BSE financial statements are BLOCKED on a source.
+  client). Parsed: the list of securities (BSE1) and the shareholding inline XBRL: `parsers/ixbrl.py` rebuilds the
+  instance it denotes (rule IXBRL1_BOOLEAN_TEXT for BSE's Yes / No tags) and the unchanged shareholding parser reads
+  it; the filing resolves by ISIN through the NSE identifier rows of the same security, visible from the listing's
+  broadcast `D` [X170]. Announcements and their PDFs stay raw. BSE announcements link no results XBRL (X168): the
+  results of Permitted members are PDFs only, so their financial statements are BLOCKED on a source.
 
 ## 12. Promoter quality gates (in order)
 

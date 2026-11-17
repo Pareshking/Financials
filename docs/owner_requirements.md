@@ -517,3 +517,17 @@ The owner asked the assistant to take these with its recommendation. Each is rev
   under `disc-1`, and the elements a reader selects (`READ_ELEMENTS`) are exempt from all three rules. Live sequence:
   `backfill-disclosures` (re-parses every filing to disc-2), `prune-versions` (archives, then removes the disc-1
   rows), `compact`. The 18D feature values do not change (FEATURES_VERSION unchanged).
+
+## Owner decisions (2026-11-17)
+
+- **N. Drop key / foreign-key indexes on large tables: PARKED (owner, 2026-11-17: "Let it be there given risk of
+  duplicate ... park it").** Measured on a copy: of the 2.47 GB file, the constraint indexes take ~1.44 GB (primary
+  keys ~1.1 GB, foreign keys ~0.34 GB); without them the same data is ~1.03 GB. The proposal replaced insert-time
+  duplicate refusal with a duplicate / orphan audit in the promote gates. Parked because a duplicate would then be
+  caught after the load instead of refused at entry. All constraints stay. Consequence for decision K: 7 daily
+  snapshots of the ~2.5 GB file (~17 GB) do not fit R2's 10 GB free tier; snapshots would need to be fewer or stored
+  as the zstd Parquet bundle (~0.47 GB measured), to be settled with decision K.
+- **Site data layout (agreed 2026-11-17, part of the proposed decision K):** the site never reads the DuckDB file.
+  Page views read small precomputed files (per-company JSON, saved-screen results); custom screens read one Parquet
+  file of the latest screener table (3,003 x 665: 2.9 MB zstd measured) with column-only range reads; Cloudflare
+  caching in front of R2. DuckDB runs only on the writer (GitHub runner or PC).

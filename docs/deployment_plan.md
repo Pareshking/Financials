@@ -38,9 +38,15 @@ Runs 00:15 IST (cron `45 18 * * *` UTC) plus a 07:15 IST catch-up for late filin
 7. **Retention**: 3 daily + 4 weekly snapshots; older ones deleted by the same job.
 
 The whole database file is uploaded each night because DuckDB rewrites blocks in place (no file-level delta). After
-decision J the file is ~1 GB: ~12 multipart writes a night.
+decision J and M the file is 2.47 GB (decision N parked): ~25 multipart writes a night, or upload the 0.47 GB Parquet bundle instead.
 
 ## 3. Site
+
+Data layout (owner agreed 2026-11-17): the site never reads the DuckDB file. Company pages and saved screens read
+small precomputed files (`site/latest/company/<id>.json` with only the fields and chart points shown, target < 50 KB;
+saved-screen results). Custom screens read `site/latest/screener.parquet` (3,003 x 665 measured at 2.9 MB zstd;
+Arrow 2.4 MB, JSON gzip 4.5 MB) with column-only HTTP range reads. Files are served through a cached route
+(custom domain or the Function with caching), not uncached R2 reads. DuckDB-WASM loads only on the custom-screen page.
 
 - Cloudflare Access in front of the Pages project (email one-time code or Google login), no self-made password page.
 - Read-only pages from precomputed `site/latest` files: saved screens, company page, breadth.
@@ -54,7 +60,7 @@ decision J the file is ~1 GB: ~12 multipart writes a night.
 
 | Service | Free limit (checked 2026-11-16) | Our use (estimate) | Headroom / risk |
 |---|---|---|---|
-| R2 storage | 10 GB-month | vault 0.7 + 7 snapshots x ~1 GB + site 0.1 = ~8 GB after J; with the raw table kept (5.3 GB file) it does not fit | keep J; at 1,500 companies drop to 2 daily + 2 weekly |
+| R2 storage | 10 GB-month | vault 0.7 + site 0.1 + snapshots. The file is 2.47 GB (2026-11-17; decision N parked, indexes kept): 7 file snapshots = ~17 GB, does not fit. As zstd Parquet bundles (0.47 GB measured) 7 = ~3.3 GB | snapshot as Parquet bundle, or 2 file snapshots; decide with K |
 | R2 Class A (writes, lists) | 1 M / month | ~100 / night (new blobs, 12 parts, manifests, site files) = ~3 k | ample |
 | R2 Class B (reads) | 10 M / month | runner restore misses + site reads, ~1 k / day | ample |
 | R2 egress | free | — | — |

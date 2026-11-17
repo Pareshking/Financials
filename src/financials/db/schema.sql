@@ -2179,6 +2179,46 @@ CREATE TABLE IF NOT EXISTS disclosure_facts (
     CHECK ((value_text IS NULL) = (text_sha256 IS NOT NULL)),
     CHECK ((text_sha256 IS NULL) = (text_len IS NULL) AND (text_sha256 IS NULL) = (text_snippet IS NULL))
 );
+
+-- ── market-cap universe (owner 2026-11-17): NSE PRddmmyy.zip mcap file and the sticky Rs 500 Cr membership ──────
+-- L1, append-only: one row per security row of mcapddmmyyyy.csv inside PRddmmyy.zip [X130-X133], exactly as sent
+-- (symbol / series as printed, no ISIN in the file). issue_size is NSE's share count for the row (exact integer);
+-- market_cap_inr is as filed (issue_size x a price within 2 paise of `close`, X132). The summary rows are checked
+-- by the parser and not stored.
+CREATE TABLE IF NOT EXISTS raw_nse_mcap (
+    filing_id        VARCHAR NOT NULL REFERENCES filings(filing_id),
+    exchange         VARCHAR NOT NULL,
+    trade_date       DATE    NOT NULL,
+    symbol           VARCHAR NOT NULL,
+    series           VARCHAR NOT NULL,
+    security_name    VARCHAR NOT NULL,
+    category         VARCHAR NOT NULL,          -- Listed | Permitted
+    last_trade_date  DATE,                      -- NULL = "Not Traded"
+    face_value       DECIMAL(18,4) NOT NULL,
+    issue_size       BIGINT  NOT NULL,
+    close            DECIMAL(18,4) NOT NULL,    -- "Close Price/Paid up value(Rs.)"
+    market_cap_inr   DECIMAL(20,2) NOT NULL,
+    PRIMARY KEY (filing_id, symbol, series)
+);
+
+-- L2: point-in-time, sticky universe membership (financials.universe, rule U1 [X134]). One row per security and
+-- universe; members never leave. PIT read: joined_date <= as_of (and visible_from_ts <= as_of_ts).
+CREATE TABLE IF NOT EXISTS universe_membership (
+    universe            VARCHAR NOT NULL,       -- MCAP500
+    security_id         VARCHAR NOT NULL REFERENCES securities(security_id),
+    entity_id           VARCHAR NOT NULL REFERENCES entity_master(entity_id),
+    joined_date         DATE    NOT NULL,
+    reason              VARCHAR NOT NULL,       -- SEED_EXISTING | MCAP_GE_500CR
+    rule_version        VARCHAR NOT NULL,
+    symbol              VARCHAR NOT NULL,       -- as on joined_date
+    series              VARCHAR NOT NULL,
+    market_cap_inr      DECIMAL(20,2),          -- the qualifying mcap-file value; NULL for SEED_EXISTING
+    evidence_filing_id  VARCHAR REFERENCES filings(filing_id),  -- the mcap file; NULL for SEED_EXISTING
+    visible_from_ts     TIMESTAMP NOT NULL,
+    recorded_at         TIMESTAMP NOT NULL,
+    PRIMARY KEY (universe, security_id),
+    CHECK (reason IN ('SEED_EXISTING', 'MCAP_GE_500CR'))
+);
 -- ── Views ──────────────────────────────────────────────────────────────
 -- Everything below VIEWS_MARKER runs after the column upgrade (db.apply_schema), so a view may name columns that an
 -- existing database gains in the same run. Views hold no data; CREATE OR REPLACE keeps them at this definition.

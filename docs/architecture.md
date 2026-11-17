@@ -9,6 +9,7 @@ UNVERIFIED there must not be hard-coded; code that depends on it quarantines on 
 
 - **Purpose:** personal, single-user research, screening and point-in-time (PIT) backtesting. No redistribution [C8].
 - **Universe v1:** NSE Mainboard `EQ`, `BE`, `BZ`, starting with the Nifty 500 [C7]. SME (`SM`, `ST`) out of scope. BSE is used only as a fallback and for historical Reg. 34 annual XBRL backfill.
+- **Filings universe `mcap500`** (owner 2026-11-17, rule U1 [X134], §11.12): every `EQ`/`BE`/`BZ` security whose NSE market cap (PR-zip mcap file [X130]) is >= Rs 500 Cr on the last trading day of a week joins `universe_membership`; members never leave; SME series and the zip's SME file are never read for it; no share-class aggregation ("ignore DVR"). The Nifty 500 set the project started with is its seed. `discover-filings --universe mcap500` (or `mcap500-new`: members without financials yet) fetches their filings; `nifty500` keeps working. The feature universe is unchanged (every security with a recent bar, §4.1).
 - **Data scope (v1, CHOICE [C9]):** `trade_date >= 2024-10-01` for prices, delivery, corporate actions and index snapshots; `period_end >= 2025-03-31` for financials and shareholding (Q4 FY25, the first Integrated Filing quarter [X38]; `financials/scope.py`). As of Nov 2026 that is 7 quarters: TTM works, YoY-on-TTM is NULL until Q3 FY27 (Dec-2026) results are filed. Promotion returns `OUT_OF_SCOPE` for older inputs (vaulted, not parsed); `fetch-days` / `fetch-corp-actions` clamp start dates. Multi-year windows use `fundamentals.cagr(..., min_periods_required)` and stay NULL until enough in-scope quarters exist.
 - **Non-goals (v1):** multi-user, UI hosting, Cloudflare (R2/D1/Workers), real-time intraday prices, SME/Indian-GAAP corporates.
 
@@ -26,15 +27,18 @@ Operator commands (`python -m financials --data-dir data …`):
 | Command | Effect |
 |---|---|
 | `init-db` | apply `schema.sql` to `data/market.duckdb` |
-| `fetch-days START [END]`, `fetch-corp-actions START END`, `fetch-holidays`, `fetch-index --as-of D`, `fetch-shareholding SYM…\|--universe U`, `fetch-annual SYM…\|--universe U`, `fetch-results [URL] [--symbols …\|--universe U]`, `discover-filings [--symbols …\|--universe nifty500\|active\|--from-rss] [--workers N]` | download → vault → staging only (`--workers` threads overlap hosts; each host stays at ≥ 1 s between requests). Vaulted archive files are never downloaded again (vault URL index); a failed day or file is reported and the run goes on; corporate actions are asked in 30-day windows |
-| `promote` | the single writer: applies pending stages in order (holidays, market days by date, index snapshots, corporate actions, results, shareholding, raw-only) and records them in `promotion_log`. ABORTED batches stay pending, and every later market day waits behind an aborted one |
+| `fetch-days START [END]`, `fetch-corp-actions START END`, `fetch-holidays`, `fetch-index --as-of D`, `fetch-shareholding SYM…\|--universe U`, `fetch-annual SYM…\|--universe U`, `fetch-results [URL] [--symbols …\|--universe U]`, `discover-filings [--symbols …\|--universe nifty500\|mcap500\|mcap500-new\|active\|--from-rss] [--workers N]` | download → vault → staging only (`--workers` threads overlap hosts; each host stays at ≥ 1 s between requests). Vaulted archive files are never downloaded again (vault URL index); a failed day or file is reported and the run goes on; corporate actions are asked in 30-day windows |
+| `promote` | the single writer: applies pending stages in order (holidays, market days by date, index snapshots and PR-zip mcap files, corporate actions, results, shareholding, raw-only) and records them in `promotion_log`. ABORTED batches stay pending, and every later market day waits behind an aborted one |
 | `rebuild-market --from D` | rolls market-derived state back to `D` (bars, bhavcopy/inferred calendar rows, identifier intervals, auto-decided corporate actions, feature history), replays the staged days and re-materialises; raw tables untouched; audited in `admin_log` |
 | `materialize D` / `materialize --from D1 --to D2` | builds features for `D` (or every promoted trading day in the range, ascending) with gates G4/G5; consumes the dirty markers the range covers (§11.10) |
 | `materialize --incremental [--to D]` | recomputes only the rows marked dirty since the last run, on already-materialised days, with G4/G5 on each merged day (§11.10); refuses when a day was built by another `FEATURES_VERSION` |
 | `compact [--keep-old \| --spill DIR]` | `--spill`: low-disk mode through verified Parquet (§4.1). Otherwise CHECKPOINT, copy every table into a sibling file created from `schema.sql`, verify row counts and views, swap the files atomically (§4.1). Refuses when free disk < 1.1 x the live size. Also runs at the end of a full `materialize --from/--to`, `rebuild-market` and `prune-versions` when there is dead space and room (`--no-compact` skips it) |
 | `prune-versions [--archive DIR] [--dry-run]` | archives (zstd Parquet + manifest + `admin_log`) and then deletes the rows of superseded parser versions no reader can select (decision I, §4.1) |
 | `drop-raw-xbrl [--spill DIR] [--no-compact] [--note N]` | one-shot, owner decision J: refuses unless the coverage check (`scripts/disclosure_coverage.py`) reports 0 uncaptured elements per profile, then drops `raw_xbrl_facts` with an `admin_log` entry in one transaction (idempotent) and compacts (§4.1) |
-| `run-day --date D` | holiday list, market days D−7..D, corporate actions D−7..D+30, discovery for symbols with results in the day's RSS (A9) + Reg. 30 events, promote, `materialize --incremental --to D−1`, materialise D in full; idempotent |
+| `run-day --date D` | holiday list, market days D−7..D (each with its PR-zip mcap file [X130]), corporate actions D−7..D+30, discovery for symbols with results in the day's RSS (A9) + Reg. 30 events, promote, rule U1 for the week ends in D−7..D (§11.12), `materialize --incremental --to D−1`, materialise D in full; idempotent |
+| `fetch-mcap START [END] [--weekly]` | the PR-zip mcap files of promoted trading days (`--weekly`: each ISO week's last trading day only, the universe backfill); vaulted zips are not downloaded again (`fetch-days` fetches each day's zip too) |
+| `update-universe [--from D] [--to D]` | rule U1 over the week ends in the range (default 2024-10-01 → today) plus the one-time seed; sticky, idempotent, audited in `admin_log` (§11.12) |
+| `check-issue-size --as-of D [--all]` | read-only cross-check: NSE Issue Size vs Reg. 31 total per security on a quarter end, 0.5% tolerance [X133] |
 | `screen "QUERY" [--as-of D]` | runs a DSL screen on the live table or point-in-time on history (read-only connection) |
 | `load-kpis FILE` | stages a supplemental-KPI CSV/JSON (`parsers.kpis`) for `promote` into `supplemental_kpis` |
 | `export-bundle --out DIR [--max-file-mb 50 --max-total-mb 250]`, `import-bundle DIR --db PATH` | zstd Parquet shards of every table of schema.sql with a manifest of row counts and checksums; import verifies them (a `raw_xbrl_facts` part of an older `--include-raw` bundle is skipped: decision J). Local or private storage only: the data is NSE-derived and the repository is public |
@@ -70,6 +74,7 @@ data/vault/ab/ab12…ef.<ext>   ───────────▶  ▼  in on
 | Corporate actions | `www.nseindia.com/api/corporates-corporateActions?index=equities&from_date=…&to_date=…` | JSON | VERIFIED [P12, CA1-CA9] | 1 |
 | Corporate actions (discovery) | `nsearchives…/content/RSS/Corporate_action.xml` (no symbol/ISIN) | RSS | VERIFIED [CA6] | discovery only |
 | Trading holidays | `www.nseindia.com/api/holiday-master?type=trading` | JSON (current year) | VERIFIED [CAL1] | 1 |
+| Market cap + Issue Size per security | `nsearchives…/archives/equities/bhavcopy/pr/PR<DDMMYY>.zip` → `mcapddmmyyyy.csv` | CSV in zip (fixed-width) | VERIFIED [X130-X133] | 1 |
 | Shareholding (Reg. 31) | `www.nseindia.com/api/corporate-share-holdings-master?index=equities&symbol=X` → `nsearchives…/corporate/xbrl/SHP_*.xml` | JSON + XBRL | VERIFIED [SHP1-SHP15] | 1 |
 | Reg. 34 annual XBRL | UNVERIFIED [R2] | XBRL | — | 2 |
 | F&O, SLBM, AMC portfolios, macro | UNVERIFIED | various | — | 3 |
@@ -809,6 +814,26 @@ only because the pinned files changed).
   after the changes above a day of ~3,000 securities is ~1.5-2 s (half per-row Python, half the Arrow insert, the
   cross-section SQL and the WAL), see docs/benchmarks.md section 6.
 
+## 11.12 Market-cap universe (rule U1, owner 2026-11-17) [X130-X134]
+- **Source.** `PRddmmyy.zip` (one per trading day, ~0.6 MB) is vaulted whole; only `mcapddmmyyyy.csv` is parsed
+  (`parsers/pr_mcap.py`, member name matched case-insensitively). The parser checks the file's own summary rows
+  (Listed / Permitted / Total sums, paisa rounding), so a truncated file fails; promotion (`mcap_day`) is
+  OUT_OF_SCOPE before 2024-10-01 and G1 needs the EQ / BE / BZ row count >= 0.92 x the median of the previous five
+  files. `raw_nse_mcap` keeps every row as sent (all series, symbol / series as printed, Issue Size BIGINT, close and
+  market cap DECIMAL); the file has no ISIN.
+- **Rule U1** (`financials/universe.py`, `RULE_VERSION`): a day is its ISO week's last trading day when every later
+  day of that week is known not to trade (holiday master / CAL3 rows / weekend of a covered year). On it, every
+  EQ / BE / BZ row with filed Market Cap >= Rs 500 Cr joins (`universe_membership`, MCAP_GE_500CR, visible from the
+  file's EOD broadcast time), resolving symbol + series on that date through `security_identifier_history`; an
+  unresolved row is quarantined (UNIVERSE / UNRESOLVED_SYMBOL, one finding per symbol / series, closed by rule once it
+  joins). Seed, once: EQ / BE / BZ securities with a bar of entities with financials, on their first bar date
+  (SEED_EXISTING; hindsight, L1). Members never leave; a backfill that finds an earlier qualifying week moves the
+  join date earlier. Each row stands alone: a DVR or other listed class joins only on its own market cap.
+- **PIT read**: `joined_date <= as_of` (`universe.members`). `discover-filings --universe mcap500` lists members
+  joined by today; `mcap500-new` only those whose entity has no `filing_meta` yet.
+- **Backfill** (once): `fetch-days` for the scope, `promote`, `fetch-mcap 2024-10-01 <today> --weekly` (111 zips on
+  2026-11-17), `promote`, `update-universe`. Live result: 595 seeded + 1,475 joined = 2,070 members.
+
 ## 12. Promoter quality gates (in order)
 
 | Gate | Rule | On failure |
@@ -836,6 +861,7 @@ only because the pinned files changed).
 | After each quarter's Reg. 31 deadline | Shareholding master + XBRL per symbol in the universe |
 | After each fetch batch | Promoter: gates → canonical → corp-action verification → gap auditor → features |
 | Monthly, and after an index change | `fetch-classification --universe nifty500` (quote API, 1 request/s, ~9 min) then `promote` [IC1] |
+| Daily, inside `run-day` | PR-zip mcap file with each market day; on the week's last trading day rule U1 adds the Rs 500 Cr joiners (§11.12); `discover-filings --universe mcap500-new` then fetches the new members' filings |
 
 **Automation (G40, G60, G289).** `ops/` holds the scheduler files; each runs, every day at 20:15 IST:
 
@@ -1060,9 +1086,14 @@ is pinned per profile by `tests/test_disclosures.py`, which parses the fixture b
 - Merger lineage and the demerger cost-of-acquisition split are **built** as admin-entered, audited edges (§11.7).
   Still open: automatic merger detection (no merger purpose in the corp-action feed, no delisting-circular fixture
   [CA14]) and automatic entitlement ratios / COA percentages (announced only in PDFs; R7 UNVERIFIED).
-- Reg. 76 exact share count: BLOCKED, no machine-readable NSE source found (F09, probes A15); Reg. 31 cross-checked
-  with paid-up capital stands in, and since batch J the Reg. 34 year-end issued / subscribed / paid-up counts are
-  cross-checked against both at annual promotion (`share_capital.py`, SHARES / ANNUAL_SHARE_COUNT_DIFFERS, X114).
+- Exact share count: the listed count is now daily: NSE's Issue Size in the PR-zip mcap file (`raw_nse_mcap`, X133;
+  owner 2026-11-17 "check bhavcopy zip, everything is inside it"). Evaluated against Reg. 31 on the live data: 98.4%
+  of 4,035 same-date pairs within 0.5% (84.6% exact), below the 99% bar, because Issue Size counts only shares
+  already listed on NSE (allotments wait for listing, bought-back shares stay until extinguished, partly-paid shares
+  are a separate E1 security, a bonus counts from its ex-date). So Reg. 31 stays the market-cap share count and
+  Issue Size is a cross-check (`check-issue-size`). The Reg. 76 reconciliation audit report itself (issued vs listed vs
+  demat) still has no machine-readable source (F09, A15); Reg. 31 x paid-up capital (X103) and the Reg. 34 year-end
+  counts (`share_capital.py`, ANNUAL_SHARE_COUNT_DIFFERS, X114) remain the other cross-checks.
 - The blueprint files AMFI holdings, PIT/SAST/SDD and bulk/block deals under Phase 2; they stay in Phase 3 here
   because their sources are UNVERIFIED (F11, F13, R8) or only OBSERVED (F14).
 - Deliberate divergences: special dividends never adjust prices (invariant 8; the blueprint's §4.2 factor is not

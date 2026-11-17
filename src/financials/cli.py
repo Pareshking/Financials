@@ -28,9 +28,9 @@ from financials.staging import read_manifest
 from financials.timeutil import utc_now, utc_to_ist_date
 from financials.vault import Vault
 
-UNIVERSES = ("nifty500", "active")
+UNIVERSES = ("nifty500", "active", "mcap500", "mcap500-new")
 
-JOB_ORDER = {"holidays": 0, "market_day": 1, "index_close": 2, "index_snapshot": 2, "corp_actions": 3,
+JOB_ORDER = {"holidays": 0, "market_day": 1, "index_close": 2, "index_snapshot": 2, "mcap_day": 2, "corp_actions": 3,
              "results_xbrl": 4, "shareholding": 5, "raw_only": 6, "kpis": 7, "equity_master": 8,
              "classification": 8}  # fmt: skip
 
@@ -106,6 +106,16 @@ def build_parser() -> argparse.ArgumentParser:
     fd.add_argument("start", type=_date)
     fd.add_argument("end", type=_date, nargs="?")
     fd.add_argument("--workers", type=int, default=1, help="threads (with --archive-rps above 1)")
+    fm = sub.add_parser("fetch-mcap", help="NSE PRddmmyy.zip market-cap files for promoted trading days [X130]")
+    fm.add_argument("start", type=_date)
+    fm.add_argument("end", type=_date, nargs="?")
+    fm.add_argument("--weekly", action="store_true", help="only the last trading day of each week (universe backfill)")
+    uu = sub.add_parser("update-universe", help="sticky Rs 500 Cr market-cap universe, weekly rule U1 [X134] (audited)")
+    uu.add_argument("--from", dest="from_date", type=_date, default=MIN_TRADE_DATE)
+    uu.add_argument("--to", dest="to_date", type=_date)
+    ci = sub.add_parser("check-issue-size", help="NSE Issue Size vs Reg. 31 total shares on a date (cross-check, X133)")
+    ci.add_argument("--as-of", type=_date, required=True)
+    ci.add_argument("--all", action="store_true", help="list agreeing rows too")
     fc = sub.add_parser("fetch-corp-actions")
     fc.add_argument("start", type=_date)
     fc.add_argument("end", type=_date)
@@ -141,7 +151,7 @@ def build_parser() -> argparse.ArgumentParser:
     df.add_argument("--no-events", action="store_true")
     df.add_argument("--workers", type=int, default=1, help="threads (per-host limits still apply)")
     df.add_argument("--shp-from", type=_date, help="shareholding quarters from this date (default: latest only)")
-    rd = sub.add_parser("run-day", help="holidays, days, corporate actions, discovery, promote, materialize")
+    rd = sub.add_parser("run-day", help="holidays, days, corporate actions, discovery, promote, universe, materialize")
     rd.add_argument("--date", type=_date, help="trading date to run (default: today in IST, for schedulers)")
     rd.add_argument("--lookback-days", type=int, default=7)
     lk = sub.add_parser("load-kpis", help="stage a supplemental KPI file (CSV/JSON: parsers.kpis) for promote")
@@ -498,7 +508,9 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
 
         print(json.dumps([asdict(v) for v in load_saved_screens().values()], indent=1), file=out)
         return 0
-    if args.cmd in ("screen", "ratios") or (args.cmd == "quarantine" and args.qcmd in ("list", "inspect")):
+    if args.cmd in ("screen", "ratios", "check-issue-size") or (
+        args.cmd == "quarantine" and args.qcmd in ("list", "inspect")
+    ):
         return read_command(args, db_path, out)
 
     if args.cmd == "compact":
@@ -649,6 +661,17 @@ def write_command(args, db_path: Path, stage_root: Path, out) -> int:
             return 0
         if args.cmd == "lineage":
             return lineage.run_cli(con, args, out)
+        if args.cmd == "update-universe":
+            from financials.universe import update_universe, weekly_growth
+
+            con.execute("BEGIN")
+            r = update_universe(con, args.from_date, args.to_date or utc_to_ist_date(utc_now()))
+            con.execute("COMMIT")
+            print(json.dumps(r, default=str, indent=1), file=out)
+            for d, reason, n in weekly_growth(con):
+                if args.from_date <= d:
+                    print(f"{d} {reason} {n}", file=out)
+            return 0
         if args.cmd == "backfill-index":
             from financials.admin import AdminError, backfill_index
             from financials.index_changes import IndexInvariantError, read_manifest
@@ -675,11 +698,16 @@ def archive_limits(args) -> dict[str, tuple[float, int]] | None:
 
 def universe_symbols(db_path: Path, name: str, as_of: date) -> list[str]:
     """Symbols of a universe from the market database (read-only): `nifty500` = index members on `as_of`,
-    `active` = every security with an open identifier interval."""
+    `active` = every security with an open identifier interval, `mcap500` = members of the sticky Rs 500 Cr
+    universe joined by `as_of` (financials.universe), `mcap500-new` = those of them without financials yet."""
     if not db_path.exists():
         raise SystemExit(f"error: --universe needs a market database at {db_path}")
     con = connect(db_path, read_only=True)
     try:
+        if name in ("mcap500", "mcap500-new"):
+            from financials.universe import members
+
+            return members(con, as_of, new_only=name == "mcap500-new")
         if name == "nifty500":
             sql = """SELECT DISTINCT h.symbol FROM index_constituents_history i
                      JOIN security_identifier_history h ON h.security_id = i.security_id AND h.valid_to IS NULL
@@ -739,6 +767,9 @@ def run_fetch(args, jobs: Jobs, db_path: Path, out) -> tuple[list[Path], list[st
         if args.start < MIN_TRADE_DATE:
             print(f"note: v1 scope starts {MIN_TRADE_DATE}; earlier dates are not fetched", file=out)
         staged, errors = jobs.market_days(start, end)
+    elif args.cmd == "fetch-mcap":
+        staged, errors = jobs.mcap_days(mcap_dates(db_path, max(args.start, MIN_TRADE_DATE), args.end or args.start,
+                                                   weekly=args.weekly, out=out))  # fmt: skip
     elif args.cmd == "fetch-corp-actions":
         staged += jobs.corp_actions(max(args.start, MIN_TRADE_DATE), args.end)
     elif args.cmd == "fetch-holidays":
@@ -781,6 +812,28 @@ def run_fetch(args, jobs: Jobs, db_path: Path, out) -> tuple[list[Path], list[st
     return staged, errors
 
 
+def mcap_dates(db_path: Path, start: date, end: date, *, weekly: bool, out) -> list[date]:
+    """Promoted trading days in [start, end] (read-only), or only each week's last trading day (`weekly`)."""
+    if not db_path.exists():
+        raise SystemExit(f"error: fetch-mcap needs a market database at {db_path} (trading days)")
+    con = connect(db_path, read_only=True)
+    try:
+        if weekly:
+            from financials.universe import week_end_trading_days
+
+            days, unknown = week_end_trading_days(con, start, end)
+            if unknown:
+                print(f"note: week end not yet known for {', '.join(map(str, unknown))}", file=out)
+        else:
+            days = [d for (d,) in con.execute(
+                "SELECT cal_date FROM trading_calendar WHERE exchange = 'NSE' AND is_trading AND cal_date BETWEEN ? "
+                "AND ? ORDER BY 1", [start, end]).fetchall()]  # fmt: skip
+    finally:
+        con.close()
+    print(f"fetch-mcap: {len(days)} trading day(s)", file=out)
+    return days
+
+
 def materialize_dates(con, as_of: date | None, start: date | None, end: date | None, out) -> int:
     if as_of is not None:
         dates = [as_of]
@@ -818,9 +871,10 @@ def materialize_incremental_cli(con, to: date | None, out) -> int:
 
 def run_day(args, transport: Transport | None, out) -> int:
     """Idempotent daily run for `--date D`: holiday list, market days D-lookback..D (vaulted days are not fetched
-    again), corporate actions D-lookback..D+30 (announced ahead of ex-date), discovery for the symbols with results
-    in today's RSS plus Reg. 30 events, then promote and materialise D. Fetch failures are reported; the rest of the
-    run continues, and the next run picks up what failed."""
+    again; each with its PR-zip mcap file), corporate actions D-lookback..D+30 (announced ahead of ex-date),
+    discovery for the symbols with results in today's RSS plus Reg. 30 events, then promote, apply universe rule U1
+    to the week ends in D-lookback..D (financials.universe) and materialise D. Fetch failures are reported; the rest
+    of the run continues, and the next run picks up what failed."""
     vault_dir, stage_root, db_path = _paths(args.data_dir)
     jobs = Jobs(PoliteFetcher(transport, warmup=WARMUP), Vault(vault_dir), stage_root)
     d = args.date or utc_to_ist_date(utc_now())
@@ -847,6 +901,12 @@ def run_day(args, transport: Transport | None, out) -> int:
     try:
         apply_schema(con)
         waiting = promote_pending(con, stage_root, out)
+        from financials.universe import update_universe
+
+        con.execute("BEGIN")  # rule U1 for the week ends in the lookback (D itself once its week is known to end)
+        u = update_universe(con, max(d - timedelta(days=args.lookback_days), MIN_TRADE_DATE), d)
+        con.execute("COMMIT")
+        print(f"universe: {u['joined']} joined, {u['members']} members ({u['week_ends']} week end(s))", file=out)
         # Dirty rows of earlier days first (a late filing, a resolved gap), so D's percentile history is current;
         # then D in full. A version mismatch skips the catch-up (it needs a full run) but still publishes D.
         caught_up = materialize_incremental_cli(con, d - timedelta(days=1), out)
@@ -896,6 +956,12 @@ def read_command(args, db_path: Path, out) -> int:
                 print(f"error: {exc}", file=out)
                 return 2
             print(json.dumps(rows, default=str, indent=1), file=out)
+            return 0
+        if args.cmd == "check-issue-size":
+            from financials.universe import issue_size_check
+
+            print(json.dumps(issue_size_check(con, args.as_of, include_agreeing=args.all), default=str, indent=1),
+                  file=out)  # fmt: skip
             return 0
         if args.cmd == "ratios":
             from financials.dsl import load_custom_ratios

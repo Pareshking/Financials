@@ -155,6 +155,7 @@ TABLE_ORDER = (
     "raw_equity_master",
     "raw_results_listing",
     "raw_quote_classification",
+    "raw_nse_mcap",
     "stg_holidays",
     "stg_shp_meta",
     "stg_shp_categories",
@@ -977,6 +978,24 @@ def stage_index_closes(vault: Vault, stage_root: Path, *, data: bytes, source_ur
         stage_root, "index_close", f"{day:%Y%m%d}-{blob.sha256[:12]}",
         {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)],
          "index_ohlcv": [{**asdict(r), "filing_id": filing.filing_id} for r in rows]},
+        extra={"trade_date": day.isoformat()},
+    )  # fmt: skip
+
+
+def stage_mcap_day(vault: Vault, stage_root: Path, *, data: bytes, source_url: str, fetched_at: datetime) -> Path:
+    """Vault one PRddmmyy.zip and parse its mcap file [X130-X133]. The blob is the whole zip (the evidence); the batch
+    is filed under the file's own trade date, visible at the end of that IST day (as the bhavcopy: EOD_RULE)."""
+    from financials.parsers.pr_mcap import parse_pr_mcap
+
+    rows = parse_pr_mcap(data)
+    day = rows[0].trade_date
+    blob = vault.put(data, ext="zip", media_type="application/zip", fetched_at=fetched_at)
+    filing = make_filing(blob, exchange="NSE", category="PR_MCAP", source_url=source_url, fetched_at=fetched_at,
+                         broadcast_ts=ist_to_utc(day, time(23, 59, 59)), broadcast_ts_source="EOD_RULE")  # fmt: skip
+    return write_stage(
+        stage_root, "mcap_day", f"{day:%Y%m%d}-{blob.sha256[:12]}",
+        {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)],
+         "raw_nse_mcap": [{**asdict(r), "filing_id": filing.filing_id} for r in rows]},
         extra={"trade_date": day.isoformat()},
     )  # fmt: skip
 

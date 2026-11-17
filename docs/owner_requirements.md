@@ -8,12 +8,12 @@ Every concrete item in the chat is mapped to the repository as of 2026-11-14. Th
 
 ## Status summary
 
-Recounted from the rows on 2026-11-16.
+Recounted from the rows on 2026-11-16; G93 moved to DONE on 2026-11-17.
 
 | Status | Meaning | Count |
 |---|---|---|
-| DONE | implemented and tested (file and test cited) | 223 |
-| DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 56 |
+| DONE | implemented and tested (file and test cited) | 224 |
+| DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 55 |
 | IN_PROGRESS | being built now | 2 |
 | MISSING | not anywhere in docs or code | 12 |
 | CONFLICTS_WITH_EVIDENCE | contradicted by our verified fixtures or tests | 19 |
@@ -38,7 +38,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G90 | Quarterly + annual XBRL: statements, notes (borrowings, leases, fixed assets) | DONE | F06, F07; parsers/integrated.py, parsers/reg34_annual.py; X71-X73. Segments tracked separately |
 | G91 | Shareholding XBRL: promoter, FII, DII (MF, insurance, banks), public, pledged shares | DONE | F08; SHP7-SHP15; tests/test_batch8_shareholding.py |
 | G92 | SAST Reg. 31(1)/31(2) encumbrance events with lender details | DOCUMENTED_PLANNED | F12 (Phase 3, OBSERVED) |
-| G93 | Reg. 76 reconciliation of share capital audit (exact issued / listed shares) | DOCUMENTED_PLANNED | F09 UNVERIFIED, BLOCKED: probed 2026-11-15 (vault ledger, announcements RSS, TCS announcements API Jul-Nov 2026; BSE 403), no Reg. 76 file found (A15); Reg. 31 x paid-up cross-check (X103) stands in; batch J adds the annual stand-in: Reg. 34 year-end issued / subscribed / paid-up counts vs Reg. 31 and paid-up / face (X114, ANNUAL_SHARE_COUNT_DIFFERS) |
+| G93 | Reg. 76 reconciliation of share capital audit (exact issued / listed shares) | DONE | Listed side (2026-11-17, owner "check bhavcopy zip, everything is inside it"): NSE Issue Size per security daily from the PR-zip mcap file (F31, X133; `raw_nse_mcap`; tests/test_mcap_universe.py), cross-checked against Reg. 31 by `check-issue-size` (0.5%). Measured 98.4% of 4,035 same-date pairs within 0.5% (84.6% exact), below the 99% bar (listing lag after allotments, buy-backs, partly-paid E1, bonus ex-date), so Reg. 31 stays the market-cap count (decision C). The Reg. 76 audit report itself (demat vs physical) is still unsourced: F09 UNVERIFIED, probed 2026-11-15 (vault ledger, announcements RSS, TCS announcements API Jul-Nov 2026; BSE 403), no Reg. 76 file found (A15); Reg. 31 x paid-up cross-check (X103) stands in; batch J adds the annual stand-in: Reg. 34 year-end issued / subscribed / paid-up counts vs Reg. 31 and paid-up / face (X114, ANNUAL_SHARE_COUNT_DIFFERS) |
 | G99 | Related-party transactions from Reg. 23(9) half-yearly Integrated Filing | DONE | X19; RPT contexts land in `reg23_related_party_transactions` / `disclosure_facts` (raw facts: the vault blob, decision J). Batch J: per counterparty from the Reg. 34 annual schedule (X113, `related_party_transactions`, `backfill-rpt`); the Reg. 23(9) rows per counterparty of standalone Q2 / Q4 Integrated Filings are parsed into `reg23_related_party_transactions` (X115, parsers/reg23_rpt.py, promoted with the results filing and by `backfill-rpt`; tests/test_reg23_rpt.py); they feed no feature because their period coverage is UNVERIFIED (R13) |
 | G101 | Daily delivery % | DONE | F02; P10; tests/test_market_parsers.py |
 | G105 | Audit qualification / modified opinion flag | DONE | E8; X75 filing_meta.auditor_qualified; since 2026-11-17 (owner decision: the text decides) X121-X124 `audit_opinions` from the auditor's report text and the Integrated Filing audit fields, tests/test_audit_opinions.py. Screener columns `audit_opinion`, `audit_opinion_quarterly`, `audit_opinion_conflict`, `going_concern_uncertainty`, `emphasis_of_matter` (20A), `rf_audit_qualified` (batch G), and the `forensic_clean` gate |
@@ -334,7 +334,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G280 | Commodity / input-cost feeds (World Bank Pink Sheet, FRED, MCX, PPAC, CEA) mapped to industries | DOCUMENTED_PLANNED | F25. FRED not listed |
 | G308 | Review: decide explicitly that the universe is NSE-only *(owner)* | DONE | C7 |
 | G312 | Review: AMFI publishes per-AMC files, not one ISIN file (verify) *(owner)* | DOCUMENTED_PLANNED | R8 (UNVERIFIED); F26 |
-| G331 | Universe can grow from Nifty 500 to all NSE mainboard stocks | DONE | C7; discover-filings --universe active |
+| G331 | Universe can grow from Nifty 500 to all NSE mainboard stocks | DONE | C7; discover-filings --universe active; owner 2026-11-17: sticky Rs 500 Cr universe `mcap500` (decision O, X134, arch 11.12; tests/test_mcap_universe.py) |
 
 ## UI/screener (20)
 
@@ -531,3 +531,17 @@ The owner asked the assistant to take these with its recommendation. Each is rev
   Page views read small precomputed files (per-company JSON, saved-screen results); custom screens read one Parquet
   file of the latest screener table (3,003 x 665: 2.9 MB zstd measured) with column-only range reads; Cloudflare
   caching in front of R2. DuckDB runs only on the writer (GitHub runner or PC).
+- **O. Market-cap universe (owner, 2026-11-17: "Add all the companies having market cap of 500 Cr and above. Every
+  week download marketcap from bhavcopy file and add companies qualified for 500 cr and above. Companies which are
+  already in universe will not go out. No SME. Ignore DVR."):** rule U1 (`financials/universe.py`, X134, architecture
+  §11.12). Source: the `mcapddmmyyyy.csv` of NSE's daily `PRddmmyy.zip` (X130-X132), fetched with every market day
+  and backfilled weekly from 2024-10-01. On each week's last trading day every EQ / BE / BZ row with Market Cap >=
+  Rs 500 Cr joins `universe_membership`; members never leave; SME series and the zip's SME file are not used; each
+  row stands on its own (no DVR aggregation). Seed: the ~595 companies that already have financials. Live
+  2026-11-17: 595 seeded + 1,475 joined = 2,070 members; `discover-filings --universe mcap500-new` fetches the new
+  members' filings. Rows of `Permitted` securities (listed on another exchange, permitted to trade on NSE: 128 of
+  the joiners) are admitted as the rule reads; they may have no NSE filings.
+- **Share count (owner, 2026-11-17: "check bhavcopy zip, everything is inside it"):** the same mcap file carries NSE's
+  Issue Size. Evaluated against Reg. 31 (X133): 98.4% of 4,035 pairs within 0.5%, under the 99% bar set for a
+  switch, with the disagreements explained (listing lag, buy-backs, partly-paid, bonus timing). Decision C stands
+  (Reg. 31 is the market-cap share count); Issue Size is stored and is a cross-check (`check-issue-size`).

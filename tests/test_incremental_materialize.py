@@ -336,7 +336,7 @@ PINNED_SOURCES = (
     "reference/valuation_archetypes.csv",
     "reference/cyclical_symbols.csv",
 )
-PINNED = ("2026.11.17-21B", "1885616dc964267ed60bd1d6917f52539d7b6f056c8180a6c5cbb398fcec1639")
+PINNED = ("2026.11.17-21C", "c5a176aed8abf5de4f1928ce8178f296bdcd34f4e16fd00a2e2c49cbe54af4b8")
 
 
 def sources_sha256() -> str:

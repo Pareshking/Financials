@@ -25,6 +25,7 @@ from financials.db import fetch_dicts, insert_rows, version_key
 from financials.fundamentals import CURRENT_VERSION
 from financials.identity import UNIVERSE_SERIES, Interval, SecurityRegistry
 from financials.ids import stable_id
+from financials.money import ROUNDING_UNITS
 from financials.parsers.udiff import BhavRow
 from financials.scope import MIN_PERIOD_END_DATE, MIN_TRADE_DATE, financials_in_scope, market_in_scope
 from financials.staging import read_manifest, read_table
@@ -1584,9 +1585,10 @@ def share_disagreement(con, entity_id: str, as_of: date) -> dict | None:
     ).fetchone()
     # Every results filing of the latest visibility (standalone and consolidated can both state paid-up capital);
     # the worst disagreement is reported, so the outcome does not depend on row order.
+    # X188: a count <= 0 is not a share count (paid-up capital tagged 0: ATLANTAELE Q1 FY27), as in features._preload.
     rows = con.execute(
-        "SELECT value_other, filing_id FROM fact_observations WHERE entity_id = ? AND canonical_tag = "
-        "'shares_from_paid_up' AND period_end = ? AND "
+        "SELECT value_other, filing_id, visible_from_ts FROM fact_observations WHERE entity_id = ? AND canonical_tag = "
+        "'shares_from_paid_up' AND period_end = ? AND value_other > 0 AND "
         + CURRENT_VERSION
         + " QUALIFY visible_from_ts = max(visible_from_ts) OVER () ORDER BY filing_id",
         [entity_id, as_of],
@@ -1599,9 +1601,22 @@ def share_disagreement(con, entity_id: str, as_of: date) -> dict | None:
         [shp[2]],
     ).fetchone()[0]
     totals = [shp_total] + ([shp_total - Decimal(trust)] if trust else [])
-    diff, derived, res_filing = max(
-        (min(abs(t - Decimal(v)) / t for t in totals), Decimal(v), f) for v, f in rows
-    )  # fmt: skip
+    capital = _paid_up_capital(con, [f for _, f, _ in rows], as_of)
+    events = _share_events_after(con, entity_id, as_of)
+    worst = []
+    for v, f, vis in rows:
+        # X187: a split / bonus / consolidation with ex-date after the period end but before the results were
+        # published is already in the results' face value (Ind AS 33.64 restates EPS too), not in the Reg. 31 total.
+        mult = Decimal(1)
+        for ex, eps_factor in events:
+            if ex <= vis.date():
+                mult /= eps_factor
+        expected = [t * mult for t in totals]
+        diff = min(abs(t - Decimal(v)) / t for t in expected)
+        if diff > SHARE_CROSS_CHECK_TOLERANCE and _within_rounding(capital.get(f), expected):
+            diff = Decimal(0)
+        worst.append((diff, Decimal(v), f))
+    diff, derived, res_filing = max(worst)
     if diff <= SHARE_CROSS_CHECK_TOLERANCE:
         return None
     return {
@@ -1613,6 +1628,72 @@ def share_disagreement(con, entity_id: str, as_of: date) -> dict | None:
         "shp_filing": shp[2],
         "results_filing": res_filing,
     }
+
+
+SHARE_COUNT_ACTIONS = ("SPLIT", "BONUS", "CONSOLIDATION")
+
+
+def _share_events_after(con, entity_id: str, as_of: date) -> list[tuple[date, Decimal]]:
+    """(ex-date, EPS factor) of the entity's split / bonus / consolidation actions with ex-date after `as_of`
+    [X187]. PENDING counts as well as the accepted statuses: the action is NSE's own record, and it only explains a
+    disagreement when its factor reproduces paid-up / face value exactly (within the 0.5% tolerance)."""
+    return [
+        (ex, Decimal(str(ef)))
+        for ex, ef in con.execute(
+            # a PENDING action has no eps_factor yet: the theoretical one from its ratio (corp_actions.py)
+            "SELECT ex_date, ef FROM (SELECT ca.ex_date, coalesce(ca.eps_factor, CASE WHEN ca.action_type = 'BONUS' "
+            "THEN ca.ratio_den / (ca.ratio_num + ca.ratio_den) ELSE ca.ratio_num / ca.ratio_den END) AS ef "
+            "FROM corp_actions ca JOIN securities s USING (security_id) "
+            "WHERE coalesce(ca.entity_id, s.entity_id) = ? AND ca.ex_date > ? "
+            "AND ca.action_type IN (SELECT unnest(?)) AND ca.status IN (SELECT unnest(?))) WHERE ef > 0 ORDER BY 1",
+            [entity_id, as_of, list(SHARE_COUNT_ACTIONS), sorted(ACCEPTED_STATUSES | {"PENDING"})],
+        ).fetchall()
+    ]
+
+
+def _paid_up_capital(con, filing_ids: list[str], as_of: date) -> dict[str, tuple[Decimal, Decimal, str]]:
+    """{filing_id: (paid-up capital, face value, LevelOfRounding)} of the results filings at `as_of` that state every
+    rupee figure in whole LevelOfRounding units (no canonical rupee fact with digits below the unit) [X188]."""
+    units = " ".join(f"WHEN '{k}' THEN {int(v)}" for k, v in ROUNDING_UNITS.items())
+    whole = {
+        fid
+        for fid, n, off in con.execute(
+            "SELECT o.filing_id, count(*), count(*) FILTER (WHERE o.value_inr % (CASE m.level_of_rounding "
+            + units
+            + " ELSE 1 END) <> 0) FROM fact_observations o JOIN filing_meta m USING (filing_id, parser_version) "
+            "WHERE o.filing_id IN (SELECT unnest(?)) AND o.value_inr IS NOT NULL AND o.value_inr <> 0 "
+            "AND NOT (starts_with(o.canonical_tag, 'li_') OR starts_with(o.canonical_tag, 'oth_') "
+            "OR starts_with(o.canonical_tag, 'asfiled_')) GROUP BY 1",
+            [filing_ids],
+        ).fetchall()
+        if n and not off
+    }
+    out = {}
+    for fid, paid, face, lor in con.execute(
+        "SELECT o.filing_id, "
+        "max(coalesce(o.value_inr, o.value_other)) FILTER (WHERE o.canonical_tag = 'paid_up_equity_capital'), "
+        "max(coalesce(o.value_other, o.value_inr)) FILTER (WHERE o.canonical_tag = 'face_value_per_share'), "
+        "any_value(m.level_of_rounding) "
+        "FROM fact_observations o JOIN filing_meta m USING (filing_id, parser_version) "
+        "WHERE o.filing_id IN (SELECT unnest(?)) AND o.period_end = ? "
+        "AND o.canonical_tag IN ('paid_up_equity_capital', 'face_value_per_share') GROUP BY 1",
+        [filing_ids, as_of],
+    ).fetchall():
+        if paid is not None and face and fid in whole:
+            out[fid] = (Decimal(paid), Decimal(face), lor)
+    return out
+
+
+def _within_rounding(capital: tuple[Decimal, Decimal, str] | None, totals: list[Decimal]) -> bool:
+    """X188: in a filing that states every rupee figure in whole LevelOfRounding units, paid-up capital was rounded to
+    that unit, so shares x face value need only agree with it to half a unit (Navneet Q1 FY26 consolidated, whole
+    crores: 221,213,181 x Rs 2 = 44.24 Cr filed as 44 Cr). A filing with digits below the unit states its own
+    precision and keeps the 0.5% relative test (Rallis 19.00 Cr in a 2-decimal filing; Lux 6.26 vs 6.01 Cr)."""
+    if capital is None or capital[2] not in ROUNDING_UNITS:
+        return False
+    paid, face, lor = capital
+    unit = ROUNDING_UNITS[lor]
+    return paid % unit == 0 and any(abs(t * face - paid) <= unit / 2 for t in totals)
 
 
 def cross_check_shares(con, entity_id: str, as_of: date) -> str | None:
@@ -1646,7 +1727,7 @@ def close_resolved_share_findings(con) -> int:
     if fixed:
         con.execute(
             "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = "
-            "'share cross-check agrees on re-check (X103 employee trust shares)' "
+            "'share cross-check agrees on re-check (X103 trust shares, X187 share-count event, X188 rounding)' "
             "WHERE quarantine_id IN (SELECT unnest(?))",
             [utc_now(), fixed],
         )

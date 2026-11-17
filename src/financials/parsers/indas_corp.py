@@ -571,6 +571,7 @@ def _map_facts(inst: Instance, result: ParsedResults, spec: ProfileSpec | None =
         )
     _apply_zero_attribution_rule(result)
     _apply_owners_tci_rule(result)
+    _apply_owners_before_jv_rule(result)
     if spec is None or spec.identities is None:
         # Only where owners + NCI = PAT is the profile's identity (corporate, NBFC, annual). Not banks: their
         # PAT precedes the share of associates (PNB Q2 FY27: owners 5,898 Cr = PAT 5,561 - NCI + associates).
@@ -783,6 +784,36 @@ def _apply_owners_tci_rule(result: ParsedResults) -> None:
     result.meta.setdefault("rules_applied", []).append(
         {"rule": "OWNERS_TAGGED_AS_TCI", "periods": [[str(f.period_start), str(f.period_end)] for f, _ in fixed]}
     )
+
+
+def _apply_owners_before_jv_rule(result: ParsedResults) -> None:
+    """Named rule OWNERS_BEFORE_JV_SHARE [X189]: the owners' profit element carries the profit before the share of
+    associates / joint ventures (the Integrated Filing puts that share after continuing profit), so owners = PAT - JV
+    share. Applied only when the NCI share is exactly 0 or not filed (then owners' profit must equal PAT, as in
+    X56) and the JV share is non-zero: owners := PAT. India Power (DPSCLTD) Q4 FY25: owners -17.748 Mn, PAT -18.661 Mn,
+    JV share -0.913 Mn; the PDF has no NCI line and reads PAT (186.61) lakhs. Gokul Agro FY26: owners 3,700.655 Mn
+    = 37,006.55 lakhs before associates, PDF minority interest 0.00. Only for a period that fails the attribution
+    identity (X93 tolerance) and a non-zero owners figure (owners 0 is a placeholder: CEAT Q1 FY27, crore rounding).
+    Raw facts stay as filed (asfiled_)."""
+    tol = identity_tolerance(result.meta["level_of_rounding"], 3)
+    identity_tol = identity_tolerance(result.meta["level_of_rounding"], ATTRIBUTION_TERMS)
+    fixed = []
+    for f in [f for f in result.facts if f.canonical_tag == "pat_owners"]:
+        p = (f.period_start, f.period_end)
+        pat, nci, jv = (result.value(t, *p) for t in ("pat", "pat_nci", "share_of_associates_jv"))
+        if pat is None or jv is None or abs(jv) <= tol or (nci is not None and nci != 0) or f.value == 0:
+            continue
+        if abs(f.value - pat) <= identity_tol:
+            continue
+        if abs(f.value - (pat - jv)) <= tol and abs(f.value - pat) > tol:
+            fixed.append((f, pat))
+    for f, pat in fixed:
+        result.facts.remove(f)
+        result.facts.append(dataclasses.replace(f, value=pat, source_element="RULE:OWNERS_BEFORE_JV_SHARE"))
+    if fixed:
+        result.meta.setdefault("rules_applied", []).append(
+            {"rule": "OWNERS_BEFORE_JV_SHARE", "periods": [[str(f.period_start), str(f.period_end)] for f, _ in fixed]}
+        )
 
 
 # X93: owners + NCI = PAT holds to 3 rounding units, not the 1.5 of a three-term sum: companies round each line from

@@ -6,7 +6,8 @@
   owners != PAT; with owners = PAT the NCI is PAT - owners = 0.
 - STL Tech 9M FY26 consolidated (1609091, crore rounding): NCI filed 0, PAT -3 Cr, owners 10 Cr. X91 matched
   "NCI = PAT" within the 3-unit tolerance and produced owners 10 / NCI -13 Cr (PDF: owners (3) Cr). A zero NCI is no
-  longer read as PAT, so the split is withheld (X86).
+  longer read as PAT. Since X214 (ATTRIBUTION_BY_EPS, 2026-11-18) the filing's own EPS decides the split: owners
+  := PAT = (3) Cr with NCI 0, which is the PDF's figure (before X214 the split was withheld, X86).
 """
 
 from __future__ import annotations
@@ -43,4 +44,5 @@ def test_nci_and_owners_both_tagged_as_pat_gives_zero_nci():
 def test_zero_nci_within_tolerance_of_pat_is_not_nci_tagged_as_pat():
     s = _split("INTEGRATED_FILING_INDAS_1609091_23012026034910_WEB.xml", ("2025-04-01", "2025-12-31"))
     assert s["pat"][0] == Decimal("-30000000")
-    assert set(s) == {"pat", "attribution_withheld"}
+    assert s["pat_owners"] == (Decimal("-30000000"), "RULE:ATTRIBUTION_BY_EPS")  # PDF: owners (3) Cr
+    assert s["pat_nci"] == (Decimal(0), "RULE:ATTRIBUTION_BY_EPS") and "attribution_withheld" not in s

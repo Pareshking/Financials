@@ -85,6 +85,9 @@ PUBLIC_HOLDER_AXES = {
     "DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis": (
         "RESIDENT_INDIVIDUALS_ABOVE_2L"
     ),
+    # Non-institutions "Others (specify)": trusts, LLPs, clearing members... Its 'More than 1 percentage' rows name
+    # trusts that hold the company's own shares (treasury shares, X213); 'Category' rows are sub-totals (skipped).
+    "DetailsOfSharesHeldByOtherNonInstitutionsAxis": "OTHER_NON_INSTITUTIONS",
 }
 SUBTOTAL_FLAG = "WhetherACategoryOrMoreThan1PercentageOfShareholding"  # "Category" rows are sub-totals
 HOLDER_NAME, HOLDER_SHARES, HOLDER_PCT = (

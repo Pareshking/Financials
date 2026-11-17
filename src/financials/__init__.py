@@ -1,5 +1,7 @@
 """Indian equity research, screening and point-in-time backtesting engine."""
 
+# 0.10.7: X214 attribution by EPS (ATTRIBUTION_BY_EPS); X213 Reg. 31 named holders of the non-institutions "Others"
+#         axis (OTHER_NON_INSTITUTIONS rows: trusts holding treasury shares); re-parses results and Reg. 31 files;
 # 0.10.6: X189 owners before the JV share (OWNERS_BEFORE_JV_SHARE; re-parses filings with open findings);
 # 0.10.5: X150-X156 quarantine rules (annual "Actual" rounding, undeclared pre-cutoff contexts, comparative stub
 #         periods, E&P face line, exchange-specific SHP taxonomy, insurer service-expense adjustments);
@@ -13,4 +15,4 @@
 # 0.8.0: X83 visibility from listing creation / file-name time (re-promotes backdated re-filings);
 # 0.7.0: SHP16-SHP18 (old SHP taxonomy, event dates, percent scale); 0.6.0: zero-drop line items (C24);
 # 0.5.0: REG34_ANNUAL; audit mappings
-PARSER_VERSION = "0.10.6"
+PARSER_VERSION = "0.10.7"

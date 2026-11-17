@@ -1600,23 +1600,32 @@ def share_disagreement(con, entity_id: str, as_of: date) -> dict | None:
         "SELECT max(shares) FROM shareholding_observations WHERE filing_id = ? AND category = 'EMPLOYEE_TRUSTS'",
         [shp[2]],
     ).fetchone()[0]
-    totals = [shp_total] + ([shp_total - Decimal(trust)] if trust else [])
+    totals = treasury_totals(con, shp[2], shp_total, trust)
     capital = _paid_up_capital(con, [f for _, f, _ in rows], as_of)
     events = _share_events_after(con, entity_id, as_of)
     worst = []
     for v, f, vis in rows:
         # X187: a split / bonus / consolidation with ex-date after the period end but before the results were
         # published is already in the results' face value (Ind AS 33.64 restates EPS too), not in the Reg. 31 total.
+        # X211: or it is not: paid-up capital is a balance-sheet figure of the period end, so a filing (or a late
+        # re-send of it) stating the period-end face value agrees with the unadjusted total (AJMERA Q2 FY26 re-sent
+        # after its 1:5 split, Goldiam Q1 FY27 published before its 1:3 bonus went ex).
         mult = Decimal(1)
         for ex, eps_factor in events:
             if ex <= vis.date():
                 mult /= eps_factor
-        expected = [t * mult for t in totals]
+        expected = [t * mult for t in totals] + (totals if mult != 1 else [])
         diff = min(abs(t - Decimal(v)) / t for t in expected)
         if diff > SHARE_CROSS_CHECK_TOLERANCE and _within_rounding(capital.get(f), expected):
             diff = Decimal(0)
-        worst.append((diff, Decimal(v), f))
-    diff, derived, res_filing = max(worst)
+        worst.append((diff, Decimal(v), f, vis))
+    if max(worst)[0] > SHARE_CROSS_CHECK_TOLERANCE:
+        # X212: paid-up / face value may be a genuine count of a later date (an allotment after the period end, at or
+        # before the results); only the disagreeing filings are re-checked.
+        for i, (d, v, f, vs) in enumerate(worst):
+            if d > SHARE_CROSS_CHECK_TOLERANCE and _count_after_period_end(con, entity_id, as_of, v, vs):
+                worst[i] = (Decimal(0), v, f, vs)
+    diff, derived, res_filing, _ = max(worst)
     if diff <= SHARE_CROSS_CHECK_TOLERANCE:
         return None
     return {
@@ -1628,6 +1637,64 @@ def share_disagreement(con, entity_id: str, as_of: date) -> dict | None:
         "shp_filing": shp[2],
         "results_filing": res_filing,
     }
+
+
+TREASURY_TRUST_CATEGORY = "OTHER_NON_INSTITUTIONS"  # shareholding_major_holders rows of the "Others" axis [X213]
+
+
+def treasury_totals(con, shp_filing: str, total: Decimal, employee_trusts) -> list[Decimal]:
+    """The Reg. 31 total and the totals less the treasury shares it may contain. X103: shares of employee benefit
+    trusts (category EMPLOYEE_TRUSTS). X213 TRUST_HOLDERS_OUTSIDE_EMPLOYEE_TRUSTS: trusts holding the company's own
+    shares that the pattern names under non-institutions "Others" (the 'More than 1 percentage' rows of that axis);
+    Ind AS 32 deducts them from equity share capital as well. Digispice Q4 FY25 results PDF note 6: paid-up capital
+    7,008.69 lakhs, presented as 6,226.65 lakhs net of the shares of 'Independent Non Promoter Trust' and
+    'Independent Non Promoter (Spice Employee Benefit) Trust' (15,912,776 + 10,155,067 shares of Rs 3 = 782.04
+    lakhs). A total less these shares is a candidate only: it agrees only when paid-up / face value equals it
+    within the 0.5% tolerance."""
+    trusts = con.execute(
+        "SELECT sum(shares) FROM (SELECT DISTINCT row_member, holder_name, shares FROM shareholding_major_holders "
+        "WHERE filing_id = ? AND holder_category = ? AND regexp_matches(holder_name, '(?i)\\btrust\\b'))",
+        [shp_filing, TREASURY_TRUST_CATEGORY],
+    ).fetchone()[0]
+    out = [total]
+    both = (employee_trusts or 0) + (trusts or 0) if employee_trusts and trusts else 0
+    for less in (employee_trusts, trusts, both):
+        if less and Decimal(less) < total and total - Decimal(less) not in out:
+            out.append(total - Decimal(less))
+    return out
+
+
+def _count_after_period_end(con, entity_id: str, as_of: date, derived: Decimal, visible: datetime) -> bool:
+    """X212 ALLOTMENT_BEFORE_RESULTS: a results filing may state paid-up capital after an allotment made after the
+    period end, at or before the board meeting that approved the results. Selan Q1 FY26: XBRL paid-up 35.16 Cr =
+    35,162,358 shares of Rs 10 after the allotment of 19,962,358 shares under its scheme of arrangement at the
+    results meeting of 12-Aug-2025 (Reg. 31 of that date), while the PDF prints the period-end 15.20 Cr. True when
+    paid-up / face value agrees (0.5%) with NSE's Issue Size (PR-zip) of the entity's EQ / BE / BZ securities on a
+    trading day from the last file on or before the period end through the results' visibility date, or with a Reg. 31
+    total dated after the period end and on or before that date (allotment-dated patterns: Orchid Pharma's re-filed
+    Q4 FY26 of 14-Aug-2026 after the allotment of 1-Aug-2026), or the first one dated after it. Market cap keeps the
+    period end's Reg. 31 total."""
+    tol = float(SHARE_CROSS_CHECK_TOLERANCE)
+    issue = con.execute(
+        "SELECT count(*) FROM raw_nse_mcap m JOIN security_identifier_history h ON h.exchange = m.exchange "
+        "AND h.symbol = m.symbol AND h.series = m.series AND h.valid_from <= m.trade_date "
+        "AND (h.valid_to IS NULL OR h.valid_to > m.trade_date) JOIN securities s ON s.security_id = h.security_id "
+        "WHERE s.entity_id = ? AND m.series IN (SELECT unnest(?)) AND m.trade_date <= ? AND m.trade_date >= "
+        "(SELECT coalesce(max(trade_date), CAST(? AS DATE)) FROM raw_nse_mcap WHERE trade_date <= ?) "
+        "AND abs(CAST(m.issue_size AS DOUBLE) - ?) <= ? * ?",
+        [entity_id, sorted(UNIVERSE_SERIES), visible.date(), as_of, as_of, float(derived), tol, float(derived)],
+    ).fetchone()[0]
+    if issue:
+        return True
+    later = con.execute(
+        "SELECT as_of_date, shares FROM shareholding_observations WHERE entity_id = ? AND category = 'TOTAL' "
+        "AND as_of_date > ? AND shares > 0 QUALIFY row_number() OVER (PARTITION BY as_of_date ORDER BY visible_from_ts "
+        "DESC, " + version_key("parser_version") + " DESC) = 1 ORDER BY as_of_date",
+        [entity_id, as_of],
+    ).fetchall()
+    # every Reg. 31 dated up to the results' visibility (allotment-dated patterns, SHP17), and the first one after
+    near = [s for d, s in later if d <= visible.date()] + [s for d, s in later if d > visible.date()][:1]
+    return any(abs(Decimal(s) - derived) / Decimal(s) <= SHARE_CROSS_CHECK_TOLERANCE for s in near)
 
 
 SHARE_COUNT_ACTIONS = ("SPLIT", "BONUS", "CONSOLIDATION")
@@ -1727,7 +1794,8 @@ def close_resolved_share_findings(con) -> int:
     if fixed:
         con.execute(
             "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = "
-            "'share cross-check agrees on re-check (X103 trust shares, X187 share-count event, X188 rounding)' "
+            "'share cross-check agrees on re-check (X103 / X213 trust shares, X187 / X211 share-count event, "
+            "X188 rounding, X212 allotment before the results)' "
             "WHERE quarantine_id IN (SELECT unnest(?))",
             [utc_now(), fixed],
         )

@@ -892,6 +892,15 @@ def _apply_attribution_recovery_rules(result: ParsedResults) -> None:
             # X105: no NCI element and no exact recovery: owners stay as filed and NCI stays absent, as before X96
             # (Oberoi Realty FY26 owners 2,224.05 vs PAT 2,225.51 Cr; the untagged NCI is the difference).
             continue
+        by_eps = _attribution_by_eps(result, p, owners, nci, pat)
+        if by_eps is not None:
+            new_owners, new_nci = by_eps
+            _replace_attribution(result, p, new_owners, new_nci if new_nci is not None else nci, "ATTRIBUTION_BY_EPS")
+            if new_nci is None:  # owners as filed: the NCI is unverified, so it is dropped (raw facts stay)
+                result.facts = [f for f in result.facts if not (f.canonical_tag == "pat_nci"
+                                                                and (f.period_start, f.period_end) == p)]  # fmt: skip
+            applied.setdefault("ATTRIBUTION_BY_EPS", []).append([str(p[0]), str(p[1])])
+            continue
         withheld.append((p, owners, nci, pat))
     for p, owners, nci, pat in withheld:
         kept = [
@@ -913,6 +922,51 @@ def _apply_attribution_recovery_rules(result: ParsedResults) -> None:
         applied.setdefault("ATTRIBUTION_WITHHELD", []).append([str(p[0]), str(p[1])])
     for rule, ps in applied.items():
         result.meta.setdefault("rules_applied", []).append({"rule": rule, "periods": ps})
+
+
+ATTRIBUTION_EPS_AGREE = Decimal("0.005")  # EPS x period-end shares within 0.5% of the chosen owners' profit
+EPS_HALF_PAISA = Decimal("0.005")  # basic EPS is printed to the paisa: owners' profit is known to 0.005 x shares
+
+
+def _attribution_by_eps(result: ParsedResults, p: tuple, owners: Decimal, nci: Decimal, pat: Decimal):
+    """ATTRIBUTION_BY_EPS [X214]: owners + NCI != PAT and no exact rule applies. Exactly one of the filed lines is
+    wrong, and the filing's own basic EPS (Ind AS 33: owners' profit / weighted shares) tells which. Candidates
+    (owners, NCI): owners as filed (NCI then unverified: None, dropped); owners := PAT - NCI as filed (owners filed
+    0 as a placeholder, or another line); owners := PAT + NCI with the NCI sign flipped. Chosen when EPS x period-end
+    shares (paid-up / face value) is within 0.5% of the candidate's owners (or within half a paisa of EPS) and every
+    other candidate is more than one paisa of EPS further away; when the only rivals are the two NCI signs and NCI is
+    itself below half a paisa of EPS, owners := PAT - NCI as filed (the error, at most 2 x NCI, is below what EPS can
+    show). Current periods only (period end = the filing's quarter end; prior-period shares differ). Ajmera Q2 FY26
+    consolidated: owners 0, NCI 87 lakh, PAT 3,124 lakh; EPS 7.72 x 39,360,000 = 3,038.6 lakh; PDF 'Profit/(Loss)
+    after Tax and Non Controlling Interests' 3,037 lakh. Bajaj Indef H1 FY26 filings with NCI +3.5 lakh: EPS picks
+    PAT + 3.5 lakh, as the other filing of the period (NCI -3.5 lakh) states. Otherwise None (withheld, X86)."""
+    q = result.meta.get("quarter_period")
+    if not q or p[1] != q[1]:
+        return None
+    shares = result.value("shares_from_paid_up", q[1], q[1])
+    eps = result.value("eps_basic", *p)
+    if not shares or shares <= 0 or not eps:
+        return None
+    oci, tol = result.value("oci_net", *p), identity_tolerance(result.meta["level_of_rounding"], ATTRIBUTION_TERMS)
+    if owners and oci is not None and abs(oci) > tol and abs(owners + nci - oci) <= tol:
+        return None  # both lines carry the OCI attribution (X84 shape, TCI split untagged): neither is usable
+    implied, r = eps * shares, EPS_HALF_PAISA * shares
+    # Owners as filed: EPS vouches for owners only, so NCI is not derived (PAT itself may be the wrong line: Nilkamal
+    # FY25 PAT 1,832 Cr with tax filed as a credit, Supreme Infrastructure H1 FY27 owners repeated as the JV share).
+    cands = ([(owners, None, "OWNERS")] if owners else []) + [(pat - nci, nci, "NCI")]
+    if nci:
+        cands.append((pat + nci, -nci, "NCI_FLIPPED"))
+    ranked = sorted(cands, key=lambda c: abs(implied - c[0]))
+    best = ranked[0]
+    d0 = abs(implied - best[0])
+    if d0 > max(ATTRIBUTION_EPS_AGREE * abs(best[0]), r):
+        return None
+    rivals = [c for c in ranked[1:] if abs(implied - c[0]) - d0 <= 2 * r]
+    if not rivals:
+        return best[0], best[1]
+    if abs(nci) <= r and {c[2] for c in [best, *rivals]} <= {"NCI", "NCI_FLIPPED"}:
+        return pat - nci, nci
+    return None
 
 
 def _classify(result: ParsedResults, op_tag: str, other_tag: str, other_label: str) -> str | None:

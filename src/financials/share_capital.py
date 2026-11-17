@@ -70,7 +70,7 @@ def annual_share_counts(con, filing_id: str, fy_end: date) -> dict[str, Decimal]
 def annual_share_disagreement(con, filing_id: str, entity_id: str, fy_end: date) -> dict | None:
     """Finding details when the annual counts disagree with the Reg. 31 total or paid-up / face value, else None
     (agreement, or no annual count, or no reference for that date)."""
-    from financials.promoter import SHARE_CROSS_CHECK_TOLERANCE
+    from financials.promoter import SHARE_CROSS_CHECK_TOLERANCE, treasury_totals
 
     counts = annual_share_counts(con, filing_id, fy_end)
     if not counts:
@@ -91,7 +91,7 @@ def annual_share_disagreement(con, filing_id: str, entity_id: str, fy_end: date)
             "SELECT max(shares) FROM shareholding_observations WHERE filing_id = ? AND category = 'EMPLOYEE_TRUSTS'",
             [shp_filing],
         ).fetchone()[0]
-        refs["reg31_total"] = [total] + ([total - Decimal(trust)] if trust else [])
+        refs["reg31_total"] = treasury_totals(con, shp_filing, total, trust)  # X103, X213
     sql = (
         "SELECT DISTINCT value_other FROM fact_observations WHERE entity_id = ? AND period_end = ? "
         "AND canonical_tag = 'shares_from_paid_up' AND value_other > 0 AND filing_id <> ? AND "
@@ -103,7 +103,7 @@ def annual_share_disagreement(con, filing_id: str, entity_id: str, fy_end: date)
         return None
     rel = lambda v: min(abs(c - v) / v for c in counts.values())  # noqa: E731
     diffs = {}
-    if "reg31_total" in refs:  # the total, or the total less employee-trust shares (X103)
+    if "reg31_total" in refs:  # the total, or the total less trust-held treasury shares (X103, X213)
         diffs["reg31_total"] = min(rel(v) for v in refs["reg31_total"])
     if "paid_up_over_face_value" in refs:  # every results filing of that date must agree
         diffs["paid_up_over_face_value"] = max(rel(v) for v in refs["paid_up_over_face_value"])

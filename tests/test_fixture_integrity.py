@@ -8,7 +8,7 @@ import pytest
 from _fixture_helpers import FIXTURES
 
 MANIFEST = FIXTURES / "MANIFEST.md"
-ROW = re.compile(r"^\|\s*`(?P<path>[a-z_]+/[^`]+)`.*`(?P<sha>[0-9a-f]{64})`\s*\|\s*$")
+ROW = re.compile(r"^\|\s*`(?P<path>[a-z0-9_]+/[^`]+)`.*`(?P<sha>[0-9a-f]{64})`\s*\|\s*$")
 
 
 def manifest_entries() -> list[tuple[str, str]]:

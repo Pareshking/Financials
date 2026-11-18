@@ -307,3 +307,25 @@ def test_x265_bse_fetch_results_pass(tmp_path):
                                  "scope": "standalone"}  # fmt: skip
     assert "500488 FlagDur 6: 7 results rows, 0 before Q4 FY25, 4 new files" in lines
     assert "500488 FlagDur 7: 7 results rows, 0 before Q4 FY25, 0 new files" in lines
+
+
+def test_r20_identical_upload_on_bse_and_nse_reads_to_the_same_canonical_facts():
+    """R20 [X266]: HILINFRA 544477 Q2 FY27 consolidated, the same upload on BSE (inline XBRL, 17:50:59 IST) and NSE
+    (XML, 17:51:50 IST). Every canonical fact the parser produces is identical (tag, period, scope, value). The raw
+    instances differ only by BSE's display duplicates and NSE's extra `OtherComprehensiveIncome` element, whose line-
+    item row `li_other_comprehensive_income` equals the mapped `oci_net` (OtherComprehensiveIncomeNetOfTaxes) both carry."""
+    from financials.parsers.integrated import parse_integrated_results
+
+    def canon(name):
+        data = (BSE / name).read_bytes()
+        r = parse_integrated_results(data, name)
+        assert r.ok, r.issues
+        return Counter((f.canonical_tag, str(f.period_start), str(f.period_end), f.value) for f in r.facts)
+
+    nse = canon("INTEGRATED_FILING_INDAS_1758435_14112026055150_WEB.xml")
+    bse_ = canon("Integrated_Finance_Ind_As_544477_14112026175059_IFIndAs.html")
+    assert len(nse) > 40
+    only_nse, only_bse = set(nse) - set(bse_), set(bse_) - set(nse)
+    assert only_bse == set()
+    assert only_nse == {("li_other_comprehensive_income", "2026-04-01", "2026-09-30", Decimal("-181000"))}
+    assert ("oci_net", "2026-04-01", "2026-09-30", Decimal("-181000")) in bse_

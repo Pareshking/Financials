@@ -691,3 +691,10 @@ its pinned counts are unchanged. Decision U (X274) reuses the QP3 `annual_restat
 | `fixed_assets/INTEGRATED_FILING_INDAS_1668105_15052026092506_WEB.xml` | MPS Ltd (MPSLTD) Q4 FY26 consolidated results: goodwill 376.32 Cr, other intangibles 138.86 Cr [X273] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1668105_15052026092506_WEB.xml | `6d22eb0e46f3b8e8dca2a19be56f8d19a93ebbe65340918c5eb6bddc58904d03` |
 | `fixed_assets/AR_XBRL_MPSLTD_01102026192529.xml` | MPSLTD FY26 consolidated Reg. 34 annual: other intangibles 494.10 Cr (class "Others" 439.54 Cr), no goodwill element [X273] | https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_MPSLTD_01102026192529.xml | `a8756e09f71d986402a995cfb5503d02f98f8b2d95d144050a7ab728fde8bd7a` |
 | `fixed_assets/INTEGRATED_FILING_INDAS_1752323_03112026100325_WEB.xml` | MPSLTD Q2 FY27 consolidated results: goodwill 381.68 Cr, other intangibles 129.37 Cr (the neighbouring half-year) [X273] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1752323_03112026100325_WEB.xml | `7888ed7f1cb5052710022fda794c95eb4cd09aa12dbf5a5e35fcefacfcadbc8b` |
+
+## R20 pair (2026-11-18, HILINFRA 544477 Q2 FY27 consolidated; BSE from bse-fetch run 44289837326, NSE from the vault)
+
+| File | Why it is here | Source URL | SHA-256 |
+|---|---|---|---|
+| `bse/Integrated_Finance_Ind_As_544477_14112026175059_IFIndAs.html` | X266 R20: BSE inline XBRL of the same upload as the NSE XML below (17:50:59 IST) | `https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_544477_14112026175059_IFIndAs.html` | `7cf9950794ef40db7033a5322ee92e173d2d4df8aee4959d11c32444aa5571c4` |
+| `bse/INTEGRATED_FILING_INDAS_1758435_14112026055150_WEB.xml` | X266 R20: NSE XML of the same upload (17:51:50 IST), gunzipped vault blob | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1758435_14112026055150_WEB.xml` | `4aa398ec87578ee68d32bdd20c1e73bb79a6c9c81261d3c33a1254f869319a66` |

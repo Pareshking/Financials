@@ -630,3 +630,13 @@ My 19:31 (2026-11-17) recommendations, unanswered, applied:
    (EPS, P/E, ROE) follows the same rules with PAT's basis. On the snapshot 1,238 guarded values change (239
    entities, 57 in the Nifty 500 seed), 14 NULL (missing quarters); owners' TTM 584 values (180 entities), 23 NULL.
    Reversible.
+7. **Rights entitlements leave the Rs 500 Cr universe** (X311 RE_NOT_A_MEMBER, rule `U1-2026.11.18-R`; main
+   session brief QU): the PR-zip mcap file lists an NSE rights entitlement (symbol `-RE[n]`, series BE, Category
+   Permitted, ISIN type code 20) like any security, so rule U1 admitted 5 of them above Rs 500 Cr (UPL-RE,
+   LLOYDS-RE1, M&MFIN-RE1, LLOYDSE-RE, ADANI-RE). An RE is a short-lived right to subscribe a rights issue, not an
+   equity share: no financials, and its "market cap" is meaningless; index providers and screeners exclude them,
+   and the parent equity (UPL, LLOYDSENGG, M&MFIN, LLOYDSENT, ADANIENT) is the member. REs no longer join, and
+   although membership is sticky ("members never leave"), the 5 admitted before the rule are removed because they
+   were never valid members; each removed row is logged in full in admin_log (UNIVERSE_REMOVE_RIGHTS_ENTITLEMENT)
+   and `update-universe` reports the count. Members 2,070 -> 2,065 (Permitted 128 -> 123); no other member changes.
+   Reversible: re-insert the logged rows, or re-run rule U1-2026.11.17-P.

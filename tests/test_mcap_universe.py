@@ -235,7 +235,7 @@ def test_rule_u1_seed_join_sticky_and_unresolved(umarket, monkeypatch):
     assert (abbott.category, abbott.market_cap_inr) == ("Permitted", Decimal("561831544880.00"))
     assert con.execute("SELECT listing_category, reason, market_cap_inr, rule_version FROM universe_membership "
                        "WHERE symbol = 'ABBOTINDIA'").fetchone() == (
-        "Permitted", "MCAP_GE_500CR", Decimal("561831544880.00"), "U1-2026.11.17-P")  # fmt: skip
+        "Permitted", "MCAP_GE_500CR", Decimal("561831544880.00"), universe.RULE_VERSION)  # fmt: skip
     cats = dict(con.execute("SELECT coalesce(listing_category, reason), count(*) FROM universe_membership "
                             "GROUP BY 1").fetchall())  # fmt: skip
     assert cats["Permitted"] == r["permitted_members"] and cats["SEED_EXISTING"] == 1

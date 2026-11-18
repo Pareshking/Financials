@@ -13,7 +13,14 @@ Rule U1 (`RULE_VERSION`):
 - Seed, once (no SEED_EXISTING row yet): every security, in those series and with a bar, of an entity that already
   has financials (filing_meta) joins on its first bar date, reason SEED_EXISTING. The seed is a hindsight selection
   (the Nifty 500 set the project started with): survivorship bias as disclosed for the index backfill [L1].
-- Sticky: a member never leaves; a backfill that finds an earlier qualifying week moves joined_date earlier.
+- No rights entitlements (rule X311, U1-R): a qualifying row whose security is a rights entitlement (named rule
+  X140's markers, `identity.rights_entitlement_sql`: ISIN type code 20, symbol -RE[n], a type-01 equity ISIN of the
+  same issuer) never joins. An RE is a short-lived right to subscribe a rights issue, not an equity share of a
+  company: no financials of its own, and its "market cap" (RE count x RE price) measures nothing; the parent equity
+  is the member. NSE lists REs in series BE, Category Permitted (UPL-RE, Rs 1,782 Cr, 6 Dec 2024).
+- Sticky: a member never leaves; a backfill that finds an earlier qualifying week moves joined_date earlier. The one
+  exception is X311 for members admitted before it: an RE was never a valid member, so it is deleted, its row logged
+  in full in admin_log (UNIVERSE_REMOVE_RIGHTS_ENTITLEMENT; reversible) and counted as `rights_entitlements_removed`.
 - A qualifying row whose symbol / series resolves to no security on W (security_identifier_history) is quarantined
   (UNIVERSE / UNRESOLVED_SYMBOL, one finding per symbol and series), never guessed.
 """
@@ -25,17 +32,18 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
 from financials.db import fetch_dicts, insert_rows
-from financials.identity import UNIVERSE_SERIES
+from financials.identity import UNIVERSE_SERIES, rights_entitlement_sql
 from financials.ids import stable_id
 from financials.timeutil import ist_to_utc, utc_now
 
 UNIVERSE = "MCAP500"
-RULE_VERSION = "U1-2026.11.17-P"  # -P: Listed and Permitted rows (was -L: Listed only)
+RULE_VERSION = "U1-2026.11.18-R"  # -R: no rights entitlements [X311] (-P: Listed and Permitted; -L: Listed only)
 ELIGIBLE_CATEGORIES = ("Listed", "Permitted")
 PERMITTED = "Permitted"
 THRESHOLD_INR = Decimal("5000000000")  # Rs 500 crore
 SEED = "SEED_EXISTING"
 JOIN = "MCAP_GE_500CR"
+REMOVE_RE = "UNIVERSE_REMOVE_RIGHTS_ENTITLEMENT"
 
 
 def week_end_trading_days(con, start: date, end: date, exchange: str = "NSE") -> tuple[list[date], list[date]]:
@@ -74,6 +82,7 @@ def update_universe(con, start: date, end: date, *, now: datetime | None = None)
     or security. Returns counts; audited in admin_log. The caller holds the write transaction."""
     now = now or utc_now()
     seeded = _seed(con, now)
+    removed = _remove_rights_entitlements(con, now)
     categorised = _fill_listing_category(con)
     weeks, unknown = week_end_trading_days(con, start, end)
     have = {d for (d,) in con.execute(
@@ -88,7 +97,10 @@ def update_universe(con, start: date, end: date, *, now: datetime | None = None)
              FROM raw_nse_mcap m JOIN filings fi USING (filing_id)
              WHERE m.trade_date IN (SELECT unnest(?)) GROUP BY 1)
            SELECT m.trade_date, m.symbol, m.series, m.market_cap_inr, m.category, m.filing_id, fi.broadcast_ts,
-                  h.security_id, s.entity_id
+                  h.security_id, s.entity_id,
+                  coalesce(h.security_id IS NOT NULL AND """
+        + rights_entitlement_sql("h")
+        + """, false) AS rights_entitlement
            FROM raw_nse_mcap m JOIN f USING (trade_date, filing_id) JOIN filings fi USING (filing_id)
            LEFT JOIN security_identifier_history h ON h.exchange = m.exchange AND h.symbol = m.symbol
                 AND h.series = m.series AND h.valid_from <= m.trade_date
@@ -101,7 +113,10 @@ def update_universe(con, start: date, end: date, *, now: datetime | None = None)
     )
     first: dict[str, dict] = {}
     unresolved: dict[tuple[str, str], dict] = {}
+    skipped_re = {r["security_id"] for r in rows if r["rights_entitlement"]}
     for r in rows:
+        if r["rights_entitlement"]:  # X311: a right to subscribe, not an equity share of a company
+            continue
         if r["security_id"] is None:
             unresolved.setdefault((r["symbol"], r["series"]), r)
         elif r["security_id"] not in first:  # rows are in date order: the first qualifying week wins
@@ -131,7 +146,8 @@ def update_universe(con, start: date, end: date, *, now: datetime | None = None)
     closed = _close_resolved(con, now)
     total = con.execute("SELECT count(*) FROM universe_membership WHERE universe = ?", [UNIVERSE]).fetchone()[0]
     result = {"universe": UNIVERSE, "rule_version": RULE_VERSION, "seeded": seeded, "joined": len(new),
-              "moved_earlier": len(earlier), "members": total,
+              "moved_earlier": len(earlier), "rights_entitlements_skipped": len(skipped_re),
+              "rights_entitlements_removed": removed, "members": total,
               "permitted_members": con.execute(
                   "SELECT count(*) FROM universe_membership WHERE universe = ? AND listing_category = ?",
                   [UNIVERSE, PERMITTED]).fetchone()[0], "listing_category_filled": categorised, "week_ends": len(weeks),
@@ -152,6 +168,37 @@ def _member(r: dict, now: datetime) -> dict:
             "series": r["series"], "market_cap_inr": r["market_cap_inr"], "listing_category": r["category"],
             "evidence_filing_id": r["filing_id"],
             "visible_from_ts": r["broadcast_ts"], "recorded_at": now}  # fmt: skip
+
+
+def _remove_rights_entitlements(con, now: datetime) -> int:
+    """Rule X311 for members admitted before it (U1-L / U1-P): membership is sticky, but a rights entitlement was
+    never a valid member, so a member whose security is an RE (X140 markers on any of its identifier intervals) is
+    deleted. The deleted rows are first written in full to admin_log (UNIVERSE_REMOVE_RIGHTS_ENTITLEMENT), so the
+    removal is audited and reversible (re-insert the logged rows, or re-run rule U1-2026.11.17-P). Idempotent."""
+    rows = fetch_dicts(
+        con,
+        """SELECT u.* FROM universe_membership u
+           WHERE u.universe = ? AND EXISTS (SELECT 1 FROM security_identifier_history h
+                                            WHERE h.security_id = u.security_id AND """
+        + rights_entitlement_sql("h")
+        + """)
+           ORDER BY u.security_id""",
+        [UNIVERSE],
+    )
+    if not rows:
+        return 0
+    ids = [r["security_id"] for r in rows]
+    con.execute(
+        "INSERT OR IGNORE INTO admin_log VALUES (?, ?, ?, ?, ?, ?)",
+        [stable_id("adm", "universe", REMOVE_RE, *ids, now), REMOVE_RE,
+         json.dumps({"universe": UNIVERSE, "rule": "X311", "rule_version": RULE_VERSION}),
+         json.dumps({"removed": rows}, default=str),
+         "rights entitlements are not equity shares of a company; never valid members [X311]", now],
+    )  # fmt: skip
+    con.execute(
+        "DELETE FROM universe_membership WHERE universe = ? AND security_id IN (SELECT unnest(?))", [UNIVERSE, ids]
+    )
+    return len(rows)
 
 
 def _seed(con, now: datetime) -> int:

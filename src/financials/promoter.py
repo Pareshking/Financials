@@ -23,7 +23,7 @@ from financials import PARSER_VERSION, dirty
 from financials.corp_actions import ACCEPTED_STATUSES, CorpAction, adjust_closes, audit_day, verify_group
 from financials.db import fetch_dicts, insert_rows, version_key
 from financials.fundamentals import CURRENT_VERSION
-from financials.identity import UNIVERSE_SERIES, Interval, SecurityRegistry
+from financials.identity import UNIVERSE_SERIES, Interval, SecurityRegistry, rights_entitlement_sql
 from financials.ids import stable_id
 from financials.money import ROUNDING_UNITS
 from financials.parsers.udiff import BhavRow
@@ -423,9 +423,9 @@ def resolve_rights_entitlement_gaps(con) -> int:
                   AND h.valid_from <= CAST(json_extract_string(q.details, '$.trade_date') AS DATE)
                   AND (h.valid_to IS NULL OR h.valid_to > CAST(json_extract_string(q.details, '$.trade_date') AS DATE))
              WHERE q.stage = 'GAP' AND q.reason_code = 'UNEXPLAINED_GAP' AND q.resolved_at IS NULL
-               AND h.isin LIKE 'INE%' AND substr(h.isin, 8, 2) = '20' AND regexp_matches(h.symbol, '-RE[0-9]*$')
-               AND EXISTS (SELECT 1 FROM security_identifier_history p WHERE p.security_id <> h.security_id
-                           AND substr(p.isin, 1, 7) = substr(h.isin, 1, 7) AND substr(p.isin, 8, 2) = '01'))
+               AND """
+        + rights_entitlement_sql("h")
+        + """)
            RETURNING 1""",
         [utc_now(), RIGHTS_ENTITLEMENT_NOTE],
     ).fetchall()

@@ -22,6 +22,18 @@ from financials.parsers.udiff import BhavRow
 UNIVERSE_SERIES = frozenset({"EQ", "BE", "BZ"})
 
 
+def rights_entitlement_sql(h: str) -> str:
+    """SQL predicate of rule X140 on a `security_identifier_history` row aliased `h`: a rights entitlement has an
+    Indian ISIN with security-type code 20 (chars 8-9), a symbol ending -RE or -RE<n>, and another security of the
+    same issuer (ISIN chars 1-7) with a type-01 equity ISIN in the history. All three markers are required. Shared
+    by X140 (gap findings) and X311 (universe admission)."""
+    return (
+        f"({h}.isin LIKE 'INE%' AND substr({h}.isin, 8, 2) = '20' AND regexp_matches({h}.symbol, '-RE[0-9]*$') "
+        f"AND EXISTS (SELECT 1 FROM security_identifier_history p_re WHERE p_re.security_id <> {h}.security_id "
+        f"AND substr(p_re.isin, 1, 7) = substr({h}.isin, 1, 7) AND substr(p_re.isin, 8, 2) = '01'))"
+    )
+
+
 @dataclass(frozen=True)
 class Interval:
     security_id: str

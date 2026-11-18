@@ -779,3 +779,13 @@ Read by `tests/test_x306_x307_cash_flow_reclassified.py`. Kept in `annual_restat
 | `annual_restated/AR_XBRL_VINDHYATEL_01092026190709.xml` | Vindhya Telelinks FY26 standalone annual: FY25 cash and cash equivalents 85.01 Cr (other bank balances 30.02 -> 40.46 Cr) and net cash flow -67.60 Cr, total assets / equity / PAT unchanged [X306] | https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_VINDHYATEL_01092026190709.xml | `32a3c120c9869e8a41fa5437a9ac1bc03b751b8983e938f9de5657613f0b4abe` |
 | `annual_restated/INTEGRATED_FILING_INDAS_1424269_24042025081042_WEB.xml` | Kirloskar Pneumatic Q4 FY25 consolidated results: FY25 net cash flow 13.63 Cr, effect of exchange rate changes 0.22 Cr, after it 13.85 Cr (the stored side) [X307] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1424269_24042025081042_WEB.xml | `922512ab95a8b9a872686fbf50ed00fa42d5dbc04ff1c8ad253706111c2f6fce` |
 | `annual_restated/AR_XBRL_KIRLPNU_19082026192059.xml` | Kirloskar Pneumatic FY26 consolidated annual: FY25 net cash flow 14.07 Cr, exchange difference -0.22 Cr, after it 13.85 Cr [X307] | https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_KIRLPNU_19082026192059.xml | `22b205d7dc05876d41f63557bb14a3fdcc237c0e26996b2a82b946b7544f9b4b` |
+
+## QU: rights entitlements kept out of the Rs 500 Cr universe (X311); copied 2026-11-18 from the local vault blob (stored uncompressed), sha256 verified
+
+Read by `tests/test_x311_universe_rights_entitlements.py`. The bhavcopy also joins the X140 characterisation glob
+(`bhavcopy/BhavCopy_NSE_CM_*.csv.zip`): UPL-RE `INE628A20010` beside UPL `INE628A01036`, markers agree.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `pr_zip/PR061224.zip` | PR zip of 06-Dec-2024 (a Friday, week end): UPL-RE, series BE, Category Permitted, Issue Size 93,680,642 x 190.25 = Market Cap Rs 17,822,742,140.50 (>= Rs 500 Cr: admitted by rule U1-P); UPL EQ Listed Rs 422,329,389,208.65 [X311] | https://nsearchives.nseindia.com/archives/equities/bhavcopy/pr/PR061224.zip | `d01ea415887c77a22ed606bf7a5d3c96fcaf486851060d881d61e994df921124` |
+| `bhavcopy/BhavCopy_NSE_CM_0_0_0_20241206_F_0000.csv.zip` | UDiFF bhavcopy of 06-Dec-2024: identity of UPL-RE (`INE628A20010`, BE) and UPL (`INE628A01036`, EQ) for the PR zip of the same day [X311] | https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20241206_F_0000.csv.zip | `ae4eff2154d4260cbb7fa8946554eb67ae7270c5a1e62fb8cbbf8cceca1c9ed8` |

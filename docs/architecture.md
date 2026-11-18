@@ -1043,7 +1043,7 @@ period_end): no nullable key column.
 | Borrowings | borrowings (NC + C) + lease liabilities (NC + C, label rule) | the four lines |
 | Other Liabilities | Total − Equity Capital − Reserves − Borrowings | NCI, trade payables, other |
 | Total | `total_assets − min(DTA, DTL)` when both are positive | deferred tax netted |
-| Net Block | PPE + investment property + goodwill + other intangibles + ROU (label rule) | the five lines |
+| Net Block | PPE + investment property + goodwill + other intangibles + ROU (label rule); at a year end the lines come from one filing on one definition (X273, decision T) | the five lines |
 | CWIP | CWIP + intangibles under development | both |
 | Investments | non-current + current + equity-method | the three lines |
 | Other Assets | Total − Net Block − CWIP − Investments | receivables (current), inventory, cash & bank, other |

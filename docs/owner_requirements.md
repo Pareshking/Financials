@@ -585,6 +585,23 @@ The owner asked the assistant to take these with its recommendation. Each is rev
 - **Decision S (share count when Reg. 31 is the outlier, rule X221 SHARES_REG31_OUTLIER):** when the results
   filing's paid-up / face value and NSE PR-zip Issue Size agree and the same-date Reg. 31 total does not, market cap
   uses NSE's count. When all three differ (HMT), Reg. 31 is kept and the finding stays open.
+- **Decision T (fixed assets at the fiscal-year end; delegated, owner-approved 2026-11-18: "you check industry
+  practice and decide; already approved"):** the audited Reg. 34 annual report stays the source of the March balance
+  sheet, but every balance-sheet line has one definition across all periods of a company (as screeners keep line
+  definitions consistent across periods). Rule X273 FIXED_ASSET_ONE_DEFINITION: the fixed-asset lines of a year end
+  (PPE, right-of-use, other intangibles, goodwill, investment property, CWIP, intangibles under development) come from
+  one filing, never mixed line by line; when the annual and the results filing report the same total split
+  differently (right-of-use inside PPE or inside intangibles), the split the company's half-year balance sheets use is
+  taken; when the annual restates the year end, its own lines stand. Screener rows are unchanged (Net Block = PPE +
+  right-of-use + other intangibles + goodwill + investment property; CWIP = CWIP + intangibles under development).
+  Raw facts are untouched; nothing changes before the annual report is visible.
+- **Decision U (restated comparatives; delegated, owner-approved 2026-11-18):** as point-in-time databases keep "as
+  first reported" and "restated" side by side: the history keeps every figure as first filed (a backtest sees only
+  what was published then); a later filing's restated comparatives are visible from that filing's broadcast and are
+  what "latest" readers use. Verified to be how the engine already works (X274); exception by the existing rule X100:
+  an annual report's re-presented income-statement comparative does not replace a results filing's figure for that
+  year (it is reported as the X182 prior-year finding). No separate `restated` column; the prior-year findings list
+  which annual reports restate.
 
 ## Decisions taken on the owner's behalf (2026-11-18, owner: "use agents where needed to speed up"; reversible)
 

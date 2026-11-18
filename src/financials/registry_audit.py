@@ -311,6 +311,9 @@ OVERRIDES: dict[tuple[str, str], str] = {
     # carried at net realisable value, Ind AS 2.36(c)).
     ("REG34_ANNUAL", "BooksPeriodicals"): "ANNUAL_EXPENSE_DETAIL",
     ("REG34_ANNUAL", "InventoriesAtNetRealisableValue"): "BALANCE_SHEET_DETAIL",
+    # Seen first in the QT fixtures (NYKAA / MPSLTD FY26 other-expenses notes).
+    ("REG34_ANNUAL", "AfterSalesServiceExpenses"): "ANNUAL_EXPENSE_DETAIL",
+    ("REG34_ANNUAL", "HireChargesAssetsContracts"): "ANNUAL_EXPENSE_DETAIL",
 }
 
 

@@ -13,7 +13,7 @@ from decimal import Decimal
 
 from financials.corp_actions import RETIRED_STATUSES
 from financials.db import version_key
-from financials.money import ROUNDING_UNITS, within_rounding_only
+from financials.money import ROUNDING_UNITS, rounding_only_tolerance, within_rounding_only
 from financials.parsers.indas_corp import period_months
 from financials.scope import financials_in_scope
 
@@ -49,6 +49,14 @@ STRUCTURAL_ACTION_TYPES = ("MERGER", "DEMERGER")
 # quarters (all filed) carry more total income than the "YTD" itself, which no real YTD can (it would need a negative
 # quarter). The copied YTD values are withheld; the quarters stay, so TTM sums them instead of bridging on the copy.
 YTD_COPY_EVIDENCE_TAGS = ("total_income", "pbt", "pat")
+# X273 (owner decision T): the fixed-asset lines of a balance sheet. Net block (Screener layout, S10) = PPE +
+# right-of-use + other intangibles + goodwill + investment property; CWIP = CWIP + intangibles under development.
+# One definition per line across all balance-sheet dates of an entity: FactBook.align_fixed_assets.
+FIXED_ASSET_LINES = (
+    "ppe_net", "right_of_use_assets", "other_intangibles", "goodwill", "investment_property", "cwip",
+    "intangibles_under_development",
+)  # fmt: skip
+ZERO = Decimal(0)
 
 
 def _add_months(d: date, months: int) -> date:
@@ -80,6 +88,9 @@ class FactBook:
     structural_actions: tuple[tuple[date, str], ...] = ()
     # X226: values of a guarded flow (tag -> period -> values) stated by filings visible later than the ranked one
     later_filed: dict[str, dict[Period, list[Decimal]]] = field(default_factory=dict)
+    # X273 (decision T): balance-sheet date -> how its fixed-asset lines were chosen (RESULTS_DEFINITION /
+    # ANNUAL_ONE_SOURCE), only for dates where a Reg. 34 annual report ranked first on one of those lines.
+    fixed_asset_rule: dict[date, str] = field(default_factory=dict)
 
     def tax_copy_breaks(self) -> list[dict]:
         """X94: periods whose current and deferred tax both equal, to the rupee and non-zero, those of the same-length
@@ -231,6 +242,73 @@ class FactBook:
             signs = {q > 0 for q in qs}
             if len(signs) == 1 and (ytd > 0) not in signs:
                 return "PAT_SIGN_FLIP"
+        return None
+
+    def align_fixed_assets(self, candidates: dict[date, list[tuple]]) -> None:
+        """X273 FIXED_ASSET_ONE_DEFINITION (owner decision T): the fixed-asset lines of one balance-sheet date come
+        from one filing, on the definition the entity's other balance-sheet dates use.
+
+        `candidates`: date -> [(rank, filing_id, is_annual, visible_from_ts, tag, value)], every visible row of
+        FIXED_ASSET_LINES at that date (rank 1 = the row the per-tag ranking chose). Only dates where a Reg. 34
+        annual report ranked first on some line are touched (the year ends it covers). The ranking picks each tag
+        on its own, so the annual report's PPE (which often includes right-of-use assets) sat beside the results
+        filing's separate right-of-use line, and a line the annual folds into another (goodwill inside other
+        intangibles) was added again from the results filing: one asset counted twice, or a line moving between
+        March and September with no capex behind it.
+        A = the annual report ranked first, R = the latest results filing stating `ppe_net` at the date. Every line
+        of A and R within rounding (X260): nothing changes. Otherwise:
+        - the totals agree within rounding (or once R's right-of-use line is added when A states none: A carries it
+          outside these lines): the same assets split differently. RESULTS_DEFINITION, R's lines, when they are
+          closer (sum of absolute line differences) to the entity's next half-year balance sheet, else the previous
+          one, than A's; else ANNUAL_DEFINITION, A's lines (with R's right-of-use line when A carries it outside).
+        - the totals differ (the annual restates or regroups the year end, decision U): ANNUAL_ONE_SOURCE, A's lines
+          only, or ANNUAL_FILLED, A plus the non-zero lines it does not state, from R, when that total is closer to
+          the neighbouring half-year's total than A's own (A then left a line out rather than folding it in).
+        - no R: ANNUAL_ONE_SOURCE."""
+        for d, rows in candidates.items():
+            rows = sorted(rows, key=lambda r: r[0])
+            first_annual = [r[1] for r in rows if r[0] == 1 and r[2]]
+            if not first_annual:
+                continue
+            a_id = next((r[1] for r in rows if r[0] == 1 and r[2] and r[4] == "ppe_net"), first_annual[0])
+            res = [r for r in rows if not r[2] and r[4] == "ppe_net"]
+            r_id = max(res, key=lambda r: (r[3], r[1]))[1] if res else None
+            a = _filing_lines(rows, a_id)
+            chosen, rule = a, "ANNUAL_ONE_SOURCE"
+            if r_id is not None:
+                r = _filing_lines(rows, r_id)
+                tol = rounding_only_tolerance([self.rounding_unit] * max(len(a) + len(r), 1))
+                if all(abs(a.get(t, ZERO) - r.get(t, ZERO)) <= tol for t in FIXED_ASSET_LINES):
+                    continue  # every line agrees: the ranked values stand
+                total_a, total_r = sum(a.values(), ZERO), sum(r.values(), ZERO)
+                rou_r = r.get("right_of_use_assets") if "right_of_use_assets" not in a else None
+                rou_outside = rou_r is not None and abs(total_a + rou_r - total_r) <= tol < abs(total_a - total_r)
+                neighbour = self._fixed_asset_neighbour(d)
+                if abs(total_a - total_r) <= tol or rou_outside:
+                    if neighbour is not None and _distance(r, neighbour) < _distance(a, neighbour):
+                        chosen, rule = r, "RESULTS_DEFINITION"
+                    else:
+                        chosen, rule = ({**a, "right_of_use_assets": rou_r} if rou_outside else a), "ANNUAL_DEFINITION"
+                elif neighbour is not None:
+                    missing = {t: v for t, v in r.items() if t not in a and v != 0}
+                    filled = {**a, **missing}
+                    total_n = sum(neighbour.values(), ZERO)
+                    if missing and abs(sum(filled.values(), ZERO) - total_n) < abs(total_a - total_n):
+                        chosen, rule = filled, "ANNUAL_FILLED"
+            for tag in FIXED_ASSET_LINES:
+                if tag in chosen:
+                    self.instants.setdefault(tag, {})[d] = chosen[tag]
+                elif tag in self.instants:
+                    self.instants[tag].pop(d, None)
+            self.fixed_asset_rule[d] = rule
+
+    def _fixed_asset_neighbour(self, d: date) -> dict[str, Decimal] | None:
+        """X273: the fixed-asset lines of the entity's next half-year balance sheet (6 months after `d`), else the
+        previous one, as ranked; None when neither is filed."""
+        for other in (_add_months(d, 6), _add_months(d, -6)):
+            lines = {t: v[other] for t in FIXED_ASSET_LINES if other in (v := self.instants.get(t, {}))}
+            if "ppe_net" in lines:
+                return lines
         return None
 
     def restatement_suspected(self, end: date) -> bool:
@@ -438,10 +516,21 @@ _RANK_ORDER = _ANNUAL_LAST + ", visible_from_ts DESC, corrected DESC, " + versio
 # the same period (a Reg. 34 annual report ranked below the results filing by X100, a re-sent results filing ranked
 # below a correction). They never enter a ratio: they are evidence that the ranked YTD is mis-filed.
 _LATER_EVIDENCE_TAGS = ("pat", "pat_owners", "revenue_from_operations", "total_income")
+_FIXED_ASSET_ROW = (
+    "period_type = 'INSTANT' AND canonical_tag IN (" + ", ".join(f"'{t}'" for t in FIXED_ASSET_LINES) + ")"
+)
 _KEEP_ROW = (
     "rn = 1 OR (corrected = 0 AND period_type = 'DURATION' AND canonical_tag IN ("
     + ", ".join(f"'{t}'" for t in _LATER_EVIDENCE_TAGS)
-    + ") AND visible_from_ts > chosen_vis AND coalesce(value_inr, value_other) IS NOT NULL)"
+    + ") AND visible_from_ts > chosen_vis AND coalesce(value_inr, value_other) IS NOT NULL) OR ("
+    + _FIXED_ASSET_ROW
+    + ")"
+)
+# X273: every candidate row of a fixed-asset line also carries its rank, filing and whether that filing is a Reg. 34
+# annual report (NULL for every other row), for FactBook.align_fixed_assets.
+_SOURCE_COLUMNS = (
+    ", CASE WHEN " + _FIXED_ASSET_ROW + " THEN rn END, filing_id, CASE WHEN " + _FIXED_ASSET_ROW + " THEN filing_id IN "
+    "(SELECT filing_id FROM filing_meta WHERE accounting_profile = 'REG34_ANNUAL') END, visible_from_ts"
 )
 
 
@@ -457,7 +546,9 @@ def load_factbook(con, entity_id: str, scope: str, as_of: datetime) -> FactBook:
         "{basis}", SAME_BASIS
     )
     rows = con.execute(
-        """SELECT canonical_tag, period_type, period_start, period_end, coalesce(value_inr, value_other), rn > 1
+        """SELECT canonical_tag, period_type, period_start, period_end, coalesce(value_inr, value_other), rn > 1"""
+        + _SOURCE_COLUMNS
+        + """
            FROM (SELECT *, row_number() OVER (
                     PARTITION BY canonical_tag, period_start, period_end
                     ORDER BY """
@@ -505,12 +596,35 @@ def _structural_actions(con, as_of: datetime, where: str, params: list) -> dict[
     return {e: tuple(v) for e, v in out.items()}
 
 
+def _filing_lines(rows, filing_id: str) -> dict[str, Decimal]:
+    """X273: one filing's fixed-asset lines among the ranked candidate rows (a correction ranks before the filed row
+    of the same filing; a withdrawn line, value None, is not stated)."""
+    out: dict[str, Decimal | None] = {}
+    for _rank, f, _annual, _vis, tag, value in rows:
+        if f == filing_id and tag not in out:
+            out[tag] = value
+    return {t: v for t, v in out.items() if v is not None}
+
+
+def _distance(lines: dict[str, Decimal], other: dict[str, Decimal]) -> Decimal:
+    """X273: sum of absolute line differences over FIXED_ASSET_LINES (a missing line is nil)."""
+    return sum((abs(lines.get(t, ZERO) - other.get(t, ZERO)) for t in FIXED_ASSET_LINES), ZERO)
+
+
 def _build_book(entity_id: str, scope: str, rows, unit, fy_starts, structural=()) -> FactBook:
     book = FactBook(entity_id, scope, fy_starts=frozenset(fy_starts or ()), structural_actions=tuple(structural))
     if rows and unit is not None:
         book.rounding_unit = Decimal(unit)
+    fixed_assets: dict[date, list[tuple]] = {}
     for tag, ptype, start, end, value, *later in rows:
-        if later and later[0]:  # X226 evidence row: a later filing's value for the same period
+        if len(later) > 1 and later[1] is not None:  # X273 fixed-asset candidate (rank, filing, annual?, visible)
+            rank, fid, annual, vis = later[1:5]
+            fixed_assets.setdefault(end, []).append(
+                (rank, fid, bool(annual), vis, tag, None if value is None else Decimal(value))
+            )
+            if rank > 1:
+                continue
+        elif later and later[0]:  # X226 evidence row: a later filing's value for the same period
             book.later_filed.setdefault(tag, {}).setdefault((start, end), []).append(Decimal(value))
             continue
         if value is None:  # a correction withdrawing the tag for this period (decision B)
@@ -519,6 +633,7 @@ def _build_book(entity_id: str, scope: str, rows, unit, fy_starts, structural=()
             book.instants.setdefault(tag, {})[end] = Decimal(value)
         else:
             book.durations.setdefault(tag, {})[(start, end)] = Decimal(value)
+    book.align_fixed_assets(fixed_assets)
     book.withhold_ytd_copies()
     jv = book.durations.get("share_of_associates_jv", {})
     if "pbt" in book.durations:
@@ -563,7 +678,9 @@ def prefetch_fundamentals(con, as_of: datetime, entities=None) -> None:
     source = _fact_source("TRUE" + only, "TRUE" + only_c).replace("{basis}", _BATCH_SAME_BASIS)
     for ent, scope, *row in con.execute(
         """SELECT entity_id, scope, canonical_tag, period_type, period_start, period_end,
-                  coalesce(value_inr, value_other), rn > 1
+                  coalesce(value_inr, value_other), rn > 1"""
+        + _SOURCE_COLUMNS
+        + """
            FROM (SELECT *, row_number() OVER (
                     PARTITION BY entity_id, scope, canonical_tag, period_start, period_end
                     ORDER BY """

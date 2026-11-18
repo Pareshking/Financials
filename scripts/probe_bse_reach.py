@@ -36,6 +36,14 @@ keys and every XBRL link field / folder prefix (logged with context), at most 8 
 scrip code in scrip-like keys), then one results and one annual file named in the answers (+ the `.xml` beside an
 `.html`).
 
+`--mode xbrl4` (X244; the owner's four BSE pointers of 2026-11-18, UNVERIFIED): (a) `AnnGetData/w` with
+strCat=Result once per scrip (20 Oct - 18 Nov 2026), then `Msource/90D/CorpXbrlGen.aspx?Bsenewid=<NEWSID>` for at most
+3 NEWSIDs (fresh rows first, then KNOWN_RESULT_NEWSIDS read offline) and, when that answers an HTML viewer, one link in
+it (at most 2 such fetches); (b) `/corporates/comp_resultsnew`: the component behind its route, its date format and
+calls, at most 2 listing calls for 12-14 Nov 2026 (all companies), one "Std" and one "Con" XBRL file the answer names;
+(c) the `/corporates/xbrldetails` component, if its route is found: one call for the first scrip, category Annual
+Reports (the option value found next to that label), 1 Apr 2025 - 18 Nov 2026. At most 40 calls (CALL_BUDGET).
+
 Every answer is written byte for byte to the ledger (--out DIR: blobs/<sha256> + ledger.jsonl) before it is read; the
 workflow uploads DIR as an artifact, which `python -m financials --data-dir data import-bse DIR` vaults and stages on
 the owner's machine. The log prints status, size and sha256 only. A refusal (`Blocked`) ends the probe: no retries
@@ -45,6 +53,7 @@ around it (CLAUDE.md, owner decision).
     python scripts/probe_bse_reach.py --out bse_probe --mode xbrl --scrips 500488:A,505036:B,530745:T
     python scripts/probe_bse_reach.py --out bse_probe --mode xbrl2 --scrips 500488:A,505036:B,530745:T
     python scripts/probe_bse_reach.py --out bse_probe --mode xbrl3 --scrips 500488:A,505036:B,530745:T
+    python scripts/probe_bse_reach.py --out bse_probe --mode xbrl4 --scrips 500488:A,505036:B,530745:T
 """
 
 from __future__ import annotations
@@ -59,7 +68,7 @@ from datetime import date
 from pathlib import Path
 from urllib.parse import urljoin
 
-from financials.fetch.bse import HOME, BadRequest, Blocked, BseClient, Failed, Ledger, Missing
+from financials.fetch.bse import HOME, BadRequest, Blocked, BseClient, Failed, Ledger, Missing, ymd
 
 SCRIP = "500488"  # ABBOTINDIA: BSE bhavcopy of 2026-11-13, FinInstrmId for ISIN INE358A01014 [X165]
 
@@ -590,6 +599,288 @@ def xbrl3_probe(c: BseClient, scrips: list[tuple[str, str]], max_chunks: int, ma
             print(f"NONE  {dataset}: none of {len(links)} named files could be fetched")
 
 
+# ── --mode xbrl4 (X244): the owner's four BSE pointers (2026-11-18), all UNVERIFIED until this run's answers ──
+# 1. /corporates/comp_resultsnew lists results with direct "Std XBRL" / "Con XBRL" links; 2. /corporates/xbrldetails
+# filters XBRL filings by security, category and From/To (DD/MM/YYYY); 3. AnnGetData/w (strCat=Result) announcements;
+# 4. Msource/90D/CorpXbrlGen.aspx?Bsenewid=<NEWSID> serves the XBRL of an announcement that has one.
+# NEWSIDs of Result rows read offline (the 3 probe scrips are absent from the 2026-11-18 bse-fetch ledgers):
+KNOWN_RESULT_NEWSIDS = (
+    ("500488", "6fa639f3-1cba-42e1-a341-ab46e27899e6"),  # 2026-11-05 18:55, tests/fixtures/bse (A18 run 3)
+    ("590041", "287a3321-71de-4a52-9089-083b8e94337f"),  # 2026-11-14 18:15, bse-fetch ledger r44229330812/3750
+    ("544416", "a114c4a1-7e95-42e0-93a2-2c61a9fa5142"),  # 2026-11-04 17:54, same ledgers
+)
+XBRL_GEN = HOME + "Msource/90D/CorpXbrlGen.aspx"
+CALL_BUDGET = 40
+_LINK = re.compile(r"""(?:href|src|action)\s*=\s*["']([^"'#][^"']*)["']""", re.I)
+_DATE_FMT = re.compile(r"""["'](dd/MM/yyyy|yyyyMMdd|dd-MM-yyyy|yyyy-MM-dd|dd-MMM-yyyy|DD/MM/YYYY|YYYYMMDD)["']""")
+
+
+class OverBudget(Exception):
+    pass
+
+
+def viewer_links(html: str, base: str) -> list[str]:
+    """Links in an HTML answer that may lead to the XBRL itself (.xml / .html / .aspx / XBRL in the path)."""
+    out = []
+    for raw in _LINK.findall(html):
+        u = urljoin(base, raw.strip())
+        low = u.lower().split("?", 1)[0]
+        if low.endswith((".js", ".css", ".png", ".gif", ".jpg", ".ico", ".svg")) or not u.startswith("http"):
+            continue
+        if low.endswith((".xml", ".html", ".htm", ".aspx", ".zip")) or "xbrl" in u.lower():
+            out.append(u)
+    return list(dict.fromkeys(out))
+
+
+def xbrl_values(body: bytes) -> list[tuple[str, str]]:
+    """(field, value) of every non-empty string field named like xbrl in the rows of a JSON answer."""
+    try:
+        rows = _rows(json.loads(body.decode("utf-8", "replace")))
+    except ValueError:
+        return []
+    out = [(k, v.strip()) for r in rows for k, v in r.items() if re.search("xbrl", k, re.I) and isinstance(v, str)]
+    return list(dict.fromkeys((k, v) for k, v in out if v))
+
+
+def date_format(js: str) -> str:
+    """The first Angular / moment date format the component names (BSE APIs use YYYYMMDD when none is found)."""
+    m = _DATE_FMT.search(js)
+    f = (m.group(1) if m else "yyyyMMdd").replace("DD", "dd").replace("YYYY", "yyyy")
+    return f.replace("yyyy", "%Y").replace("MMM", "%b").replace("MM", "%m").replace("dd", "%d")
+
+
+def fill_params(keys: list[str], code: str, a: date, b: date, fmt: str, category: str = "") -> dict[str, str]:
+    """A value for each key: scrip-like -> code, from / to dates in `fmt`, category-like -> `category`, else ''."""
+    out = {}
+    for k in keys:
+        low = k.lower()
+        if re.search(r"cat", low):
+            out[k] = category
+        elif re.search(r"from|prev|start|fdt|frdt|fromdate|dtfrom", low):
+            out[k] = a.strftime(fmt)
+        elif re.search(r"to(date|dt)?$|^to|end|tdt|dtto", low):
+            out[k] = b.strftime(fmt)
+        elif re.search(r"page", low):
+            out[k] = "1"
+        else:
+            out[k] = scrip_value(k, code)
+    return out
+
+
+def category_value(js: str, label: str = "Annual Report") -> tuple[str, list[str]]:
+    """The option value next to `label` in a component (an object literal or <option value=..>), and the contexts."""
+    ctx = _context(js, re.escape(label), 6, 200)
+    for c in ctx:
+        val = r"""(?:value|id|code|val|key)\s*[:=]\s*["']?([^"',}<>\s]+)"""
+        m = re.search(val + r"""["']?[^{}]{0,120}""" + re.escape(label), c)
+        m = m or re.search(re.escape(label) + r"[^{}]{0,120}?" + val, c)
+        if m:
+            return m.group(1), ctx
+    return "", ctx
+
+
+def xbrl4_probe(c: BseClient, scrips: list[tuple[str, str]]) -> None:
+    codes = [code for code, _ in scrips]
+    cache: dict[str, str | None] = {}
+
+    def guard() -> None:
+        if c.calls >= CALL_BUDGET:
+            raise OverBudget(f"{c.calls} calls made (budget {CALL_BUDGET})")
+
+    def text(url: str) -> str | None:
+        if url in cache:
+            return cache[url]
+        guard()
+        try:
+            body = c.fetch_url(url, {}, "site_js" if url.endswith(".js") else "site_page", {}, file=True)
+            cache[url] = body.decode("utf-8", "replace")
+        except (Missing, BadRequest) as exc:
+            print(f"SKIP  {url}: {type(exc).__name__}: {exc}")
+            cache[url] = None
+        return cache[url]
+
+    def show_file(u: str, dataset: str, covers: dict) -> str | None:
+        guard()
+        try:
+            body = c.xbrl_file(u, dataset, covers)
+        except (Missing, BadRequest) as exc:
+            print(f"SKIP  {dataset} {u}: {type(exc).__name__}: {exc}")
+            return None
+        t = body.decode("utf-8", errors="replace")
+        ns = sorted(set(re.findall(r'xmlns:[\w-]+="(http[^"]+)"', t[:20000])))
+        kind = "inline XBRL" if "ix:header" in t else "XBRL instance" if "xbrli:" in t[:20000] else "other"
+        _show(f"{dataset} {u}", body, f"{kind}; namespaces={ns[:12]}")
+        print(f"      head: {t[:300]!r}")
+        return t
+
+    # (a) AnnGetData/w, strCat=Result, once per scrip; then CorpXbrlGen.aspx for at most 3 NEWSIDs
+    a, b = date(2026, 10, 20), date(2026, 11, 18)  # 500488 filed its Q2 results on 2026-11-05 (A18 run 3)
+    fresh: list[tuple[str, str]] = []
+    for code in codes:
+        guard()
+        params = {"pageno": "1", "strCat": "Result", "strPrevDate": ymd(a), "strScrip": code, "strSearch": "P",
+                  "strToDate": ymd(b), "strType": "C"}  # fmt: skip
+        try:
+            covers = {"api": "AnnGetData", "scrip": code, "from": a.isoformat(), "to": b.isoformat()}
+            body = c.get("AnnGetData/w", params, "announcements", covers)
+        except (Missing, BadRequest) as exc:
+            print(f"SKIP  AnnGetData {code}: {type(exc).__name__}: {exc}")
+            continue
+        try:
+            payload = json.loads(body.decode("utf-8", "replace"))
+        except ValueError:
+            _show(f"AnnGetData {code} (not JSON)", body, f"head {body[:300]!r}")
+            continue
+        rows = payload.get("Table") if isinstance(payload, dict) else payload
+        rows = rows if isinstance(rows, list) else []
+        keys = sorted({k for r in rows if isinstance(r, dict) for k in r})
+        _show(f"AnnGetData {code} Result {a}..{b}", body, f"{len(rows)} rows; tables "
+              f"{sorted(payload) if isinstance(payload, dict) else '-'}; row keys {keys}")  # fmt: skip
+        for r in rows[:6]:
+            if isinstance(r, dict):
+                print(f"      {r.get('NEWSID')} {r.get('NEWS_DT')} {r.get('CATEGORYNAME')} / {r.get('SUBCATNAME')} "
+                      f"XML_NAME={r.get('XML_NAME')} QUARTER_ID={r.get('QUARTER_ID')} "
+                      f"xbrl fields={ {k: v for k, v in r.items() if 'xbrl' in k.lower()} }")  # fmt: skip
+        mine = [r for r in rows if isinstance(r, dict) and str(r.get("SCRIP_CD")) == code and r.get("NEWSID")]
+        fresh += [(code, str(r["NEWSID"])) for r in mine[:1]]
+    targets = list(dict.fromkeys([*fresh, *KNOWN_RESULT_NEWSIDS]))
+    seen_ids: set[str] = set()
+    fetched: set[str] = set()  # viewer links fetched (at most 2)
+    for code, nid in targets:
+        if nid.lower() in seen_ids or len(seen_ids) >= 3:
+            continue
+        seen_ids.add(nid.lower())
+        guard()
+        try:
+            covers = {"scrip": code, "news_id": nid, "from": "CorpXbrlGen"}
+            body = c.fetch_url(XBRL_GEN, {"Bsenewid": nid}, "results_xbrl", covers, file=True)
+        except (Missing, BadRequest) as exc:
+            print(f"SKIP  CorpXbrlGen {code} {nid}: {type(exc).__name__}: {exc}")
+            continue
+        t = body.decode("utf-8", errors="replace")
+        ns = sorted(set(re.findall(r'xmlns:[\w-]+="(http[^"]+)"', t[:20000])))
+        links = viewer_links(t, XBRL_GEN)
+        kind = "inline XBRL" if "ix:header" in t else "XBRL instance" if "xbrli:" in t[:20000] else "HTML / other"
+        _show(f"CorpXbrlGen {code} {nid}", body, f"{kind}; namespaces={ns[:10]}; {len(links)} links {links[:8]}")
+        print(f"      head: {t[:300]!r}")
+        links = [u for u in links if u not in fetched]
+        if kind == "HTML / other" and links and len(fetched) < 2:
+            pick = sorted(links, key=lambda u: (not u.lower().split("?")[0].endswith(".xml"), "xbrl" not in u.lower()))
+            fetched.add(pick[0])
+            show_file(pick[0], "results_xbrl", {"scrip": code, "news_id": nid, "from": "CorpXbrlGen viewer"})
+
+    # (b) comp_resultsnew: the page, the component behind its route, its listing call, one Std and one Con file
+    page = HOME + "corporates/comp_resultsnew"
+    html = text(page) or ""
+    mains = [urljoin(HOME, s) for s in _MAIN.findall(html)]
+    print(f"OK    page {page}: {len(html)} chars, main bundle {mains[:1]}, links {viewer_links(html, page)[:6]}")
+    main_js = text(mains[0]) if mains else ""
+    lazy = lazy_routes(main_js or "")
+    corp = _CORP_ROUTES.search(main_js or "")
+    corp_chunk = corp.group(1) if corp else lazy.get("corporates", "")
+    routes_js = text(JS_DIR + corp_chunk) if corp_chunk else None
+    print(f"OK    lazy routes {lazy}; /corporates routes chunk {corp_chunk or '-'}")
+
+    def component(word: str) -> tuple[str, str]:
+        """(route path, component code) of the first route whose path contains `word` (case-insensitive)."""
+        for src in (routes_js or "", main_js or ""):
+            found = route_chunks(src, word)  # `word` lowercase: route_chunks lowercases the path
+            for path, ch in found.items():
+                if ch:
+                    js = text(JS_DIR + ch)
+                    if js:
+                        return path, js
+                code, imported = component_code(src, path)
+                if code:
+                    return path, code
+                if imported:
+                    js = text(JS_DIR + imported)
+                    if js:
+                        return path, js
+        ctx = _context((routes_js or "") + (main_js or ""), word, 4)
+        print(f"NONE  no route path containing {word!r}; contexts: {ctx}")
+        return "", ""
+
+    def url_maps(js: str) -> dict[str, str]:
+        urls: dict[str, str] = {}
+        for ch in url_map_chunks(js)[:2]:
+            urls.update(url_map(text(JS_DIR + ch) or ""))
+        return urls
+
+    path, comp = component("resultsnew")
+    named: dict[str, list[str]] = {"std": [], "con": []}
+    if comp:
+        urls = url_maps(comp)
+        calls = calls_in(comp, urls)
+        fmt = date_format(comp)
+        fields = {f for _, f in _HREF_FIELD.findall(comp)}
+        prefixes = _PREFIX_FIELD.findall(comp)
+        listed = json.dumps(calls, sort_keys=True)
+        print(f"OK    component {path}: {len(comp)} chars, date format {fmt!r}, calls {listed}; "
+              f"XBRL link fields {sorted(fields)}; folder + field {prefixes}")  # fmt: skip
+        for ctx in _context(comp, r"Std XBRL|Con XBRL|xbrl|/w`|/w\?|\.url\.", 16):
+            print(f"      ...{ctx!r}")
+        ranked = sorted(calls, key=lambda n: (not re.search("result", n, re.I), not re.search("xbrl", n, re.I)))
+        for name in ranked[:2]:  # the listing, for one recent window of all companies
+            guard()
+            params = fill_params(calls[name], "", date(2026, 11, 12), date(2026, 11, 14), fmt)
+            try:
+                body = c.get(f"{name}/w", params, "xbrl_listing", {"api": name, "route": path})
+            except (Missing, BadRequest) as exc:
+                print(f"SKIP  {name} {params}: {type(exc).__name__}: {exc}")
+                continue
+            vals = xbrl_values(body)
+            links = answer_links(body, prefixes, fields)
+            _show(f"{name} {params}", body, f"xbrl fields {vals[:6]}; links {links[:4]}; head {body[:300]!r}")
+            for f, v in vals:
+                named["con" if re.search(r"con", f, re.I) else "std"].append(urljoin(HOME, v))
+            for link in links:
+                named["con" if re.search(r"con", link, re.I) else "std"].append(link)
+            if vals or links:
+                break
+    else:  # a legacy page, not the Angular shell: its own Std / Con links
+        for link in viewer_links(html, page):
+            if "xbrl" in link.lower():
+                named["con" if re.search(r"con", link, re.I) else "std"].append(link)
+    for kind, links in named.items():
+        ok = False
+        for link in list(dict.fromkeys(links))[:2]:
+            if show_file(link, "results_xbrl", {"from": f"comp_resultsnew {kind} XBRL"}) is not None:
+                ok = True
+                break
+        if not ok:
+            print(f"NONE  comp_resultsnew {kind} XBRL: none of {len(links)} named files could be fetched")
+
+    # (c) xbrldetails, category Annual Reports, one scrip
+    path, comp = component("xbrldetail")
+    if comp:
+        urls = url_maps(comp)
+        calls = calls_in(comp, urls)
+        fmt = date_format(comp)
+        cat, ctx = category_value(comp)
+        print(f"OK    component {path}: {len(comp)} chars, date format {fmt!r}, Annual Report option {cat!r}, "
+              f"calls {json.dumps(calls, sort_keys=True)}")  # fmt: skip
+        for x in ctx + _context(comp, r"/w`|/w\?|\.url\.", 8):
+            print(f"      ...{x!r}")
+
+        def rank(n: str) -> tuple[bool, bool]:
+            return not re.search("xbrl", n, re.I), not any(re.search("cat", k, re.I) for k in calls[n])
+
+        ranked = sorted(calls, key=rank)
+        for name in ranked[:1]:
+            guard()
+            params = fill_params(
+                calls[name], codes[0], date(2025, 4, 1), date(2026, 11, 18), fmt, cat or "Annual Report"
+            )
+            try:
+                body = c.get(f"{name}/w", params, "xbrl_listing", {"api": name, "route": path, "scrip": codes[0]})
+            except (Missing, BadRequest) as exc:
+                print(f"SKIP  {name} {params}: {type(exc).__name__}: {exc}")
+                continue
+            _show(f"{name} {params}", body, f"xbrl fields {xbrl_values(body)[:6]}; head {body[:400]!r}")
+    print(f"{c.calls} calls made (budget {CALL_BUDGET})")
+
+
 def _scrips(text: str) -> list[tuple[str, str]]:
     out = []
     for part in (p.strip() for p in text.split(",") if p.strip()):
@@ -610,22 +901,24 @@ def _summary(led: Ledger) -> None:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", type=Path, required=True)
-    ap.add_argument("--mode", choices=("reach", "xbrl", "xbrl2", "xbrl3"), default="reach")
+    ap.add_argument("--mode", choices=("reach", "xbrl", "xbrl2", "xbrl3", "xbrl4"), default="reach")
     ap.add_argument("--scrips", default="500488:A,505036:B,530745:T", help="--mode xbrl: CODE or CODE:GROUP list")
     ap.add_argument("--max-js", type=int, default=30)
     ap.add_argument("--max-endpoints", type=int, default=4)
     a = ap.parse_args(argv)
     led = Ledger(a.out)
     c = BseClient(ledger=led)
-    if a.mode in ("xbrl", "xbrl2", "xbrl3"):
+    if a.mode in ("xbrl", "xbrl2", "xbrl3", "xbrl4"):
         try:
             if a.mode == "xbrl":
                 xbrl_probe(c, _scrips(a.scrips), a.max_js, a.max_endpoints)
             elif a.mode == "xbrl2":
                 xbrl2_probe(c, _scrips(a.scrips), 6, a.max_endpoints)
-            else:
+            elif a.mode == "xbrl3":
                 xbrl3_probe(c, _scrips(a.scrips), 6, max(a.max_endpoints, 8))
-        except (Blocked, Failed) as exc:
+            else:
+                xbrl4_probe(c, _scrips(a.scrips))
+        except (Blocked, Failed, OverBudget) as exc:
             print(f"STOP  {type(exc).__name__}: {exc}")
         finally:
             c.close()

@@ -404,6 +404,19 @@ class FactBook:
             # X86: where the owners / NCI split is withheld, neither the split nor a fallback to PAT is used.
             blocked = self.durations.get(ATTRIBUTION_WITHHELD_TAG, {}) if tag in ATTRIBUTION_TAGS else {}
             out = {p: primary.get(p, base[p] if fallback else Decimal(0)) for p in base if p not in blocked}
+            if tag in ATTRIBUTION_TAGS and fallback:
+                # X293 (OWNERS_FROM_YTD): a period without the attribution that the tag's own figures imply (a later
+                # filing states the longer period from the same start and the rest of it) takes that difference,
+                # not PAT: LUMAXTECH Q1 FY27 consolidated files no owners' profit, its Q2 files Q2 and H1 owners,
+                # so owners' Q1 = H1 - Q2 (PAT would put the NCI share into owners' TTM, EPS and ROE).
+                for p in out:
+                    if p in primary:
+                        continue
+                    for s, e in primary:
+                        rest = (p[1] + timedelta(days=1), e)
+                        if s == p[0] and e > p[1] and rest in primary:
+                            out[p] = primary[(s, e)] - primary[rest]
+                            break
             out.update(primary)
             self.durations[key] = out
         return key

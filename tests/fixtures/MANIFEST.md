@@ -722,3 +722,13 @@ unchanged.
 | `bse/Integrated_Finance_Ind_As_539469_1422026194048_IFIndAs.html` | X285: Q3 FY26 consolidated (539469 Panorama Studios), OCR'd notes text block with a bare `<` ("re<lassified"): not well-formed (invalid token) | `https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_539469_1422026194048_IFIndAs.html` | `f3b7ca98e23ad2008c9168c83953f5b66245f113a7024fda26817cf91d279774` |
 | `bse/IFOtherthan_538668_1482025163259_IFOtherthan.html` | X286: Q1 FY26 (538668) on the OtherThanBank template, segment table rows without `</tr>` before the next row (mismatched tag) | `https://www.bseindia.com/XBRLFILES/IFOtherthanDuplicateUploadDocument/IFOtherthan_538668_1482025163259_IFOtherthan.html` | `3a79de3ff9574ee059a8d101c8b143cfe97b186bafd8987e0615852a92eaa604` |
 | `bse/Integrated_Finance_Ind_As_538668_141120252067_IFIndAs.html` | X287: Q2 FY26 consolidated (538668), the empty "Audit qualification" table left open before the next `<h2>` (mismatched tag) | `https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_538668_141120252067_IFIndAs.html` | `935f5a350ff068d9bfea3eb53c9204405f132296fb62cfcfc188276d6ca34134` |
+
+## QD2: rule X293 (owners' quarter covered by the owners' own YTD takes no PAT fallback); copied 2026-11-18 from the local vault blob, gunzipped, sha256 verified
+
+Read by `tests/test_x293_owners_from_ytd.py`. Kept in `owners_ytd/` so the end-to-end fixture glob (`xbrl/*.xml`) and
+its pinned counts are unchanged.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `owners_ytd/INTEGRATED_FILING_INDAS_1711189_10082026062233_WEB.xml` | Lumax Auto Technologies (LUMAXTECH) Q1 FY27 consolidated results: PAT 98.6365 Cr, no ProfitOrLossAttributableToOwnersOfParent (only the comprehensive-income split) [X293] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1711189_10082026062233_WEB.xml | `1bb5ab346ddfb1378c66f37050f63beea9689db5b24f0a63d6820ad5261171af` |
+| `owners_ytd/INTEGRATED_FILING_INDAS_1745364_24102026044213_WEB.xml` | LUMAXTECH Q2 FY27 consolidated results: owners' profit Q2 105.50894 Cr and H1 192.14884 Cr (the owners' YTD covering Q1) [X293] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1745364_24102026044213_WEB.xml | `9b23c2e7389d00e1e486d1e4750c2bae30ac77d5e72e02e451c5ac178d48e4fc` |

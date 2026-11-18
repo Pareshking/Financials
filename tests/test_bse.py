@@ -612,3 +612,126 @@ def test_x245_probe_xbrl5_dry_run_offline(tmp_path, capsys):
     assert next(x[2] for x in s.calls if "Corp_FinanceResult_ng_new" in x[1])["FlagDur"] == "Q"
     assert any("a_std.xml" in x[1] for x in s.calls) and any("a_con.xml" in x[1] for x in s.calls)
     assert sum("AttachLive" in x[1] for x in s.calls) == 2
+
+
+# ── X246-X248: CorpXbrlGen answers (fixtures of run 44262396799) and the xbrl6 probe ──
+
+GEN_XML = BSE / "CorpXbrlGen_500488_6fa639f3-1cba-42e1-a341-ab46e27899e6.xml"
+GEN_STUB = BSE / "CorpXbrlGen_590041_287a3321-71de-4a52-9089-083b8e94337f.html"
+BETA_PAGE = BSE / "beta_Comp_Resultsnew_expandable0_20261118.html"
+BSE_CO = "http://www.bseindia.com/xbrl/co/2017-06-21/in-bse-co"
+CAPMKT = FIXTURES / "xbrl" / "INTEGRATED_FILING_INDAS_1502813_05082025045022_WEB.xml"
+
+
+def test_x246_corpxbrlgen_is_the_announcement_xbrl_not_the_financials():
+    import xml.etree.ElementTree as ET
+
+    body = GEN_XML.read_bytes()
+    root = ET.fromstring(body)
+    assert root.tag == "{http://www.xbrl.org/2003/instance}xbrl"
+    facts = {el.tag.split("}")[1]: (el.text or "") for el in root if el.tag.startswith("{" + BSE_CO + "}")}
+    assert len(facts) == 28 and all(el.tag.startswith(("{" + BSE_CO, "{http://www.xbrl.org/")) for el in root)
+    assert facts["ScripCode"] == "500488" and facts["NameOfTheCompany"] == "Abbott India Ltd"
+    assert (facts["CategoryOfAnnouncement"], facts["TypeOfAnnouncement"], facts["ResultType"]) == (
+        "Results", "Outcome", "standalone")  # fmt: skip
+    assert b"sebi.gov.in" not in body and b"icai.org" not in body  # no financial statement taxonomy, no figures
+    # the same announcement as the AnnSubCategoryGetData row (NEWSID) and its PDF attachment fixture
+    rows = json.loads((BSE / "bse_AnnSubCategoryGetData_500488_20261015_20261117.json").read_bytes())["Table"]
+    row = next(r for r in rows if r["NEWSID"] == "6fa639f3-1cba-42e1-a341-ab46e27899e6")
+    assert facts["AttachmentURL"].endswith("Pname=" + row["ATTACHMENTNAME"])
+    assert (BSE / f"AttachLive_{row['ATTACHMENTNAME']}").is_file()
+    assert facts["SubjectOfAnnouncement"] == row["NEWSSUB"]
+    # submission time on a 12-hour clock without AM / PM: 06:55:12 here, 18:55:13 IST disseminated
+    assert (facts["DateAndTimeOfSubmission"], row["DT_TM"]) == ("2026-11-05T06:55:12", "2026-11-05T18:55:13.97")
+    m = _probe()
+    assert m.xbrl_class(body, "text/xml; charset=utf-8").startswith("in-bse-co announcement XBRL (XBRL;")
+    stub = GEN_STUB.read_bytes()
+    assert stub == b"Invalid Input Details"
+    assert m.xbrl_class(stub, "text/html; charset=utf-8") == "HTML"
+    assert m.xbrl_class(CAPMKT.read_bytes()).startswith("in-capmkt financial XBRL")
+
+
+def test_x248_beta_page_first_name_wins_and_grid_postbacks():
+    m = _probe()
+    html = BETA_PAGE.read_bytes().decode("utf-8")
+    action, fields = m.form_fields(html)
+    names = [f["name"] for f in fields]
+    assert action == "./Comp_Resultsnew.aspx?expandable=0"
+    for n in ("broadcastdd", "periioddd", "industrydd", "btnSubmit", "btnReset", "hdnCode", "hf_scripcode",
+              "SmartSearch$hdnCode", "SmartSearch$smartSearch"):  # fmt: skip
+        assert P + n in names
+    assert not {"broadcast6", "period6", "industry6", "submt6", "reset6"} & set(names)  # the second name attributes
+    sel = {f["name"]: f for f in fields}
+    assert [(v, t) for v, t, _ in sel[P + "broadcastdd"]["options"]] == [
+        ("1", "Today"), ("2", "Last 1 Week"), ("3", "Last 15 Days"), ("4", "Last 1 month"), ("5", "Last 3 month"),
+        ("6", "Last 1 year"), ("7", "Beyond last 1 year")]  # fmt: skip
+    assert [v for v, _, _ in sel[P + "periioddd"]["options"]] == ["ALL", "3", "2", "1"]
+    assert sel[P + "industrydd"]["options"][0][0] == "ALL" and len(sel[P + "industrydd"]["options"]) == 171
+    assert m.grid_rows(html) == []  # the first load's grid row is blank
+    (blank,) = m.grid_rows(html, keep_blank=True)
+    assert blank["postbacks"] == {"lnkXML": P + "gvData$ctl02$lnkXML", "lnkConXML": P + "gvData$ctl02$lnkConXML"}
+    data = m.page_form(fields, {P + "broadcastdd": "6"}, sel[P + "btnSubmit"])
+    assert data[P + "btnSubmit"] == "Submit" and data[P + "broadcastdd"] == "6" and P + "btnReset" not in data
+    assert data["__VIEWSTATEGENERATOR"] == "2D106EDB"
+
+
+def test_x247_probe_xbrl6_dry_run_offline(tmp_path, capsys):
+    """The xbrl6 path against synthetic API answers, the real beta page and a synthetic grid answer: the component's
+    parameters, the /XBRLFILES/ links, the browser's Submit, the grid's two postbacks; within budget."""
+    m = _probe()
+    periods = {"Table": [{"FlagDur": "1", "FlagDISPLAY": "Today"}, {"FlagDur": "6", "FlagDISPLAY": "Last 1 year"},
+                         {"FlagDur": "7", "FlagDISPLAY": "Beyond last 1 year"}]}  # fmt: skip
+    result = {"Table": [{"Scrip_cd": 500488, "quarter_code": "SQ", "audited": "U", "XMLName": "500488_std.xml",
+                         "Consol_XMLName": "500488_con.xml", "Resultpageurl": "https://x"}]}  # fmt: skip
+    archive = {"Table": [{"NEWSID": "n2", "SCRIP_CD": 500488, "NEWSSUB": "Results"}]}
+    grid_page = (
+        '<form method="post" action="./Comp_Resultsnew.aspx?expandable=0" id="form1">'
+        '<input type="hidden" name="__VIEWSTATE" value="VS2" /><input type="hidden" name="__EVENTTARGET" value="" />'
+        f'<select name="{P}broadcastdd" name="broadcast6"><option selected="selected" value="6">Last 1 year</option>'
+        f'</select><input type="submit" name="{P}btnSubmit" value="Submit" name="submt6" />'
+        '<table id="ContentPlaceHolder1_gvData"><tr><th>Security Code</th></tr><tr><td>500488</td><td>Abbott</td>'
+        f'<td><a href="javascript:__doPostBack(&#39;{P}gvData$ctl02$lnkXML&#39;,&#39;&#39;)">x</a></td>'
+        f'<td><a href="javascript:__doPostBack(&#39;{P}gvData$ctl02$lnkConXML&#39;,&#39;&#39;)">y</a></td></tr>'
+        "</table></form>"
+    ).encode()
+    posts = []
+
+    def beta(method):
+        if method == "GET":
+            return _resp(200, BETA_PAGE.read_bytes(), "text/html; charset=utf-8")
+        posts.append(method)
+        return _resp(200, grid_page, "text/html") if len(posts) == 1 else _resp(200, GEN_XML.read_bytes(), "text/xml")
+
+    s = RoutedSession([
+        ("Corp_GetFINANCE_DRDOWN_ng/w?flag=1", _resp(200, json.dumps(periods).encode(), "application/json")),
+        ("Corp_GetFINANCE_DRDOWN_ng", _resp(200, b'{"Table": []}', "application/json")),
+        ("FlagDur=7", _resp(200, json.dumps(result).encode(), "application/json")),
+        ("Corp_FinanceResult_ng_new", _resp(200, b'{"Table": []}', "application/json")),
+        ("Corp_Archive_Wthxml_ng_new", _resp(200, json.dumps(archive).encode(), "application/json")),
+        ("CorpXbrlGen", _resp(200, GEN_XML.read_bytes(), "text/xml; charset=utf-8")),
+        ("XBRLFILES/500488_std.xml", _resp(200, CAPMKT.read_bytes(), "text/xml")),
+        ("XBRLFILES/500488_con.xml", _resp(200, b"<html>viewer</html>")),
+        ("beta.bseindia.com", beta),
+    ])  # fmt: skip
+    c = bse.BseClient(s, sleep=lambda _: None, ledger=bse.Ledger(tmp_path / "led"), allow_in_page=False)
+    m.xbrl6_probe(c, [("500488", "A")])
+    out = capsys.readouterr().out
+    assert c.calls <= m.XBRL6_BUDGET
+    fin = [x[2] for x in s.calls if "Corp_FinanceResult_ng_new" in x[1]]
+    assert fin == [m.finance_params("500488", "6"), m.finance_params("500488", "7"), m.finance_params("", "1")]
+    assert fin[0] == {"SCRIP_CD": "500488", "FlagDur": "6", "HFQ": "", "ISUBGROUP_CODE": "", "segment": "C"}
+    arch = [x[2] for x in s.calls if "Corp_Archive_Wthxml_ng_new" in x[1]]
+    assert arch == [{"SCRIP_CD": "500488", "CATNAME": "Result", "FROMDT": "", "TODT": "", "PER": "D", "SEGMENT": "A"}]
+    assert [x[2] for x in s.calls if "CorpXbrlGen" in x[1]] == [{"Bsenewid": "n2", "Scripcode": "500488"}]
+    urls = [x[1] for x in s.calls]
+    assert "https://www.bseindia.com/XBRLFILES/500488_std.xml" in urls
+    assert "https://www.bseindia.com/XBRLFILES/500488_con.xml" in urls
+    sent = [x[3] for x in s.calls if x[0] == "POST"]
+    assert len(sent) == 3  # one Submit (its grid has a row), then the row's Std and Con XBRL postbacks
+    assert sent[0][P + "btnSubmit"] == "Submit" and sent[0][P + "broadcastdd"] == "6"
+    assert (sent[0][P + "hdnCode"], sent[0][P + "SmartSearch$smartSearch"]) == ("500488", "")
+    assert not {"broadcast6", "submt6"} & set(sent[0])
+    assert [d["__EVENTTARGET"] for d in sent[1:]] == [P + "gvData$ctl02$lnkXML", P + "gvData$ctl02$lnkConXML"]
+    assert all(d["__VIEWSTATE"] == "VS2" and P + "btnSubmit" not in d for d in sent[1:])
+    assert "kind in-capmkt financial XBRL" in out and "kind in-bse-co announcement XBRL" in out
+    assert "STOP  (this step) HTML where XBRL was expected" in out

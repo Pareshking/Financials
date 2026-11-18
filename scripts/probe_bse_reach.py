@@ -59,6 +59,18 @@ redirects, final URL, Content-Type and kind (XBRL / XML with namespaces, inline 
 answer where XBRL was expected is reported and not followed; a refusal or a redirect to showinterest ends the probe
 (`Blocked`). At most 40 calls (XBRL5_BUDGET).
 
+`--mode xbrl6` (X247-X248; the comp_resultsnew component and the beta WebForms page of run 44262396799, read offline):
+(a) `Corp_GetFINANCE_DRDOWN_ng` flag 1 / 2 / 3 (broadcast periods, industries, result periods), then
+`Corp_FinanceResult_ng_new` with the component's own keys and values for the first scrip (FlagDur = "Last 1 year",
+then "Beyond last 1 year", then HFQ / ISUBGROUP_CODE set; segment "C"; stops at the first answer with rows) and once
+for every company with FlagDur "Today" (the page's first load), full row keys logged; (b) `Corp_Archive_Wthxml_ng_new`
+with the component's literals (CATNAME "Result", PER "D", SEGMENT "A", dates blank); (c) CorpXbrlGen for one archive
+row and the "/XBRLFILES/" + XMLName (Std) and + Consol_XMLName (Con) documents of the result rows; (d) the beta
+`Comp_Resultsnew.aspx?expandable=0`: GET, the browser's Submit (first `name` of each control, the scrip in the hidden
+fields, broadcast "6"), a second Submit with the search box filled only if the first grid is empty, then the
+grid's lnkXML / lnkConXML postbacks of its first row. Each document is classified (in-bse-co announcement XBRL,
+in-capmkt financial XBRL, ICAI XBRL, HTML, ...). At most 30 calls (XBRL6_BUDGET).
+
 Every answer is written byte for byte to the ledger (--out DIR: blobs/<sha256> + ledger.jsonl) before it is read; the
 workflow uploads DIR as an artifact, which `python -m financials --data-dir data import-bse DIR` vaults and stages on
 the owner's machine. The log prints status, size and sha256 only. A refusal (`Blocked`) ends the probe: no retries
@@ -70,6 +82,7 @@ around it (CLAUDE.md, owner decision).
     python scripts/probe_bse_reach.py --out bse_probe --mode xbrl3 --scrips 500488:A,505036:B,530745:T
     python scripts/probe_bse_reach.py --out bse_probe --mode xbrl4 --scrips 500488:A,505036:B,530745:T
     python scripts/probe_bse_reach.py --out bse_probe --mode xbrl5 --scrips 500488:A
+    python scripts/probe_bse_reach.py --out bse_probe --mode xbrl6 --scrips 500488:A
 """
 
 from __future__ import annotations
@@ -81,6 +94,7 @@ import json
 import re
 import sys
 from datetime import date
+from html import unescape
 from pathlib import Path
 from urllib.parse import urljoin
 
@@ -952,7 +966,11 @@ def is_xbrl(kind: str) -> bool:
 
 
 def _attrs(s: str) -> dict[str, str]:
-    out = {k.lower(): next(v for v in vals if v is not None) for k, *vals in _ATTR.findall(s)}
+    """Attributes of one tag. A repeated attribute keeps its FIRST value, as an HTML parser does (X248: BSE's beta
+    Comp_Resultsnew.aspx writes `name="ctl00$...$broadcastdd" ... name="broadcast6"`; a browser posts the first)."""
+    out: dict[str, str] = {}
+    for k, *vals in _ATTR.findall(s):
+        out.setdefault(k.lower(), next(v for v in vals if v is not None))
     for flag in ("checked", "selected"):
         if re.search(rf"\b{flag}\b", s, re.I):
             out.setdefault(flag, flag)
@@ -1328,6 +1346,275 @@ def xbrl5_probe(c: BseClient, scrips: list[tuple[str, str]]) -> None:
     print(f"{c.calls} calls made (budget {XBRL5_BUDGET})")
 
 
+# ── --mode xbrl6 (X247-X248): the comp_resultsnew component's real parameters (read offline from run 44262396799) ──
+# Run 44262396799 (xbrl5): CorpXbrlGen.aspx?Bsenewid=<NEWSID>&Scripcode=<scrip> answered BSE's in-bse-co announcement
+# XBRL for 500488 (X246, fixture), "Invalid Input Details" for 590041 / 544416; the xbrl5 Corp_* calls sent JS
+# template text as values and answered []. The component (chunk-WJUFOT7J.js, `app-comp-results-new-fno`) sends:
+#   Corp_FinanceResult_ng_new  SCRIP_CD, FlagDur (broadcast period; default "1" Today, "7" when opened with ?Code=;
+#                              any value but "1" needs a scrip), HFQ (result period; default ""), ISUBGROUP_CODE
+#                              (industry; default ""), segment ("C" Equity, "EQFO" Equity F&O; default "C")
+#   Corp_Archive_Wthxml_ng_new SCRIP_CD, CATNAME "Result", FROMDT "", TODT "", PER "D", SEGMENT "A" (announcement rows:
+#                              NEWSID, SCRIP_CD, NEWSSUB, linked to /corporates/anndet_new; no XBRL field)
+#   Corp_GetFINANCE_DRDOWN_ng  flag 1 broadcast periods (FlagDur / FlagDISPLAY), 2 industries (isubgroup_code /
+#                              Industry_name), 3 result periods (HFQ / HFQDISPLAY)
+# and renders each result row's Std XBRL as href "/XBRLFILES/" + XMLName and Con XBRL as "/XBRLFILES/" +
+# Consol_XMLName (other fields: Scrip_cd, scrip_name, Industry_name, Resultpageurl, quarter_code, audited).
+# The beta WebForms page names its controls twice (`name="ctl00$ContentPlaceHolder1$broadcastdd" .. name="broadcast6"`);
+# a browser posts the first name, xbrl5 posted the second (so the server saw no btnSubmit click). Its grid's Std / Con
+# XBRL links are __doPostBack('ctl00$ContentPlaceHolder1$gvData$ctlNN$lnkXML' / '...$lnkConXML'). All UNVERIFIED
+# until this run's answers.
+XBRL6_BUDGET = 30
+FIN_RESULT = "Corp_FinanceResult_ng_new"
+ARCHIVE = "Corp_Archive_Wthxml_ng_new"
+DROPDOWN = "Corp_GetFINANCE_DRDOWN_ng"
+BETA = "ctl00$ContentPlaceHolder1$"
+_GRID = re.compile(r"""<table\b[^>]*id=["']ContentPlaceHolder1_gvData["'][^>]*>(.*?)</table>""", re.I | re.S)
+_TR = re.compile(r"<tr\b[^>]*>(.*?)</tr>", re.I | re.S)
+_TD = re.compile(r"<td\b[^>]*>(.*?)</td>", re.I | re.S)
+
+
+def xbrl_class(body: bytes, ctype: str = "") -> str:
+    """What an expected-XBRL answer is: BSE's in-bse-co announcement XBRL, SEBI in-capmkt financial XBRL (the Integrated
+    Filing taxonomy), ICAI financial XBRL, another XBRL / XML, or the non-XBRL kind of `answer_kind`."""
+    kind = answer_kind(body, ctype)
+    if not is_xbrl(kind):
+        return kind
+    t = body[:20000].decode("utf-8", "replace")
+    if "bseindia.com/xbrl/co/" in t:
+        return f"in-bse-co announcement XBRL ({kind})"
+    if "sebi.gov.in/xbrl" in t and "in-capmkt" in t:
+        return f"in-capmkt financial XBRL ({kind})"
+    if "icai.org/xbrl" in t:
+        return f"ICAI financial XBRL ({kind})"
+    return f"other ({kind})"
+
+
+def finance_params(code: str, flag_dur: str, hfq: str = "", industry: str = "", segment: str = "C") -> dict[str, str]:
+    """Corp_FinanceResult_ng_new as the component sends it (its key order; UI defaults HFQ / ISUBGROUP_CODE "")."""
+    return {"SCRIP_CD": code, "FlagDur": flag_dur, "HFQ": hfq, "ISUBGROUP_CODE": industry, "segment": segment}
+
+
+def archive_params(code: str) -> dict[str, str]:
+    """Corp_Archive_Wthxml_ng_new with the component's literal values."""
+    return {"SCRIP_CD": code, "CATNAME": "Result", "FROMDT": "", "TODT": "", "PER": "D", "SEGMENT": "A"}
+
+
+def dropdown_value(rows: list[dict], key: str, label_key: str, label: str, default: str) -> str:
+    """The `key` of the first dropdown row whose `label_key` matches `label` (a regex), else `default`."""
+    for r in rows:
+        if re.search(label, str(r.get(label_key, "")), re.I) and str(r.get(key, "")).strip():
+            return str(r[key]).strip()
+    return default
+
+
+def xbrlfiles_url(name: str) -> str:
+    """The component's link: href "/XBRLFILES/" + name on www.bseindia.com (an absolute URL is kept)."""
+    name = name.strip()
+    return name if re.match(r"https?://", name) else urljoin(HOME, "/XBRLFILES/" + name)
+
+
+def grid_rows(html: str, keep_blank: bool = False) -> list[dict]:
+    """Data rows of the beta page's results grid (ContentPlaceHolder1_gvData): cell texts, postback targets of its
+    links by control name (lnkXML / lnkConXML / ...; the page writes the quotes as `&#39;`) and direct links; rows
+    whose cells are all blank and that have no direct link are dropped unless `keep_blank`."""
+    m = _GRID.search(html)
+    out = []
+    for tr in _TR.findall(m.group(1) if m else ""):
+        cells = _TD.findall(tr)
+        if not cells:
+            continue  # the header row (<th>)
+        texts = [_plain(x) for x in cells]
+        posts, links = {}, []
+        for attrs, _label in _ANCHOR.findall(tr):
+            a = {k: unescape(v) for k, v in _attrs(attrs).items()}
+            pb = _DOPOSTBACK.search(a.get("href", "") + a.get("onclick", ""))
+            if pb:
+                posts[pb.group(1).split("$")[-1]] = pb.group(1)
+            elif a.get("href") and not a["href"].lower().startswith("javascript"):
+                links.append(a["href"])
+        if any(texts) or links or keep_blank:
+            out.append({"cells": texts, "postbacks": posts, "links": links})
+    return out
+
+
+def page_form(fields: list[dict], overrides: dict[str, str], submit: dict | None = None,
+              event_target: str = "") -> dict[str, str]:  # fmt: skip
+    """The fields a browser posts: hidden / text / select values as the page holds them (checked boxes only, no
+    buttons), then `overrides`, then the clicked submit button or a __doPostBack target."""
+    data = {}
+    for f in fields:
+        if f["type"] in ("submit", "image", "button", "reset", "file"):
+            continue
+        if f["type"] in ("checkbox", "radio") and not f["checked"]:
+            continue
+        data[unescape(f["name"])] = unescape(f["value"])  # a browser posts the decoded attribute values
+    data.update(overrides)
+    if submit is not None:
+        data[submit["name"]] = submit["value"]
+    if event_target:
+        data["__EVENTTARGET"], data["__EVENTARGUMENT"] = event_target, ""
+    return data
+
+
+def xbrl6_probe(c: BseClient, scrips: list[tuple[str, str]]) -> None:
+    code0 = scrips[0][0] if scrips else SCRIP
+
+    def guard() -> None:
+        if c.calls >= XBRL6_BUDGET:
+            raise OverBudget(f"{c.calls} calls made (budget {XBRL6_BUDGET})")
+
+    def meta(label: str, body: bytes) -> str:
+        last = c.last
+        kind = xbrl_class(body, last.get("content_type", ""))
+        side = "api" if "api.bseindia.com" in last.get("url", "") else "www"
+        print(f"ANS   [{side}] {label}: status {last.get('status')} redirects {last.get('redirects')} final "
+              f"{last.get('url')} content-type {last.get('content_type')!r} {len(body)} bytes sha256 "
+              f"{hashlib.sha256(body).hexdigest()[:16]} kind {kind}")  # fmt: skip
+        return kind
+
+    def api(name: str, params: dict, covers: dict) -> list[dict] | None:
+        guard()
+        try:
+            body = c.get(f"{name}/w", params, "xbrl_listing", {"api": name, **covers})
+        except (Missing, BadRequest) as exc:
+            print(f"SKIP  {name} {params}: {type(exc).__name__}: {exc}")
+            return None
+        meta(f"{name} {params}", body)
+        rows = first_rows(body)
+        print(f"      {len(rows)} rows; row keys {sorted(rows[0]) if rows else '-'}; head {body[:200]!r}")
+        return rows
+
+    def document(url: str, covers: dict, params: dict | None = None, form: dict | None = None,
+                 headers: dict | None = None) -> str | None:  # fmt: skip
+        """One expected-XBRL document, classified; an HTML (non-XBRL) answer is reported, never followed."""
+        guard()
+        try:
+            body = c.fetch_url(url, params or {}, "results_xbrl", covers, file=True, form=form, headers=headers)
+        except (Missing, BadRequest) as exc:
+            print(f"SKIP  results_xbrl {url} {params or ''}: {type(exc).__name__}: {exc}")
+            return None
+        kind = meta(f"results_xbrl {'POST ' if form else ''}{url} {params or covers}", body)
+        print(f"      first bytes: {body[:300]!r}")
+        t = body[:200000].decode("utf-8", "replace")
+        for el in ("ScripCode", "Symbol", "NatureOfReportStandaloneConsolidated", "DateOfEndOfReportingPeriod",
+                   "CategoryOfAnnouncement", "TypeOfAnnouncement", "ResultType"):  # fmt: skip
+            v = re.search(rf"<[\w-]+:{el}\b[^>]*>([^<]{{0,80}})<", t)
+            if v:
+                print(f"      {el} = {v.group(1)!r}")
+        if not is_xbrl(answer_kind(body, c.last.get("content_type", ""))):
+            print(f"STOP  (this step) {kind} where XBRL was expected: reported, not followed")
+            return None
+        return kind
+
+    # (a) api.bseindia.com: the dropdown lists, then Corp_FinanceResult_ng_new with the component's values
+    lists: dict[int, list[dict]] = {}
+    for flag in (1, 2, 3):
+        rows = api(DROPDOWN, {"flag": str(flag)}, {"flag": flag}) or []
+        lists[flag] = rows
+        for r in rows[: 12 if flag != 2 else 4]:
+            print(f"      flag {flag}: {json.dumps(r, sort_keys=True, default=str)[:200]}")
+    periods = lists.get(1, [])
+    fd_today = dropdown_value(periods, "FlagDur", "FlagDISPLAY", r"today", "1")
+    fd_year = dropdown_value(periods, "FlagDur", "FlagDISPLAY", r"^\s*last\s*1\s*year", "6")
+    fd_beyond = dropdown_value(periods, "FlagDur", "FlagDISPLAY", r"beyond", "7")
+    hfq0 = next((str(r.get("HFQ")).strip() for r in lists.get(3, []) if str(r.get("HFQ") or "").strip()), "ALL")
+    print(f"      FlagDur today {fd_today!r}, last 1 year {fd_year!r}, beyond {fd_beyond!r}; first HFQ {hfq0!r}")
+    results: list[dict] = []
+    for p in (finance_params(code0, fd_year), finance_params(code0, fd_beyond),
+              finance_params(code0, fd_year, hfq0, "ALL")):  # fmt: skip
+        rows = api(FIN_RESULT, p, {"scrip": code0}) or []
+        for r in rows[:10]:
+            print(f"      row {json.dumps(r, sort_keys=True, default=str)[:900]}")
+        if rows:
+            results += rows
+            break
+    rows = api(FIN_RESULT, finance_params("", fd_today), {"scrip": ""}) or []  # the page's own first load
+    for r in rows[:3]:
+        print(f"      row (all, today) {json.dumps(r, sort_keys=True, default=str)[:900]}")
+    results += rows
+
+    # (b) Corp_Archive_Wthxml_ng_new with the component's literals
+    archive = api(ARCHIVE, archive_params(code0), {"scrip": code0}) or []
+    if not archive:
+        archive = api(ARCHIVE, archive_params(""), {"scrip": ""}) or []
+    for r in archive[:10]:
+        print(f"      archive {json.dumps(r, sort_keys=True, default=str)[:400]}")
+
+    # (c) www documents: CorpXbrlGen for one archive row (not the X246 one), the Std and Con XBRL of the result rows
+    known = {nid.lower() for _, nid in KNOWN_RESULT_NEWSIDS}
+    row = next((r for r in archive if r.get("NEWSID") and str(r["NEWSID"]).lower() not in known), None)
+    if row:
+        code, nid = str(row.get("SCRIP_CD") or code0), str(row["NEWSID"])
+        document(XBRL_GEN, {"scrip": code, "news_id": nid, "from": "CorpXbrlGen"}, {"Bsenewid": nid, "Scripcode": code})
+    mine = [r for r in results if str(r.get("Scrip_cd") or r.get("SCRIP_CD") or "") == code0] + results
+    for field in ("XMLName", "Consol_XMLName"):
+        hit = next((r for r in mine if str(r.get(field) or "").strip()), None)
+        if hit is None:
+            print(f"NONE  {field}: no result row names one")
+            continue
+        url = xbrlfiles_url(str(hit[field]))
+        print(f"      {field} of {hit.get('Scrip_cd')} {hit.get('quarter_code')} ({hit.get('audited')}): {url}; "
+              f"Resultpageurl {hit.get('Resultpageurl')!r}")  # fmt: skip
+        document(url, {"from": f"comp_resultsnew {field}", "scrip": str(hit.get("Scrip_cd") or "")})
+
+    # (d) the beta WebForms page: GET, then the browser's Submit (scrip in the hidden fields, smartSearch cleared by
+    # its Navigate(), Last 1 year), then the grid's Std / Con XBRL postbacks of the first data row
+    guard()
+    try:
+        raw = c.fetch_url(LEGACY_RESULTS_BETA, {}, "site_page", {}, file=True)
+    except (Missing, BadRequest) as exc:
+        print(f"SKIP  {LEGACY_RESULTS_BETA}: {type(exc).__name__}: {exc}")
+        return
+    meta(f"page {LEGACY_RESULTS_BETA}", raw)
+    html = raw.decode("utf-8", "replace")
+    page = c.last.get("url") or LEGACY_RESULTS_BETA
+    headers = {"Referer": page, "Origin": "https://beta.bseindia.com"}
+    grid: list[dict] = []
+    for attempt in range(2):
+        action, fields = form_fields(html)
+        names = {f["name"] for f in fields}
+        submit = next((f for f in fields if f["name"] == BETA + "btnSubmit"), None)
+        if not fields or submit is None:
+            print(f"NONE  {page}: no WebForms form with {BETA}btnSubmit (fields {sorted(names)[:20]})")
+            break
+        over = {BETA + k: code0 for k in ("SmartSearch$hdnCode", "hdnCode", "hf_scripcode") if BETA + k in names}
+        over[BETA + "SmartSearch$smartSearch"] = code0 if attempt else ""
+        over.update({BETA + "broadcastdd": "6", BETA + "periioddd": "ALL", BETA + "industrydd": "ALL"})
+        data = page_form(fields, over, submit)
+        print(f"      postback {attempt + 1} sets { {k: v for k, v in data.items() if not k.startswith('__')} }")
+        guard()
+        target = urljoin(page, action) if action else page
+        try:
+            body = c.fetch_url(target, {}, "site_page", {"postback": page, "fields": sorted(data)}, file=True,
+                               form=data, headers=headers)  # fmt: skip
+        except (Missing, BadRequest) as exc:
+            print(f"SKIP  postback {target}: {type(exc).__name__}: {exc}")
+            break
+        meta(f"postback {attempt + 1} {target}", body)
+        html = body.decode("utf-8", "replace")
+        grid = grid_rows(html)
+        msg = re.search(r"No Record Found[^<]*", html)
+        print(f"      {len(grid)} grid rows{'; ' + msg.group(0) if msg else ''}")
+        for g in grid[:10]:
+            print(f"      grid {g}")
+        if grid:
+            break
+    if grid:
+        action, fields = form_fields(html)
+        target = urljoin(page, action) if action else page
+        g = grid[0]
+        for link in g["links"][:1]:
+            document(urljoin(page, link), {"from": "beta grid link", "scrip": code0})
+        for ctl in ("lnkXML", "lnkConXML"):
+            if ctl not in g["postbacks"]:
+                print(f"NONE  grid row 1: no {ctl} postback")
+                continue
+            data = page_form(fields, {}, None, g["postbacks"][ctl])
+            document(target, {"from": f"beta grid {ctl}", "scrip": code0, "row": g["cells"][:5]}, form=data,
+                     headers=headers)  # fmt: skip
+    print(f"{c.calls} calls made (budget {XBRL6_BUDGET})")
+
+
 def _scrips(text: str) -> list[tuple[str, str]]:
     out = []
     for part in (p.strip() for p in text.split(",") if p.strip()):
@@ -1348,14 +1635,14 @@ def _summary(led: Ledger) -> None:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", type=Path, required=True)
-    ap.add_argument("--mode", choices=("reach", "xbrl", "xbrl2", "xbrl3", "xbrl4", "xbrl5"), default="reach")
+    ap.add_argument("--mode", choices=("reach", "xbrl", "xbrl2", "xbrl3", "xbrl4", "xbrl5", "xbrl6"), default="reach")
     ap.add_argument("--scrips", default="500488:A,505036:B,530745:T", help="--mode xbrl: CODE or CODE:GROUP list")
     ap.add_argument("--max-js", type=int, default=30)
     ap.add_argument("--max-endpoints", type=int, default=4)
     a = ap.parse_args(argv)
     led = Ledger(a.out)
     c = BseClient(ledger=led)
-    if a.mode in ("xbrl", "xbrl2", "xbrl3", "xbrl4", "xbrl5"):
+    if a.mode in ("xbrl", "xbrl2", "xbrl3", "xbrl4", "xbrl5", "xbrl6"):
         try:
             if a.mode == "xbrl":
                 xbrl_probe(c, _scrips(a.scrips), a.max_js, a.max_endpoints)
@@ -1365,8 +1652,10 @@ def main(argv: list[str] | None = None) -> int:
                 xbrl3_probe(c, _scrips(a.scrips), 6, max(a.max_endpoints, 8))
             elif a.mode == "xbrl4":
                 xbrl4_probe(c, _scrips(a.scrips))
-            else:
+            elif a.mode == "xbrl5":
                 xbrl5_probe(c, _scrips(a.scrips))
+            else:
+                xbrl6_probe(c, _scrips(a.scrips))
         except (Blocked, Failed, OverBudget) as exc:
             print(f"STOP  {type(exc).__name__}: {exc}")
         finally:

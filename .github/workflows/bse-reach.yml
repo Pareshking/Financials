@@ -8,8 +8,8 @@ name: bse-reach
 # `import-bse` vaults and stages on the owner's machine. No database is read or written.
 # Dispatch with mode=xbrl (X240) for the results / annual XBRL probe (results RSS feed, stock pages and their scripts,
 # at most 4 candidate listing endpoints per scrip, one results and one annual file); see scripts/probe_bse_reach.py.
-# A push of the paths below runs mode xbrl5 (X245, the owner's second BSE pointers; no inputs on push), so merging this
-# change is itself the one probe.
+# A push of the paths below runs mode xbrl6 (X247-X248, the comp_resultsnew component's real parameters and the beta
+# WebForms grid; no inputs on push), so merging this change is itself the one probe.
 on:
   push:
     paths:
@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "reach (the A18 calls), xbrl (X240), xbrl2 (X242), xbrl3 (X243), xbrl4 (X244) or xbrl5 (X245: CorpXbrlGen with Scripcode, Corp_FinanceResult_ng_new / Corp_Archive_Wthxml_ng_new, legacy Comp_Resultsnew.aspx / xbrldetails.aspx postbacks)"
+        description: "reach (the A18 calls), xbrl (X240), xbrl2 (X242), xbrl3 (X243), xbrl4 (X244), xbrl5 (X245: CorpXbrlGen with Scripcode, Corp_* listings, legacy postbacks) or xbrl6 (X247-X248: Corp_FinanceResult_ng_new / Corp_Archive_Wthxml_ng_new with the component values, XBRLFILES Std / Con, beta Comp_Resultsnew.aspx grid postbacks)"
         default: "reach"
       scrips:
         description: "xbrl mode: CODE:GROUP list (list of securities group)"
@@ -41,7 +41,7 @@ jobs:
       - run: curl -s https://api.ipify.org; echo " (runner public IP)"
       - run: python scripts/probe_bse_reach.py --out bse_probe --mode "$MODE" --scrips "$SCRIPS"
         env:
-          MODE: ${{ inputs.mode || 'xbrl5' }}  # a push (no inputs) runs the X245 xbrl5 probe
+          MODE: ${{ inputs.mode || 'xbrl6' }}  # a push (no inputs) runs the X247-X248 xbrl6 probe
           SCRIPS: ${{ inputs.scrips || '500488:A,505036:B,530745:T' }}
       - uses: actions/upload-artifact@v4
         if: always()

@@ -698,3 +698,16 @@ its pinned counts are unchanged. Decision U (X274) reuses the QP3 `annual_restat
 |---|---|---|---|
 | `bse/Integrated_Finance_Ind_As_544477_14112026175059_IFIndAs.html` | X266 R20: BSE inline XBRL of the same upload as the NSE XML below (17:50:59 IST) | `https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_544477_14112026175059_IFIndAs.html` | `7cf9950794ef40db7033a5322ee92e173d2d4df8aee4959d11c32444aa5571c4` |
 | `bse/INTEGRATED_FILING_INDAS_1758435_14112026055150_WEB.xml` | X266 R20: NSE XML of the same upload (17:51:50 IST), gunzipped vault blob | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1758435_14112026055150_WEB.xml` | `4aa398ec87578ee68d32bdd20c1e73bb79a6c9c81261d3c33a1254f869319a66` |
+
+## QB8: BSE results inline XBRL quarantined by batch 1 of the BSE results fetch (X280-X283; vault blobs of the bse-fetch runner ledger, imported unmodified, plain `.html` in the vault, sha256 verified = blob)
+
+Read by `tests/test_qb8_bse_ixbrl_rules.py`. Kept in `bse/` so the end-to-end fixture glob (`xbrl/*.xml`) and its
+pinned counts are unchanged.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `bse/Integrated_Finance_Ind_As_523862_1411202516851_IFIndAs.html` | X280: Q2 FY26 consolidated (523862), `WhetherCashFlowStatementIsApplicableOnCompany` displayed `true` under `ixt2:booleantrue` (153 batch-1 files failed on this element) | `https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_523862_1411202516851_IFIndAs.html` | `3b7024ca22e9e72b344799d39566e7ad6828123e33bbcd0577d440f14f4f27fa` |
+| `bse/Integrated_Finance_Ind_As_539607_132202620589_IFIndAs.html` | X280: Q3 FY26 consolidated (539607), `DeclarationPursuantToClauseDOfSubRegulation3OfRegulation33OfSEBILODRRegulation2015` displayed `false` under `ixt2:booleantrue` | `https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_539607_132202620589_IFIndAs.html` | `75dca24dbfe294da722163e3270160e9d707af07e655f48e4498d63f95b91fba` |
+| `bse/Integrated_Finance_Ind_As_513536_128202520028_IFIndAs.html` | X281 / X283: Q1 FY26 consolidated (513536), 6 unclosed `<BR>` inside the notes text block (not well-formed XHTML), reporting period displayed but not tagged | `https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_513536_128202520028_IFIndAs.html` | `6509895a1b5fc83ecc45425ecc086cd0b030c9c62705853076420623b8a5dfd8` |
+| `bse/Integrated_Finance_Ind_As_539607_25112025201023_IFIndAs.html` | X282: Q2 FY26 standalone (539607), the empty "additional disclosure of related party transactions" table opens `<thead>` and closes it with `</tbody>` | `https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_539607_25112025201023_IFIndAs.html` | `2362afd3acdd78c8d585e52ed33ffa598806ddf42dea4e2541f0241ce52b9c25` |
+| `bse/Integrated_Finance_Ind_As_504731_88202519641_IFIndAs.html` | X283: Q1 FY26 consolidated (504731), well-formed, reporting period displayed as plain text only (NO_DECLARED_PERIOD at 0.10.7) | `https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_504731_88202519641_IFIndAs.html` | `60bba0bba0737afac7eabbb407932e17ae9d16db4311012e9589b4aa8898382e` |

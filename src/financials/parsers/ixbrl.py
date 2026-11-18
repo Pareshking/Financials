@@ -19,6 +19,20 @@ Rule IXBRL1_BOOLEAN_TEXT [X170]: BSE tags every Yes / No answer `ixt2:booleantru
 files: 151 such facts, 146 "No" and 5 "Yes"). The registry transform would make every one of them true; the displayed
 word is the filer's answer and agrees with the figures (542910: "Yes" to locked-in shares and 10,361,783 locked-in
 shares; ABBOTINDIA: "No" and no locked-in figure). So "Yes" -> true, "No" -> false, any other text -> ParseError.
+Extended [X280]: BSE's results files of Jul-2025 .. Feb-2026 display the xs:boolean lexical form itself, "true" /
+"false", again always under `ixt2:booleantrue`; that text is the value NSE's XML of the same form carries, and is read
+as itself ("true" -> true, "false" -> false).
+
+Rule IXBRL2_VOID_BR [X281]: BSE writes the filer's text blocks into the page unescaped, so a line break the filer typed
+as `<BR>` (NSE's XML carries it as the text `&lt;BR&gt;`) becomes an unclosed element and the XHTML is not well-formed.
+In HTML `br` is a void element; when a file fails to parse, has no `</BR>`, and every `<BR>` lies inside an
+`ix:nonNumeric`, each is read as `<BR/>` (as BSE's own `<br/>` line breaks are, so the text block loses the marker).
+Rule IXBRL3_THEAD_CLOSED_BY_TBODY [X282]: BSE's empty "additional disclosure of related party transactions" table
+opens `<thead>` and closes it with `</tbody>`; such a `</tbody>` (no `ix:` element, `<thead>` or `<tbody>` between) is
+read as `</thead>`. A repaired file is accepted only if it then parses and yields exactly as many facts as the raw text
+has `<ix:nonFraction` / `<ix:nonNumeric` start tags; otherwise the original ParseError stands.
+Rule IXBRL4_DISPLAYED_REPORTING_PERIOD [X283]: the untagged reporting period of BSE's Jun .. Aug 2025 pages, read from
+the displayed rows when they equal the contexts (`_displayed_reporting_period`).
 """
 
 from __future__ import annotations
@@ -34,6 +48,9 @@ IX = "http://www.xbrl.org/2013/inlineXBRL"
 XHTML = "http://www.w3.org/1999/xhtml"
 XBRLI = "http://www.xbrl.org/2003/instance"
 IXBRL1_RULE = "IXBRL1_BOOLEAN_TEXT"
+IXBRL2_RULE = "IXBRL2_VOID_BR"
+IXBRL3_RULE = "IXBRL3_THEAD_CLOSED_BY_TBODY"
+IXBRL4_RULE = "IXBRL4_DISPLAYED_REPORTING_PERIOD"
 NUM_FORMATS = {None, "num-dot-decimal", "numdotdecimal", "numdotdecimalin"}
 BOOL_FORMATS = {"booleantrue", "booleanfalse"}
 UNSUPPORTED = ("continuation", "exclude", "footnote", "tuple", "fraction")
@@ -84,9 +101,9 @@ def _text(el: ET.Element, name: str) -> str:
         return text
     t = text.strip()
     if fmt in BOOL_FORMATS:  # IXBRL1_BOOLEAN_TEXT
-        if t == "Yes":
+        if t in ("Yes", "true"):  # "true" / "false": X280
             return "true"
-        if t == "No":
+        if t in ("No", "false"):
             return "false"
         raise ParseError(f"{name}: boolean text {t!r} is neither Yes nor No")
     if fmt == "datedaymonthyear":
@@ -100,12 +117,18 @@ def _text(el: ET.Element, name: str) -> str:
 def inline_to_instance(data: bytes) -> bytes:
     """The XBRL instance an inline XBRL document denotes (facts in document order; contexts and units as filed)."""
     try:
-        namespaces: dict[str, str] = {}
-        for _, (prefix, uri) in ET.iterparse(io.BytesIO(data), events=("start-ns",)):
-            namespaces.setdefault(prefix, uri)
-        root = ET.fromstring(data)
+        namespaces, root = _parse(data)
     except ET.ParseError as exc:
-        raise ParseError(f"inline XBRL: invalid XHTML: {exc}") from exc
+        repaired = repair_xhtml(data)
+        if repaired is None:
+            raise ParseError(f"inline XBRL: invalid XHTML: {exc}") from exc
+        try:
+            namespaces, root = _parse(repaired)
+        except ET.ParseError:
+            raise ParseError(f"inline XBRL: invalid XHTML: {exc}") from exc
+        found = sum(1 for el in root.iter() if el.tag in (f"{{{IX}}}nonFraction", f"{{{IX}}}nonNumeric"))
+        if namespaces.get("ix") != IX or found != len(_IX_FACT_TAG.findall(data)):
+            raise ParseError(f"inline XBRL: invalid XHTML: {exc} (repair lost facts)") from exc
     for bad in UNSUPPORTED:
         if root.find(f".//{{{IX}}}{bad}") is not None:
             raise ParseError(f"inline XBRL: ix:{bad} is not supported")
@@ -134,11 +157,86 @@ def inline_to_instance(data: bytes) -> bytes:
             fact.text = _number(el, qname)
         else:
             fact.text = _text(el, qname)
+    _displayed_reporting_period(data, out, namespaces)
     for prefix, uri in namespaces.items():
         if prefix and uri not in (IX, XHTML):
             ET.register_namespace(prefix, uri)
     xml = ET.tostring(out, encoding="utf-8", xml_declaration=True)
     return _declare_all(xml, namespaces)
+
+
+_PERIOD_ROW = re.compile(
+    rb">Date of (start|end) of reporting period</td>"
+    rb"<td[^>]*>(\d{2}-\d{2}-\d{4})</td><td[^>]*>(\d{2}-\d{2}-\d{4})</td></tr>"
+)
+_PERIOD_ELEMENTS = {"start": "DateOfStartOfReportingPeriod", "end": "DateOfEndOfReportingPeriod"}
+
+
+def _displayed_reporting_period(data: bytes, out: ET.Element, namespaces: dict[str, str]) -> None:
+    """Rule IXBRL4_DISPLAYED_REPORTING_PERIOD [X283]: BSE's results pages of Jun .. Aug 2025 display the declared
+    reporting period in the first "Date of start / end of reporting period" rows (two columns, quarter and year to
+    date) as plain text, not tagged; the later template tags the same cells `contextRef='OneD'` and, when the file has
+    that context, `'FourD'`. When no DateOf{Start,End}OfReportingPeriod fact is tagged, the first displayed start and
+    end rows are read as those facts on OneD (column 1) and FourD (column 2, only if that context exists), and only
+    if each displayed pair equals that context's period; otherwise nothing is added (NO_DECLARED_PERIOD stands)."""
+    uri = namespaces.get("in-capmkt")
+    if uri is None:
+        return
+    for element in _PERIOD_ELEMENTS.values():  # a tagged one on OneD / FourD (StatementStatic<n>D ones do not count)
+        if any(f.get("contextRef") in ("OneD", "FourD") for f in out.findall(f"{{{uri}}}{element}")):
+            return
+    first: dict[str, tuple[str, str]] = {}
+    for m in _PERIOD_ROW.finditer(data):
+        first.setdefault(m[1].decode(), (m[2].decode(), m[3].decode()))
+    if set(first) != {"start", "end"}:
+        return
+    periods = {}
+    for ctx in out.findall(f"{{{XBRLI}}}context"):
+        start, end = ctx.find(f".//{{{XBRLI}}}startDate"), ctx.find(f".//{{{XBRLI}}}endDate")
+        if start is not None and end is not None:
+            periods[ctx.get("id")] = ((start.text or "").strip(), (end.text or "").strip())
+
+    def iso(dmy: str) -> str:
+        return f"{dmy[6:]}-{dmy[3:5]}-{dmy[:2]}"
+
+    facts = []
+    for col, ctx_id in enumerate(("OneD", "FourD")):
+        shown = (iso(first["start"][col]), iso(first["end"][col]))
+        if ctx_id not in periods:
+            if ctx_id == "OneD":
+                return
+            continue
+        if periods[ctx_id] != shown:
+            return
+        facts += [(kind, ctx_id, value) for kind, value in zip(("start", "end"), shown, strict=True)]
+    for kind, ctx_id, value in facts:
+        ET.SubElement(out, f"{{{uri}}}{_PERIOD_ELEMENTS[kind]}", {"contextRef": ctx_id}).text = value
+
+
+def _parse(data: bytes) -> tuple[dict[str, str], ET.Element]:
+    namespaces: dict[str, str] = {}
+    for _, (prefix, uri) in ET.iterparse(io.BytesIO(data), events=("start-ns",)):
+        namespaces.setdefault(prefix, uri)
+    return namespaces, ET.fromstring(data)
+
+
+_IX_FACT_TAG = re.compile(rb"<ix:(?:nonFraction|nonNumeric)\b")
+_NON_NUMERIC = re.compile(rb"(<ix:nonNumeric\b[^>]*>)(.*?)(</ix:nonNumeric>)", re.S)
+_THEAD_TBODY = re.compile(rb"(<thead\b[^>]*>)((?:(?!</?thead\b|</?tbody\b|<ix:).)*)</tbody>", re.S)
+
+
+def repair_xhtml(data: bytes) -> bytes | None:
+    """Rules IXBRL2_VOID_BR and IXBRL3_THEAD_CLOSED_BY_TBODY [X281, X282] (module docstring), for a file that does
+    not parse; None when neither applies. The caller re-parses and checks the fact count."""
+    out, applied = data, False
+    if b"<BR>" in out and b"</BR>" not in out:
+        fixed = _NON_NUMERIC.sub(lambda m: m[1] + m[2].replace(b"<BR>", b"<BR/>") + m[3], out)
+        if b"<BR>" not in fixed:  # every <BR> was inside an ix:nonNumeric
+            out, applied = fixed, True
+    fixed = _THEAD_TBODY.sub(lambda m: m[1] + m[2] + b"</thead>", out)
+    if fixed != out:
+        out, applied = fixed, True
+    return out if applied else None
 
 
 _ROOT = re.compile(rb"<(?:[\w.-]+:)?xbrl\b([^>]*)>")

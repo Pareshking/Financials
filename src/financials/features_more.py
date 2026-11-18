@@ -46,7 +46,8 @@ Definitions (fractions as DOUBLE, `_pp` = fraction points, days as DOUBLE):
 - segments (B9.1, B9.2): BUSINESS-axis SEGMENT members of the latest filed segment period (`load_segments` point in
   time rule, batched), the row's scope; count, largest revenue / sum of segment revenue (before eliminations),
   fastest-growing segment vs the same period a year earlier (matched by filed label within the entity, base > 0)
-  and the largest segment's margin (RESULT / REVENUE) change YoY.
+  and the largest segment's margin (RESULT / REVENUE) change YoY. X250: a `ReportableSegmentsNMember` whose filed
+  label names a reconciling line (Unallocated / Unallocable, inter-segment, Eliminations, Total) is not a segment.
 - industry earnings breadth (B4.9, G205) = share of the NSE industry's companies (one per company) reporting the
   industry's latest quarter whose core profit grew YoY (`core_profit_yoy_latest_q` > 0); >= 3 companies.
 """
@@ -55,6 +56,7 @@ from __future__ import annotations
 
 import bisect
 import math
+import re
 import statistics
 from collections import defaultdict
 from datetime import date, datetime, timedelta
@@ -94,6 +96,13 @@ EVENT_COLUMNS = ("nifty500_inclusion_90d", "nifty500_exclusion_90d", "days_to_ne
                  "dividend_365d", "bonus_365d", "split_365d")  # fmt: skip
 SEGMENT_COLUMNS = ("segment_period_end", "segment_count", "largest_segment_revenue_share", "fastest_growing_segment",
                    "fastest_growing_segment_growth_yoy", "largest_segment_margin_change_yoy_pp")  # fmt: skip
+# X250: filers put reconciling lines on the segment axis as ordinary `ReportableSegmentsNMember`s (Suryoday SFB
+# "Unallocated", SGLTL "Eliminations" -12.90 Cr, Sandesh's Reg. 34 "Total"): member_role stays SEGMENT (it is
+# derived from the member name, never the label), so the readers that count segments drop them by the filed label.
+NON_SEGMENT_LABEL = re.compile(
+    r"^(?:less\s*:?\s*)?(?:un[\s-]?allocated|un[\s-]?allocable|inter[\s-]?segment(?:al)?|eliminations?)\b"
+    r"|^(?:total|segment total|total segments?)$"
+)
 CROSS_COLUMNS = ("rs_rank_12m_1m", "industry_earnings_breadth", "industry_earnings_breadth_n")
 MORE_COLUMNS = (
     *BENEISH_COLUMNS, *PIOTROSKI_COLUMNS, *FORENSIC_COLUMNS, *DAYS_COLUMNS, *PERCENTILES, *PRICE_COLUMNS,
@@ -470,6 +479,8 @@ def segment_columns(rows: list[tuple] | None) -> dict:
     members: dict[tuple, dict[tuple, dict]] = defaultdict(lambda: defaultdict(dict))
     labels: dict[tuple, str] = {}
     for metric, period, months, key, label, value, *member in rows:
+        if NON_SEGMENT_LABEL.match(key):  # X250
+            continue
         per = members[metric][(period, months, key)]
         per.setdefault(member[0] if member else key, value)
         labels.setdefault((period, months, key), label)

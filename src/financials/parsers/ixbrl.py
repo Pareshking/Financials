@@ -33,6 +33,14 @@ read as `</thead>`. A repaired file is accepted only if it then parses and yield
 has `<ix:nonFraction` / `<ix:nonNumeric` start tags; otherwise the original ParseError stands.
 Rule IXBRL4_DISPLAYED_REPORTING_PERIOD [X283]: the untagged reporting period of BSE's Jun .. Aug 2025 pages, read from
 the displayed rows when they equal the contexts (`_displayed_reporting_period`).
+Rule IXBRL5_BARE_LT_IN_TEXT [X285]: a `<` the filer typed in a text block (OCR'd notes: "re<lassified", "taken <m
+record") is written unescaped; inside an `ix:nonNumeric`, a `<` whose text up to the next `<` holds no `>` cannot
+start a tag and is read as the character (`&lt;`).
+Rule IXBRL6_TR_END_OMITTED [X286]: BSE's segment table omits a row's `</tr>` before the next row (`</td><tr`); HTML's
+`tr` end tag is optional before the next `tr`, so it is read there.
+Rule IXBRL7_TABLE_END_OMITTED [X287]: BSE's empty "Audit qualification" table (no `ix:` element, no nested table)
+ends `</tr>` and the page goes on with `<h2`; the table and its body are read as closed there (HTML ends an open table
+at the next `<table>` anyway; nothing is moved). Rules IXBRL5-7 are under the same fact-count gate as IXBRL2 / IXBRL3.
 """
 
 from __future__ import annotations
@@ -51,6 +59,9 @@ IXBRL1_RULE = "IXBRL1_BOOLEAN_TEXT"
 IXBRL2_RULE = "IXBRL2_VOID_BR"
 IXBRL3_RULE = "IXBRL3_THEAD_CLOSED_BY_TBODY"
 IXBRL4_RULE = "IXBRL4_DISPLAYED_REPORTING_PERIOD"
+IXBRL5_RULE = "IXBRL5_BARE_LT_IN_TEXT"
+IXBRL6_RULE = "IXBRL6_TR_END_OMITTED"
+IXBRL7_RULE = "IXBRL7_TABLE_END_OMITTED"
 NUM_FORMATS = {None, "num-dot-decimal", "numdotdecimal", "numdotdecimalin"}
 BOOL_FORMATS = {"booleantrue", "booleanfalse"}
 UNSUPPORTED = ("continuation", "exclude", "footnote", "tuple", "fraction")
@@ -223,17 +234,29 @@ def _parse(data: bytes) -> tuple[dict[str, str], ET.Element]:
 _IX_FACT_TAG = re.compile(rb"<ix:(?:nonFraction|nonNumeric)\b")
 _NON_NUMERIC = re.compile(rb"(<ix:nonNumeric\b[^>]*>)(.*?)(</ix:nonNumeric>)", re.S)
 _THEAD_TBODY = re.compile(rb"(<thead\b[^>]*>)((?:(?!</?thead\b|</?tbody\b|<ix:).)*)</tbody>", re.S)
+_BARE_LT = re.compile(rb"<(?=[^<>]*(?:<|$))")  # a '<' with no '>' before the next '<' (or the end of the text)
+_TR_END = re.compile(rb"</td>(?=<tr\b)")
+_TABLE_OPEN = re.compile(rb"(<table\b[^>]*><tbody\b[^>]*>(?:(?!</?table\b|</?tbody\b|<ix:).)*</tr>)(?=<h2\b)", re.S)
 
 
 def repair_xhtml(data: bytes) -> bytes | None:
-    """Rules IXBRL2_VOID_BR and IXBRL3_THEAD_CLOSED_BY_TBODY [X281, X282] (module docstring), for a file that does
-    not parse; None when neither applies. The caller re-parses and checks the fact count."""
+    """Rules IXBRL2_VOID_BR, IXBRL3_THEAD_CLOSED_BY_TBODY [X281, X282] and IXBRL5-7 [X285-X287] (module docstring),
+    for a file that does not parse; None when none applies. The caller re-parses and checks the fact count."""
     out, applied = data, False
     if b"<BR>" in out and b"</BR>" not in out:
         fixed = _NON_NUMERIC.sub(lambda m: m[1] + m[2].replace(b"<BR>", b"<BR/>") + m[3], out)
         if b"<BR>" not in fixed:  # every <BR> was inside an ix:nonNumeric
             out, applied = fixed, True
     fixed = _THEAD_TBODY.sub(lambda m: m[1] + m[2] + b"</thead>", out)
+    if fixed != out:
+        out, applied = fixed, True
+    fixed = _NON_NUMERIC.sub(lambda m: m[1] + _BARE_LT.sub(b"&lt;", m[2]) + m[3], out)  # IXBRL5
+    if fixed != out:
+        out, applied = fixed, True
+    fixed = _TR_END.sub(b"</td></tr>", out)  # IXBRL6
+    if fixed != out:
+        out, applied = fixed, True
+    fixed = _TABLE_OPEN.sub(lambda m: m[1] + b"</tbody></table>", out)  # IXBRL7
     if fixed != out:
         out, applied = fixed, True
     return out if applied else None

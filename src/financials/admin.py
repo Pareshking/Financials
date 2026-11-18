@@ -390,7 +390,7 @@ def inspect_quarantine(con, quarantine_id: str) -> dict[str, Any]:
                           "python -m financials quarantine reprocess  (after the calendar covers the date)"],
         "MISSING_SESSION": ["fetch the missing day(s), then python -m financials rebuild-market --from <date>"],
     }  # fmt: skip
-    for r in ("UNKNOWN_ISIN", "UNKNOWN_SYMBOL", "AMBIGUOUS_ISIN", "AMBIGUOUS_SYMBOL", "CIN_MISMATCH"):
+    for r in FILING_OVERRIDE_FIELDS["security_id"]:
         suggest[r] = [f"{base} --action OVERRIDE --note '<evidence>' --payload-json "
                       "'{\"field\": \"security_id\", \"value\": \"<sec_...>\"}'",
                       "python -m financials quarantine reprocess  (once the security is known)"]  # fmt: skip
@@ -502,7 +502,16 @@ def _resolve(con, qid: str, action: str, note: str, payload: dict) -> dict:
 # OVERRIDE writes only fields the promoter reads, per quarantine reason [P2-13].
 FILING_OVERRIDE_FIELDS = {
     "broadcast_ts": ("NO_VISIBILITY",),
-    "security_id": ("UNKNOWN_ISIN", "UNKNOWN_SYMBOL", "AMBIGUOUS_ISIN", "AMBIGUOUS_SYMBOL", "CIN_MISMATCH"),
+    # ISIN_SYMBOL_CONFLICT [X288]: identifiers that disagree and no named rule settles (X101) are decided by hand,
+    # on evidence the filing carries (e.g. a BSE filing's ScripCode and company name).
+    "security_id": (
+        "UNKNOWN_ISIN",
+        "UNKNOWN_SYMBOL",
+        "AMBIGUOUS_ISIN",
+        "AMBIGUOUS_SYMBOL",
+        "CIN_MISMATCH",
+        "ISIN_SYMBOL_CONFLICT",
+    ),
 }
 
 

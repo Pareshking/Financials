@@ -711,3 +711,14 @@ pinned counts are unchanged.
 | `bse/Integrated_Finance_Ind_As_513536_128202520028_IFIndAs.html` | X281 / X283: Q1 FY26 consolidated (513536), 6 unclosed `<BR>` inside the notes text block (not well-formed XHTML), reporting period displayed but not tagged | `https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_513536_128202520028_IFIndAs.html` | `6509895a1b5fc83ecc45425ecc086cd0b030c9c62705853076420623b8a5dfd8` |
 | `bse/Integrated_Finance_Ind_As_539607_25112025201023_IFIndAs.html` | X282: Q2 FY26 standalone (539607), the empty "additional disclosure of related party transactions" table opens `<thead>` and closes it with `</tbody>` | `https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_539607_25112025201023_IFIndAs.html` | `2362afd3acdd78c8d585e52ed33ffa598806ddf42dea4e2541f0241ce52b9c25` |
 | `bse/Integrated_Finance_Ind_As_504731_88202519641_IFIndAs.html` | X283: Q1 FY26 consolidated (504731), well-formed, reporting period displayed as plain text only (NO_DECLARED_PERIOD at 0.10.7) | `https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_504731_88202519641_IFIndAs.html` | `60bba0bba0737afac7eabbb407932e17ae9d16db4311012e9589b4aa8898382e` |
+
+## QP4: the last BSE results inline XBRL files still INVALID_XBRL (X285-X287; files of the bse-fetch runner ledgers, unmodified, sha256 verified = ledger / vault blob)
+
+Read by `tests/test_qp4_bse_ixbrl_repairs.py`. Kept in `bse/` so the end-to-end fixture glob and its pinned counts are
+unchanged.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `bse/Integrated_Finance_Ind_As_539469_1422026194048_IFIndAs.html` | X285: Q3 FY26 consolidated (539469 Panorama Studios), OCR'd notes text block with a bare `<` ("re<lassified"): not well-formed (invalid token) | `https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_539469_1422026194048_IFIndAs.html` | `f3b7ca98e23ad2008c9168c83953f5b66245f113a7024fda26817cf91d279774` |
+| `bse/IFOtherthan_538668_1482025163259_IFOtherthan.html` | X286: Q1 FY26 (538668) on the OtherThanBank template, segment table rows without `</tr>` before the next row (mismatched tag) | `https://www.bseindia.com/XBRLFILES/IFOtherthanDuplicateUploadDocument/IFOtherthan_538668_1482025163259_IFOtherthan.html` | `3a79de3ff9574ee059a8d101c8b143cfe97b186bafd8987e0615852a92eaa604` |
+| `bse/Integrated_Finance_Ind_As_538668_141120252067_IFIndAs.html` | X287: Q2 FY26 consolidated (538668), the empty "Audit qualification" table left open before the next `<h2>` (mismatched tag) | `https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_538668_141120252067_IFIndAs.html` | `935f5a350ff068d9bfea3eb53c9204405f132296fb62cfcfc188276d6ca34134` |

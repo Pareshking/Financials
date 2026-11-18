@@ -1,5 +1,7 @@
 """Indian equity research, screening and point-in-time backtesting engine."""
 
+# 0.10.9: X285-X287 BSE results inline XBRL repairs (bare '<' in text blocks, omitted </tr>, unclosed empty audit-
+#         qualification table); NSE XML output unchanged; re-parses BSE results with open parse findings;
 # 0.10.8: X280-X283 BSE results inline XBRL (boolean "true" / "false" text, void <BR>, <thead> closed by </tbody>,
 #         untagged displayed reporting period); NSE XML output unchanged; re-parses BSE results with open findings;
 # 0.10.7: X214 attribution by EPS (ATTRIBUTION_BY_EPS); X213 Reg. 31 named holders of the non-institutions "Others"
@@ -17,4 +19,4 @@
 # 0.8.0: X83 visibility from listing creation / file-name time (re-promotes backdated re-filings);
 # 0.7.0: SHP16-SHP18 (old SHP taxonomy, event dates, percent scale); 0.6.0: zero-drop line items (C24);
 # 0.5.0: REG34_ANNUAL; audit mappings
-PARSER_VERSION = "0.10.8"
+PARSER_VERSION = "0.10.9"

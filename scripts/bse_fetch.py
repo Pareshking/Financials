@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from financials.fetch.bse import BadRequest, Blocked, BseClient, Failed, Ledger, Missing
@@ -27,6 +27,20 @@ from financials.fetch.bse import BadRequest, Blocked, BseClient, Failed, Ledger,
 GROUPS = ("A", "B", "E", "F", "FC", "G", "GC", "I", "IF", "IT", "M", "MS", "MT", "P", "R", "T", "TS", "W", "X",
           "XD", "XT", "Y", "Z", "ZP", "ZY")  # fmt: skip  # the `bse` package's valid_groups (3.3.4)
 MAX_PAGES = 40
+
+
+WINDOW_DAYS = 3  # CODE@YYYY-MM-DD: announcements from 3 days before to 3 days after that date
+
+
+def _window(entry: str, since: date, today: date) -> tuple[str, date, date]:
+    """`CODE` uses --since..--to; `CODE@YYYY-MM-DD` asks only around that date. BSE answers HTTP 400 to a 19-month
+    range for one scrip (bse-fetch runs of 2026-11-18, strPrevDate 20250401), so results PDFs are fetched around each
+    filing's NSE broadcast date instead."""
+    code, _, day = entry.partition("@")
+    if not day:
+        return code, since, today
+    d = date.fromisoformat(day)
+    return code, d - timedelta(days=WINDOW_DAYS), min(d + timedelta(days=WINDOW_DAYS), today)
 
 
 def run(c: BseClient, scrips: list[str], since: date, today: date, log) -> int:
@@ -37,11 +51,12 @@ def run(c: BseClient, scrips: list[str], since: date, today: date, log) -> int:
         except BadRequest as exc:
             skipped += 1
             log(f"SKIP group {g}: {exc}")
-    for s in scrips:
+    for entry in scrips:
+        s, lo, hi = _window(entry, since, today)
         rows: list[dict] = []
         try:
             for page in range(1, MAX_PAGES + 1):
-                got, total = c.announcements(since, today, page=page, scrip=s)
+                got, total = c.announcements(lo, hi, page=page, scrip=s)
                 rows += got
                 if not got or total is None or len(rows) >= total:
                     break
@@ -56,7 +71,7 @@ def run(c: BseClient, scrips: list[str], since: date, today: date, log) -> int:
             except (Missing, BadRequest) as exc:
                 skipped += 1
                 log(f"SKIP attachment {r['ATTACHMENTNAME']}: {exc}")
-    wanted = set(scrips)
+    wanted = {_window(e, since, today)[0] for e in scrips}
     try:
         shp = [r for r in c.shareholding_filings(5) if str(r.get("FLD_ScripCode")) in wanted]
     except BadRequest as exc:
@@ -76,14 +91,14 @@ def run(c: BseClient, scrips: list[str], since: date, today: date, log) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--scrips", required=True, help="comma-separated BSE scrip codes")
+    ap.add_argument("--scrips", required=True, help="comma-separated BSE scrip codes, or CODE@YYYY-MM-DD windows")
     ap.add_argument("--since", type=date.fromisoformat, required=True)
     ap.add_argument("--to", type=date.fromisoformat, default=date.today())
     ap.add_argument("--out", type=Path, required=True)
     a = ap.parse_args(argv)
     scrips = [s.strip() for s in a.scrips.split(",") if s.strip()]
-    if not all(s.isdigit() for s in scrips):
-        ap.error("--scrips: BSE scrip codes are digits")
+    if not all(s.partition("@")[0].isdigit() for s in scrips):
+        ap.error("--scrips: BSE scrip codes are digits (optionally CODE@YYYY-MM-DD)")
     led = Ledger(a.out)
     c = BseClient(ledger=led)
     rc = 0

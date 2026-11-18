@@ -445,3 +445,18 @@ def test_bse2_rows_without_an_isin_are_skipped_and_other_defects_still_reject():
     bad = data.replace(b'"ISIN_NUMBER":"NA"', b'"ISIN_NUMBER":"INE12"')
     with pytest.raises(ParseError, match="malformed"):
         parse_list_securities(bad)
+
+
+def test_bse_fetch_windows_a_scrip_around_a_date():
+    """BSE answered HTTP 400 to a 19-month announcements range for one scrip (2026-11-18); CODE@DATE asks +-3 days."""
+    import importlib.util
+
+    from financials.sources import ROOT
+
+    spec = importlib.util.spec_from_file_location("bse_fetch", ROOT / "scripts" / "bse_fetch.py")
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    since, today = date(2025, 4, 1), date(2026, 11, 18)
+    assert m._window("500488", since, today) == ("500488", since, today)
+    assert m._window("500488@2026-05-20", since, today) == ("500488", date(2026, 5, 17), date(2026, 5, 23))
+    assert m._window("500488@2026-11-17", since, today) == ("500488", date(2026, 11, 14), today)

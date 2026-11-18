@@ -94,7 +94,12 @@ def test_nazara_bridge_stays_until_the_agreeing_filing_is_visible(market):
     book = load_factbook(market.con, ent, "CONSOLIDATED", BEFORE_AR)
     assert "pat" not in book.later_filed  # the first Q4 filing (81.94) is earlier than the ranked re-send
     assert book.misfiled_ytd_evidence("pat", FY26) is None
-    assert book.ttm("pat", Q2_FY27) == Decimal("-877600000")  # X106 bridge, as before
+    assert book.ttm_from_ytd("pat", Q2_FY27) == Decimal("-877600000")  # the X106 bridge
+    # X301 (decision 2026-11-18 item 6): FY26 (-23.24 Cr, the re-send) breaks the identity while H1 FY26 holds it, so
+    # the bridge would mix two bases; the FY26 break contains window quarters and is not (yet) proven mis-filed, so
+    # the quarters are not shown to be on one basis either: NULL (was the -87.76 Cr bridge before X301).
+    assert book.prior_year_mixed_basis("pat", book._bridge_periods("pat", Q2_FY27))
+    assert book.ttm("pat", Q2_FY27) is None
 
 
 def _aarti_book() -> FactBook:

@@ -752,3 +752,18 @@ Read by `tests/test_x300_operating_lines_bridge.py`. Kept in `operating_bridge/`
 | `operating_bridge/INTEGRATED_FILING_INDAS_1665216_09052026120920_WEB.xml` | SWIGGY Q4 FY26 standalone: Q4 279 Cr, FY26 436 Cr on the continuing basis (quarters -2,479 Cr): FY restated, H1 FY26 not [X300] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1665216_09052026120920_WEB.xml | `91cf2d1de71eb615e6d87bb5bc1c7b1ee1f95d97e56b251eaadadb4f10c3f0e2` |
 | `operating_bridge/INTEGRATED_FILING_INDAS_1705249_30072026050331_WEB.xml` | SWIGGY Q1 FY27 standalone: 350 Cr [X300] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1705249_30072026050331_WEB.xml | `1da2df2ea1dbb87ea6fe760c47f47cd21d299f21da03b6d17bdc4746390e7c4b` |
 | `operating_bridge/INTEGRATED_FILING_INDAS_1744174_22102026064058_WEB.xml` | SWIGGY Q2 FY27 standalone: Q2 287 Cr, H1 FY27 637 Cr [X300] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1744174_22102026064058_WEB.xml | `6b9ecaf33b10611f0ca3514c9020430605bf63ff73d0a01595791f24b0ab8bf4` |
+
+## QE2: rule X301 (X106 guarded-tag bridge only on one basis); copied 2026-11-18 from the local vault blob, gunzipped, sha256 verified
+
+Read by `tests/test_x301_guarded_bridge_one_basis.py` (with the SWIGGY files of the QE section above). Kept in
+`operating_bridge/` so the end-to-end fixture glob (`xbrl/*.xml`) and its pinned counts are unchanged. Patanjali Foods
+(PATANJALI) standalone results, FY26 and H1 FY27 (LevelOfRounding: lakhs).
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `operating_bridge/INTEGRATED_FILING_INDAS_1513074_14082025053356_WEB.xml` | PATANJALI Q1 FY26 standalone results: revenue 8,899.71 Cr [X301] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1513074_14082025053356_WEB.xml | `e3e016926d789d643cff7412794fbf41cb8b8e3146051c849eb2d589913facd2` |
+| `operating_bridge/INTEGRATED_FILING_INDAS_1562673_31102025052557_WEB.xml` | PATANJALI Q2 FY26 standalone: Q2 revenue 9,798.84 Cr, H1 FY26 18,564.86 Cr (Q1 + Q2 = 18,698.55: the prior-year YTD breaks the identity) [X301] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1562673_31102025052557_WEB.xml | `e296f343c3e55e308aaeb9b7cda51e6b1ffa7a76d48670cbca98cb81385a423e` |
+| `operating_bridge/INTEGRATED_FILING_INDAS_1623623_11022026072616_WEB.xml` | PATANJALI Q3 FY26 standalone: Q3 10,483.71 Cr, 9M 29,013.98 Cr (quarters 29,182.26; NEXT_YTD_AGREES) [X301] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1623623_11022026072616_WEB.xml | `64b91826bbbfdb3639bbe9fc699e5b67dd7c3fc1fc18374c37f105bf71f33b5e` |
+| `operating_bridge/INTEGRATED_FILING_INDAS_1678022_30052026094755_WEB.xml` | PATANJALI Q4 FY26 standalone (re-sent results, same figures as the first): Q4 11,155.60 Cr, FY26 40,169.58 Cr (quarters 40,337.81, within 0.5 %: holds) [X301] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1678022_30052026094755_WEB.xml | `4b003f1cc8bd222d5e13a8bbd5ce3799ba9b5343d8331d3b059667a9a552649b` |
+| `operating_bridge/INTEGRATED_FILING_INDAS_1715092_14082026083859_WEB.xml` | PATANJALI Q1 FY27 standalone: revenue 11,337.45 Cr [X301] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1715092_14082026083859_WEB.xml | `ee764b0850ad9c7dc8ab4f94c22acd8a15e588acfaaa3554069f7b9758a3b885` |
+| `operating_bridge/INTEGRATED_FILING_INDAS_1758226_14112026020725_WEB.xml` | PATANJALI Q2 FY27 standalone: H1 FY27 revenue 22,660.03 Cr [X301] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1758226_14112026020725_WEB.xml | `cb26c4ab5ae6224e1ad531824cc63b00cc0261ce19c4bf4a8ac32f0a05af1dfa` |

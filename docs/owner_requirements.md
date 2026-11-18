@@ -619,3 +619,12 @@ My 19:31 (2026-11-17) recommendations, unanswered, applied:
    a restated row, so OPM, EBITDA, EBIT (ROCE) and interest coverage are on one basis (POLYPLEX TTM other income
    105 Cr via the YTD instead of 158 Cr from the quarters). X226 (no bridge on a proven mis-filed YTD) and X173
    hold for these lines; a row whose operating lines have no bridge on one basis keeps the quarter sums.
+6. **X106 bridges revenue and profit only on one basis** (X301 GUARDED_BRIDGE_ONE_BASIS; main session, owner:
+   "continue doing what you are doing"): the guarded tags (revenue, total income, PAT, PBT incl. JV, owners' PAT)
+   use the YTD bridge only when the prior year's FY and YTD are on one basis. When one of them holds the YTD
+   identity and the other breaks it (Swiggy standalone FY26 revenue 8,258 Cr continuing vs H1 FY26 5,693 Cr as
+   first filed), TTM is the 4-quarter sum if those quarters are on one basis (they agree with the latest YTD and
+   with every YTD containing them that is not proven mis-filed), else NULL: never a mixed-basis number (Swiggy Q2
+   FY27 TTM revenue NULL instead of 7,673 Cr). On the snapshot this turns 1,231 TTM values NULL in 236 entities
+   (56 in the Nifty 500 seed), among them `sales_ttm` of Bajaj Finance, Coal India, HUL and LTTS in Jun-26 /
+   Sep-26 rows, because their FY26 revenue is restated (or regrouped) beyond 0.5 % while H1 FY26 is not. Reversible.

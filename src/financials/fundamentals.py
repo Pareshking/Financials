@@ -388,7 +388,8 @@ class FactBook:
         YTD identity while the other provably holds it (all its quarters filed). Swiggy standalone FY26 PBT before
         exceptional items 436 Cr on the continuing basis after the Instamart transfer vs H1 FY26 -1,872 Cr = Q1 + Q2
         as filed (Vedanta standalone FY26 D&A 38 Cr after the demerger vs H1 FY26 2,050 Cr: FY - H1 would be a
-        negative D&A). FY - YTD is then no set of quarters, so the line is not bridged."""
+        negative D&A). FY - YTD is then no set of quarters, so the line is not bridged (X301: nor a guarded tag;
+        `one_basis_quarter_sum` then)."""
         if len(used) != 3:
             return False
         broken = {(date.fromisoformat(b["ytd_period"][0]), date.fromisoformat(b["ytd_period"][1]))
@@ -427,11 +428,39 @@ class FactBook:
             used = self._bridge_periods(tag, end)
             if used and any(self.misfiled_ytd_evidence(tag, p) for p in used):
                 return None
+            if tag in YTD_GUARDED_TAGS and self.prior_year_mixed_basis(tag, used):
+                # X301 GUARDED_BRIDGE_ONE_BASIS: the prior year's FY and YTD are on two bases (Swiggy standalone
+                # FY26 revenue 8,258 Cr continuing vs H1 FY26 5,693 Cr as first filed): FY - YTD is no set of
+                # quarters, so no bridge. The quarter sum if it is on one basis, else NULL (never mixed).
+                return self.one_basis_quarter_sum(tag, end, used)
             return self.ttm_from_ytd(tag, end)
         qs = [self.quarter(tag, _add_months(end, -3 * i)) for i in range(4)]
         if None not in qs:
             return sum(qs, Decimal(0))
         return self.ttm_from_ytd(tag, end)
+
+    def one_basis_quarter_sum(self, tag: str, end: date, used: list[Period]) -> Decimal | None:
+        """X301: the 4 quarters to `end` when they are on one basis, else None. On one basis: all 4 are known, the
+        current-year ones agree with the latest YTD (`used[0]`, identity tolerance), and every YTD of `tag` that
+        contains one of them and breaks the identity is provably the mis-filed side (X226 evidence). A prior FY
+        restated on a new basis (a break nothing proves mis-filed) means its quarters in the window are not all on
+        the basis of the later ones: Swiggy standalone Q3 FY26 revenue 3,166 Cr with Instamart, Q4 2,194 Cr
+        continuing, so the window has no one-basis value and the TTM is NULL."""
+        ends = [_add_months(end, -3 * i) for i in range(4)]
+        qs = [self.quarter(tag, e) for e in ends]
+        if None in qs or not used:
+            return None
+        ytd = self.durations[tag][used[0]]
+        current = [q for q, e in zip(qs, ends, strict=True) if e >= used[0][0]]
+        if abs(ytd - sum(current, ZERO)) > self._identity_tolerance(len(current), ytd):
+            return None
+        starts = [_add_months(date(e.year, e.month, 1), -2) for e in ends]
+        for b in self.ytd_breaks(tag):
+            p = (date.fromisoformat(b["ytd_period"][0]), date.fromisoformat(b["ytd_period"][1]))
+            contains = any(p[0] <= s and e <= p[1] for s, e in zip(starts, ends, strict=True))
+            if contains and self.misfiled_ytd_evidence(tag, p) is None:
+                return None
+        return sum(qs, ZERO)
 
     def ttm_from_ytd(self, tag: str, end: date) -> Decimal | None:
         """Semi-annual bridge (§6.5): FY directly, else YTD_curr + FY_prev − YTD_prev."""

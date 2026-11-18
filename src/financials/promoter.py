@@ -1177,6 +1177,27 @@ def _close_stale_ytd_findings(
         )
 
 
+def _entities_by_staged_scrip_code(con, stage_dir: Path) -> list[tuple[str]]:
+    """Entities whose identifier rows hold the BSE scrip code a staged BSE results file states (its non-dimensional
+    `ScripCode`, rule SC0; codes filled by rule BSE1 from BSE's list of securities) [X265]."""
+    from financials import filing_checks as fc
+
+    path = Path(stage_dir) / "stg_disclosures.parquet"
+    if not path.exists():
+        return []
+    vals = {fc.scrip_code(v) for (v,) in con.execute(
+        "SELECT value_text FROM read_parquet(?) WHERE element = 'ScripCode' AND dimensions IS NULL",
+        [path.as_posix()]).fetchall()}  # fmt: skip
+    vals.discard(None)
+    if len(vals) != 1:
+        return []
+    return con.execute(
+        "SELECT DISTINCT s.entity_id FROM security_identifier_history h JOIN securities s USING (security_id) "
+        "WHERE h.exchange <> 'BSE' AND h.bse_scrip_code = ?",
+        [vals.pop()],
+    ).fetchall()
+
+
 def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
     declared_end = _declared_period_end(con, stage_dir, manifest)
     if declared_end is not None and not financials_in_scope(declared_end):
@@ -1205,6 +1226,9 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     ).fetchone()[0]:
         return PromotionResult("ALREADY_PROMOTED", "results_xbrl", message=fid)
 
+    # A BSE results file (Permitted member, X265) resolves through the NSE identifier rows of the same security, as
+    # BSE shareholding does (X170); with no ISIN match, by its filed ScripCode (codes of rule BSE1).
+    ix = "NSE" if filing["exchange"] == "BSE" else filing["exchange"]
     if meta["stated_isin"] is None and meta["accounting_profile"] == "REG34_ANNUAL":
         # Reg. 34 annual XBRL carries no ISIN: the symbol in the NSE file name, resolved on the broadcast date (the
         # file is named when it is filed), plus the filed CIN when the entity has one on record [X70].
@@ -1223,16 +1247,16 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
         ent = con.execute(
             "SELECT DISTINCT s.entity_id FROM security_identifier_history h "
             "JOIN securities s USING (security_id) WHERE h.exchange = ? AND h.isin = ?",
-            [filing["exchange"], meta["stated_isin"]],
+            [ix, meta["stated_isin"]],
         ).fetchall()
         if not ent:
-            typo = resolve_isin_typo(con, filing["exchange"], meta["stated_isin"], meta["stated_symbol"],
-                                     meta["period_end"], fid)  # fmt: skip
-            typo = typo or resolve_unregistered_isin(con, filing["exchange"], meta["stated_isin"],
-                                                     meta["stated_symbol"], meta.get("company_name"),
-                                                     meta["period_end"], fid)  # fmt: skip
+            typo = resolve_isin_typo(con, ix, meta["stated_isin"], meta["stated_symbol"], meta["period_end"], fid)
+            typo = typo or resolve_unregistered_isin(con, ix, meta["stated_isin"], meta["stated_symbol"],
+                                                     meta.get("company_name"), meta["period_end"], fid)  # fmt: skip
             ent = con.execute("SELECT entity_id FROM securities WHERE security_id IN (SELECT unnest(?))",
                               [typo]).fetchall()  # fmt: skip
+        if not ent and filing["exchange"] == "BSE":
+            ent = _entities_by_staged_scrip_code(con, stage_dir)
         reason = "UNKNOWN_ISIN" if not ent else "AMBIGUOUS_ISIN"
     ovr = filing_overrides(con, fid)
     conflict = None
@@ -1240,7 +1264,7 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
         ent = con.execute("SELECT entity_id FROM securities WHERE security_id = ?", [ovr["security_id"]]).fetchall()
     elif len(ent) == 1 and meta["stated_isin"] is not None:
         resolved, conflict = resolve_isin_symbol_conflict(
-            con, filing["exchange"], ent[0][0], meta["stated_symbol"], meta.get("company_name"), meta["period_end"], fid
+            con, ix, ent[0][0], meta["stated_symbol"], meta.get("company_name"), meta["period_end"], fid
         )
         ent = [(resolved,)] if resolved else []
         reason = "ISIN_SYMBOL_CONFLICT"
@@ -1377,8 +1401,20 @@ def _filing_check_rows(con, fid: str, exchange: str, entity_id: str, meta: dict,
             details = {"scope": meta["scope"], "differences": diffs, **fc.prior_year_class(diffs, ctx)}  # X182
             rows.append(_quarantine_row(stage="CONSISTENCY", reason_code=fc.PRIOR_YEAR_REASON, filing_id=fid,
                                         entity_id=entity_id, details=details))  # fmt: skip
-    conflicts = fc.apply_bse_scrip_code(con, exchange=exchange, entity_id=entity_id, isin=meta["stated_isin"],
-                                        symbol=meta["stated_symbol"], code=fc.filed_scrip_code(con, fid))  # fmt: skip
+    code = fc.filed_scrip_code(con, fid)
+    if exchange == "BSE":  # X265: BSE's own file states the code BSE lists; a different stored code is a finding
+        conflicts = [
+            {"security_id": sec, "valid_from": str(vf), "stored": old, "filed": code, "isin": meta["stated_isin"],
+             "symbol": sym}
+            for sec, vf, old, sym in con.execute(
+                "SELECT h.security_id, h.valid_from, h.bse_scrip_code, h.symbol FROM security_identifier_history h "
+                "JOIN securities s USING (security_id) WHERE s.entity_id = ? AND h.exchange <> 'BSE' AND h.isin = ? "
+                "ORDER BY h.security_id, h.valid_from", [entity_id, meta["stated_isin"]]).fetchall()
+            if code and fc.scrip_code(old) is not None and old != code
+        ]  # fmt: skip
+    else:
+        conflicts = fc.apply_bse_scrip_code(con, exchange=exchange, entity_id=entity_id, isin=meta["stated_isin"],
+                                            symbol=meta["stated_symbol"], code=code)  # fmt: skip
     for c in conflicts:
         rows.append(_quarantine_row(stage="IDENTIFIER", reason_code=fc.SCRIP_CONFLICT_REASON, filing_id=fid,
                                     entity_id=entity_id, security_id=c["security_id"], details=c))  # fmt: skip

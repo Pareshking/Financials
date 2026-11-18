@@ -16,6 +16,9 @@ on:
       since:
         description: "announcements from (YYYY-MM-DD)"
         default: "2026-10-01"
+      only:
+        description: "all, or results (only the results XBRL listing and files, X265)"
+        default: "all"
   push:
     paths:
       - ".github/workflows/bse-fetch.yml"
@@ -33,10 +36,11 @@ jobs:
         with:
           python-version: "3.11"
       - run: python -m pip install -e ".[bse]"
-      - run: python scripts/bse_fetch.py --scrips "$SCRIPS" --since "$SINCE" --out bse_fetch
+      - run: python scripts/bse_fetch.py --scrips "$SCRIPS" --since "$SINCE" --only "$ONLY" --out bse_fetch
         env:
           SCRIPS: ${{ inputs.scrips || '500488' }}
           SINCE: ${{ inputs.since || '2026-10-01' }}
+          ONLY: ${{ inputs.only || 'all' }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:

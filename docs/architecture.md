@@ -864,8 +864,12 @@ only because the pinned files changed).
   client). Parsed: the list of securities (BSE1) and the shareholding inline XBRL: `parsers/ixbrl.py` rebuilds the
   instance it denotes (rule IXBRL1_BOOLEAN_TEXT for BSE's Yes / No tags) and the unchanged shareholding parser reads
   it; the filing resolves by ISIN through the NSE identifier rows of the same security, visible from the listing's
-  broadcast `D` [X170]. Announcements and their PDFs stay raw. BSE announcements link no results XBRL (X168): the
-  results of Permitted members are PDFs only, so their financial statements are BLOCKED on a source.
+  broadcast `D` [X170]. Announcements and their PDFs stay raw. BSE announcements link no results XBRL (X168), but
+  BSE's results listing `Corp_FinanceResult_ng_new` does (X247): each row's `XMLName` / `Consol_XMLName` is the
+  Integrated Filing (Finance) as inline XBRL of NSE's `in-capmkt` taxonomy, which `parse_instance` reads as the
+  instance it denotes, so the NSE results parser stages it unchanged (exchange `BSE`, `bse_fetch.py --only results`).
+  It resolves by ISIN through the NSE identifier rows, else by the filed ScripCode (BSE1 codes), visible from the
+  latest of the row's `Fld_CreateDate` and its file name's same-day readings [X265].
 
 ## 12. Promoter quality gates (in order)
 

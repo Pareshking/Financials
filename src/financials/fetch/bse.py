@@ -22,12 +22,14 @@ fixtures are committed under tests/fixtures/bse/ [A17]):
   linking inline XBRL under `www.bseindia.com/XBRLFILES/SHPXBRLDataXML/`;
 - list of securities `ListofScripData/w` (`bse` package `listSecurities`: per group, `SCRIP_CD`, `ISIN_NUMBER`,
   `Mktcap` in Rs crore), the scrip-code / ISIN map and BSE's own market cap.
-- results XBRL [X240, UNVERIFIED]: the RSS feed `www.bseindia.com/Data/XML/FinancialResultsFeed.aspx` (latest
-  filings of every company, per a third-party project's measurement of 2026-10-01), whose items link Integrated Filing
-  (Finance) files under `XBRLFILES/IFIndasDuplicateUploadDocument/` (`.html` inline XBRL, reportedly with a plain
-  `.xml` instance beside it). No per-scrip results-XBRL or annual-XBRL listing is known; `probe_bse_reach.py --mode
-  xbrl` looks for one in BSE's own page code. Until a probe returns real files (committed as fixtures, tests pinned),
-  `import_ledger` vaults these answers raw only (`RESULTS_XBRL_VERIFIED`).
+- results XBRL [X247, X265, VERIFIED]: per scrip `Corp_FinanceResult_ng_new/w?SCRIP_CD=&FlagDur=&HFQ=&ISUBGROUP_CODE=
+  &segment=C` (`FlagDur` 1 Today .. 6 Last 1 year, 7 Beyond last 1 year), rows with `quarter_code`, `Fld_CreateDate`
+  (IST), `XMLName` (standalone) and `Consol_XMLName` (consolidated) under `www.bseindia.com/XBRLFILES/`: the
+  Integrated Filing (Finance) as inline XBRL (`IFIndasDuplicateUploadDocument/..._IFIndAs.html`), the SEBI `in-capmkt`
+  taxonomy of NSE's XML instances. `import_ledger` stages these `.html` files through `stage_results_xbrl`, the NSE
+  path (`parse_instance` reads inline XBRL as the instance it denotes, parsers.ixbrl). A plain `.xml` copy and annual
+  XBRL (`annual_xbrl`, X241) stay raw only: no real file of either has been seen. The RSS feed
+  `www.bseindia.com/Data/XML/FinancialResultsFeed.aspx` [X240, X242] is kept as a raw-only dataset.
 
 `requests` and `selenium` are needed only here (`pip install -e ".[bse]"`), imported lazily.
 """
@@ -37,6 +39,7 @@ from __future__ import annotations
 import hashlib
 import json
 import random
+import re
 import time
 from collections.abc import Callable
 from datetime import date, datetime
@@ -48,9 +51,11 @@ API = "https://api.bseindia.com/BseIndiaAPI/api/"
 HOME = "https://www.bseindia.com/"
 ATTACHMENT = "https://www.bseindia.com/xml-data/corpfiling/AttachLive/"
 RESULTS_FEED = "https://www.bseindia.com/Data/XML/FinancialResultsFeed.aspx"  # X240, UNVERIFIED
-# X240: flip to True only together with the tests on the probe's real BSE results / annual XBRL files (QB follow-up):
-# then `import_ledger` parses `.xml` instances of datasets results_xbrl / annual_xbrl with the NSE parsers.
-RESULTS_XBRL_VERIFIED = False
+XBRL_FILES = "https://www.bseindia.com/XBRLFILES/"  # + a results row's XMLName / Consol_XMLName [X247, X265]
+# X265: BSE results inline XBRL (`.html`, dataset results_xbrl) is parsed with the NSE results parser (fixtures
+# tests/fixtures/bse/Integrated_Finance_Ind_As_*.html, tests/test_bse_results_ixbrl.py). Plain `.xml` copies and
+# annual XBRL stay raw only (never seen).
+RESULTS_XBRL_VERIFIED = True
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
 HEADERS = {"User-Agent": UA, "Accept": "application/json, text/plain, */*", "Accept-Language": "en-US,en;q=0.5",
            "Origin": "https://www.bseindia.com", "Referer": HOME, "Connection": "keep-alive",
@@ -302,6 +307,15 @@ class BseClient:
                                                 "segment": "Equity", "status": "Active"},
                           "list_securities", {"group": group, "scrip": scrip})  # fmt: skip
 
+    def finance_results(self, scrip: str, flag_dur: int, segment: str = "C") -> list[dict]:
+        """BSE's results listing of one scrip (comp_resultsnew page) [X247, X265]: `flag_dur` 6 = last 1 year,
+        7 = beyond last 1 year (`Corp_GetFINANCE_DRDOWN_ng` flag 1); `segment` C = Equity."""
+        return self._rows("Corp_FinanceResult_ng_new/w",
+                          {"SCRIP_CD": scrip, "FlagDur": str(flag_dur), "HFQ": "", "ISUBGROUP_CODE": "",
+                           "segment": segment},
+                          "xbrl_listing", {"api": "Corp_FinanceResult_ng_new", "scrip": scrip,
+                                           "flag_dur": flag_dur})  # fmt: skip
+
     def results_feed(self) -> bytes:
         """BSE's financial results RSS feed, as sent [X240, UNVERIFIED]."""
         return self.fetch_url(RESULTS_FEED, {}, "results_feed", {}, file=True)
@@ -325,7 +339,7 @@ CATEGORY = {"announcements": "BSE_ANNOUNCEMENTS", "attachment": "BSE_ATTACHMENT"
             "shareholding_filings": "BSE_SHP_LISTING", "shareholding_xbrl": "BSE_SHP_XBRL",
             "list_securities": "BSE_LIST_SECURITIES", "results_feed": "BSE_RESULTS_FEED",
             "xbrl_listing": "BSE_XBRL_LISTING", "results_xbrl": "BSE_RESULTS_XBRL",
-            "annual_xbrl": "BSE_ANNUAL_XBRL"}  # fmt: skip  # X240: the last four raw only until RESULTS_XBRL_VERIFIED
+            "annual_xbrl": "BSE_ANNUAL_XBRL"}  # fmt: skip  # raw only but results .html (parsed, X265)
 
 
 def _ext(rec: dict) -> tuple[str, str]:
@@ -350,12 +364,14 @@ def import_ledger(vault, stage_root: Path, ledger_dir: Path) -> tuple[list[Path]
     recorded) and stage it: the list of securities is parsed (raw_bse_securities, rule BSE1 [X169]); everything else
     raw only, until a parser is proven on a real file of that kind [A17]. Each blob's sha256 is checked against the
     ledger; a re-import adds nothing (idempotent ids)."""
+    from financials.parsers.ixbrl import is_inline
     from financials.staging import stage_raw_only
     from financials.timeutil import utc_now
 
     led = Ledger(ledger_dir)
     staged, errors = [], []
     shp_broadcast = _shp_broadcast_times(led)
+    results_broadcast = _results_broadcast_times(led)
     for rec in led.records():
         if rec["status"] != 200 or rec["dataset"] not in CATEGORY:
             continue
@@ -388,19 +404,115 @@ def import_ledger(vault, stage_root: Path, ledger_dir: Path) -> tuple[list[Path]
                                              broadcast_ts=ts, broadcast_ts_source="API_FIELD" if ts else "UNKNOWN",
                                              exchange="BSE"))  # fmt: skip
             continue
-        if rec["dataset"] in ("results_xbrl", "annual_xbrl") and RESULTS_XBRL_VERIFIED and ext == "xml":
-            # X240 (prepared, NOT yet enabled or tested: needs the probe's real files as fixtures first). A plain
-            # instance of the SEBI in-capmkt (results) or Reg. 34 (annual) taxonomy takes the NSE path unchanged:
-            # parse_integrated_results dispatches on the namespace. Inline `.html` copies stay raw only.
+        if rec["dataset"] == "results_xbrl" and RESULTS_XBRL_VERIFIED and is_inline(data):
+            # X265: BSE's inline XBRL of the SEBI in-capmkt results taxonomy takes the NSE path unchanged
+            # (parse_instance reads it as the instance it denotes; parse_integrated_results dispatches on the profile).
             from financials.staging import stage_results_xbrl
 
+            ts = results_broadcast.get(rec["url"].split("?", 1)[0])
             staged.append(stage_results_xbrl(vault, stage_root, data=data, source_url=rec["url"], fetched_at=fetched,
+                                             broadcast_ts=ts, broadcast_ts_source="API_CREATION" if ts else "UNKNOWN",
                                              exchange="BSE"))  # fmt: skip
             continue
         staged.append(stage_raw_only(vault, stage_root, data=data, ext=ext, media_type=media,
                                      category=CATEGORY[rec["dataset"]], source_url=rec["url"], fetched_at=fetched,
                                      exchange="BSE"))  # fmt: skip
     return staged, errors
+
+
+_QUARTER_CODE = re.compile(r"^([JSDM])([QHNC])(\d{4})-(\d{4})$")
+_MONTH_END = {"J": (6, 30), "S": (9, 30), "D": (12, 31), "M": (3, 31)}
+
+
+def quarter_period_end(code: str | None) -> date | None:
+    """Period end of a BSE results row's `quarter_code` [X265]: month letter J / S / D / M (June, September, December
+    of the first year; March of the second) + Q quarter / H half year / N nine months / C cumulative (year), then the
+    financial year: `SQ2026-2027` -> 2026-09-30, `MC2025-2026` -> 2026-03-31. Anything else -> None."""
+    m = _QUARTER_CODE.match((code or "").strip())
+    if not m or int(m[4]) != int(m[3]) + 1:
+        return None
+    month, day = _MONTH_END[m[1]]
+    return date(int(m[4]) if m[1] == "M" else int(m[3]), month, day)
+
+
+def results_files(rows: list[dict], min_period_end: date) -> tuple[list[tuple[str, dict]], int]:
+    """(file URL, covers) of every distinct `XMLName` / `Consol_XMLName` in a scrip's results rows whose quarter ends
+    on or after `min_period_end` (a row with an unreadable `quarter_code` is kept: the promoter's scope gate decides),
+    and the number of rows skipped as earlier. One file serves several rows (quarter + half year, quarter + year)."""
+    out: dict[str, dict] = {}
+    skipped = 0
+    for r in rows:
+        end = quarter_period_end(r.get("quarter_code"))
+        if end is not None and end < min_period_end:
+            skipped += 1
+            continue
+        for field, scope in (("XMLName", "standalone"), ("Consol_XMLName", "consolidated")):
+            name = (r.get(field) or "").strip()
+            if name:
+                out.setdefault(XBRL_FILES + name.lstrip("/"),
+                               {"scrip": str(r.get("Scrip_cd", "")), "quarter_code": r.get("quarter_code"),
+                                "field": field, "scope": scope})  # fmt: skip
+    return list(out.items()), skipped
+
+
+_FILE_STAMP = re.compile(r"_(\d{11,16})_IFIndAs\.html$", re.IGNORECASE)
+
+
+def file_stamps(url: str) -> list[datetime]:
+    """Every IST time a BSE results file name `..._<D><M><YYYY><H><MM><SS>_IFIndAs.html` can encode: the parts are
+    not zero-padded (X240), so `511202619052` reads as 5-11-2026 19:05:02 or 19:00:52 (its row's Fld_CreateDate is
+    19:00:52.8). Only valid dates and times, years 20xx."""
+    m = _FILE_STAMP.search(url.split("?", 1)[0])
+    if not m:
+        return []
+    s, out = m[1], set()
+    for d in (1, 2):
+        for mo in (1, 2):
+            year, rest = s[d + mo : d + mo + 4], s[d + mo + 4 :]
+            if not year.startswith("20"):
+                continue
+            for h in (1, 2):
+                for mi in (1, 2):
+                    if len(rest) - h - mi not in (1, 2):
+                        continue
+                    try:
+                        out.add(datetime(int(year), int(s[d : d + mo]), int(s[:d]), int(rest[:h]),
+                                         int(rest[h : h + mi]), int(rest[h + mi :])))  # fmt: skip
+                    except ValueError:
+                        continue
+    return sorted(out)
+
+
+def _results_broadcast_times(led: Ledger) -> dict[str, datetime]:
+    """Results file URL -> the earliest time it is taken as public (UTC) [X265]: the latest of its listing rows'
+    `Fld_CreateDate` (IST, the XBRL row's creation, minutes after the announcement: 500488 Q2 FY27 announced 18:55:13,
+    Fld_CreateDate 19:00:52.8) and every same-day time its file name can encode, since a consolidated file can be
+    named after its row's Fld_CreateDate (544111: 13:33:42 against 13:33:28.4). Later, never earlier."""
+    from financials.timeutil import ist_to_utc
+
+    created: dict[str, datetime] = {}
+    for rec in led.records():
+        if rec["dataset"] != "xbrl_listing" or rec["status"] != 200 or "Corp_FinanceResult_ng_new" not in rec["url"]:
+            continue
+        try:
+            rows = json.loads(led.read(rec["sha256"]).decode("utf-8")).get("Table") or []
+        except (OSError, ValueError, AttributeError):
+            continue
+        for r in rows:
+            try:
+                ts = datetime.fromisoformat(str(r.get("Fld_CreateDate") or ""))
+            except ValueError:
+                continue
+            for field in ("XMLName", "Consol_XMLName"):
+                name = (r.get(field) or "").strip()
+                if name:
+                    url = XBRL_FILES + name.lstrip("/")
+                    created[url] = max(created.get(url, ts), ts)
+    out = {}
+    for url, ts in created.items():
+        ist = max([ts, *(t for t in file_stamps(url) if t.date() == ts.date())])
+        out[url] = ist_to_utc(ist.date(), ist.time())
+    return out
 
 
 def _shp_broadcast_times(led: Ledger) -> dict[str, datetime]:

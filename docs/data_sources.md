@@ -39,7 +39,7 @@
 | F31 | NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv) | 1 | VERIFIED | CONTAINER_DIRECT | X130, X131, X132, X133, X134, P18 |
 | F34 | BSE equity UDiFF bhavcopy | 1 | VERIFIED | CONTAINER_DIRECT | X165, A16 |
 | F35 | BSE list of securities (ListofScripData, per BSE group) | 1 | VERIFIED | GITHUB_RUNNER | X169, A17, A18 |
-| F36 | BSE announcements (+ AttachLive attachments) and shareholding filings (+ inline XBRL) | 1 | VERIFIED | GITHUB_RUNNER | A17, A18, X166, X167, X168, X170 |
+| F36 | BSE announcements (+ AttachLive attachments), shareholding filings (+ inline XBRL) and results XBRL | 1 | VERIFIED | GITHUB_RUNNER | A17, A18, X166, X167, X168, X170, X247, X265 |
 
 ## F01 — UDiFF cash-market bhavcopy
 
@@ -602,19 +602,19 @@
 | evidence | X169, A17, A18 |
 | notes | Ported owner client (financials.fetch.bse) on a runner: group A answered 200 by plain requests with BSE's headers (probe run 2, 705 rows). Runner ledger -> import-bse -> promote (rule BSE1). The container gets 403/404 (A16). |
 
-## F36 — BSE announcements (+ AttachLive attachments) and shareholding filings (+ inline XBRL)
+## F36 — BSE announcements (+ AttachLive attachments), shareholding filings (+ inline XBRL) and results XBRL
 
 | Field | Value |
 |---|---|
 | exchange_or_agency | BSE |
-| url_or_endpoint_pattern | https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=<N>&strCat=-1&strPrevDate=<YYYYMMDD>&strScrip=<code>&strSearch=P&strToDate=<YYYYMMDD>&strType=C&subcategory=-1; https://www.bseindia.com/xml-data/corpfiling/AttachLive/<ATTACHMENTNAME>; https://api.bseindia.com/BseIndiaAPI/api/Corp_Shareholding_ng/w?scripcode=<code>&flag=<1-6>&indtype=; https://www.bseindia.com/XBRLFILES/SHPXBRLDataXML/<code>_<ts>_SP.html |
-| format | JSON (Table / Table1 ROWCNT); attachments PDF; shareholding inline XBRL (in-bse-shp taxonomy) |
+| url_or_endpoint_pattern | https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=<N>&strCat=-1&strPrevDate=<YYYYMMDD>&strScrip=<code>&strSearch=P&strToDate=<YYYYMMDD>&strType=C&subcategory=-1; https://www.bseindia.com/xml-data/corpfiling/AttachLive/<ATTACHMENTNAME>; https://api.bseindia.com/BseIndiaAPI/api/Corp_Shareholding_ng/w?scripcode=<code>&flag=<1-6>&indtype=; https://www.bseindia.com/XBRLFILES/SHPXBRLDataXML/<code>_<ts>_SP.html; https://api.bseindia.com/BseIndiaAPI/api/Corp_FinanceResult_ng_new/w?SCRIP_CD=<code>&FlagDur=<1-7>&HFQ=&ISUBGROUP_CODE=&segment=C; https://www.bseindia.com/XBRLFILES/<XMLName \| Consol_XMLName> (IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_<code>_<D><M><YYYY><H><MM><SS>_IFIndAs.html) |
+| format | JSON (Table / Table1 ROWCNT); attachments PDF; shareholding inline XBRL (in-bse-shp taxonomy); results inline XBRL (SEBI in-capmkt taxonomy, scale 7 = crores) |
 | cadence | Per filing |
 | fetch_runtime | GITHUB_RUNNER |
 | join_keys | SCRIP_CD / FLD_ScripCode, NEWSID, ISIN inside the shareholding file |
-| target_tables | filings (exchange BSE), shareholding_meta, shareholding_observations (inline XBRL, X170) |
-| unlocked_metrics | Reg. 31 shareholding of the Permitted members of rule U1-P; their results as PDF only (no XBRL source, X168) |
+| target_tables | filings (exchange BSE), shareholding_meta, shareholding_observations (inline XBRL, X170), filing_meta, fact_observations, segment_observations, disclosure_facts (results inline XBRL, X265) |
+| unlocked_metrics | Reg. 31 shareholding of the Permitted members of rule U1-P; their Integrated Filing results (inline XBRL, X265; no NSE XBRL, X176) and results PDFs |
 | phase | 1 |
 | verification_status | VERIFIED |
-| evidence | A17, A18, X166, X167, X168, X170 |
-| notes | bse-fetch workflow (scripts/bse_fetch.py) -> import-bse -> promote. Shareholding inline XBRL is parsed into the shareholding tables (X170); announcements and PDFs are vaulted raw. strCat=Result with strScrip answered 400 (A18): ask strCat=-1 and pick Result rows by CATEGORYNAME. |
+| evidence | A17, A18, X166, X167, X168, X170, X247, X265 |
+| notes | bse-fetch workflow (scripts/bse_fetch.py) -> import-bse -> promote. Shareholding inline XBRL is parsed into the shareholding tables (X170); announcements and PDFs are vaulted raw. strCat=Result with strScrip answered 400 (A18): ask strCat=-1 and pick Result rows by CATEGORYNAME. Results XBRL (bse_fetch.py --only results): the Corp_FinanceResult_ng_new rows' XMLName / Consol_XMLName inline files are read by the NSE results parser (parse_instance reads inline XBRL as its instance); identity by ISIN through the NSE identifier rows, else the filed ScripCode (BSE1 codes); visible from the latest of Fld_CreateDate and the file name's same-day readings. FlagDur 7 (beyond last 1 year) not answered yet. |

@@ -327,8 +327,12 @@ def stage_results_xbrl(
     run_suffix: str | None = None,
 ) -> Path:
     """Vault + parse one quarterly results XBRL. Parse problems are staged as issues, not raised.
-    `run_suffix` (restage) gives a re-parse its own batch, promoted as a new parser_version."""
-    blob = vault.put(data, ext="xml", media_type="application/xml", fetched_at=fetched_at)
+    `run_suffix` (restage) gives a re-parse its own batch, promoted as a new parser_version. A BSE inline XBRL file
+    [X265] is vaulted as the HTML it is and parsed as the instance it denotes."""
+    from financials.parsers.ixbrl import is_inline
+
+    ext, media = ("html", "text/html") if is_inline(data) else ("xml", "application/xml")
+    blob = vault.put(data, ext=ext, media_type=media, fetched_at=fetched_at)
     filing = make_filing(
         blob,
         exchange=exchange,

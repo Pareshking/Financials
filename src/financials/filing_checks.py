@@ -28,7 +28,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from financials.db import version_key
-from financials.money import ROUNDING_UNITS
+from financials.money import ROUNDING_UNITS, rounding_only_tolerance
 
 PRIOR_YEAR_REASON = "ANNUAL_PRIOR_YEAR_DIFFERS"
 SCRIP_CONFLICT_REASON = "BSE_SCRIP_CODE_CONFLICT"
@@ -63,7 +63,8 @@ def annual_prior_year_comparison(
     """Rupee facts of this annual filing for periods ending before its own fiscal year (the prior-year columns),
     each compared with the value a reader had for that tag and period one microsecond before this filing became
     visible (`load_factbook`: results outrank the annual report on P&L lines [X100], latest version wins). Tolerance:
-    half a LevelOfRounding unit of each side (this filing's unit, the coarsest unit among the stored filings).
+    half a LevelOfRounding unit of each side (this filing's unit, the coarsest unit among the stored filings): rule
+    ROUNDING_ONLY [X260] for two figures.
     The filing's own active corrections (decision B, rule X201) replace its filed values (X235): a rescaled annual is
     compared at its corrected scale. Returns (differences, context): context holds the tags compared on both sides
     (`compared`) and whether the filing states a non-zero prior-year profit from discontinued operations
@@ -88,7 +89,7 @@ def annual_prior_year_comparison(
         if (t, p, s, e) in values:
             values[(t, p, s, e)] = v  # None: the correction withdraws the value
     book = load_factbook(con, entity_id, scope, visible_from_ts - timedelta(microseconds=1))
-    tol = (book.rounding_unit + ROUNDING_UNITS[level_of_rounding]) / 2
+    tol = rounding_only_tolerance([book.rounding_unit, ROUNDING_UNITS[level_of_rounding]])  # X260: one figure each
     out = []
     for (tag, ptype, start, end), value in sorted(
         values.items(), key=lambda x: (*x[0][:2], x[0][2] or date.min, x[0][3])

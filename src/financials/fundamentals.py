@@ -13,7 +13,7 @@ from decimal import Decimal
 
 from financials.corp_actions import RETIRED_STATUSES
 from financials.db import version_key
-from financials.money import ROUNDING_UNITS
+from financials.money import ROUNDING_UNITS, within_rounding_only
 from financials.parsers.indas_corp import period_months
 from financials.scope import financials_in_scope
 
@@ -147,7 +147,25 @@ class FactBook:
     def ytd_breaks(self, tag: str) -> list[dict]:
         """Every filed YTD (> 3 months, from a fiscal-year start) whose quarters were all filed directly, and whose
         value differs from their sum by more than the tolerance. A break means a restated or mis-filed quarter
-        (or YTD); which one is wrong cannot be told from the numbers, so nothing is corrected [X80]."""
+        (or YTD); which one is wrong cannot be told from the numbers, so nothing is corrected [X80]. A difference
+        within the rounding of the figures compared (rule ROUNDING_ONLY, X260) is no break."""
+        return [b for b, rounding_only in self._ytd_identity_failures(tag) if not rounding_only]
+
+    def ytd_rounding_only(self, tag: str) -> list[dict]:
+        """X260: the comparisons that exceed the identity tolerance but not the rounding of the figures compared
+        (`rounded_figures`, see `_ytd_rounded_figures`): the break details `ytd_breaks` would have returned."""
+        return [b for b, rounding_only in self._ytd_identity_failures(tag) if rounding_only]
+
+    def _ytd_rounded_figures(self, tag: str, periods: list[Period]) -> int:
+        """X260: rounded figures behind `tag` over `periods`: one per period, two for pbt_incl_jv in a period whose
+        JV share is filed and non-zero (PBT and the JV share are each rounded)."""
+        if tag != PBT_INCL_JV:
+            return len(periods)
+        jv = self.durations.get("share_of_associates_jv", {})
+        return len(periods) + sum(1 for p in periods if jv.get(p))
+
+    def _ytd_identity_failures(self, tag: str) -> list[tuple[dict, bool]]:
+        """(break details, within rounding only [X260]) of every YTD failing the identity tolerance."""
         d = self.durations.get(tag, {})
         out = []
         for (s, e), ytd in d.items():
@@ -155,14 +173,17 @@ class FactBook:
             if m is None or m <= 3 or m > 12 or m % 3 or not self.is_ytd_start(s):
                 continue
             ends = [_add_months(e, -3 * i) for i in range(m // 3)]
-            qs = [d.get((_add_months(date(qe.year, qe.month, 1), -2), qe)) for qe in ends]
+            periods = [(_add_months(date(qe.year, qe.month, 1), -2), qe) for qe in ends]
+            qs = [d.get(p) for p in periods]
             if None in qs:
                 continue
             total = sum(qs, Decimal(0))
             tol = max(self.rounding_unit * (len(qs) + 1) / 2, abs(ytd) * YTD_IDENTITY_REL_TOLERANCE)
             if abs(ytd - total) > tol:
-                out.append({"tag": tag, "ytd_period": [str(s), str(e)], "ytd": str(ytd), "quarters_sum": str(total),
-                            "quarters": len(qs), "tolerance": str(tol)})  # fmt: skip
+                figures = self._ytd_rounded_figures(tag, [*periods, (s, e)])
+                b = {"tag": tag, "ytd_period": [str(s), str(e)], "ytd": str(ytd), "quarters_sum": str(total),
+                     "quarters": len(qs), "tolerance": str(tol)}  # fmt: skip
+                out.append((b, within_rounding_only(ytd - total, [self.rounding_unit] * figures)))
         return out
 
     def _ytd_quarters(self, tag: str, s: date, e: date) -> list[Decimal | None]:

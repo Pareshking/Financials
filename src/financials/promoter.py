@@ -1129,23 +1129,36 @@ def audit_ytd_identity(con, pairs: Iterable[tuple[str, str]]) -> list[str]:
     filing that restores the identity is the only fix."""
     from financials.fundamentals import YTD_GUARDED_TAGS, load_factbook
 
-    rows, pairs = [], list(pairs)
+    rows, pairs, rounding_only = [], list(pairs), set()
     for entity_id, scope in pairs:
         book = load_factbook(con, entity_id, scope, datetime(9999, 12, 31))
         for tag in sorted(YTD_GUARDED_TAGS):
             for b in book.ytd_breaks(tag):
                 rows.append(_quarantine_row(stage="CONSISTENCY", reason_code="YTD_QUARTER_MISMATCH",
                                             entity_id=entity_id, details={"scope": scope, **b}))  # fmt: skip
+            for b in book.ytd_rounding_only(tag):  # X260: the id the finding had, to name the rule when closing it
+                row = _quarantine_row(stage="CONSISTENCY", reason_code="YTD_QUARTER_MISMATCH",
+                                      entity_id=entity_id, details={"scope": scope, **b})  # fmt: skip
+                rounding_only.add(row["quarantine_id"])
         for b in book.tax_copied:  # X94: already withheld by load_factbook; the finding makes it visible
             rows.append(_quarantine_row(stage="CONSISTENCY", reason_code="TAX_COPIED_FROM_PRIOR_YEAR",
                                         entity_id=entity_id, details={"scope": scope, **b}))  # fmt: skip
-    _close_stale_ytd_findings(con, pairs, {r["quarantine_id"] for r in rows})
+    _close_stale_ytd_findings(con, pairs, {r["quarantine_id"] for r in rows}, rounding_only)
     return _quarantine_many(con, rows) if rows else []
 
 
-def _close_stale_ytd_findings(con, pairs: list[tuple[str, str]], current: set[str]) -> None:
+ROUNDING_ONLY_NOTE = (
+    "ROUNDING_ONLY [X260]: the difference is within the rounding of the figures compared (half a unit of the "
+    "coarser LevelOfRounding per rounded figure)"
+)
+
+
+def _close_stale_ytd_findings(
+    con, pairs: list[tuple[str, str]], current: set[str], rounding_only: set[str] = frozenset()
+) -> None:
     """An open YTD_QUARTER_MISMATCH of an audited (entity, scope) that the audit no longer raises is closed: a
-    corrected filing or a later rule (X82: a non-FY-start duration is not a YTD) removed the break."""
+    corrected filing or a later rule (X82: a non-FY-start duration is not a YTD) removed the break. One whose
+    difference is a rounding difference (`rounding_only`, rule X260) is closed with a note naming the rule."""
     if not pairs:
         return
     open_rows = con.execute(
@@ -1157,9 +1170,10 @@ def _close_stale_ytd_findings(con, pairs: list[tuple[str, str]], current: set[st
     stale = [q for q, e, s in open_rows if (e, s) in audited and q not in current]
     if stale:
         con.execute(
-            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', "
-            "resolution_note = 'consistency holds on re-audit' WHERE quarantine_id IN (SELECT unnest(?))",
-            [utc_now(), stale],
+            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = CASE "
+            "WHEN quarantine_id IN (SELECT unnest(?)) THEN ? ELSE 'consistency holds on re-audit' END "
+            "WHERE quarantine_id IN (SELECT unnest(?))",
+            [utc_now(), sorted(rounding_only) or [""], ROUNDING_ONLY_NOTE, stale],
         )
 
 

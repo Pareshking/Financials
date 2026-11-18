@@ -144,7 +144,7 @@ def test_cli_warms_up_the_api_host_once(tmp_path):
              out=io.StringIO())  # fmt: skip
     finally:
         cli_mod.PoliteFetcher = orig
-    assert t.calls[0][0] == "https://www.nseindia.com/"
+    assert t.calls[0][0] == "https://www.nseindia.in/"
 
 
 # ── P1-8 resumable, vault-aware fetch-days ──────────────────────────────────
@@ -337,8 +337,8 @@ def test_parallel_workers_keep_one_request_per_host_interval(tmp_path):
     per_host: dict[str, list[float]] = {}
     for host, t in calls:
         per_host.setdefault(host, []).append(t)
-    assert set(per_host) == {"www.nseindia.com"}
-    ts = sorted(per_host["www.nseindia.com"])
+    assert set(per_host) == {"www.nseindia.in"}
+    ts = sorted(per_host["www.nseindia.in"])
     assert len(ts) == 8 and all(b - a >= 0.049 for a, b in pairwise(ts))
 
 

@@ -80,7 +80,7 @@
 | Field | Value |
 |---|---|
 | exchange_or_agency | NSE |
-| url_or_endpoint_pattern | https://www.nseindia.com/api/corporates-corporateActions?index=equities&from_date=<DD-MM-YYYY>&to_date=<DD-MM-YYYY>; RSS https://nsearchives.nseindia.com/content/RSS/Corporate_action.xml |
+| url_or_endpoint_pattern | https://www.nseindia.in/api/corporates-corporateActions?index=equities&from_date=<DD-MM-YYYY>&to_date=<DD-MM-YYYY>; RSS https://nsearchives.nseindia.com/content/RSS/Corporate_action.xml |
 | format | JSON; RSS XML |
 | cadence | Daily (rolling window) |
 | fetch_runtime | CONTAINER_DIRECT |
@@ -97,7 +97,7 @@
 | Field | Value |
 |---|---|
 | exchange_or_agency | NSE |
-| url_or_endpoint_pattern | https://www.nseindia.com/api/holiday-master?type=trading |
+| url_or_endpoint_pattern | https://www.nseindia.in/api/holiday-master?type=trading |
 | format | JSON keyed by segment |
 | cadence | Yearly (current year only) and on change |
 | fetch_runtime | CONTAINER_DIRECT |
@@ -131,7 +131,7 @@
 | Field | Value |
 |---|---|
 | exchange_or_agency | NSE (SEBI taxonomy) |
-| url_or_endpoint_pattern | discovery https://www.nseindia.com/api/integrated-filing-results?index=equities&symbol=<SYM>; files https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_<PROFILE>_<id>_<ts>_WEB.xml |
+| url_or_endpoint_pattern | discovery https://www.nseindia.in/api/integrated-filing-results?index=equities&symbol=<SYM>; files https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_<PROFILE>_<id>_<ts>_WEB.xml |
 | format | XBRL instance |
 | cadence | Quarterly per company (standalone and consolidated filings) |
 | fetch_runtime | CONTAINER_DIRECT |
@@ -148,7 +148,7 @@
 | Field | Value |
 |---|---|
 | exchange_or_agency | NSE (ICAI/MCA taxonomy) |
-| url_or_endpoint_pattern | discovery https://www.nseindia.com/api/annual-reports-xbrl?index=equities&symbol=<SYM>; files https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_<SYM>_<ts>.xml |
+| url_or_endpoint_pattern | discovery https://www.nseindia.in/api/annual-reports-xbrl?index=equities&symbol=<SYM>; files https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_<SYM>_<ts>.xml |
 | format | XBRL instance (ICAI ind-as 2017-03-31) |
 | cadence | Annual (post-AGM) |
 | fetch_runtime | CONTAINER_DIRECT |
@@ -165,7 +165,7 @@
 | Field | Value |
 |---|---|
 | exchange_or_agency | NSE (BSE shp taxonomy) |
-| url_or_endpoint_pattern | listing https://www.nseindia.com/api/corporate-share-holdings-master?index=equities&symbol=<SYM>; files https://nsearchives.nseindia.com/corporate/xbrl/SHP_<id>_<ts>_WEB.xml; RSS https://nsearchives.nseindia.com/content/RSS/Shareholding_Pattern.xml |
+| url_or_endpoint_pattern | listing https://www.nseindia.in/api/corporate-share-holdings-master?index=equities&symbol=<SYM>; files https://nsearchives.nseindia.com/corporate/xbrl/SHP_<id>_<ts>_WEB.xml; RSS https://nsearchives.nseindia.com/content/RSS/Shareholding_Pattern.xml |
 | format | JSON + XBRL instance |
 | cadence | Quarterly per company |
 | fetch_runtime | CONTAINER_DIRECT |
@@ -233,7 +233,7 @@
 | Field | Value |
 |---|---|
 | exchange_or_agency | NSE |
-| url_or_endpoint_pattern | pledge summary https://www.nseindia.com/api/corporate-pledgedata?index=equities; per-event filings endpoint TBD |
+| url_or_endpoint_pattern | pledge summary https://www.nseindia.in/api/corporate-pledgedata?index=equities; per-event filings endpoint TBD |
 | format | JSON (pledge summary); XBRL expected for events |
 | cadence | Event |
 | fetch_runtime | CONTAINER_DIRECT |
@@ -369,7 +369,7 @@
 | Field | Value |
 |---|---|
 | exchange_or_agency | NSE / NSE Clearing |
-| url_or_endpoint_pattern | bands https://nsearchives.nseindia.com/content/equities/sec_list_<DDMMYYYY>.csv; ASM https://www.nseindia.com/api/reportASM; VaR https://nsearchives.nseindia.com/archives/nsccl/var/C_VAR1_<DDMMYYYY>_1.DAT; GSM endpoint TBD |
+| url_or_endpoint_pattern | bands https://nsearchives.nseindia.com/content/equities/sec_list_<DDMMYYYY>.csv; ASM https://www.nseindia.in/api/reportASM; VaR https://nsearchives.nseindia.com/archives/nsccl/var/C_VAR1_<DDMMYYYY>_1.DAT; GSM endpoint TBD |
 | format | CSV; JSON; DAT |
 | cadence | Daily |
 | fetch_runtime | CONTAINER_DIRECT |
@@ -420,7 +420,7 @@
 | Field | Value |
 |---|---|
 | exchange_or_agency | NSE |
-| url_or_endpoint_pattern | Integrated Filing - Governance rows in https://www.nseindia.com/api/integrated-filing-results (INTEGRATED_FILING_GOVERNANCE_<id>_<ts>_WEB.xml); others TBD |
+| url_or_endpoint_pattern | Integrated Filing - Governance rows in https://www.nseindia.in/api/integrated-filing-results (INTEGRATED_FILING_GOVERNANCE_<id>_<ts>_WEB.xml); others TBD |
 | format | XBRL |
 | cadence | Quarterly / event |
 | fetch_runtime | CONTAINER_DIRECT |
@@ -539,7 +539,7 @@
 | Field | Value |
 |---|---|
 | exchange_or_agency | NSE |
-| url_or_endpoint_pattern | https://www.nseindia.com/api/NextApi/apiClient/GetQuoteApi?functionName=getSymbolData&marketType=N&series=<SERIES>&symbol=<SYM> |
+| url_or_endpoint_pattern | https://www.nseindia.in/api/NextApi/apiClient/GetQuoteApi?functionName=getSymbolData&marketType=N&series=<SERIES>&symbol=<SYM> |
 | format | JSON (equityResponse[0].secInfo macro / sector / industryInfo / basicIndustry) |
 | cadence | Snapshot (as shown on the fetch day; no effective dates) |
 | fetch_runtime | CONTAINER_DIRECT |

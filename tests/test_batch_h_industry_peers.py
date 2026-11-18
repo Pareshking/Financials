@@ -173,7 +173,7 @@ def test_fetch_job_vaults_and_stages_one_answer_per_symbol(tmp_path):
     jobs = Jobs(PoliteFetcher(t, sleep=lambda s: None, max_attempts=1), Vault(tmp_path / "v"), tmp_path / "s")
     staged, errors = jobs.classification(["TCS", "M&M", "NOPE"], {"TCS": "EQ"})
     assert len(staged) == 2 and len(errors) == 1 and "NOPE" in errors[0]
-    assert all(u.startswith("https://www.nseindia.com/api/NextApi/apiClient/GetQuoteApi?") for u in t.urls)
+    assert all(u.startswith("https://www.nseindia.in/api/NextApi/apiClient/GetQuoteApi?") for u in t.urls)
     assert {p.parent.name for p in staged} == {"classification"}
 
 

@@ -42,9 +42,11 @@ from financials.timeutil import ist_to_utc, utc_now
 from financials.vault import Vault
 
 ARCHIVE = "https://nsearchives.nseindia.com"
-API = "https://www.nseindia.com/api"
+# NSE moved its site to nseindia.in (A19, nse-reach run 44357423381, 2026-11-18): www.nseindia.com answers 301 to the
+# same path on www.nseindia.in, API included; calling .in directly avoids the redirect and keeps cookies on one host.
+API = "https://www.nseindia.in/api"
 JSON = "application/json"
-WARMUP = {"www.nseindia.com": "https://www.nseindia.com/"}  # session cookies for the API host [A1]
+WARMUP = {"www.nseindia.in": "https://www.nseindia.in/"}  # session cookies for the API host [A1]
 CORP_ACTION_CHUNK_DAYS = 30  # the API answer was verified on a one-month window [P12]
 IMMUTABLE_PREFIXES = (f"{ARCHIVE}/content/cm/BhavCopy_", f"{ARCHIVE}/products/content/sec_bhavdata_full_",
                       f"{ARCHIVE}/corporate/xbrl/", f"{ARCHIVE}/content/indices/ind_close_all_",

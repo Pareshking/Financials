@@ -189,7 +189,7 @@ def test_e2e_fetchers_never_touched_unlisted_urls(e2e):
     _, t, _ = e2e
     routes = fixture_routes()
     misses = {u for u, _ in t.calls if u not in routes}
-    weekend = {bhavcopy_url(date(2025, 9, 20)), bhavcopy_url(date(2025, 9, 21)), "https://www.nseindia.com/"}
+    weekend = {bhavcopy_url(date(2025, 9, 20)), bhavcopy_url(date(2025, 9, 21)), "https://www.nseindia.in/"}
     no_delivery_fixture = {delivery_url(d) for d in DAYS if delivery_url(d) not in routes}
     no_close_fixture = {index_close_url(d) for d in DAYS}  # each trading day also asks for its index closes [IDX9]
     no_mcap_fixture = {pr_zip_url(d) for d in DAYS}  # ... and its PR-zip market-cap file [X130]

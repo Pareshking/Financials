@@ -177,30 +177,47 @@ class BseClient:
         self.in_page, self.allow_in_page = in_page, allow_in_page
         self.via = "in_page_xhr" if in_page is not None else "requests"
         self.calls = 0
+        self.last: dict = {}  # the last answer's final URL (after redirects) and redirect statuses
 
     def _wait(self) -> None:
         if self.calls:
             self.sleep(self.rng.uniform(*self.pace))
         self.calls += 1
 
-    def _fetch(self, url: str, params: dict) -> tuple[int, str, bytes]:
+    def _fetch(self, url: str, params: dict, form: dict | None = None,
+               headers: dict | None = None) -> tuple[int, str, bytes]:  # fmt: skip
         if self.via == "in_page_xhr":
-            return self.in_page.get(f"{url}?{urlencode(params)}" if params else url)
-        r = self.session.get(url, params=params, timeout=45)
-        return r.status_code, r.headers.get("Content-Type", ""), r.content
+            if form is not None:
+                raise Failed("a form postback is sent with plain requests only (in-page mode is GET only)")
+            full = f"{url}?{urlencode(params)}" if params else url
+            status, ctype, body = self.in_page.get(full)
+            self.last = {"url": full, "redirects": [], "status": status, "content_type": ctype}
+            return status, ctype, body
+        if form is not None:  # a browser's form postback: the page's own fields, sent to the page's own URL
+            r = self.session.post(url, data=form, timeout=45, headers=headers)
+        else:
+            r = self.session.get(url, params=params, timeout=45)
+        ctype = r.headers.get("Content-Type", "")
+        hops = [getattr(h, "status_code", 0) for h in getattr(r, "history", None) or []]
+        self.last = {"url": str(getattr(r, "url", "") or url), "status": r.status_code, "content_type": ctype,
+                     "redirects": hops}  # fmt: skip
+        return r.status_code, ctype, r.content
 
     def get(self, path: str, params: dict, dataset: str, covers: dict | None = None) -> bytes:
         return self.fetch_url(API + path, params, dataset, covers)
 
     def fetch_url(self, url: str, params: dict, dataset: str, covers: dict | None = None,
-                  file: bool = False) -> bytes:  # fmt: skip
-        """`file`: one filing's file (a 404 is Missing, not a refusal). The raw copy is written before return."""
+                  file: bool = False, form: dict | None = None, headers: dict | None = None) -> bytes:  # fmt: skip
+        """`file`: one filing's file (a 404 is Missing, not a refusal). `form`: POST these fields to `url` (an ASP.NET
+        page's own postback, as a browser submits it; plain requests only). The raw copy is written before return;
+        `self.last` holds the final URL after redirects. A redirect to BSE's `showinterest` page is a refusal
+        (`Blocked`), never data."""
         last = None
         errors = _net_errors()
         for _ in range(RETRIES + 1):
             self._wait()
             try:
-                status, ctype, body = self._fetch(url, params)
+                status, ctype, body = self._fetch(url, params, form, headers)
             except errors as e:
                 last = f"{type(e).__name__}: {e}"
                 continue
@@ -214,6 +231,8 @@ class BseClient:
                     raise Blocked(f"HTTP {status} from {url}; in-page fetch failed ({type(e).__name__}: {e})") from e
             if status in STOP_STATUSES:
                 raise Blocked(f"HTTP {status} from {url} ({self.via})")
+            if "showinterest" in self.last.get("url", "").lower():
+                raise Blocked(f"redirected to {self.last['url']} from {url} ({self.via})")
             if status == 0 or status >= 500:
                 last = f"HTTP {status} from {url} ({self.via})"
                 continue

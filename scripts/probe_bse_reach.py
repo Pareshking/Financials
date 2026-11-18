@@ -44,6 +44,21 @@ calls, at most 2 listing calls for 12-14 Nov 2026 (all companies), one "Std" and
 (c) the `/corporates/xbrldetails` component, if its route is found: one call for the first scrip, category Annual
 Reports (the option value found next to that label), 1 Apr 2025 - 18 Nov 2026. At most 40 calls (CALL_BUDGET).
 
+`--mode xbrl5` (X245; the owner's second pointers after run 44256592010, UNVERIFIED). API discovery first, then www
+documents, so a refusal on documents still leaves the API answers: (b) `AnnGetData/w` for the first scrip, 1 May -
+18 Nov 2026, strCat=Result and strCat=-1 (XML_NAME per row; Result / Financial Results / Outcome of Board Meeting rows
+kept); (c) the comp_resultsnew component, every call with its full key list, the call sites and literal values of
+`Corp_FinanceResult_ng_new` / `Corp_Archive_Wthxml_ng_new`, each called (at most twice) for the first scrip over 18 May
+- 18 Nov 2026 (SEGMENT=Equity, a Result-like CATNAME, other keys from the component's literals), the first row's keys;
+(a) `CorpXbrlGen.aspx?Bsenewid=<NEWSID>&Scripcode=<scrip>` for the 3 known NEWSIDs and at most 2 Result rows of (b);
+one Std and one Con document named by the Corp_* rows; (d) the legacy ASP.NET pages `Comp_Resultsnew.aspx` (else the
+beta host's) and `xbrldetails.aspx`: GET, then ONE form postback each with that load's own fields (__VIEWSTATE,
+__VIEWSTATEGENERATOR, __EVENTVALIDATION, the form's submit button; scrip, date window, category "Annual Reports (Pdf &
+XBRL)" for xbrldetails), the document links of the answer and one document each. Every answer logs [api|www], status,
+redirects, final URL, Content-Type and kind (XBRL / XML with namespaces, inline XBRL, JSON, HTML, PDF, empty). An HTML
+answer where XBRL was expected is reported and not followed; a refusal or a redirect to showinterest ends the probe
+(`Blocked`). At most 40 calls (XBRL5_BUDGET).
+
 Every answer is written byte for byte to the ledger (--out DIR: blobs/<sha256> + ledger.jsonl) before it is read; the
 workflow uploads DIR as an artifact, which `python -m financials --data-dir data import-bse DIR` vaults and stages on
 the owner's machine. The log prints status, size and sha256 only. A refusal (`Blocked`) ends the probe: no retries
@@ -54,6 +69,7 @@ around it (CLAUDE.md, owner decision).
     python scripts/probe_bse_reach.py --out bse_probe --mode xbrl2 --scrips 500488:A,505036:B,530745:T
     python scripts/probe_bse_reach.py --out bse_probe --mode xbrl3 --scrips 500488:A,505036:B,530745:T
     python scripts/probe_bse_reach.py --out bse_probe --mode xbrl4 --scrips 500488:A,505036:B,530745:T
+    python scripts/probe_bse_reach.py --out bse_probe --mode xbrl5 --scrips 500488:A
 """
 
 from __future__ import annotations
@@ -881,6 +897,437 @@ def xbrl4_probe(c: BseClient, scrips: list[tuple[str, str]]) -> None:
     print(f"{c.calls} calls made (budget {CALL_BUDGET})")
 
 
+# ── --mode xbrl5 (X245): the owner's second set of pointers (2026-11-18), all UNVERIFIED until this run's answers ──
+# Run 44256592010 (xbrl4): AnnGetData/w strCat=Result answered 18 bytes / 0 rows for each scrip over 20 Oct - 18 Nov;
+# CorpXbrlGen.aspx?Bsenewid=<NEWSID> answered the same 23-byte stub for 3 NEWSIDs; the comp_resultsnew component calls
+# Corp_Archive_Wthxml_ng_new [SCRIP_CD, CATNAME, FROMDT, TODT, PER, SEGMENT, ...] and Corp_FinanceResult_ng_new
+# [SCRIP_CD, FlagDur, ...] (log truncated), dates %Y%m%d. Owner pointers: CorpXbrlGen needs Bsenewid AND Scripcode;
+# only Result / Financial Results / Outcome of Board Meeting rows can have XBRL (XML_NAME is announcement metadata on
+# almost every row, not an XBRL marker); the two Corp_* calls feed Comp_Resultsnew and name separate Standalone /
+# Consolidated XBRL fields only when XBRL exists; the legacy ASP.NET pages Comp_Resultsnew.aspx and xbrldetails.aspx
+# (category "Annual Reports (Pdf & XBRL)") render their grids on a normal form postback (__VIEWSTATE,
+# __VIEWSTATEGENERATOR, __EVENTVALIDATION of the same load), annual links possibly under xml-data/corpfiling/AttachLive/
+# or AttachHis/. Order: API discovery first (api.bseindia.com), then www documents, so a refusal on www documents
+# (403 / showinterest, a STOP) still leaves the API answers in the log. An HTML answer where XBRL was expected is
+# reported (STOP for that step) and never followed.
+XBRL5_BUDGET = 40
+LEGACY_RESULTS = HOME + "corporates/Comp_Resultsnew.aspx"
+LEGACY_RESULTS_BETA = "https://beta.bseindia.com/corporates/Comp_Resultsnew.aspx?expandable=0"
+LEGACY_XBRL = HOME + "corporates/xbrldetails.aspx"
+ANNUAL_LABEL = "Annual Reports (Pdf & XBRL)"
+RESULT_SUBCATS = re.compile(r"financial results|outcome of board meeting", re.I)
+_FORM = re.compile(r"<form\b([^>]*)>(.*?)</form>", re.I | re.S)
+_FIELD = re.compile(r"<(input|select|textarea)\b([^>]*)>", re.I)
+_ATTR = re.compile(r"""([\w:$.-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))""")
+_OPTION = re.compile(r"<option\b([^>]*)>(.*?)</option>", re.I | re.S)
+_ANCHOR = re.compile(r"<a\b([^>]*)>(.*?)</a>", re.I | re.S)
+_DOPOSTBACK = re.compile(r"__doPostBack\(\s*['\"]([^'\"]+)['\"]")
+_DOC_LINK = re.compile(r"xbrl|\.xml\b|AttachLive|AttachHis|XBRLFILES|CorpXbrlGen", re.I)
+_TAGS = re.compile(r"<[^>]+>")
+
+
+def answer_kind(body: bytes, ctype: str = "") -> str:
+    """XBRL (`<?xml` / `<xbrli:xbrl` start or inline XBRL), JSON, HTML, PDF, empty or other, with its namespaces."""
+    t = body[:20000].decode("utf-8", "replace").lstrip("﻿ \r\n\t")
+    if not t.strip():
+        return "empty"
+    ns = sorted(set(re.findall(r'xmlns(?::[\w-]+)?="(http[^"]+)"', t)))
+    if body[:5] == b"%PDF-":
+        return "PDF"
+    if "ix:header" in t or "inlineXBRL" in t:
+        return f"inline XBRL; namespaces={ns[:12]}"
+    if t.startswith(("<?xml", "<xbrli:xbrl", "<xbrl")):
+        return f"{'XBRL' if 'xbrl' in t[:4000].lower() else 'XML'}; namespaces={ns[:12]}"
+    if t[:1] in "{[":
+        with contextlib.suppress(ValueError):
+            json.loads(body.decode("utf-8", "replace"))
+            return "JSON"
+    if re.search(r"<html|<!doctype html|<body|<form", t[:4000], re.I) or "html" in ctype.lower():
+        return "HTML"
+    return "other"
+
+
+def is_xbrl(kind: str) -> bool:
+    return kind.startswith(("XBRL", "XML", "inline XBRL"))
+
+
+def _attrs(s: str) -> dict[str, str]:
+    out = {k.lower(): next(v for v in vals if v is not None) for k, *vals in _ATTR.findall(s)}
+    for flag in ("checked", "selected"):
+        if re.search(rf"\b{flag}\b", s, re.I):
+            out.setdefault(flag, flag)
+    return out
+
+
+def _plain(s: str) -> str:
+    return re.sub(r"\s+", " ", _TAGS.sub(" ", s)).replace("&amp;", "&").strip()
+
+
+def form_fields(html: str) -> tuple[str, list[dict]]:
+    """(action, fields) of the first <form> holding __VIEWSTATE: name, tag, type, value, checked, options [(value,
+    label, selected)], as the page sent them."""
+    for fattrs, inner in _FORM.findall(html):
+        if "__VIEWSTATE" not in inner:
+            continue
+        fields = []
+        for m in _FIELD.finditer(inner):
+            tag, a = m.group(1).lower(), _attrs(m.group(2))
+            if not a.get("name"):
+                continue
+            f = {"name": a["name"], "tag": tag, "type": a.get("type", "text").lower() if tag == "input" else tag,
+                 "value": a.get("value", ""), "checked": "checked" in a, "options": []}  # fmt: skip
+            if tag == "select":
+                end = inner.find("</select>", m.end())
+                opts = [(_attrs(oa).get("value", _plain(ot)), _plain(ot), "selected" in _attrs(oa))
+                        for oa, ot in _OPTION.findall(inner[m.end() : end if end > 0 else None])]  # fmt: skip
+                f["options"] = opts
+                f["value"] = next((v for v, _, s in opts if s), opts[0][0] if opts else "")
+            elif tag == "textarea":
+                end = inner.find("</textarea>", m.end())
+                f["value"] = inner[m.end() : end] if end > 0 else ""
+            fields.append(f)
+        return _attrs(fattrs).get("action", ""), fields
+    return "", []
+
+
+def _date_fmt(value: str) -> str:
+    if re.fullmatch(r"\d{8}", value or ""):
+        return "%Y%m%d"
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value or ""):
+        return "%Y-%m-%d"
+    return "%d/%m/%Y"  # the owner's DD/MM/YYYY (X244)
+
+
+def browser_form(html: str, fields: list[dict], scrip: str, a: date, b: date, category: str = ""
+                 ) -> tuple[dict[str, str], list[str]]:  # fmt: skip
+    """The fields a browser submits for this form (hidden / text / textarea / select values, checked boxes only, one
+    submit button), with the scrip, the date window and the category option set; and notes on what was set."""
+    data: dict[str, str] = {}
+    notes: list[str] = []
+    for f in fields:
+        n, low, typ = f["name"], f["name"].lower(), f["type"]
+        if typ in ("submit", "image", "button", "reset", "file"):
+            continue
+        if typ in ("checkbox", "radio") and not f["checked"]:
+            continue
+        v = f["value"]
+        if f["tag"] == "select" and category:
+            hit = next((ov for ov, label, _ in f["options"] if label.lower() == category.lower()), None)
+            if hit is not None:
+                v = hit
+                notes.append(f"{n}={hit!r} (option {category!r})")
+        elif not n.startswith("__") and typ in ("text", "hidden", "search", "textarea"):
+            short = re.split(r"[$:]", low)[-1]
+            if re.search(r"from|frm|fdate|start", short):
+                v = a.strftime(_date_fmt(f["value"]))
+            elif re.search(r"todt|todate|tdate|^txtto|^to|enddt|enddate", short):
+                v = b.strftime(_date_fmt(f["value"]))
+            elif re.search(r"scrip|security|smartsearch|scode|code", short) and not re.search(r"cat|flag", short):
+                v = scrip
+            if v != f["value"]:
+                notes.append(f"{n}={v!r}")
+        data[n] = v
+    submits = [f for f in fields if f["type"] in ("submit", "image")]
+    btn = next((f for f in submits if re.search(r"submit|search|go\b|show|btn", f["name"] + f["value"], re.I)),
+               submits[0] if submits else None)  # fmt: skip
+    if btn is not None:
+        data[btn["name"]] = btn["value"]
+        notes.append(f"submit {btn['name']}={btn['value']!r}")
+    else:  # a LinkButton: __doPostBack('<target>','') on a "Submit" / "Search" / "Go" link
+        for attrs, label in _ANCHOR.findall(html):
+            t = _DOPOSTBACK.search(attrs)
+            if t and re.search(r"submit|search|\bgo\b|show", _plain(label) + attrs, re.I):
+                data["__EVENTTARGET"], data["__EVENTARGUMENT"] = t.group(1), ""
+                notes.append(f"__EVENTTARGET={t.group(1)!r}")
+                break
+    return data, notes
+
+
+def doc_anchors(html: str, base: str) -> list[tuple[str, str]]:
+    """(label, URL or `postback:<target>`) of each link that looks like an XBRL / XML / attachment document."""
+    out = []
+    for attrs, label in _ANCHOR.findall(html):
+        a = _attrs(attrs)
+        href = a.get("href", "")
+        onclick = a.get("onclick", "")
+        text = _plain(label)
+        if not (_DOC_LINK.search(href + onclick) or re.search(r"xbrl", text, re.I)):
+            continue
+        pb = _DOPOSTBACK.search(href + onclick)
+        win = re.search(r"window\.open\(\s*['\"]([^'\"]+)['\"]", onclick + href)
+        if win:
+            out.append((text, urljoin(base, win.group(1))))
+        elif pb:
+            out.append((text, "postback:" + pb.group(1)))
+        elif href and not href.lower().startswith("javascript"):
+            out.append((text, urljoin(base, href)))
+    return list(dict.fromkeys(out))
+
+
+def literal_candidates(js: str, key: str) -> list[str]:
+    """String values the component gives `key`: `key:"v"`, `key="v"`, `key=v` in a query, `.set("key","v")`, and the
+    literals assigned to the property it reads (`key:this.prop` -> `prop="v"` / `prop:"v"`)."""
+    k = re.escape(key)
+    pats = [rf'\b{k}\s*:\s*"([^"]*)"', rf'\b{k}\s*=\s*"([^"]*)"', rf"[?&]{k}=([^&`\"$]+)", rf'"{k}"\s*,\s*"([^"]*)"']
+    out = [v for p in pats for v in re.findall(p, js)]
+    for prop in re.findall(rf"\b{k}\s*:\s*(?:this|[a-z])\.(\w+)", js):
+        p = re.escape(prop)
+        out += re.findall(rf'\b{p}\s*=\s*"([^"]*)"', js) + re.findall(rf'\b{p}\s*:\s*"([^"]*)"', js)
+    return list(dict.fromkeys(out))[:8]
+
+
+def first_rows(body: bytes) -> list[dict]:
+    try:
+        payload = json.loads(body.decode("utf-8", "replace"))
+    except ValueError:
+        return []
+    rows = payload.get("Table") if isinstance(payload, dict) and "Table" in payload else payload
+    if isinstance(rows, dict):
+        rows = next((v for v in rows.values() if isinstance(v, list)), [rows])
+    return [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+
+
+def std_con_links(rows: list[dict]) -> dict[str, list[str]]:
+    """Standalone / consolidated XBRL documents named in answer rows: values of fields named like xbrl / xml / std /
+    con / standalone / consolidated that look like a path, a file name or an URL."""
+    out: dict[str, list[str]] = {"std": [], "con": []}
+    for r in rows:
+        for k, v in r.items():
+            if not isinstance(v, str) or not v.strip() or not re.search(r"xbrl|xml|std|con|standalone|consol", k, re.I):
+                continue
+            v = v.strip()
+            if not (re.search(r"/|\.(?:xml|html?|aspx|zip)\b", v, re.I) or re.match(r"https?://", v)):
+                continue
+            kind = "con" if re.search(r"con", k, re.I) and not re.search(r"std|stand", k, re.I) else "std"
+            out[kind].append(urljoin(HOME, v))
+    return {k: list(dict.fromkeys(v)) for k, v in out.items()}
+
+
+def xbrl5_probe(c: BseClient, scrips: list[tuple[str, str]]) -> None:
+    code0 = scrips[0][0] if scrips else SCRIP
+    cache: dict[str, str | None] = {}
+    state = {"main": "", "routes": ""}
+
+    def guard() -> None:
+        if c.calls >= XBRL5_BUDGET:
+            raise OverBudget(f"{c.calls} calls made (budget {XBRL5_BUDGET})")
+
+    def meta(label: str, body: bytes) -> str:
+        """One line per answer: host side (api / www), status, final URL, Content-Type, kind."""
+        last = c.last
+        kind = answer_kind(body, last.get("content_type", ""))
+        side = "api" if "api.bseindia.com" in last.get("url", "") else "www"
+        print(f"ANS   [{side}] {label}: status {last.get('status')} redirects {last.get('redirects')} final "
+              f"{last.get('url')} content-type {last.get('content_type')!r} {len(body)} bytes sha256 "
+              f"{hashlib.sha256(body).hexdigest()[:16]} kind {kind}")  # fmt: skip
+        return kind
+
+    def text(url: str) -> str | None:
+        if url in cache:
+            return cache[url]
+        guard()
+        try:
+            body = c.fetch_url(url, {}, "site_js" if url.endswith(".js") else "site_page", {}, file=True)
+            meta(f"page {url}", body)
+            cache[url] = body.decode("utf-8", "replace")
+        except (Missing, BadRequest) as exc:
+            print(f"SKIP  {url}: {type(exc).__name__}: {exc}")
+            cache[url] = None
+        return cache[url]
+
+    def document(url: str, dataset: str, covers: dict, params: dict | None = None) -> str | None:
+        """One expected-XBRL document: logged; an HTML (or other non-XBRL) answer is reported, never followed."""
+        guard()
+        try:
+            body = c.fetch_url(url, params or {}, dataset, covers, file=True)
+        except (Missing, BadRequest) as exc:
+            print(f"SKIP  {dataset} {url} {params or ''}: {type(exc).__name__}: {exc}")
+            return None
+        kind = meta(f"{dataset} {url} {params or ''}".rstrip(), body)
+        print(f"      first bytes: {body[:300]!r}")
+        if not is_xbrl(kind):
+            print(f"STOP  (this step) {kind} where XBRL was expected: reported, not followed")
+            return None
+        return kind
+
+    # (b) AnnGetData/w for the first scrip, 1 May - 18 Nov 2026, strCat=Result and strCat=-1 (api.bseindia.com)
+    a, b = date(2026, 5, 1), date(2026, 11, 18)
+    result_rows: list[dict] = []
+    for cat in ("Result", "-1"):
+        guard()
+        params = {"pageno": "1", "strCat": cat, "strPrevDate": ymd(a), "strScrip": code0, "strSearch": "P",
+                  "strToDate": ymd(b), "strType": "C"}  # fmt: skip
+        try:
+            covers = {"api": "AnnGetData", "scrip": code0, "from": a.isoformat(), "to": b.isoformat(), "cat": cat}
+            body = c.get("AnnGetData/w", params, "announcements", covers)
+        except (Missing, BadRequest) as exc:
+            print(f"SKIP  AnnGetData {code0} strCat={cat}: {type(exc).__name__}: {exc}")
+            continue
+        meta(f"AnnGetData {code0} strCat={cat} {a}..{b}", body)
+        rows = first_rows(body)
+        filled = [r for r in rows if str(r.get("XML_NAME") or "").strip()]
+        ann_form = [r for r in filled if str(r.get("XML_NAME")).upper() == f"ANN_{code0}_{r.get('NEWSID')}".upper()]
+        print(f"      {len(rows)} rows; XML_NAME populated on {len(filled)}, of the form ANN_<scrip>_<NEWSID> on "
+              f"{len(ann_form)}; first row keys {sorted(rows[0]) if rows else '-'}; head {body[:200]!r}")  # fmt: skip
+        for r in rows[:60]:
+            print(f"      {r.get('NEWSID')} {r.get('NEWS_DT')} {r.get('CATEGORYNAME')} / {r.get('SUBCATNAME')} "
+                  f"XML_NAME={r.get('XML_NAME')!r} ATTACHMENTNAME={r.get('ATTACHMENTNAME')!r} "
+                  f"xbrl fields={ {k: v for k, v in r.items() if re.search('xbrl', k, re.I)} }")  # fmt: skip
+        for r in rows:
+            cat_ok = str(r.get("CATEGORYNAME", "")).strip() == "Result"
+            if r.get("NEWSID") and (cat_ok or RESULT_SUBCATS.search(str(r.get("SUBCATNAME", "")))):
+                result_rows.append(r)
+
+    # (c) the comp_resultsnew component (www scripts) and its two listing calls (api.bseindia.com)
+    shell = text(HOME + "corporates/comp_resultsnew") or ""
+    mains = [urljoin(HOME, s) for s in _MAIN.findall(shell)]
+    state["main"] = (text(mains[0]) if mains else "") or ""
+    corp = _CORP_ROUTES.search(state["main"])
+    chunk = corp.group(1) if corp else lazy_routes(state["main"]).get("corporates", "")
+    state["routes"] = (text(JS_DIR + chunk) if chunk else "") or ""
+    comp, path = "", ""
+    for src in (state["routes"], state["main"]):
+        for p, ch in route_chunks(src, "resultsnew").items():
+            code, imported = component_code(src, p)
+            comp = (text(JS_DIR + ch) if ch else None) or code or (text(JS_DIR + imported) if imported else "") or ""
+            path = p
+            if comp:
+                break
+        if comp:
+            break
+    if not comp and "Corp_Archive_Wthxml_ng_new" in state["main"]:
+        comp, path = state["main"], "(main bundle)"
+    std_con: dict[str, list[str]] = {"std": [], "con": []}
+    if comp:
+        urls: dict[str, str] = {}
+        for ch in url_map_chunks(comp)[:2]:
+            urls.update(url_map(text(JS_DIR + ch) or ""))
+        calls = calls_in(comp, urls)
+        fmt = date_format(comp)
+        print(f"OK    component {path}: {len(comp)} chars, date format {fmt!r}")
+        for name, keys in sorted(calls.items()):  # every call, its full key list
+            print(f"      call {name}: keys {keys}")
+        targets = [n for n in ("Corp_FinanceResult_ng_new", "Corp_Archive_Wthxml_ng_new") if n in calls]
+        for name in targets:
+            for ctx in _context(comp, re.escape(name), 3, 900):  # the call sites in full
+                print(f"      site {name}: {ctx!r}")
+            cand = {k: literal_candidates(comp, k) for k in calls[name]}
+            print(f"      literal candidates {name}: {json.dumps(cand, sort_keys=True)}")
+            for k in ("FlagDur", "PER", "CATNAME", "SEGMENT"):
+                for ctx in _context(comp, rf"\b{k}\b", 4, 300):
+                    print(f"      ctx {k}: {ctx!r}")
+        a6, b6 = date(2026, 5, 18), date(2026, 11, 18)
+        for name in targets:
+            keys = calls[name]
+            base = fill_params(keys, code0, a6, b6, fmt)
+            variants: list[dict[str, str]] = []
+            for i in range(2):  # at most 2 calls per API: first literal candidates, then the second ones
+                p = dict(base)
+                for k in keys:
+                    low = k.lower()
+                    if p.get(k) or re.search(r"from|todt|todate|^to", low):
+                        continue
+                    cands = literal_candidates(comp, k)
+                    if low == "segment":
+                        p[k] = "Equity"
+                    elif re.search("cat", low):
+                        p[k] = next((x for x in cands if re.search("result", x, re.I)), "Result")
+                    elif cands:
+                        p[k] = cands[min(i, len(cands) - 1)]
+                if p not in variants:
+                    variants.append(p)
+            for p in variants:
+                guard()
+                try:
+                    body = c.get(f"{name}/w", p, "xbrl_listing", {"api": name, "route": path, "scrip": code0})
+                except (Missing, BadRequest) as exc:
+                    print(f"SKIP  {name} {p}: {type(exc).__name__}: {exc}")
+                    continue
+                meta(f"{name} {p}", body)
+                rows = first_rows(body)
+                print(f"      {len(rows)} rows; first row keys {sorted(rows[0]) if rows else '-'}; "
+                      f"xbrl fields {xbrl_values(body)[:8]}; head {body[:300]!r}")  # fmt: skip
+                for r in rows[:2]:
+                    print(f"      row {json.dumps(r, sort_keys=True, default=str)[:1500]}")
+                found = std_con_links(rows)
+                print(f"      std links {found['std'][:3]}; con links {found['con'][:3]}")
+                for k in std_con:
+                    std_con[k] += found[k]
+                if rows:
+                    break
+    else:
+        print("NONE  no comp_resultsnew component found")
+
+    # (a) + (b) CorpXbrlGen.aspx with Bsenewid AND Scripcode (www documents): the 3 known NEWSIDs, then at most 2
+    # Result rows of (b)
+    known = {nid.lower() for _, nid in KNOWN_RESULT_NEWSIDS}
+    fresh = [(str(r.get("SCRIP_CD") or code0), str(r["NEWSID"])) for r in result_rows]
+    fresh = [x for x in dict.fromkeys(fresh) if x[1].lower() not in known][:2]
+    for code, nid in [*KNOWN_RESULT_NEWSIDS, *fresh]:
+        document(XBRL_GEN, "results_xbrl", {"scrip": code, "news_id": nid, "from": "CorpXbrlGen"},
+                 {"Bsenewid": nid, "Scripcode": code})  # fmt: skip
+
+    # (c) one Std and one Con document named by the Corp_* answers
+    for kind, links in std_con.items():
+        for link in links[:1]:
+            document(link, "results_xbrl", {"from": f"comp_resultsnew {kind} XBRL", "scrip": code0})
+        if not links:
+            print(f"NONE  comp_resultsnew {kind} XBRL: no document named in the answers")
+
+    # (d) the legacy ASP.NET pages: GET, then ONE postback with that same load's own fields; one document each
+    def legacy(url: str, dataset: str, a: date, b: date, category: str = "", alt: str = "") -> None:
+        html = text(url) or ""
+        action, fields = form_fields(html)
+        if not fields and alt:
+            print(f"NONE  {url}: no WebForms form (__VIEWSTATE); trying {alt}")
+            url, html = alt, text(alt) or ""
+            action, fields = form_fields(html)
+        page = c.last.get("url") or url
+        if not fields:
+            print(f"NONE  {url}: no WebForms form; doc links {doc_anchors(html, page)[:6]}")
+            return
+        state_keys = {f["name"]: len(f["value"]) for f in fields if f["name"].startswith("__")}
+        print(f"OK    form of {page}: action {action!r}; state fields (chars) {state_keys}")
+        for f in fields:
+            if not f["name"].startswith("__"):
+                opts = [(v, t) for v, t, _ in f["options"]][:40]
+                print(f"      field {f['name']} {f['tag']}/{f['type']} value {f['value'][:60]!r} options {opts}")
+        print(f"      doc links before postback {doc_anchors(html, page)[:6]}")
+        data, notes = browser_form(html, fields, code0, a, b, category)
+        if category and not any(category in n for n in notes):
+            print(f"NONE  no option labelled {category!r}: the postback is not sent")
+            return
+        if not any(n.startswith(("submit", "__EVENTTARGET")) for n in notes):
+            print("NONE  no submit button or postback link found: the postback is not sent")
+            return
+        print(f"      postback sets {notes}")
+        guard()
+        target = urljoin(page, action) if action else page
+        origin = re.match(r"https?://[^/]+", page)
+        headers = {"Referer": page, "Origin": origin.group(0) if origin else HOME.rstrip("/")}
+        try:
+            body = c.fetch_url(target, {}, "site_page", {"postback": page, "fields": sorted(data)}, file=True,
+                               form=data, headers=headers)  # fmt: skip
+        except (Missing, BadRequest) as exc:
+            print(f"SKIP  postback {target}: {type(exc).__name__}: {exc}")
+            return
+        meta(f"postback {target}", body)
+        out = body.decode("utf-8", "replace")
+        rows = re.findall(r"<tr\b.*?</tr>", out, re.I | re.S)
+        links = doc_anchors(out, c.last.get("url") or target)
+        print(f"      {len(rows)} table rows; first rows {[_plain(r)[:200] for r in rows[:4]]}")
+        print(f"      doc links ({len(links)}): {links[:12]}")
+        for label, link in links:
+            if not link.startswith("postback:"):
+                document(link, dataset, {"from": f"postback {page}", "label": label, "scrip": code0})
+                return
+        print(f"NONE  {page}: no fetchable document link (postback links are not followed)")
+
+    legacy(LEGACY_RESULTS, "results_xbrl", date(2026, 5, 1), date(2026, 11, 18), alt=LEGACY_RESULTS_BETA)
+    legacy(LEGACY_XBRL, "annual_xbrl", date(2025, 4, 1), date(2026, 11, 18), ANNUAL_LABEL)
+    print(f"{c.calls} calls made (budget {XBRL5_BUDGET})")
+
+
 def _scrips(text: str) -> list[tuple[str, str]]:
     out = []
     for part in (p.strip() for p in text.split(",") if p.strip()):
@@ -901,14 +1348,14 @@ def _summary(led: Ledger) -> None:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", type=Path, required=True)
-    ap.add_argument("--mode", choices=("reach", "xbrl", "xbrl2", "xbrl3", "xbrl4"), default="reach")
+    ap.add_argument("--mode", choices=("reach", "xbrl", "xbrl2", "xbrl3", "xbrl4", "xbrl5"), default="reach")
     ap.add_argument("--scrips", default="500488:A,505036:B,530745:T", help="--mode xbrl: CODE or CODE:GROUP list")
     ap.add_argument("--max-js", type=int, default=30)
     ap.add_argument("--max-endpoints", type=int, default=4)
     a = ap.parse_args(argv)
     led = Ledger(a.out)
     c = BseClient(ledger=led)
-    if a.mode in ("xbrl", "xbrl2", "xbrl3", "xbrl4"):
+    if a.mode in ("xbrl", "xbrl2", "xbrl3", "xbrl4", "xbrl5"):
         try:
             if a.mode == "xbrl":
                 xbrl_probe(c, _scrips(a.scrips), a.max_js, a.max_endpoints)
@@ -916,8 +1363,10 @@ def main(argv: list[str] | None = None) -> int:
                 xbrl2_probe(c, _scrips(a.scrips), 6, a.max_endpoints)
             elif a.mode == "xbrl3":
                 xbrl3_probe(c, _scrips(a.scrips), 6, max(a.max_endpoints, 8))
-            else:
+            elif a.mode == "xbrl4":
                 xbrl4_probe(c, _scrips(a.scrips))
+            else:
+                xbrl5_probe(c, _scrips(a.scrips))
         except (Blocked, Failed, OverBudget) as exc:
             print(f"STOP  {type(exc).__name__}: {exc}")
         finally:

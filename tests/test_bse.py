@@ -460,3 +460,155 @@ def test_bse_fetch_windows_a_scrip_around_a_date():
     assert m._window("500488", since, today) == ("500488", since, today)
     assert m._window("500488@2026-05-20", since, today) == ("500488", date(2026, 5, 17), date(2026, 5, 23))
     assert m._window("500488@2026-11-17", since, today) == ("500488", date(2026, 11, 14), today)
+
+
+# ── X245: the client records the final URL, stops on a showinterest redirect, posts a page's own form ──
+
+
+class Hop:
+    status_code = 302
+
+
+class RoutedSession:
+    """Answers by URL substring (synthetic bodies: they test the probe's code paths, not BSE's formats)."""
+
+    def __init__(self, routes: list) -> None:
+        self.headers: dict = {}
+        self.routes, self.calls, self.post_headers = routes, [], None
+
+    def _answer(self, method, url, params, data):
+        self.calls.append((method, url, dict(params or {}), dict(data or {})))
+        full = url + "?" + "&".join(f"{k}={v}" for k, v in (params or {}).items())
+        for key, resp in self.routes:
+            if key in full:
+                return resp(method) if callable(resp) else resp
+        return _resp(404, b"")
+
+    def get(self, url, params=None, timeout=None):
+        return self._answer("GET", url, params, None)
+
+    def post(self, url, data=None, timeout=None, headers=None):
+        self.post_headers = headers
+        return self._answer("POST", url, None, data)
+
+
+def _resp(status, body, ctype="text/html", url=None, history=()):
+    r = Resp(status, body, ctype)
+    r.url, r.history = url, list(history)
+    return r
+
+
+def test_x245_client_final_url_showinterest_stop_and_form_post(tmp_path):
+    moved = _resp(200, b"<html/>", url="https://www.bseindia.com/b.aspx", history=[Hop()])
+    refused = _resp(200, b"<html/>", url="https://www.bseindia.com/showinterest.aspx")
+    s = RoutedSession([("a.aspx", moved), ("c.aspx", refused)])
+    c = bse.BseClient(s, sleep=lambda _: None, ledger=bse.Ledger(tmp_path / "led"), allow_in_page=False)
+    c.fetch_url(bse.HOME + "a.aspx", {}, "site_page", file=True)
+    assert c.last == {"url": "https://www.bseindia.com/b.aspx", "status": 200, "content_type": "text/html",
+                      "redirects": [302]}  # fmt: skip
+    c.fetch_url(bse.HOME + "a.aspx", {}, "site_page", file=True, form={"__VIEWSTATE": "x"}, headers={"Referer": "r"})
+    assert s.calls[-1][0] == "POST" and s.calls[-1][3] == {"__VIEWSTATE": "x"} and s.post_headers == {"Referer": "r"}
+    with pytest.raises(bse.Blocked, match="showinterest"):
+        c.fetch_url(bse.HOME + "c.aspx", {}, "site_page", file=True)
+    assert len(c.ledger.records()) == 2  # the redirect to showinterest is never stored as data
+
+
+def _probe():
+    import importlib.util
+
+    from financials.sources import ROOT
+
+    spec = importlib.util.spec_from_file_location("probe_bse_reach", ROOT / "scripts" / "probe_bse_reach.py")
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+FORM_PAGE = b"""<html><body><form method="post" action="./xbrldetails.aspx" id="form1">
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="VS1" />
+<input type="hidden" name="__VIEWSTATEGENERATOR" value="GEN" />
+<input type="hidden" name="__EVENTVALIDATION" value="EV1" />
+<input name="ctl00$ContentPlaceHolder1$SmartSearch$smartSearch" type="text" value="" />
+<input name="ctl00$ContentPlaceHolder1$hdnCode" type="hidden" value="" />
+<input name="ctl00$ContentPlaceHolder1$txtFromDt" type="text" value="01/11/2026" />
+<input name="ctl00$ContentPlaceHolder1$txtToDt" type="text" value="18/11/2026" />
+<select name="ctl00$ContentPlaceHolder1$ddlCategory"><option selected="selected" value="0">Select</option>
+<option value="7">Annual Reports (Pdf &amp; XBRL)</option></select>
+<input type="checkbox" name="ctl00$ContentPlaceHolder1$chkAll" />
+<input type="submit" name="ctl00$ContentPlaceHolder1$btnSubmit" value="Submit" />
+</form></body></html>"""
+P = "ctl00$ContentPlaceHolder1$"
+
+
+def test_x245_probe_form_postback_fields_and_answer_kinds():
+    m = _probe()
+    html = FORM_PAGE.decode()
+    action, fields = m.form_fields(html)
+    assert action == "./xbrldetails.aspx" and len(fields) == 10
+    data, _ = m.browser_form(html, fields, "500488", date(2025, 4, 1), date(2026, 11, 18), m.ANNUAL_LABEL)
+    assert (data["__VIEWSTATE"], data["__VIEWSTATEGENERATOR"], data["__EVENTVALIDATION"]) == ("VS1", "GEN", "EV1")
+    assert data[P + "ddlCategory"] == "7"
+    assert (data[P + "txtFromDt"], data[P + "txtToDt"]) == ("01/04/2025", "18/11/2026")
+    assert data[P + "hdnCode"] == "500488" and data[P + "SmartSearch$smartSearch"] == "500488"
+    assert data[P + "btnSubmit"] == "Submit" and P + "chkAll" not in data
+    xml = b'<?xml version="1.0"?><xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance"/>'
+    assert m.answer_kind(xml) == "XBRL; namespaces=['http://www.xbrl.org/2003/instance']"
+    assert m.answer_kind(b"<html><body>x</body></html>") == "HTML" and m.answer_kind(b"") == "empty"
+    assert m.answer_kind(b'{"Table": []}') == "JSON" and m.answer_kind(b"%PDF-1.7") == "PDF"
+    links = m.doc_anchors(
+        '<a href="/xml-data/corpfiling/AttachHis/a.xml">x</a>'
+        "<a href=\"javascript:__doPostBack('g$ctl02$lnkXbrl','')\">Std XBRL</a>",
+        "https://www.bseindia.com/c/p.aspx",
+    )
+    assert links == [
+        ("x", "https://www.bseindia.com/xml-data/corpfiling/AttachHis/a.xml"),
+        ("Std XBRL", "postback:g$ctl02$lnkXbrl"),
+    ]
+
+
+def test_x245_probe_xbrl5_dry_run_offline(tmp_path, capsys):
+    """The whole xbrl5 path against synthetic answers: calls stay in budget, one postback per legacy page, an HTML
+    answer where XBRL was expected is reported and not followed."""
+    m = _probe()
+    main_js = (
+        '{path:"corporates",loadChildren:()=>import("./chunk-CORP.js")}'
+        "X=class{f(){this.http.get(`${I.BSE_Domain_APIUrl}/Corp_Archive_Wthxml_ng_new/w?SCRIP_CD=${a}&CATNAME="
+        "${b}&FROMDT=${c}&TODT=${d}&PER=${e}&SEGMENT=${f}`);this.http.get(`${I.BSE_Domain_APIUrl}/"
+        'Corp_FinanceResult_ng_new/w?SCRIP_CD=${a}&FlagDur=${g}`)}};FlagDur:"Q";"yyyyMMdd"'
+    )
+    routes_js = '{path:"comp_resultsnew",loadChildren:()=>import("./chunk-RES.js")}'
+    row = {"SCRIP_CD": 500488, "XBRL_STD": "/XBRLFILES/a_std.xml", "XBRL_CON": "/XBRLFILES/a_con.xml"}
+    ann = {"Table": [{"NEWSID": "n1", "SCRIP_CD": 500488, "CATEGORYNAME": "Result", "SUBCATNAME": "Financial Results",
+                      "XML_NAME": "ANN_500488_N1"}]}  # fmt: skip
+    xml = b'<?xml version="1.0"?><xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance"/>'
+    results_page = FORM_PAGE.replace(b"xbrldetails", b"Comp_Resultsnew").replace(b"ddlCategory", b"ddlPeriod")
+    answer = b'<table><tr><td><a href="/xml-data/corpfiling/AttachLive/r.xml">Std XBRL</a></td></tr></table>'
+    s = RoutedSession([
+        ("AnnGetData/w", _resp(200, json.dumps(ann).encode(), "application/json")),
+        ("corporates/comp_resultsnew", _resp(200, b'<script src="main-ABC.js"></script>')),
+        ("main-ABC.js", _resp(200, main_js.encode(), "text/javascript")),
+        ("chunk-CORP.js", _resp(200, routes_js.encode(), "text/javascript")),
+        ("chunk-RES.js", _resp(200, main_js.encode(), "text/javascript")),
+        ("Corp_", _resp(200, json.dumps({"Table": [row]}).encode(), "application/json")),
+        ("Bsenewid=6fa", _resp(200, b"<html>viewer</html>")),
+        ("CorpXbrlGen", _resp(200, xml, "text/xml")),
+        ("XBRLFILES", _resp(200, xml, "text/xml")),
+        ("Comp_Resultsnew.aspx", lambda method: _resp(200, answer if method == "POST" else results_page)),
+        ("xbrldetails.aspx", lambda method: _resp(200, answer if method == "POST" else FORM_PAGE)),
+        ("AttachLive", _resp(200, xml, "text/xml")),
+    ])  # fmt: skip
+    c = bse.BseClient(s, sleep=lambda _: None, ledger=bse.Ledger(tmp_path / "led"), allow_in_page=False)
+    m.xbrl5_probe(c, [("500488", "A")])
+    out = capsys.readouterr().out
+    assert c.calls <= m.XBRL5_BUDGET
+    gen = {(x[2]["Bsenewid"], x[2]["Scripcode"]) for x in s.calls if "CorpXbrlGen" in x[1]}
+    assert gen == {(nid, code) for code, nid in m.KNOWN_RESULT_NEWSIDS} | {("n1", "500488")}
+    assert "STOP  (this step) HTML where XBRL was expected" in out
+    posts = [x for x in s.calls if x[0] == "POST"]
+    assert len(posts) == 2 and posts[1][3][P + "ddlCategory"] == "7"
+    corp = next(x[2] for x in s.calls if "Corp_Archive_Wthxml_ng_new" in x[1])
+    assert (corp["SEGMENT"], corp["SCRIP_CD"], corp["FROMDT"], corp["CATNAME"]) == ("Equity", "500488", "20260518",
+                                                                                     "Result")  # fmt: skip
+    assert next(x[2] for x in s.calls if "Corp_FinanceResult_ng_new" in x[1])["FlagDur"] == "Q"
+    assert any("a_std.xml" in x[1] for x in s.calls) and any("a_con.xml" in x[1] for x in s.calls)
+    assert sum("AttachLive" in x[1] for x in s.calls) == 2

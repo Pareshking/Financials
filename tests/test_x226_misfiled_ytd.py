@@ -7,7 +7,8 @@ identity breaks and X106 bridged TTM across it: Q2 FY27 TTM = H1 FY27 -47.11 + F
 Cr, against +17.43 Cr from the four quarters. The Reg. 34 annual report of 16-Nov-2026 states FY PAT 81.94 Cr again
 (ranked below the results filing on P&L lines by X100): a filing later than the ranked one agrees with the quarters,
 so the ranked YTD is the mis-filed side and the TTM is withheld (NULL) instead of bridged. Before the annual report
-is visible the bridge stays (point in time).
+is visible there is no evidence (point in time); since X301 the re-sent FY (breaking) and H1 FY26 (holding) are on two
+bases, so the TTM is then the 4 quarters (+17.43 Cr), not the bridge.
 
 Aarti Pharmalabs consolidated H1 FY26 (1569445): Q1 49.50 Cr and Q2 27.92 Cr, H1 filed as -44.18 Cr; the 9M of
 1622052 equals Q1 + Q2 + Q3 (NEXT_YTD_AGREES), and both quarters are positive while the H1 is negative (PAT_SIGN_FLIP).
@@ -18,6 +19,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
+import financials.fundamentals as F
 from _fixture_helpers import FIXTURES
 from financials.fundamentals import FactBook, clear_prefetch, load_factbook, prefetch_fundamentals
 from financials.parsers.integrated import parse_integrated_results
@@ -96,10 +98,23 @@ def test_nazara_bridge_stays_until_the_agreeing_filing_is_visible(market):
     assert book.misfiled_ytd_evidence("pat", FY26) is None
     assert book.ttm_from_ytd("pat", Q2_FY27) == Decimal("-877600000")  # the X106 bridge
     # X301 (decision 2026-11-18 item 6): FY26 (-23.24 Cr, the re-send) breaks the identity while H1 FY26 holds it, so
-    # the bridge would mix two bases; the FY26 break contains window quarters and is not (yet) proven mis-filed, so
-    # the quarters are not shown to be on one basis either: NULL (was the -87.76 Cr bridge before X301).
+    # the bridge would mix two bases: the latest 4 quarters as filed instead (was the -87.76 Cr bridge before X301).
     assert book.prior_year_mixed_basis("pat", book._bridge_periods("pat", Q2_FY27))
+    assert book.ttm("pat", Q2_FY27) == Decimal("174300000")
+    assert book.restatement_suspected(Q2_FY27)  # the flag tells a reader the TTM spans a YTD-identity break
+    # owners' profit TTM (EPS, P/E, ROE) follows PAT's basis (X301): the same 4-quarter sum
+    owners = book.coalesced("pat_owners", "pat")
+    assert book._bridge_periods(owners, Q2_FY27) == []  # FY26 / H1 FY26 attribution withheld (X86): no own bridge
+    assert book.ttm(owners, Q2_FY27) == sum(book.quarter(owners, F._add_months(Q2_FY27, -3 * i)) for i in range(4))
+
+
+def test_nazara_owners_ttm_follows_pat_after_the_annual_report(market):
+    """X301: owners' profit TTM is withheld with PAT's (X226 on PAT's FY26), not summed from the quarters."""
+    ent = _nazara(market)
+    book = load_factbook(market.con, ent, "CONSOLIDATED", AFTER_AR)
     assert book.ttm("pat", Q2_FY27) is None
+    assert book.ttm(book.coalesced("pat_owners", "pat"), Q2_FY27) is None
+    assert book.ttm(book.continuing_owners(), Q2_FY27) is None
 
 
 def _aarti_book() -> FactBook:

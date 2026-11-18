@@ -33,6 +33,12 @@ YTD_BRIDGED_TAGS = frozenset({
     "other_income", "depreciation_amortisation", "finance_costs", "profit_before_exceptional_and_tax", "pbt",
     "excise_duty|0",
 })  # fmt: skip
+# X301: owners' profit TTM tags (derived per period: COALESCE(owners, PAT), and that less discontinued operations; EPS,
+# P/E, ROE). Not restatement triggers or YTD findings, but their TTM takes the X106 / X226 / X301 path when the filed
+# owners' profit or PAT (guarded tags: the row is flagged YTD_IDENTITY) breaks the YTD identity in the window, so
+# owners' TTM follows PAT's basis. A break of the derived series alone (owners filed in some periods, PAT in others)
+# does not.
+OWNERS_TTM_TAGS = {"pat_owners|pat": ("pat_owners", "pat"), "pat_owners_continuing": ("pat_owners", "pat")}
 # X102: PBT including the share of associates / JVs, per period = filed PBT + filed JV share. Integrated Filing XBRL
 # puts the JV share after PBT, but filers also book it inside PBT as an exceptional item with the JV element 0
 # (FINCABLES Q1 FY26 PBT 176.37 + JV 26.18 = 202.55; Q2 PBT 206.20 incl. 38.11 exceptional, JV 0). Filed PBT then
@@ -248,7 +254,7 @@ class FactBook:
             nq = self._ytd_quarters(tag, s, nxt_end) if nxt is not None else [None]
             if None not in nq and abs(nxt - sum(nq, Decimal(0))) <= self._identity_tolerance(len(nq), nxt):
                 return "NEXT_YTD_AGREES"
-        if tag in ("pat", "pat_owners") and ytd != 0 and 0 not in qs:
+        if (tag in ("pat", "pat_owners") or tag in OWNERS_TTM_TAGS) and ytd != 0 and 0 not in qs:
             signs = {q > 0 for q in qs}
             if len(signs) == 1 and (ytd > 0) not in signs:
                 return "PAT_SIGN_FLIP"
@@ -342,6 +348,8 @@ class FactBook:
 
     def _ytd_consistent(self, tag: str, end: date) -> bool:
         """False when any YTD ending inside the 4 quarters to `end` breaks the identity (guarded tags only)."""
+        if tag in OWNERS_TTM_TAGS:  # X301: owners' profit TTM follows PAT's (and filed owners' profit's) basis
+            return not any(self._breaks_in_window(t, end) for t in OWNERS_TTM_TAGS[tag])
         if tag not in YTD_GUARDED_TAGS:
             return True
         return not self._breaks_in_window(tag, end)
@@ -389,7 +397,7 @@ class FactBook:
         exceptional items 436 Cr on the continuing basis after the Instamart transfer vs H1 FY26 -1,872 Cr = Q1 + Q2
         as filed (Vedanta standalone FY26 D&A 38 Cr after the demerger vs H1 FY26 2,050 Cr: FY - H1 would be a
         negative D&A). FY - YTD is then no set of quarters, so the line is not bridged (X301: nor a guarded tag;
-        `one_basis_quarter_sum` then)."""
+        `mixed_basis_quarter_sum` then)."""
         if len(used) != 3:
             return False
         broken = {(date.fromisoformat(b["ytd_period"][0]), date.fromisoformat(b["ytd_period"][1]))
@@ -426,41 +434,62 @@ class FactBook:
             # X226: unless a YTD the bridge reads is provably mis-filed: then the TTM is withheld (NULL).
             # X300: the operating lines of a restated row (other income, D&A, finance costs, PBT) likewise.
             used = self._bridge_periods(tag, end)
-            if used and any(self.misfiled_ytd_evidence(tag, p) for p in used):
+            if used and any(self._misfiled(tag, p) for p in used):
                 return None
-            if tag in YTD_GUARDED_TAGS and self.prior_year_mixed_basis(tag, used):
+            srcs = OWNERS_TTM_TAGS.get(tag, ())
+            if any(self.misfiled_ytd_evidence(t, p) for t in srcs for p in self._bridge_periods(t, end)):
+                return None  # X301: owners' profit is withheld with PAT's (or filed owners' profit's) bridge
+            if (
+                self.prior_year_mixed_basis(tag, used)
+                if tag in YTD_GUARDED_TAGS
+                else srcs
+                and (
+                    not used
+                    or self.prior_year_mixed_basis(tag, used)
+                    or any(self.prior_year_mixed_basis(t, self._bridge_periods(t, end)) for t in srcs)
+                )
+            ):
                 # X301 GUARDED_BRIDGE_ONE_BASIS: the prior year's FY and YTD are on two bases (Swiggy standalone
                 # FY26 revenue 8,258 Cr continuing vs H1 FY26 5,693 Cr as first filed): FY - YTD is no set of
-                # quarters, so no bridge. The quarter sum if it is on one basis, else NULL (never mixed).
-                return self.one_basis_quarter_sum(tag, end, used)
+                # quarters, so no bridge; the latest 4 quarters as filed instead (industry practice). Owners' profit
+                # follows PAT there, and sums its quarters when it has no bridge of its own (attribution withheld, X86).
+                return self.mixed_basis_quarter_sum(tag, end)
             return self.ttm_from_ytd(tag, end)
         qs = [self.quarter(tag, _add_months(end, -3 * i)) for i in range(4)]
         if None not in qs:
             return sum(qs, Decimal(0))
         return self.ttm_from_ytd(tag, end)
 
-    def one_basis_quarter_sum(self, tag: str, end: date, used: list[Period]) -> Decimal | None:
-        """X301: the 4 quarters to `end` when they are on one basis, else None. On one basis: all 4 are known, the
-        current-year ones agree with the latest YTD (`used[0]`, identity tolerance), and every YTD of `tag` that
-        contains one of them and breaks the identity is provably the mis-filed side (X226 evidence). A prior FY
-        restated on a new basis (a break nothing proves mis-filed) means its quarters in the window are not all on
-        the basis of the later ones: Swiggy standalone Q3 FY26 revenue 3,166 Cr with Instamart, Q4 2,194 Cr
-        continuing, so the window has no one-basis value and the TTM is NULL."""
-        ends = [_add_months(end, -3 * i) for i in range(4)]
-        qs = [self.quarter(tag, e) for e in ends]
-        if None in qs or not used:
-            return None
-        ytd = self.durations[tag][used[0]]
-        current = [q for q, e in zip(qs, ends, strict=True) if e >= used[0][0]]
-        if abs(ytd - sum(current, ZERO)) > self._identity_tolerance(len(current), ytd):
-            return None
-        starts = [_add_months(date(e.year, e.month, 1), -2) for e in ends]
-        for b in self.ytd_breaks(tag):
-            p = (date.fromisoformat(b["ytd_period"][0]), date.fromisoformat(b["ytd_period"][1]))
-            contains = any(p[0] <= s and e <= p[1] for s, e in zip(starts, ends, strict=True))
-            if contains and self.misfiled_ytd_evidence(tag, p) is None:
+    def mixed_basis_quarter_sum(self, tag: str, end: date) -> Decimal | None:
+        """X301: the sum of the 4 quarters to `end`, each at its latest visible value, when the bridge would mix two
+        bases (Swiggy standalone Q2 FY27 revenue 3,166 + 2,194 + 2,462 + 2,646 = 10,468 Cr instead of the bridge
+        5,108 + 8,258 - 5,693 = 7,673). None when a quarter is missing or is itself a proven mis-filing: derived
+        (YTD_k - YTD_k-1) from a YTD with X226 evidence. The row is flagged `restatement_suspected` (YTD_IDENTITY:
+        the window holds a YTD-identity break), so a reader sees the TTM may mix bases."""
+        d = self.durations.get(tag, {})
+        total = ZERO
+        for e in (_add_months(end, -3 * i) for i in range(4)):
+            q_start = _add_months(date(e.year, e.month, 1), -2)
+            if (q_start, e) not in d:
+                prev_end = _add_months(e, -3)
+                for s, pe in d:
+                    if pe == e and (s, prev_end) in d and s < q_start and self.is_ytd_start(s):
+                        if self._misfiled(tag, (s, e)) or self._misfiled(tag, (s, prev_end)):
+                            return None
+                        break
+            q = self.quarter(tag, e)
+            if q is None:
                 return None
-        return sum(qs, ZERO)
+            total += q
+        return total
+
+    def _misfiled(self, tag: str, period: Period) -> str | None:
+        """X226 evidence for `tag`'s YTD `period`; for an owners' profit TTM tag (X301) also that of the filed owners'
+        profit and of PAT for the period (owners' TTM follows PAT's basis)."""
+        ev = self.misfiled_ytd_evidence(tag, period)
+        for src in OWNERS_TTM_TAGS.get(tag, ()):
+            ev = ev or self.misfiled_ytd_evidence(src, period)
+        return ev
 
     def ttm_from_ytd(self, tag: str, end: date) -> Decimal | None:
         """Semi-annual bridge (§6.5): FY directly, else YTD_curr + FY_prev − YTD_prev."""

@@ -623,8 +623,10 @@ My 19:31 (2026-11-17) recommendations, unanswered, applied:
    "continue doing what you are doing"): the guarded tags (revenue, total income, PAT, PBT incl. JV, owners' PAT)
    use the YTD bridge only when the prior year's FY and YTD are on one basis. When one of them holds the YTD
    identity and the other breaks it (Swiggy standalone FY26 revenue 8,258 Cr continuing vs H1 FY26 5,693 Cr as
-   first filed), TTM is the 4-quarter sum if those quarters are on one basis (they agree with the latest YTD and
-   with every YTD containing them that is not proven mis-filed), else NULL: never a mixed-basis number (Swiggy Q2
-   FY27 TTM revenue NULL instead of 7,673 Cr). On the snapshot this turns 1,231 TTM values NULL in 236 entities
-   (56 in the Nifty 500 seed), among them `sales_ttm` of Bajaj Finance, Coal India, HUL and LTTS in Jun-26 /
-   Sep-26 rows, because their FY26 revenue is restated (or regrouped) beyond 0.5 % while H1 FY26 is not. Reversible.
+   first filed), TTM is the sum of the latest 4 quarters as filed, as Screener and data vendors show it (Swiggy Q2
+   FY27 TTM revenue 10,468 Cr instead of 7,673), NULL only if a quarter is missing or proven mis-filed (X226 first);
+   the row carries `restatement_suspected`. (A first version returned NULL unless the quarters were provably on one
+   basis: 1,231 NULLs incl. Bajaj Finance, HUL, Coal India and LTTS revenue; judged too costly.) Owners' profit TTM
+   (EPS, P/E, ROE) follows the same rules with PAT's basis. On the snapshot 1,238 guarded values change (239
+   entities, 57 in the Nifty 500 seed), 14 NULL (missing quarters); owners' TTM 584 values (180 entities), 23 NULL.
+   Reversible.

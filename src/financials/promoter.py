@@ -1355,12 +1355,12 @@ def _filing_check_rows(con, fid: str, exchange: str, entity_id: str, meta: dict,
 
     rows = []
     if meta["accounting_profile"] == "REG34_ANNUAL":
-        diffs = fc.annual_prior_year_differences(
+        diffs, ctx = fc.annual_prior_year_comparison(
             con, filing_id=fid, parser_version=meta["parser_version"], entity_id=entity_id, scope=meta["scope"],
             fy_start=meta["fy_start"], level_of_rounding=meta["level_of_rounding"], visible_from_ts=visible,
         )  # fmt: skip
         if diffs:
-            details = {"scope": meta["scope"], "differences": diffs, **fc.prior_year_class(diffs)}  # X182
+            details = {"scope": meta["scope"], "differences": diffs, **fc.prior_year_class(diffs, ctx)}  # X182
             rows.append(_quarantine_row(stage="CONSISTENCY", reason_code=fc.PRIOR_YEAR_REASON, filing_id=fid,
                                         entity_id=entity_id, details=details))  # fmt: skip
     conflicts = fc.apply_bse_scrip_code(con, exchange=exchange, entity_id=entity_id, isin=meta["stated_isin"],
@@ -1805,7 +1805,7 @@ def close_resolved_share_findings(con) -> int:
 ANNUAL_RECHECK_NOTE = "annual re-check [X180]: "
 
 
-def audit_annual_checks(con) -> dict[str, int]:
+def audit_annual_checks(con, entity_ids=None) -> dict[str, int]:
     """X180: re-run the two Reg. 34 annual checks (G328 prior-year columns [X110, X182]; G93 year-end share counts
     [X114, X181]) for every promoted annual filing on the data now stored. Both run only at promotion, so their
     outcome depended on what had been promoted before (an FY26 annual promoted before the FY25 annual or the FY-end
@@ -1813,7 +1813,8 @@ def audit_annual_checks(con) -> dict[str, int]:
     never checked). The checks are point-in-time (prior year: what a reader had one microsecond before the annual
     became visible), so a re-run gives the answer promotion in broadcast order would have given. New findings are
     queued (deterministic ids: an unchanged finding, or one a human resolved, is kept as it is); an open finding of
-    the same reason and filing that the re-run no longer produces is closed FIXED_BY_RULE. Returns counts."""
+    the same reason and filing that the re-run no longer produces is closed FIXED_BY_RULE. Returns counts.
+    `entity_ids`: re-run only those entities' annuals (X235: after rule X201 rescaled one of their filings)."""
     from financials import filing_checks as fc
     from financials.share_capital import REASON as SHARE_REASON
     from financials.share_capital import annual_share_disagreement
@@ -1823,16 +1824,19 @@ def audit_annual_checks(con) -> dict[str, int]:
         "FROM filing_meta WHERE accounting_profile = 'REG34_ANNUAL' QUALIFY row_number() OVER (PARTITION BY "
         "filing_id ORDER BY " + version_key() + " DESC) = 1 ORDER BY filing_id"
     ).fetchall()
+    if entity_ids is not None:
+        wanted = set(entity_ids)
+        metas = [m for m in metas if m[2] in wanted]
     rows = []
     for fid, pv, ent, scope, fy_start, fy_end, lor, visible in metas:
-        diffs = fc.annual_prior_year_differences(
+        diffs, ctx = fc.annual_prior_year_comparison(
             con, filing_id=fid, parser_version=pv, entity_id=ent, scope=scope, fy_start=fy_start,
             level_of_rounding=lor, visible_from_ts=visible,
         )  # fmt: skip
         if diffs:
             rows.append(_quarantine_row(stage="CONSISTENCY", reason_code=fc.PRIOR_YEAR_REASON, filing_id=fid,
                                         entity_id=ent, details={"scope": scope, "differences": diffs,
-                                                                **fc.prior_year_class(diffs)}))  # fmt: skip
+                                                                **fc.prior_year_class(diffs, ctx)}))  # fmt: skip
         share = annual_share_disagreement(con, fid, ent, fy_end)
         if share is not None:
             rows.append(_quarantine_row(stage="SHARES", reason_code=SHARE_REASON, entity_id=ent, filing_id=fid,

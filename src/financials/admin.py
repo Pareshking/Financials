@@ -962,7 +962,8 @@ VK = version_key()
 
 
 def find_level_slips(con) -> list[dict]:
-    """Every quarterly results filing (current parser version) the X201 rule rescales, with its proof."""
+    """Every quarterly results filing (current parser version) the X201 rule rescales, with its proof, and every
+    Reg. 34 annual filing it rescales (X235, `_annual_level_slips`)."""
     meta = con.execute(
         "SELECT m.filing_id, m.entity_id, m.scope, m.level_of_rounding, m.period_end, f.source_url FROM filing_meta m "
         "JOIN filings f USING (filing_id) WHERE f.category = 'RESULTS_XBRL' AND m.accounting_profile <> 'REG34_ANNUAL' "
@@ -1007,7 +1008,66 @@ def find_level_slips(con) -> list[dict]:
             if v is not None:
                 out.append({"filing_id": fid, "entity_id": ent, "scope": scope, "period_end": end,
                             "source_url": url, "verdict": v})  # fmt: skip
+    out += _annual_level_slips(con, by_pair, quarter, shp)
     return sorted(out, key=lambda x: (x["entity_id"], x["scope"], x["period_end"], x["filing_id"]))
+
+
+def _annual_level_slips(con, by_pair: dict, quarter: dict, shp: dict) -> list[dict]:
+    """X235: the X201 proof for a Reg. 34 annual filing, against the entity-scope's quarterly results filings (the
+    neighbours; another annual never votes, so two slipped annuals cannot outvote the results). The annual files
+    no face value and no quarter, so: (A) its FY-end `equity_share_capital` against the neighbours' paid-up capital
+    at the usual level; (B) the shareholding pattern's total shares nearest the FY end x the face value of the
+    entity's results filing nearest the FY end (either scope; per share, independent of the declared unit) against
+    that capital; (C) its full-year basic EPS (`eps_basic`, else `eps_basic_continuing`) x those shares against its
+    full-year profit (owners' where filed). Same thresholds as X201: two checks at the unit ratio, none at 1.
+    TD Power Systems consolidated FY25 and FY26 (`Rupees`, results `Lakhs`): FY26 revenue 185,623.38 rupees = Rs
+    1,856.23 Cr typed in lakhs; equity capital 3,124.30 vs 156,214,830 shares x Rs 2."""
+    metas = con.execute(
+        "SELECT m.filing_id, m.entity_id, m.scope, m.level_of_rounding, m.fy_end, f.source_url FROM filing_meta m "
+        "JOIN filings f USING (filing_id) WHERE m.accounting_profile = 'REG34_ANNUAL' "
+        "QUALIFY row_number() OVER (PARTITION BY m.filing_id ORDER BY " + version_key("m.parser_version") + " DESC) = 1"
+    ).fetchall()
+    if not metas:
+        return []
+    facts: dict[str, dict] = {}
+    for fid, tag, v in con.execute(
+        "SELECT o.filing_id, o.canonical_tag, any_value(coalesce(o.value_inr, o.value_other)) FROM fact_observations o "
+        f"JOIN (SELECT filing_id, arg_max(parser_version, {VK}) AS pv, arg_max(fy_end, {VK}) AS fe FROM filing_meta "
+        "WHERE accounting_profile = 'REG34_ANNUAL' GROUP BY filing_id) m ON m.filing_id = o.filing_id "
+        "AND m.pv = o.parser_version AND m.fe = o.period_end "
+        "WHERE ((o.period_type = 'INSTANT' AND o.canonical_tag = 'equity_share_capital') OR (o.period_type = "
+        "'DURATION' AND o.period_months = 12 AND o.canonical_tag IN ('eps_basic', 'eps_basic_continuing', 'pat', "
+        "'pat_owners'))) GROUP BY ALL"
+    ).fetchall():
+        facts.setdefault(fid, {})[tag] = v
+    face: dict[str, list] = {}
+    for (ent, _scope), rows in by_pair.items():
+        for fid, _, _, _, end, _ in rows:
+            fv = quarter.get(fid, {}).get("face_value_per_share")
+            if fv:
+                face.setdefault(ent, []).append((end, fv))
+    out = []
+    for fid, ent, scope, level, fy_end, url in metas:
+        results = by_pair.get((ent, scope), [])
+        usual = usual_level([r[3] for r in results])
+        if usual is None or usual == level:
+            continue
+        near = [s for s in shp.get(ent, []) if abs((s[0] - fy_end).days) <= 92]
+        shares = min(near, key=lambda s: (abs((s[0] - fy_end).days), s[0]))[1] if near else None
+        fvs = [x for x in face.get(ent, []) if abs((x[0] - fy_end).days) <= 92]
+        fv = min(fvs, key=lambda x: (abs((x[0] - fy_end).days), x[0]))[1] if fvs else None
+        a = facts.get(fid, {})
+        v = level_slip(
+            level, [r[3] for r in results], paid_up=a.get("equity_share_capital"),
+            neighbour_paid_ups=[quarter.get(r[0], {}).get("paid_up_equity_capital") for r in results
+                                if r[3] == usual],
+            face_value=fv, shp_shares=shares, eps_basic=a.get("eps_basic") or a.get("eps_basic_continuing"),
+            profit=a.get("pat_owners") or a.get("pat"),
+        )  # fmt: skip
+        if v is not None:
+            out.append({"filing_id": fid, "entity_id": ent, "scope": scope, "period_end": fy_end, "source_url": url,
+                        "verdict": v, "annual": True})  # fmt: skip
+    return out
 
 
 def rescale_level_slips(con, *, dry_run: bool = False) -> list[dict]:
@@ -1063,6 +1123,11 @@ def _rescale(con, slips: list[dict]) -> list[dict]:
             _mark_correction_dirty(con, s["filing_id"], s["entity_id"], "level_of_rounding_slip")
         s["corrections"] = len(rows)
     audit_ytd_identity(con, sorted({(s["entity_id"], s["scope"]) for s in slips}))
+    annual = sorted({s["entity_id"] for s in slips if s.get("annual")})
+    if annual:  # X235: the prior-year check of these entities' annuals compares at the corrected scale
+        from financials.promoter import audit_annual_checks
+
+        audit_annual_checks(con, entity_ids=annual)
     return slips
 
 

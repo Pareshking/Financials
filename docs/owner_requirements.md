@@ -585,3 +585,14 @@ The owner asked the assistant to take these with its recommendation. Each is rev
 - **Decision S (share count when Reg. 31 is the outlier, rule X221 SHARES_REG31_OUTLIER):** when the results
   filing's paid-up / face value and NSE PR-zip Issue Size agree and the same-date Reg. 31 total does not, market cap
   uses NSE's count. When all three differ (HMT), Reg. 31 is kept and the finding stays open.
+
+## Decisions taken on the owner's behalf (2026-11-18, owner: "use agents where needed to speed up"; reversible)
+
+My 19:31 (2026-11-17) recommendations, unanswered, applied:
+1. **REGROUPED prior-year findings** (X182) are bulk-ACCEPTed with their class in the note when every statement
+   total agrees; restatements of the bottom line or the cash flow stay open (X233, X234 sub-classes).
+2. **`roe_screener`** (X227) is added beside `roe` (Screener's form: last full year's owners' profit over average
+   owners' equity); `roe` is unchanged, and C16 no longer claims to match Screener.
+3. **Debt/equity for lending NBFCs** (X228): (debt securities + borrowings + deposits + subordinated liabilities) /
+   total equity; banks and insurers stay NULL.
+4. **TTM is NULL on a proven mis-filed YTD** (X226 YTD_MISFILED_NO_BRIDGE) instead of the X106 bridge (NAZARA).

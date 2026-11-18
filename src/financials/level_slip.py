@@ -15,6 +15,10 @@ least two checks read SLIP at the same k and none reads GENUINE. A company that 
 values in the new unit (all checks GENUINE) and is never touched. Navneet Education Q4 FY26 consolidated (1670953,
 `Lakhs`; Q1-Q3 `Crores`): paid-up 0.44 Cr vs 44.00 Cr, SHP 22.12 Cr shares x Rs 2 = 44.24 Cr; FY revenue 17.21 Cr
 becomes 1,721 Cr = the quarters 794 + 247 + 250 + 430.
+
+X235: the same proof applies to a Reg. 34 annual filing (`admin._annual_level_slips`): its FY-end equity share capital,
+the face value of the nearest results filing and its full-year EPS and profit stand in for the quarter's facts, and
+the entity-scope's quarterly results are its neighbours (TD Power Systems consolidated FY25 and FY26, `Rupees`).
 """
 
 from __future__ import annotations

@@ -7,6 +7,10 @@
   X182: every such finding carries a deterministic class for triage (`prior_year_class`): SCALE (a line differs by
   an exact power of ten: a unit error in one of the two filings), RESTATED (a statement total differs), else
   REGROUPED (the totals agree; detail lines moved between captions, Schedule III "regrouped / reclassified").
+  X233-X234: a RESTATED finding carries a sub-class: RECLASSIFIED / DISCONTINUED_REPRESENTED when PAT, total equity
+  and net cash flow all agree (the totals moved, the bottom lines did not), else CASH_FLOW_RESTATED or
+  BOTTOM_LINE_RESTATED. X235: the annual's own active corrections (rule X201 rescale, decision B) replace its filed
+  values in the comparison.
 - G79 [X111]: the BSE scrip code stated inside a results filing (`ScripCode`, X7; from disclosure_facts) fills
   `security_identifier_history.bse_scrip_code` of the NSE identifier rows that match the filing's own ISIN and
   symbol. A different code already on such a row is an IDENTIFIER / BSE_SCRIP_CODE_CONFLICT finding; nothing is
@@ -36,11 +40,16 @@ PRIOR_YEAR_TOTALS = frozenset({
     "total_assets", "total_equity_and_liabilities", "total_equity", "total_income", "total_expenses", "pbt", "pat",
     "cfo", "cfi", "cff", "net_cash_flow",
 })  # fmt: skip
+# X233-X234: the bottom lines whose agreement proves a RESTATED finding is a reclassification; the sub-classes a
+# reviewer may accept on that proof (owner decision 2026-11-18, delegated).
+BOTTOM_LINES = ("pat", "total_equity", "net_cash_flow")
+DISCONTINUED_PROFIT_TAG = "pat_discontinued"
+RESTATED_ACCEPTABLE = frozenset({"RECLASSIFIED", "DISCONTINUED_REPRESENTED"})
 _SCALE_FACTORS = tuple(Decimal(10) ** k for k in range(1, 8))
 _SCALE_SLACK = Decimal("0.001")  # relative: 40,197,100,000 vs 401,971,000 is exactly 100x (KUANTUM FY26 vs FY25)
 
 
-def annual_prior_year_differences(
+def annual_prior_year_comparison(
     con,
     *,
     filing_id: str,
@@ -50,35 +59,60 @@ def annual_prior_year_differences(
     fy_start: date,
     level_of_rounding: str,
     visible_from_ts: datetime,
-) -> list[dict]:
+) -> tuple[list[dict], dict]:
     """Rupee facts of this annual filing for periods ending before its own fiscal year (the prior-year columns),
     each compared with the value a reader had for that tag and period one microsecond before this filing became
     visible (`load_factbook`: results outrank the annual report on P&L lines [X100], latest version wins). Tolerance:
-    half a LevelOfRounding unit of each side (this filing's unit, the coarsest unit among the stored filings)."""
+    half a LevelOfRounding unit of each side (this filing's unit, the coarsest unit among the stored filings).
+    The filing's own active corrections (decision B, rule X201) replace its filed values (X235): a rescaled annual is
+    compared at its corrected scale. Returns (differences, context): context holds the tags compared on both sides
+    (`compared`) and whether the filing states a non-zero prior-year profit from discontinued operations
+    (`discontinued_filed`), which `prior_year_class` needs for the RESTATED sub-classes."""
     from financials.fundamentals import load_factbook
 
-    rows = con.execute(
+    filed = con.execute(
         "SELECT canonical_tag, period_type, period_start, period_end, value_inr FROM fact_observations "
         "WHERE filing_id = ? AND parser_version = ? AND value_inr IS NOT NULL AND period_end < ? "
         "AND canonical_tag NOT LIKE ? ESCAPE '\\' ORDER BY canonical_tag, period_type, period_start, period_end",
         [filing_id, parser_version, fy_start, _NOT_COMPARABLE_PREFIX],
     ).fetchall()
-    if not rows:
-        return []
+    context: dict = {"compared": set(), "discontinued_filed": False}
+    if not filed:
+        return [], context
+    values = {(t, p, s, e): v for t, p, s, e, v in filed}
+    for t, p, s, e, v in con.execute(
+        "SELECT canonical_tag, period_type, period_start, period_end, value_inr FROM fact_corrections "
+        "WHERE filing_id = ? AND revoked_at IS NULL AND period_end < ? ORDER BY created_at, correction_id",
+        [filing_id, fy_start],
+    ).fetchall():
+        if (t, p, s, e) in values:
+            values[(t, p, s, e)] = v  # None: the correction withdraws the value
     book = load_factbook(con, entity_id, scope, visible_from_ts - timedelta(microseconds=1))
     tol = (book.rounding_unit + ROUNDING_UNITS[level_of_rounding]) / 2
     out = []
-    for tag, ptype, start, end, value in rows:
+    for (tag, ptype, start, end), value in sorted(
+        values.items(), key=lambda x: (*x[0][:2], x[0][2] or date.min, x[0][3])
+    ):
+        if value is None:
+            continue
+        if tag == DISCONTINUED_PROFIT_TAG and value:
+            context["discontinued_filed"] = True
         stored = (
             book.instants.get(tag, {}).get(end) if ptype == "INSTANT" else book.durations.get(tag, {}).get((start, end))
         )
         if stored is None:
             continue
+        context["compared"].add(tag)
         diff = Decimal(value) - stored
         if abs(diff) > tol:
             out.append({"tag": tag, "period_type": ptype, "period": [str(start), str(end)], "annual": str(value),
                         "stored": str(stored), "difference": str(diff), "tolerance": str(tol)})  # fmt: skip
-    return out
+    return out, context
+
+
+def annual_prior_year_differences(con, **kwargs) -> list[dict]:
+    """The differences of `annual_prior_year_comparison` alone."""
+    return annual_prior_year_comparison(con, **kwargs)[0]
 
 
 SC0_RULE = "SC0"
@@ -97,14 +131,44 @@ def _is_scale(annual: Decimal, stored: Decimal) -> bool:
     return any(abs(big / small - f) <= _SCALE_SLACK * f for f in _SCALE_FACTORS)
 
 
-def prior_year_class(differences: list[dict]) -> dict:
+def prior_year_class(differences: list[dict], context: dict | None = None) -> dict:
     """X182: triage class of one ANNUAL_PRIOR_YEAR_DIFFERS finding, from its own differences only. SCALE when any
     line differs by an exact power of ten (10..10^7), RESTATED when a statement total (PRIOR_YEAR_TOTALS) differs,
-    else REGROUPED. The tags behind the class are listed; nothing is suppressed."""
+    else REGROUPED. The tags behind the class are listed; nothing is suppressed.
+
+    A RESTATED finding also carries a `subclass` (X233-X234), from the comparison context of
+    `annual_prior_year_comparison` (without one nothing counts as compared):
+      - RECLASSIFIED: every bottom line (PAT, total equity, net cash flow) was compared and agrees, so the totals
+        that differ moved between captions or statements (income and expenses grossed up or netted, assets and
+        liabilities offset, cash flows moved between activities): a Schedule III reclassification, not a restatement.
+      - DISCONTINUED_REPRESENTED: as RECLASSIFIED, and the annual files a non-zero prior-year profit from discontinued
+        operations that the stored figures do not have (Ind AS 105 re-presentation of the comparatives: PAT is the
+        same, the continuing-operations lines shrink).
+      - CASH_FLOW_RESTATED: PAT and total equity agree, net cash flow differs or was not compared.
+      - BOTTOM_LINE_RESTATED: PAT or total equity differs or was not compared (merger, Ind AS 8 correction, ...)."""
     scale = sorted({d["tag"] for d in differences if _is_scale(Decimal(d["annual"]), Decimal(d["stored"]))})
     totals = sorted({d["tag"] for d in differences if d["tag"] in PRIOR_YEAR_TOTALS})
     cls = "SCALE" if scale else "RESTATED" if totals else "REGROUPED"
-    return {"class": cls, "scale_lines": scale, "totals_differ": totals}
+    out = {"class": cls, "scale_lines": scale, "totals_differ": totals}
+    if cls == "RESTATED":
+        out["subclass"] = restated_subclass(differences, context)
+    return out
+
+
+def restated_subclass(differences: list[dict], context: dict | None) -> str:
+    """X233-X234: why the totals of a RESTATED finding differ, as far as the two filings prove it (see
+    `prior_year_class`)."""
+    compared = (context or {}).get("compared", set())
+    differ = {d["tag"] for d in differences}
+    ok = {t: t in compared and t not in differ for t in BOTTOM_LINES}
+    if not (ok["pat"] and ok["total_equity"]):
+        return "BOTTOM_LINE_RESTATED"
+    if not ok["net_cash_flow"]:
+        return "CASH_FLOW_RESTATED"
+    represented = (context or {}).get("discontinued_filed") and (
+        DISCONTINUED_PROFIT_TAG in differ or DISCONTINUED_PROFIT_TAG not in compared
+    )
+    return "DISCONTINUED_REPRESENTED" if represented else "RECLASSIFIED"
 
 
 def filed_scrip_code(con, filing_id: str) -> str | None:

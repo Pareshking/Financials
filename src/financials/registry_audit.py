@@ -307,6 +307,10 @@ OVERRIDES: dict[tuple[str, str], str] = {
     ("REG34_ANNUAL", "ReclassificationAdjustmentsOnExchangeDifferencesOnTranslationNetOfTax"): "OCI_SUBLINE",
     # Ind AS 7.40: consideration paid / received on obtaining or losing control of subsidiaries.
     ("REG34_ANNUAL", "ConsiderationPaidReceived"): "CASH_FLOW_DETAIL",
+    # Seen first in the QP3 fixtures: TD Power Systems FY26 (other-expenses note), Vintage Coffee FY26 (inventories
+    # carried at net realisable value, Ind AS 2.36(c)).
+    ("REG34_ANNUAL", "BooksPeriodicals"): "ANNUAL_EXPENSE_DETAIL",
+    ("REG34_ANNUAL", "InventoriesAtNetRealisableValue"): "BALANCE_SHEET_DETAIL",
 }
 
 

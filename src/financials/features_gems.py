@@ -419,9 +419,10 @@ def signal_columns(row: dict, g: dict | None, industry: str | None, curated: dic
                               UNDER_OWNED_PROMOTER_MIN), None if row.get("promoter_pledge_pct") is None
                               else row["promoter_pledge_pct"] == 0)  # fmt: skip
     out["cash_conversion_ok"] = _ge(row.get("cfo_to_ebitda"), CASH_CONVERSION_MIN)
-    out["capex_pay_off_signal"] = _and(_ge(row.get("cwip_to_gross_block"), CAPEX_CWIP_MIN),
-                                       _ge(row.get("capex_to_depreciation"), CAPEX_TO_DEP_MIN),
-                                       _le(row.get("debt_to_equity"), CAPEX_DE_MAX))  # fmt: skip
+    # industrial signal: NULL for lenders and insurers (lending NBFCs carry a debt / equity since X228)
+    out["capex_pay_off_signal"] = None if financial else _and(_ge(row.get("cwip_to_gross_block"), CAPEX_CWIP_MIN),
+                                                              _ge(row.get("capex_to_depreciation"), CAPEX_TO_DEP_MIN),
+                                                              _le(row.get("debt_to_equity"), CAPEX_DE_MAX))  # fmt: skip
     out["forensic_clean"] = forensic_clean({**row, **out})
     return out
 

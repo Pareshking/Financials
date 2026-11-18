@@ -63,6 +63,7 @@ from financials.fundamentals import (
     interest_coverage,
     load_factbook,
     nbfc_blocks,
+    nbfc_gearing,
     newgen_inputs,
     percentile_rank,
     prefetch_fundamentals,
@@ -71,6 +72,7 @@ from financials.fundamentals import (
     quarter_rev_ops,
     resolve_scope,
     reverse_dcf_implied_growth,
+    roe_screener,
     safe_div,
     screener_convention_ratios,
     yoy_growth,
@@ -831,7 +833,7 @@ _EMPTY_FUNDAMENTALS: dict = {
     "_net_debt": None, "_fcff": None, "_pat_owners": None, "_pe_earnings": None, "_equity_owners": None,
     "_minority": None, "roe_continuing": None, "core_profit_ttm": None, "_pat_owners_total": None,
     "sales_growth_qoq_pct": None, "profit_growth_qoq_pct": None, "npm_pct": None, "interest_coverage": None,
-    "opm_preceding_year_quarter_pct": None,
+    "opm_preceding_year_quarter_pct": None, "roe_screener": None,
     **dict.fromkeys(NBFC_COLUMNS + BANK_COLUMNS + INSURER_COLUMNS + CASH_CONVERSION_COLUMNS + ANNUAL_COLUMNS
                   + SCREENER_CONVENTION_COLUMNS),
 }  # fmt: skip
@@ -941,11 +943,14 @@ def _fundamentals(con, entity_id: str, as_of_ts: datetime, end: date) -> dict:
         "_net_debt": b["net_debt"], "_fcff": b["fcff"], "_pat_owners": b["pat_owners"],
         "_pe_earnings": b["pat_owners_continuing"], "_pat_owners_total": b["pat_owners"],
         "roe_continuing": _f(safe_div(b["pat_owners_continuing"], b["equity_owners"])),
+        "roe_screener": _f(roe_screener(book, end)),  # X227: Screener's FY ROE on average equity, beside `roe`
         "core_profit_ttm": b["core_continuing_profit"],
         "_equity_owners": b["equity_owners"], "_minority": b["minority_interest"],
         **_quarterly_columns(book, end),
         "interest_coverage": _f(interest_coverage(b["pbt"], b["finance_costs"])),
     } | _lender_overrides(book, end)  # fmt: skip
+    if out.get("is_lending_nbfc") is True and "interest_expended" not in book.durations:
+        out["debt_to_equity"] = _f(nbfc_gearing(book, end))  # X228: NBFC gearing; banks and insurers stay NULL
     # NPM on the row's own sales (interest earned for banks, premium for insurers) and owners' TTM profit [X42]
     out["npm_pct"] = _f(safe_div(b["pat_owners"], out["sales_ttm"]))
     out["_pl"] = features_pl.period_values(con, book, end, as_of_ts)  # period P&L family (ratio catalogue Batch 1)

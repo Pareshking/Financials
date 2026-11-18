@@ -78,6 +78,8 @@ class FactBook:
     # G68: (ex_date, action_type) of MERGER / DEMERGER ledger rows of this entity (as issuer or related entity),
     # ex-date on or before as_of. Loaded with the book; empty for a book built by hand.
     structural_actions: tuple[tuple[date, str], ...] = ()
+    # X226: values of a guarded flow (tag -> period -> values) stated by filings visible later than the ranked one
+    later_filed: dict[str, dict[Period, list[Decimal]]] = field(default_factory=dict)
 
     def tax_copy_breaks(self) -> list[dict]:
         """X94: periods whose current and deferred tax both equal, to the rupee and non-zero, those of the same-length
@@ -163,6 +165,53 @@ class FactBook:
                             "quarters": len(qs), "tolerance": str(tol)})  # fmt: skip
         return out
 
+    def _ytd_quarters(self, tag: str, s: date, e: date) -> list[Decimal | None]:
+        d = self.durations.get(tag, {})
+        ends = [_add_months(e, -3 * i) for i in range(period_months(s, e) // 3)]
+        return [d.get((_add_months(date(qe.year, qe.month, 1), -2), qe)) for qe in ends]
+
+    def _identity_tolerance(self, n_quarters: int, ytd: Decimal) -> Decimal:
+        return max(self.rounding_unit * (n_quarters + 1) / 2, abs(ytd) * YTD_IDENTITY_REL_TOLERANCE)
+
+    def misfiled_ytd_evidence(self, tag: str, period: Period) -> str | None:
+        """X226 (rule YTD_MISFILED_NO_BRIDGE): why the filed YTD `period` of `tag`, which breaks the YTD identity, is
+        provably the wrong side of the break (not a restated quarter), or None.
+        LATER_FILING_AGREES: a filing visible later than the ranked one states, for the same period, a value within
+        the identity tolerance of the quarters' sum (NAZARA FY26 consolidated PAT: the results re-send says -23.24 Cr,
+        the quarters 81.95 Cr, the later annual report 81.94 Cr).
+        NEXT_YTD_AGREES: the next YTD of the same fiscal year (3 months longer) holds the identity with the same
+        directly filed quarters plus its own, so the company's cumulative figures side with the quarters.
+        PAT_SIGN_FLIP: profit (pat / pat_owners) whose quarters are all non-zero and of one sign while the YTD is
+        non-zero and of the other; no sum of those quarters can have that sign."""
+        s, e = period
+        ytd = self.durations.get(tag, {}).get(period)
+        m = period_months(s, e)
+        if ytd is None or m is None or m <= 3 or m > 12 or m % 3 or not self.is_ytd_start(s):
+            return None
+        qs = self._ytd_quarters(tag, s, e)
+        if None in qs:
+            return None
+        total = sum(qs, Decimal(0))
+        tol = self._identity_tolerance(len(qs), ytd)
+        if abs(ytd - total) <= tol:
+            return None  # no break
+        if any(
+            abs(v - total) <= self._identity_tolerance(len(qs), v)
+            for v in self.later_filed.get(tag, {}).get(period, ())
+        ):
+            return "LATER_FILING_AGREES"
+        if m < 12:
+            nxt_end = _add_months(e, 3)
+            nxt = self.durations.get(tag, {}).get((s, nxt_end))
+            nq = self._ytd_quarters(tag, s, nxt_end) if nxt is not None else [None]
+            if None not in nq and abs(nxt - sum(nq, Decimal(0))) <= self._identity_tolerance(len(nq), nxt):
+                return "NEXT_YTD_AGREES"
+        if tag in ("pat", "pat_owners") and ytd != 0 and 0 not in qs:
+            signs = {q > 0 for q in qs}
+            if len(signs) == 1 and (ytd > 0) not in signs:
+                return "PAT_SIGN_FLIP"
+        return None
+
     def restatement_suspected(self, end: date) -> bool:
         """X106 / architecture §7.6: any restatement trigger holds for the row ending `end`."""
         return bool(self.restatement_triggers(end))
@@ -208,6 +257,10 @@ class FactBook:
             # X106 (owner decision A, 2026-11-15): a restated quarter inside the window. Never sum mixed-basis
             # quarters; use the company's latest YTD for the current year plus the prior year's FY - YTD as filed
             # (Tata Motors FY26 standalone after the CV demerger: FY revenue 57,859 Cr as restated).
+            # X226: unless a YTD the bridge reads is provably mis-filed: then the TTM is withheld (NULL).
+            used = self._bridge_periods(tag, end)
+            if used and any(self.misfiled_ytd_evidence(tag, p) for p in used):
+                return None
             return self.ttm_from_ytd(tag, end)
         qs = [self.quarter(tag, _add_months(end, -3 * i)) for i in range(4)]
         if None not in qs:
@@ -216,20 +269,28 @@ class FactBook:
 
     def ttm_from_ytd(self, tag: str, end: date) -> Decimal | None:
         """Semi-annual bridge (§6.5): FY directly, else YTD_curr + FY_prev − YTD_prev."""
+        used = self._bridge_periods(tag, end)
+        if not used:
+            return None
+        d = self.durations[tag]
+        return d[used[0]] if len(used) == 1 else d[used[0]] + d[used[1]] - d[used[2]]
+
+    def _bridge_periods(self, tag: str, end: date) -> list[Period]:
+        """The filed periods `ttm_from_ytd` combines for `end`: [FY], or [YTD_curr, FY_prev, YTD_prev]; [] if none."""
         d = self.durations.get(tag, {})
-        for (s, e), v in d.items():
+        for s, e in d:
             if e != end:
                 continue
             m = period_months(s, e)
             if m == 12:
-                return v
+                return [(s, e)]
             if m is None or m > 12 or not self.is_ytd_start(s):
                 continue
             fy_prev = (_add_months(s, -12), _prev_day_month_end(s))
             ytd_prev = (_add_months(s, -12), _add_months(e, -12))
             if fy_prev in d and ytd_prev in d:
-                return v + d[fy_prev] - d[ytd_prev]
-        return None
+                return [(s, e), fy_prev, ytd_prev]
+        return []
 
     def coalesced(self, tag: str, fallback: str | None) -> str:
         """Per-period COALESCE(tag, fallback) as a derived tag, so TTM never mixes "present" and "absent" filings.
@@ -350,6 +411,19 @@ def _fact_source(fact_where: str, corr_where: str) -> str:
     )
 
 
+# Latest-value ranking of fact rows (X100 annual last, then visibility, corrections, parser version, filing id).
+_RANK_ORDER = _ANNUAL_LAST + ", visible_from_ts DESC, corrected DESC, " + version_key() + " DESC, filing_id DESC"
+# X226: besides the ranked row, the values of a guarded flow that filings visible LATER than the ranked row state for
+# the same period (a Reg. 34 annual report ranked below the results filing by X100, a re-sent results filing ranked
+# below a correction). They never enter a ratio: they are evidence that the ranked YTD is mis-filed.
+_LATER_EVIDENCE_TAGS = ("pat", "pat_owners", "revenue_from_operations", "total_income")
+_KEEP_ROW = (
+    "rn = 1 OR (corrected = 0 AND period_type = 'DURATION' AND canonical_tag IN ("
+    + ", ".join(f"'{t}'" for t in _LATER_EVIDENCE_TAGS)
+    + ") AND visible_from_ts > chosen_vis AND coalesce(value_inr, value_other) IS NOT NULL)"
+)
+
+
 def load_factbook(con, entity_id: str, scope: str, as_of: datetime) -> FactBook:
     """Latest visible value per (tag, period), from filings on the accounting basis of the entity's latest
     quarterly filing (X90): after a change of basis the older basis drops out, so quarters and TTM rebuild."""
@@ -362,18 +436,20 @@ def load_factbook(con, entity_id: str, scope: str, as_of: datetime) -> FactBook:
         "{basis}", SAME_BASIS
     )
     rows = con.execute(
-        """SELECT canonical_tag, period_type, period_start, period_end, coalesce(value_inr, value_other)
+        """SELECT canonical_tag, period_type, period_start, period_end, coalesce(value_inr, value_other), rn > 1
            FROM (SELECT *, row_number() OVER (
                     PARTITION BY canonical_tag, period_start, period_end
                     ORDER BY """
-        + _ANNUAL_LAST
-        + """, visible_from_ts DESC, corrected DESC, """
-        + version_key()
-        + """ DESC, filing_id DESC) AS rn
+        + _RANK_ORDER
+        + """) AS rn, first_value(visible_from_ts) OVER (PARTITION BY canonical_tag, period_start, period_end
+                    ORDER BY """
+        + _RANK_ORDER
+        + """) AS chosen_vis
                  FROM """
         + source
         + """)
-           WHERE rn = 1""",
+           WHERE """
+        + _KEEP_ROW,
         [entity_id, scope, as_of, entity_id, scope, as_of, entity_id, scope, as_of],
     ).fetchall()
     unit, fy_starts = con.execute(
@@ -412,7 +488,10 @@ def _build_book(entity_id: str, scope: str, rows, unit, fy_starts, structural=()
     book = FactBook(entity_id, scope, fy_starts=frozenset(fy_starts or ()), structural_actions=tuple(structural))
     if rows and unit is not None:
         book.rounding_unit = Decimal(unit)
-    for tag, ptype, start, end, value in rows:
+    for tag, ptype, start, end, value, *later in rows:
+        if later and later[0]:  # X226 evidence row: a later filing's value for the same period
+            book.later_filed.setdefault(tag, {}).setdefault((start, end), []).append(Decimal(value))
+            continue
         if value is None:  # a correction withdrawing the tag for this period (decision B)
             continue
         if ptype == "INSTANT":
@@ -463,18 +542,20 @@ def prefetch_fundamentals(con, as_of: datetime, entities=None) -> None:
     source = _fact_source("TRUE" + only, "TRUE" + only_c).replace("{basis}", _BATCH_SAME_BASIS)
     for ent, scope, *row in con.execute(
         """SELECT entity_id, scope, canonical_tag, period_type, period_start, period_end,
-                  coalesce(value_inr, value_other)
+                  coalesce(value_inr, value_other), rn > 1
            FROM (SELECT *, row_number() OVER (
                     PARTITION BY entity_id, scope, canonical_tag, period_start, period_end
                     ORDER BY """
-        + _ANNUAL_LAST
-        + """, visible_from_ts DESC, corrected DESC, """
-        + version_key()
-        + """ DESC, filing_id DESC) AS rn
+        + _RANK_ORDER
+        + """) AS rn, first_value(visible_from_ts) OVER (
+                    PARTITION BY entity_id, scope, canonical_tag, period_start, period_end ORDER BY """
+        + _RANK_ORDER
+        + """) AS chosen_vis
                  FROM """
         + source
         + """)
-           WHERE rn = 1""",
+           WHERE """
+        + _KEEP_ROW,
         [*only_p, as_of, as_of, *only_c_p, as_of],
     ).fetchall():
         facts.setdefault((ent, scope), []).append(tuple(row))
@@ -1062,6 +1143,31 @@ def nbfc_blocks(book: FactBook, end: date) -> dict:
     return out
 
 
+# X228: an NBFC's borrowed funds on the Division III balance sheet: debt securities, borrowings (other than debt
+# securities), deposits (public / inter-corporate, borrowed funds of a deposit-taking NBFC or HFC) and subordinated
+# liabilities. Lease liabilities are not borrowed funds and stay out (the gearing NBFCs and rating agencies report).
+NBFC_BORROWING_TAGS = (
+    "debt_securities",
+    "borrowings_other_than_debt_securities",
+    "deposits",
+    "subordinated_liabilities",
+)
+
+
+def nbfc_gearing(book: FactBook, end: date) -> Decimal | None:
+    """X228: debt / equity of a lending NBFC = borrowed funds / total equity, on the latest balance sheet <= end.
+    Schedule III omits nil lines, so an absent component counts 0 once at least one is filed; NULL without any, and
+    when total equity is not positive."""
+    bs = book.latest_instant("total_assets", end)
+    if bs is None:
+        return None
+    parts = [book.instants.get(t, {}).get(bs[0]) for t in NBFC_BORROWING_TAGS]
+    equity = book.instants.get("total_equity", {}).get(bs[0])
+    if all(p is None for p in parts) or equity is None or equity <= 0:
+        return None
+    return sum((p or Decimal(0) for p in parts), Decimal(0)) / equity
+
+
 def bank_blocks(book: FactBook, end: date, regulatory: FactBook | None = None) -> dict:
     """Bank ratios (architecture §10.5) [X58-X61]. `regulatory` is the STANDALONE book: GNPA / NNPA / CET1 / AT1 /
     filed RoA are standalone disclosures (consolidated filings carry 0 placeholders, dropped by X60)."""
@@ -1419,6 +1525,27 @@ class _BookAsResult:
 
 
 BookAsResult = _BookAsResult  # public name for statement builders over a point-in-time FactBook
+
+
+def roe_screener(book: FactBook, on_or_before: date) -> Decimal | None:
+    """X227: Screener's website ROE [X195] = the last full fiscal year's net profit (owners' share where the filing
+    attributes it, S5: COALESCE(owners, PAT) of the FY period) x 2 / (opening + closing owners' equity, i.e. Equity
+    Capital + Reserves without NCI, X197). Every profile (Screener shows it for banks and NBFCs too). NULL unless the
+    year's profit and both balance sheets (FY end and 12 months earlier) are filed and owners' equity is positive at
+    both ends (as X194 for `roce_screener`: an average across zero is not an equity base). `roe` (TTM owners' profit
+    / closing owners' equity, C16) is unchanged."""
+    fy = latest_fiscal_year(book, on_or_before)
+    if fy is None:
+        return None
+    profit = book.durations.get(book.coalesced("pat_owners", "pat"), {}).get(fy)
+
+    def owners_equity(d: date) -> Decimal | None:
+        return _at(book, "equity_attributable_to_owners", d) or _at(book, "total_equity", d)
+
+    e0, e1 = owners_equity(_add_months(fy[1], -12)), owners_equity(fy[1])
+    if profit is None or e0 is None or e1 is None or e0 <= 0 or e1 <= 0:
+        return None
+    return profit * 2 / (e0 + e1)
 
 
 def screener_convention_ratios(book: FactBook, on_or_before: date) -> dict:

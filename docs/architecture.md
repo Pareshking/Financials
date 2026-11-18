@@ -465,8 +465,9 @@ parser (`parsers/igaap_bank.py`, X58-X61). Industrial ratios (EBITDA, OPM, ROCE,
 NULL for both. Bank `sales_ttm` = TTM interest earned (Screener's bank "Revenue", S4). Bank regulatory ratios come from
 the standalone book (X60).
 
-**Denominators (C16):** ROE and ROE (continuing) use the latest **closing** owners' equity (Screener's convention,
-available from the first balance sheet). RoA, NIM proxy, credit cost, **ROIC and CROIC** use **(opening + closing) / 2** over 12
+**Denominators (C16):** ROE and ROE (continuing) use the latest **closing** owners' equity (Screener's export
+formula S22, available from the first balance sheet; Screener's website ROE averages opening and closing equity over
+the last FY and is stored separately as `roe_screener`, X227). RoA, NIM proxy, credit cost, **ROIC and CROIC** use **(opening + closing) / 2** over 12
 months and stay NULL until the opening balance sheet exists.
 
 | Column | NBFC formula | Bank formula |
@@ -550,6 +551,7 @@ Ratios still read only curated tags; line items are for statements, sub-rows and
 | `order_wins_90d`, `order_value_90d`, `kmp_resignations_90d`, `auditor_resignations_90d`, `fraud_or_default_90d` | Reg. 30 events visible at the as-of and disclosed in the 90 days to it (`corporate_events`) |
 | `penalties_90d` | NULL: no penalty / regulatory-action filing observed (UNVERIFIED, E7) |
 | `roce_screener`, `debtor_days`, `inventory_turnover`, `working_capital` | Screener export formulas (S22) on our Screener-style statement rows, latest FY; kept beside our own `roce` (operating EBIT over closing capital) |
+| `roe_screener` | Screener website ROE (X195, X227): last FY owners' profit × 2 / (opening + closing owners' equity), every profile; NULL unless both balance sheets are filed and positive; kept beside `roe` (TTM, closing equity, C16) |
 | `inventory_days`, `days_payable`, `cash_conversion_cycle`, `working_capital_days` | closing balance / (Sales / 365); cycle = debtor + inventory − payable days; working-capital days on (CA − cash − current investments − CL) (S23: matches the website on TCS; CCC does not) |
 
 Revisions (E9, E10): `filing_revisions` links a filing to the one it supersedes (REVISION or byte-identical RESEND);

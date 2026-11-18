@@ -132,7 +132,7 @@ EVENT_COLUMNS = (
     "insider_receivables_to_receivables", "has_insider_receivables", "subsidiary_fy_end", "parent_profit_share",
     "largest_subsidiary_profit_share", "largest_subsidiary_name", "consolidated_entities_count", "audit_opinion",
     "audit_opinion_fy_end", "audit_opinion_conflict", "going_concern_uncertainty", "emphasis_of_matter",
-    "audit_opinion_quarterly", "audit_opinion_quarter_end",
+    "audit_opinion_quarterly", "audit_opinion_quarter_end", "roe_screener",
 )  # fmt: skip
 
 _DECLARED = declared_columns()

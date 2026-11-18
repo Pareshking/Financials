@@ -1190,6 +1190,7 @@ CREATE TABLE IF NOT EXISTS features_events (
     emphasis_of_matter                       BOOLEAN,         -- informational
     audit_opinion_quarterly                  VARCHAR,         -- latest results filing stating an opinion
     audit_opinion_quarter_end                DATE,
+    roe_screener                             DOUBLE,          -- Screener ROE: last FY owners' PAT / avg owners' equity [X227]
     PRIMARY KEY (security_id, valid_from_date)
 );
 
@@ -1880,6 +1881,7 @@ CREATE TABLE IF NOT EXISTS screener_features (
     emphasis_of_matter                       BOOLEAN,         -- informational
     audit_opinion_quarterly                  VARCHAR,         -- latest results filing stating an opinion
     audit_opinion_quarter_end                DATE,
+    roe_screener                             DOUBLE,          -- Screener ROE: last FY owners' PAT / avg owners' equity [X227]
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -2362,7 +2364,7 @@ SELECT d.as_of_date, d.security_id, d.entity_id, d.symbol, d.series, d.price_dat
        d.has_partly_paid, d.has_locked_in, d.has_dvr_shares, d.has_sbo, d.is_psu, e.subsidiary_fy_end,
        e.parent_profit_share, e.largest_subsidiary_profit_share, e.largest_subsidiary_name, e.consolidated_entities_count,
        e.audit_opinion, e.audit_opinion_fy_end, e.audit_opinion_conflict, e.going_concern_uncertainty, e.emphasis_of_matter,
-       e.audit_opinion_quarterly, e.audit_opinion_quarter_end
+       e.audit_opinion_quarterly, e.audit_opinion_quarter_end, e.roe_screener
 FROM features_daily d
 LEFT JOIN features_events e ON e.security_id = d.security_id AND e.valid_from_date <= d.as_of_date
      AND d.as_of_date < coalesce(e.valid_to_date, DATE '9999-12-31');  -- open interval; an OR here is ~400x slower

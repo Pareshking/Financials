@@ -314,6 +314,8 @@ OVERRIDES: dict[tuple[str, str], str] = {
     # Seen first in the QT fixtures (NYKAA / MPSLTD FY26 other-expenses notes).
     ("REG34_ANNUAL", "AfterSalesServiceExpenses"): "ANNUAL_EXPENSE_DETAIL",
     ("REG34_ANNUAL", "HireChargesAssetsContracts"): "ANNUAL_EXPENSE_DETAIL",
+    # Seen first in the QF4 fixtures (auditors' remuneration note: cost auditor, reimbursement of expenses).
+    ("REG34_ANNUAL", "PaymentToCostAuditorForReimbursementOfExpenses"): "ANNUAL_EXPENSE_DETAIL",
 }
 
 

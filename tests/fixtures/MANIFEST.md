@@ -767,3 +767,15 @@ Read by `tests/test_x301_guarded_bridge_one_basis.py` (with the SWIGGY files of 
 | `operating_bridge/INTEGRATED_FILING_INDAS_1678022_30052026094755_WEB.xml` | PATANJALI Q4 FY26 standalone (re-sent results, same figures as the first): Q4 11,155.60 Cr, FY26 40,169.58 Cr (quarters 40,337.81, within 0.5 %: holds) [X301] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1678022_30052026094755_WEB.xml | `4b003f1cc8bd222d5e13a8bbd5ce3799ba9b5343d8331d3b059667a9a552649b` |
 | `operating_bridge/INTEGRATED_FILING_INDAS_1715092_14082026083859_WEB.xml` | PATANJALI Q1 FY27 standalone: revenue 11,337.45 Cr [X301] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1715092_14082026083859_WEB.xml | `ee764b0850ad9c7dc8ab4f94c22acd8a15e588acfaaa3554069f7b9758a3b885` |
 | `operating_bridge/INTEGRATED_FILING_INDAS_1758226_14112026020725_WEB.xml` | PATANJALI Q2 FY27 standalone: H1 FY27 revenue 22,660.03 Cr [X301] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1758226_14112026020725_WEB.xml | `cb26c4ab5ae6224e1ad531824cc63b00cc0261ce19c4bf4a8ac32f0a05af1dfa` |
+
+## QF4: RESTATED sub-classes CASH_EQUIVALENTS_RECLASSIFIED (X306) and FX_EFFECT_RECLASSIFIED (X307); copied 2026-11-18 from the local vault blob, gunzipped, sha256 verified
+
+Read by `tests/test_x306_x307_cash_flow_reclassified.py`. Kept in `annual_restated/` so the end-to-end fixture glob
+(`xbrl/*.xml`) and its pinned counts are unchanged.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `annual_restated/INTEGRATED_FILING_INDAS_1447925_22052025091528_WEB.xml` | Vindhya Telelinks Q4 FY25 standalone results: FY25 net cash flow -57.16 Cr, closing cash and cash equivalents 95.44 Cr, total assets 4,079.00 Cr (the stored side) [X306] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1447925_22052025091528_WEB.xml | `2e6c6344c4c89b09c1bcf040636b5cb7602b50c9d1db7e2a557fdfbf02801020` |
+| `annual_restated/AR_XBRL_VINDHYATEL_01092026190709.xml` | Vindhya Telelinks FY26 standalone annual: FY25 cash and cash equivalents 85.01 Cr (other bank balances 30.02 -> 40.46 Cr) and net cash flow -67.60 Cr, total assets / equity / PAT unchanged [X306] | https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_VINDHYATEL_01092026190709.xml | `32a3c120c9869e8a41fa5437a9ac1bc03b751b8983e938f9de5657613f0b4abe` |
+| `annual_restated/INTEGRATED_FILING_INDAS_1424269_24042025081042_WEB.xml` | Kirloskar Pneumatic Q4 FY25 consolidated results: FY25 net cash flow 13.63 Cr, effect of exchange rate changes 0.22 Cr, after it 13.85 Cr (the stored side) [X307] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1424269_24042025081042_WEB.xml | `922512ab95a8b9a872686fbf50ed00fa42d5dbc04ff1c8ad253706111c2f6fce` |
+| `annual_restated/AR_XBRL_KIRLPNU_19082026192059.xml` | Kirloskar Pneumatic FY26 consolidated annual: FY25 net cash flow 14.07 Cr, exchange difference -0.22 Cr, after it 13.85 Cr [X307] | https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_KIRLPNU_19082026192059.xml | `22b205d7dc05876d41f63557bb14a3fdcc237c0e26996b2a82b946b7544f9b4b` |

@@ -10,7 +10,9 @@
   X233-X234: a RESTATED finding carries a sub-class: RECLASSIFIED / DISCONTINUED_REPRESENTED when PAT, total equity
   and net cash flow all agree (the totals moved, the bottom lines did not), else CASH_FLOW_RESTATED or
   BOTTOM_LINE_RESTATED. X235: the annual's own active corrections (rule X201 rescale, decision B) replace its filed
-  values in the comparison.
+  values in the comparison. X306-X307: a CASH_FLOW_RESTATED finding whose net cash flow moved only because the
+  comparative's cash and cash equivalents were redefined (CASH_EQUIVALENTS_RECLASSIFIED) or because the exchange
+  difference on cash moved into or out of the net change (FX_EFFECT_RECLASSIFIED) is a reclassification too.
 - G79 [X111]: the BSE scrip code stated inside a results filing (`ScripCode`, X7; from disclosure_facts) fills
   `security_identifier_history.bse_scrip_code` of the NSE identifier rows that match the filing's own ISIN and
   symbol. A different code already on such a row is an IDENTIFIER / BSE_SCRIP_CODE_CONFLICT finding; nothing is
@@ -44,7 +46,13 @@ PRIOR_YEAR_TOTALS = frozenset({
 # reviewer may accept on that proof (owner decision 2026-11-18, delegated).
 BOTTOM_LINES = ("pat", "total_equity", "net_cash_flow")
 DISCONTINUED_PROFIT_TAG = "pat_discontinued"
-RESTATED_ACCEPTABLE = frozenset({"RECLASSIFIED", "DISCONTINUED_REPRESENTED"})
+RESTATED_ACCEPTABLE = frozenset({
+    "RECLASSIFIED", "DISCONTINUED_REPRESENTED", "CASH_EQUIVALENTS_RECLASSIFIED", "FX_EFFECT_RECLASSIFIED",
+})  # fmt: skip
+# X306: the cash balances a cash-flow statement reconciles to (the statement's own closing cash, else the balance
+# sheet's cash and cash equivalents); X307: the net change after the exchange difference on cash.
+CASH_BALANCE_TAGS = ("cash_cf_statement", "cash_and_equivalents")
+NET_CASH_AFTER_FX = "net_cash_flow_after_fx"
 _SCALE_FACTORS = tuple(Decimal(10) ** k for k in range(1, 8))
 _SCALE_SLACK = Decimal("0.001")  # relative: 40,197,100,000 vs 401,971,000 is exactly 100x (KUANTUM FY26 vs FY25)
 
@@ -145,6 +153,15 @@ def prior_year_class(differences: list[dict], context: dict | None = None) -> di
       - DISCONTINUED_REPRESENTED: as RECLASSIFIED, and the annual files a non-zero prior-year profit from discontinued
         operations that the stored figures do not have (Ind AS 105 re-presentation of the comparatives: PAT is the
         same, the continuing-operations lines shrink).
+      - FX_EFFECT_RECLASSIFIED (X307): PAT and total equity agree, net cash flow differs, and the net change after the
+        exchange difference on cash (`net_cash_flow_after_fx`) was compared and agrees: an amount moved between the
+        net change and the exchange-difference line below it, the cash reconciled to is the same (KIRLPNU FY26 C:
+        FY25 net change 13.63 -> 14.07 Cr, effect of exchange rate changes 0.22 -> -0.22 Cr).
+      - CASH_EQUIVALENTS_RECLASSIFIED (X306): PAT, total equity and total assets agree, net cash flow (after the
+        exchange difference where that differs too) differs, and the prior year-end cash balance (`cash_cf_statement`,
+        else `cash_and_equivalents`) differs by the same amount within the two lines' tolerances: the comparative's
+        cash and cash equivalents were redefined (deposits, overdrafts or restricted balances moved in or out), no
+        amount was restated.
       - CASH_FLOW_RESTATED: PAT and total equity agree, net cash flow differs or was not compared.
       - BOTTOM_LINE_RESTATED: PAT or total equity differs or was not compared (merger, Ind AS 8 correction, ...)."""
     scale = sorted({d["tag"] for d in differences if _is_scale(Decimal(d["annual"]), Decimal(d["stored"]))})
@@ -165,11 +182,35 @@ def restated_subclass(differences: list[dict], context: dict | None) -> str:
     if not (ok["pat"] and ok["total_equity"]):
         return "BOTTOM_LINE_RESTATED"
     if not ok["net_cash_flow"]:
-        return "CASH_FLOW_RESTATED"
+        return _cash_flow_subclass(differences, compared, differ)
     represented = (context or {}).get("discontinued_filed") and (
         DISCONTINUED_PROFIT_TAG in differ or DISCONTINUED_PROFIT_TAG not in compared
     )
     return "DISCONTINUED_REPRESENTED" if represented else "RECLASSIFIED"
+
+
+def _cash_flow_subclass(differences: list[dict], compared: set, differ: set) -> str:
+    """X306-X307 (see `prior_year_class`): PAT and total equity agree, net cash flow does not."""
+    if "net_cash_flow" not in differ:
+        return "CASH_FLOW_RESTATED"  # not compared: nothing proven
+    if NET_CASH_AFTER_FX in compared and NET_CASH_AFTER_FX not in differ:
+        return "FX_EFFECT_RECLASSIFIED"
+    if "total_assets" not in compared or "total_assets" in differ:
+        return "CASH_FLOW_RESTATED"
+    by_tag: dict[str, list[dict]] = {}
+    for d in differences:
+        by_tag.setdefault(d["tag"], []).append(d)
+    net = (by_tag.get(NET_CASH_AFTER_FX) or by_tag["net_cash_flow"])[-1]
+    end = (net.get("period") or [None, None])[1]
+    moved = Decimal(net["annual"]) - Decimal(net["stored"])
+    for tag in CASH_BALANCE_TAGS:
+        for cash in by_tag.get(tag, ()):
+            if (cash.get("period") or [None, None])[1] != end:
+                continue
+            slack = Decimal(net.get("tolerance") or 0) + Decimal(cash.get("tolerance") or 0)
+            if abs(Decimal(cash["annual"]) - Decimal(cash["stored"]) - moved) <= slack:
+                return "CASH_EQUIVALENTS_RECLASSIFIED"
+    return "CASH_FLOW_RESTATED"
 
 
 def filed_scrip_code(con, filing_id: str) -> str | None:

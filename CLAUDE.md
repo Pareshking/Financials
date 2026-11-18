@@ -105,6 +105,8 @@ data/                  local only, gitignored: vault/, staging/, market.duckdb
 8. **Prices** are adjusted only for splits, bonuses, rights bonus element and demergers. EPS only
    for share-count events. Dividends never adjust prices; they feed the total-return series.
    Absolute financials are never multiplied by any factor.
+   (Exception, owner decision R: a filing's wrong declared unit, proven by rule X201, is corrected in
+   `fact_corrections`; that fixes a label, it is not an adjustment.)
 9. **Quarantine over auto-heal.** Unknown taxonomy, missing critical tag, failed identity, period
    conflict, unexplained >10% open gap or ISIN change → `quarantine_queue`; keep raw data (the vault blob and
    its `filings` row; raw market tables), freeze derived data. A recurring defect may only be fixed by a named deterministic rule with its own fixture and test.

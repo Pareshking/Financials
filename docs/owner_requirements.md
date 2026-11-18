@@ -572,3 +572,16 @@ The owner asked the assistant to take these with its recommendation. Each is rev
   Issue Size. Evaluated against Reg. 31 (X133): 98.4% of 4,035 pairs within 0.5%, under the 99% bar set for a
   switch, with the disagreements explained (listing lag, buy-backs, partly-paid, bonus timing). Decision C stands
   (Reg. 31 is the market-cap share count); Issue Size is stored and is a cross-check (`check-issue-size`).
+
+## Owner decisions (2026-11-18)
+
+- **Decision R (wrong declared unit, rule X201 LEVEL_OF_ROUNDING_SLIP):** approved. A filing whose declared
+  `LevelOfRounding` contradicts the company's other filings, proven by at least two of three independent checks
+  (paid-up capital vs other filings, Reg. 31 shares x face value vs paid-up, EPS x shares vs profit) and none reading
+  1:1, is rescaled as rule-made rows in `fact_corrections` (raw facts untouched; a later PDF correction revokes the
+  rule's value). This is a correction of a unit label, not a price or share-count adjustment (CLAUDE.md invariant 8).
+  Applied live 2026-11-18: 16 filings, 12 entities (5 Nifty 500 seed filings: AFCONS, COROMANDEL x3, IGIL, MARKSANS,
+  METROBRAND; their PDF corrections kept).
+- **Decision S (share count when Reg. 31 is the outlier, rule X221 SHARES_REG31_OUTLIER):** when the results
+  filing's paid-up / face value and NSE PR-zip Issue Size agree and the same-date Reg. 31 total does not, market cap
+  uses NSE's count. When all three differ (HMT), Reg. 31 is kept and the finding stays open.

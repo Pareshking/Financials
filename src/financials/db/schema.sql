@@ -505,7 +505,7 @@ CREATE TABLE IF NOT EXISTS features_daily (
     price_date          DATE,                -- last bar on/before as_of_date
     close               DECIMAL(18,4),
     shares              BIGINT,
-    shares_source       VARCHAR,             -- REG31 | PAID_UP
+    shares_source       VARCHAR,             -- REG31 | ISSUE_SIZE (rule SHARES_REG31_OUTLIER, X221) | PAID_UP
     market_cap          DECIMAL(24,2),
     enterprise_value    DECIMAL(24,2),
     pe                  DOUBLE,
@@ -1202,7 +1202,7 @@ CREATE TABLE IF NOT EXISTS screener_features (
     price_date          DATE,                -- last bar on/before as_of_date
     close               DECIMAL(18,4),
     shares              BIGINT,
-    shares_source       VARCHAR,             -- REG31 | PAID_UP
+    shares_source       VARCHAR,             -- REG31 | ISSUE_SIZE (rule SHARES_REG31_OUTLIER, X221) | PAID_UP
     market_cap          DECIMAL(24,2),
     enterprise_value    DECIMAL(24,2),
     sales_ttm           DECIMAL(24,2),

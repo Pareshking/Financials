@@ -75,6 +75,7 @@ from financials.fundamentals import (
     screener_convention_ratios,
     yoy_growth,
 )
+from financials.identity import UNIVERSE_SERIES
 from financials.price_history import PriceHistory
 from financials.price_history import legacy as legacy_materialize
 from financials.scope import MIN_PERIOD_END_DATE, MIN_TRADE_DATE
@@ -83,10 +84,11 @@ from financials.timeutil import ist_to_utc, utc_now
 # Reader version of materialised rows. Bump it whenever features.py, fundamentals.py (or another file pinned by
 # tests/test_incremental_materialize.py) changes any output: `materialize --incremental` refuses days built by another
 # version, because only a full run then reproduces the history.
-FEATURES_VERSION = "2026.11.17-21C"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
+FEATURES_VERSION = "2026.11.18-21D"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
 # -21A: core profit (fundamentals._core) quantized to the paisa (Arrow decimal256 on the expanded universe)
 # -21B: gate G4 compares only securities present on the previous day (rule G4_NEW_ENTRANT; output unchanged)
 # -21C: X173 YTD copies of a quarter withheld (TTM sums the quarters); X194 roce_screener needs positive capital
+# -21D: X221 SHARES_REG31_OUTLIER (market cap uses NSE Issue Size when Reg. 31 alone disagrees; owner decision S)
 # -3: QoQ sales / profit growth, NPM, interest coverage, OPM same quarter last year, dividend yield / payout,
 #     promoter holding QoQ change (owner_requirements items 1, 3, 4)
 # -4A: period P&L family (features_pl: quarter / fiscal-year lines, quarter YoY growth, result dates, history-gated
@@ -171,22 +173,82 @@ def _universe(con, exchange: str, as_of: date, entities=None) -> list[tuple[str,
     ).fetchall()
 
 
+# Rule SHARES_REG31_OUTLIER [X221] (owner decision S, 2026-11-18): when the results filing and NSE agree and Reg. 31
+# does not, use NSE's count. Same 0.5% tolerance as the share cross-check (promoter.SHARE_CROSS_CHECK_TOLERANCE, X18,
+# X133): on the snapshot of 2026-11-17, where paid-up / face value agrees with Issue Size, |Reg. 31 / Issue Size - 1|
+# is <= 0.5% on 578,285 of 590,011 rows and the remainder spreads evenly to > 5% (no second mode to put a wider bar
+# at); paid-up stated in rounded lakhs or crores (TCS) stays inside 0.5%.
+SHARES_REG31_OUTLIER_TOLERANCE = Decimal("0.005")
+ISSUE_SIZE_MAX_AGE_DAYS = 14  # PR-zip mcap files are weekly (gaps of 5 to 9 days between files) plus quarter ends
+
+
+def reg31_outlier(
+    reg31: tuple[Decimal, date] | None,
+    paid_up: tuple[Decimal, date] | None,
+    issue: tuple[Decimal, date] | None,
+    factors: list[tuple[date, Decimal, Decimal]],
+    *,
+    partly_paid: bool = False,
+    entity_listings: int = 1,
+    trust_shares: Decimal | None = None,
+) -> str | None:
+    """Rule SHARES_REG31_OUTLIER [X221]: compare the three share counts visible at as-of, the Reg. 31 total (pattern
+    date R), the results filing's paid-up / face value (period end P) and NSE's Issue Size (latest PR-zip mcap file,
+    trade date I). "REG31_OUTLIER" when Reg. 31 differs from Issue Size by more than the tolerance while paid-up /
+    face value agrees with it; "ALL_DIFFER" when no two of the three agree (keep Reg. 31: HMT, and the share cross-
+    check keeps its CROSS_CHECK_FAILED finding open, Reg. 31 vs paid-up of the same date); None otherwise. Compared
+    only like with like: P == R (the results speak to the pattern's own date; a later allotment explains a Reg. 31
+    pattern newer than the results, an earlier one a stale pattern), no accepted share-count action with ex-date in
+    (R, I] (Issue Size moves on the ex-date), no partly-paid shares (Reg. 31 counts them, NSE lists them as a
+    separate security, paid-up / face value is not a share count [X18]) and one listed EQ / BE / BZ security of the
+    entity in the file (a Reg. 31 total of two listed classes is not one Issue Size). A Reg. 31 total that agrees
+    with paid-up / face value once employee-trust shares are deducted (X103: treasury shares, out of share capital,
+    in the total and listed) is explained, never an outlier."""
+    if reg31 is None or paid_up is None or issue is None or partly_paid or entity_listings != 1:
+        return None
+    (r, r_date), (p, p_date), (i, i_date) = reg31, paid_up, issue
+    if p_date != r_date or not r or not i or any(r_date < ex <= i_date for ex, _, _ in factors):
+        return None
+    tol = SHARES_REG31_OUTLIER_TOLERANCE
+    if abs(r - i) <= tol * i or any(abs(t - p) <= tol * p for t in (r, r - (trust_shares or 0))):
+        return None  # agrees with NSE, or with the results (Issue Size lags an allotment or a buy-back, X133)
+    return "REG31_OUTLIER" if abs(p - i) <= tol * i else "ALL_DIFFER"
+
+
+def _trust_shares(shp: dict) -> Decimal | None:
+    t = shp.get("EMPLOYEE_TRUSTS", (None, None))[1]
+    return None if t is None else Decimal(t)
+
+
 def market_cap_shares(
     reg31: tuple[Decimal, date] | None,
     paid_up: tuple[Decimal, date] | None,
     factors: list[tuple[date, Decimal, Decimal]],
     as_of: date,
+    issue: tuple[Decimal, date] | None = None,
+    *,
+    partly_paid: bool = False,
+    entity_listings: int = 1,
+    trust_shares: Decimal | None = None,
 ) -> tuple[Decimal | None, date | None, str | None]:
-    """Share count for market cap, in order [X18, X53, X61]:
-    1. the Reg. 31 total of the latest visible shareholding pattern (REG31);
+    """Share count for market cap, in order [X18, X53, X61, X221]:
+    1. the Reg. 31 total of the latest visible shareholding pattern (REG31), unless rule SHARES_REG31_OUTLIER
+       (`reg31_outlier`) finds it the outlier against NSE's Issue Size and the results' paid-up / face value of the
+       same date: then the Issue Size (ISSUE_SIZE);
     2. else the results filing's paid-up capital / face value (PAID_UP). The parser withholds it when no filed EPS
        implies a share count within 10x (Kotak Q2 FY27 tags FaceValue = 994.79: SHARES_FROM_PAID_UP_WITHHELD), so a
        withheld count never reaches here; promotion cross-checks it against Reg. 31 (> 0.5% -> quarantine);
     3. then divided by the EPS factor of every accepted share-count action with ex-date in (count date, as_of]
        (a 1:5 split after the count multiplies shares by 5).
+    `issue` is (Issue Size, file trade date), already limited to ISSUE_SIZE_MAX_AGE_DAYS before as_of.
     Returns (shares, count date, source), all None when neither count exists."""
     if reg31 is not None:
-        (shares, counted), source = reg31, "REG31"
+        verdict = reg31_outlier(reg31, paid_up, issue, factors, partly_paid=partly_paid,
+                                entity_listings=entity_listings, trust_shares=trust_shares)  # fmt: skip
+        if verdict == "REG31_OUTLIER":
+            (shares, counted), source = issue, "ISSUE_SIZE"
+        else:
+            (shares, counted), source = reg31, "REG31"
     elif paid_up is not None:
         (shares, counted), source = paid_up, "PAID_UP"
     else:
@@ -195,6 +257,34 @@ def market_cap_shares(
         if counted < ex <= as_of:
             shares = shares / eps_factor
     return shares, counted, source
+
+
+def issue_sizes(con, as_of: date, exchange: str = "NSE", entities=None) -> dict[str, tuple[Decimal, date, int]]:
+    """Per security: (Issue Size, trade date, listed EQ / BE / BZ securities of its entity in that file) of the latest
+    PR-zip mcap file [X130-X133] with trade date in (as_of - ISSUE_SIZE_MAX_AGE_DAYS, as_of]. The file of a trade
+    date is published after the close of that day (EOD_RULE), as the day's bars. One query (no per-security read);
+    of several fetches of one trade date the latest fetched file is read, as in `universe.issue_size_check`."""
+    only, only_p = entity_filter("s.entity_id", entities)
+    rows = con.execute(
+        """WITH f AS (
+             SELECT m.trade_date, arg_max(m.filing_id, (fi.fetched_at, m.filing_id)) AS filing_id
+             FROM (SELECT DISTINCT trade_date, filing_id FROM raw_nse_mcap
+                   WHERE exchange = ? AND trade_date <= ? AND trade_date > ?) m
+             JOIN filings fi USING (filing_id) GROUP BY 1),
+           r AS (
+             SELECT h.security_id, s.entity_id, m.trade_date, m.issue_size
+             FROM raw_nse_mcap m JOIN f USING (trade_date, filing_id)
+             JOIN security_identifier_history h ON h.exchange = m.exchange AND h.symbol = m.symbol
+                  AND h.series = m.series AND h.valid_from <= m.trade_date
+                  AND (h.valid_to IS NULL OR h.valid_to > m.trade_date)
+             JOIN securities s ON s.security_id = h.security_id
+             WHERE m.series IN (SELECT unnest(?))"""
+        + only
+        + """ QUALIFY row_number() OVER (PARTITION BY h.security_id ORDER BY m.trade_date DESC) = 1)
+           SELECT security_id, trade_date, issue_size, count(*) OVER (PARTITION BY entity_id, trade_date) FROM r""",
+        [exchange, as_of, as_of - timedelta(days=ISSUE_SIZE_MAX_AGE_DAYS), sorted(UNIVERSE_SERIES), *only_p],
+    ).fetchall()
+    return {sec: (Decimal(n), d, listings) for sec, d, n, listings in rows}
 
 
 KPI_COLUMNS = ("vnb_margin", "embedded_value", "ape_growth", "gov", "take_rate", "contribution_margin", "nrr",
@@ -459,18 +549,19 @@ def _preload(con, as_of_ts: datetime, entities=None):
         + """) WHERE rn = 1),
            r AS (SELECT *, row_number() OVER (PARTITION BY entity_id ORDER BY as_of_date DESC) AS r FROM f)
            SELECT r.entity_id, r.as_of_date, r.r, o.category, o.pct, o.shares,
-                  m.promoter_pledged_shares, m.promoter_encumbered_shares
+                  m.promoter_pledged_shares, m.promoter_encumbered_shares, m.has_partly_paid
            FROM r JOIN shareholding_observations o USING (filing_id, parser_version)
            JOIN shareholding_meta m USING (filing_id, parser_version)
            WHERE r.r <= 2""",
         [as_of_ts, *only_p],
     ).fetchall()
     shp: dict[str, dict] = defaultdict(dict)
-    for ent, d, rank, cat, pct, shares, pledged, encumbered in shp_rows:
+    for ent, d, rank, cat, pct, shares, pledged, encumbered, partly_paid in shp_rows:
         if rank == 1:
             shp[ent][cat] = (pct, shares)
             shp[ent]["_as_of"] = d
             shp[ent]["_pledged"], shp[ent]["_encumbered"] = pledged, encumbered
+            shp[ent]["_partly_paid"] = bool(partly_paid)
         else:
             shp[ent].setdefault("_prev", {})[cat] = (pct, shares)
             shp[ent]["_prev_as_of"] = d
@@ -594,6 +685,7 @@ def compute_rows(
         ).fetchall()
     }
     shp_all, paid_up, quarter_end = _preload(con, as_of_ts, entities)
+    issues = issue_sizes(con, as_of, exchange, entities)  # rule SHARES_REG31_OUTLIER [X221]
     dividends = _dividends(con, as_of, knowledge, as_of_ts, secs)
     events = _event_counts(con, as_of, as_of_ts, entities)
     kpis = supplemental_kpi_columns(con, as_of_ts, entities)
@@ -614,7 +706,8 @@ def compute_rows(
     features_bs.prefetch(con, as_of_ts, entities)
     try:
         rows = _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all, paid_up, quarter_end,
-                     events, kpis, history, curated, arch_override, fundamentals_cache, dividends, prices)  # fmt: skip
+                     events, kpis, history, curated, arch_override, fundamentals_cache, dividends, prices,
+                     issues)  # fmt: skip
         if run_cache is not None:
             run_cache.store({e: (k, fundamentals_cache[e]) for e, k in keys.items() if e in stale})
     finally:
@@ -635,7 +728,8 @@ def compute_rows(
 
 
 def _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all, paid_up, quarter_end, events, kpis,
-          history, curated, arch_override, fundamentals_cache, dividends=None, prices=None) -> list[dict]:  # fmt: skip
+          history, curated, arch_override, fundamentals_cache, dividends=None, prices=None,
+          issues=None) -> list[dict]:  # fmt: skip
     rows = []
     for sec, ent, symbol, series in universe:
         b = bars.get(sec, [])
@@ -665,7 +759,12 @@ def _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all,
 
         shp = shp_all.get(ent, {})
         reg31 = (Decimal(shp["TOTAL"][1]), shp["_as_of"]) if "TOTAL" in shp else None
-        shares, _counted, source = market_cap_shares(reg31, paid_up.get(ent), factors.get(sec, []), as_of)
+        iss = (issues or {}).get(sec)
+        shares, _counted, source = market_cap_shares(
+            reg31, paid_up.get(ent), factors.get(sec, []), as_of, None if iss is None else iss[:2],
+            partly_paid=shp.get("_partly_paid", False), entity_listings=1 if iss is None else iss[2],
+            trust_shares=_trust_shares(shp),
+        )  # fmt: skip
         mcap = close * shares if close is not None and shares is not None else None
         ev = (
             mcap + fund["_net_debt"] + (fund["_minority"] or 0)

@@ -2143,6 +2143,9 @@ def _promote_mcap_day(con, stage_dir: Path, manifest: dict[str, Any]) -> Promoti
     if prior and Decimal(n) < G1_MIN_RATIO * Decimal(statistics.median(prior)):
         raise GateFailure("G1", f"{n} EQ/BE/BZ mcap rows < {G1_MIN_RATIO} x median {statistics.median(prior)}")
     _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_nse_mcap"))
+    # Rule SHARES_REG31_OUTLIER [X221] reads Issue Size: rows from this day on (up to features.ISSUE_SIZE_MAX_AGE_DAYS
+    # later) may change share count; marked like a market day.
+    dirty.mark_all(con, day, "MCAP_DAY", read_table(con, stage_dir, "filings")[0]["filing_id"])
     return PromotionResult("PROMOTED", "mcap_day", message=f"{day}: {n} EQ/BE/BZ rows")
 
 

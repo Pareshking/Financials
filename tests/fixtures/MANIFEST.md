@@ -595,3 +595,15 @@ Copied byte-for-byte from the vault (gunzip only; sha256 equals the blob sha256)
 | `xbrl_qc2/INTEGRATED_FILING_INDAS_1567276_06112025071457_WEB.xml` | Ajmera Realty Q2 FY26 consolidated, owners filed 0, NCI 87 lakh [X214] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1567276_06112025071457_WEB.xml | `eef2b9cf9600479a26dbebfd928a801ba00a7857c29772555182b35a1a7519f0` |
 | `xbrl_qc2/INTEGRATED_FILING_INDAS_1598932_12012026052921_WEB.xml` | Bajaj Indef Q2 FY26 consolidated re-filing, owners 0, NCI +3.5 lakh (PDF (3.50)) [X214] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1598932_12012026052921_WEB.xml | `cf608c041bffdc6fe9e83835aa44aa0e7cf72b7006beb6ed154742e85f8bf091` |
 | `xbrl_qc2/INTEGRATED_FILING_INDAS_1439263_14052025102806_WEB.xml` | Nilkamal Q4 FY25 consolidated, owners agree with EPS, PAT line does not [X214] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1439263_14052025102806_WEB.xml | `af47cff30b663b9c941e25d6c0a184b41ded9df163afbe6b7162a7f3fc0658fb` |
+
+## QS: rule SHARES_REG31_OUTLIER (X221; copied 2026-11-18 from the local vault blob, gunzipped, sha256 verified)
+
+Read by `tests/test_x221_reg31_outlier.py`. The PR zip is the vault blob as fetched (stored uncompressed).
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `shares_outlier/SHP_1696707_20072026025841_WEB.xml` | MBLINFRA Reg. 31 30-Jun-2026: TOTAL 155,879,256 shares (the outlier against results and NSE until the 30-Sep-2026 listing) | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_1696707_20072026025841_WEB.xml` | `ea538ab6ccb2b81c9374d92b17f0d558715e71de29be55dfa4e91fa87dbc38ea` |
+| `shares_outlier/INTEGRATED_FILING_INDAS_1700387_23072026082824_WEB.xml` | MBLINFRA Q1 FY27 standalone results: paid-up 152.53 Cr of Rs 10 = 152,530,000 shares | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1700387_23072026082824_WEB.xml` | `18732b9de8e373b347a75b2970c8cb3ee3418de5da5aad35c7d1f69e8a46df77` |
+| `shares_outlier/SHP_1739920_16102026040314_WEB.xml` | HMT Reg. 31 30-Sep-2026: TOTAL 1,204,091,640 shares (all three counts differ) | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_1739920_16102026040314_WEB.xml` | `51ddf496191c356069e49066182b6360c0cdcc6ffd447fba3710d98bc0f08b45` |
+| `shares_outlier/INTEGRATED_FILING_INDAS_1755096_06112026073646_WEB.xml` | HMT Q2 FY27 standalone results: paid-up 355.60 Cr of Rs 10 = 355,600,000 shares | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1755096_06112026073646_WEB.xml` | `0a03f319fdd01e21b7e35985d9c163ce3be4fb7c93585dab403458a65a98c155` |
+| `pr_zip/PR250926.zip` | PR zip of 25-Sep-2026: MBLINFRA Issue Size 152,529,256 (= results paid-up / face, Reg. 31 the outlier; 155,879,256 in `PR300926.zip`) | `https://nsearchives.nseindia.com/archives/equities/bhavcopy/pr/PR250926.zip` | `03c07898138cb6b62ccef18f902cd14b397bae2f68996cc726fb0a2889f560af` |

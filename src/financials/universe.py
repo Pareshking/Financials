@@ -281,9 +281,10 @@ ISSUE_SIZE_MAX_STALENESS_DAYS = 7  # a quarter end on a holiday (31 Mar 2025) re
 def issue_size_check(con, as_of: date, *, include_agreeing: bool = False) -> dict:
     """Cross-check [X133]: NSE Issue Size (shares listed on NSE, mcap file of `as_of` or the latest within
     ISSUE_SIZE_MAX_STALENESS_DAYS before it) vs the Reg. 31 TOTAL shares of patterns as of `as_of` (latest version),
-    per EQ / BE / BZ security. Not a share count for market cap: Reg. 31 stays primary (X133: 98.4% within 0.5%,
-    below the 99% bar; Issue Size lags allotments until listing, keeps bought-back shares until extinguished on NSE,
-    moves on the ex-date of a bonus / split, and excludes partly-paid shares)."""
+    per EQ / BE / BZ security. Reg. 31 stays the primary market-cap count (Issue Size replaces only a Reg. 31
+    outlier, rule SHARES_REG31_OUTLIER [X221]; X133: 98.4% within 0.5%, below the 99% bar; Issue Size lags
+    allotments until listing, keeps bought-back shares until extinguished on NSE, moves on the ex-date of a bonus /
+    split, and excludes partly-paid shares)."""
     from financials.promoter import SHARE_CROSS_CHECK_TOLERANCE
 
     rows = fetch_dicts(

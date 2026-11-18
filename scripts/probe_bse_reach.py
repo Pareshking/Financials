@@ -29,6 +29,13 @@ contains "xbrl" (the xbrldetails one first, at most 6), every API call and XBRLF
 context), at most --max-endpoints of the xbrldetails component's calls once per scrip, then one results-like and one
 annual-like file named in the answers.
 
+`--mode xbrl3` (X243; run 44245923545 found no "xbrldetails" route and an XBRL-figures "results" view, not files):
+the stock-share-price routes chunk named by the main bundle, the components of its routes around "financ", "annual"
+and "result" (at most 6 chunks), the url-map modules they import (at most 3), every call they make with its parameter
+keys and every XBRL link field / folder prefix (logged with context), at most 8 of those calls once per scrip (the
+scrip code in scrip-like keys), then one results and one annual file named in the answers (+ the `.xml` beside an
+`.html`).
+
 Every answer is written byte for byte to the ledger (--out DIR: blobs/<sha256> + ledger.jsonl) before it is read; the
 workflow uploads DIR as an artifact, which `python -m financials --data-dir data import-bse DIR` vaults and stages on
 the owner's machine. The log prints status, size and sha256 only. A refusal (`Blocked`) ends the probe: no retries
@@ -37,6 +44,7 @@ around it (CLAUDE.md, owner decision).
     python scripts/probe_bse_reach.py --out bse_probe
     python scripts/probe_bse_reach.py --out bse_probe --mode xbrl --scrips 500488:A,505036:B,530745:T
     python scripts/probe_bse_reach.py --out bse_probe --mode xbrl2 --scrips 500488:A,505036:B,530745:T
+    python scripts/probe_bse_reach.py --out bse_probe --mode xbrl3 --scrips 500488:A,505036:B,530745:T
 """
 
 from __future__ import annotations
@@ -243,7 +251,8 @@ def route_chunks(routes_js: str, word: str = "xbrl") -> dict[str, str]:
         imp = _IMPORT.search(routes_js, m.end(), nxt)
         if imp is None:
             before = list(_IMPORT.finditer(routes_js, paths[i - 1].end() if i else 0, m.start()))
-            imp = before[-1] if before else None
+            # only an import inside this route's own object literal (no "},{" between it and this path)
+            imp = before[-1] if before and "},{" not in routes_js[before[-1].end() : m.start()] else None
         out[m.group(1)] = imp.group(1) if imp else ""
     return out
 
@@ -358,6 +367,229 @@ def xbrl2_probe(c: BseClient, scrips: list[tuple[str, str]], max_chunks: int, ma
             print(f"NONE  {dataset}: none of {len(links)} named files could be fetched")
 
 
+# ── --mode xbrl3 (X243): the stock page's own results / annual-report components ──
+# Run 44245923545 (xbrl2): the /corporates routes chunk has no "xbrldetails" route; its "results" component shows
+# figures "as per XBRL submission" (Corp_BSEDnBResults_SEBI_Consolidated_Res_ng, Corp_detailedResult_Transpose_ng:
+# parsed values keyed by a quarter code, not files), its API paths are template literals
+# (`${I.BSE_Domain_APIUrl}/<Name>/w`) or `_.url.<Key>` entries of an imported url map, and XBRL links are row fields
+# (`ae("href",n.IXBRLFileName,...)`, `n.xbrlurl`). The stock pages load the "stock-share-price" routes chunk.
+
+_LAZY = re.compile(r"""\{path:"([^"]+)",loadChildren:\(\)=>import\("\./(chunk-[A-Za-z0-9_-]+\.js)"\)""")
+_TEMPLATE = re.compile(r"""\$\{[\w.]+\}/([A-Za-z][A-Za-z0-9_]{2,80})/w(\?[^`]*)?`""")
+_URLKEY = re.compile(r"""\b([A-Za-z_$][\w$]*)\.url\.([A-Za-z_]\w*)""")
+_STATIC_IMPORT = re.compile(r"""import\{([^}]*)\}from"\./(chunk-[A-Za-z0-9_-]+\.js)\"""")
+_HREF_FIELD = re.compile(r"""(?:"href"|"routerLink"),\s*(?:"([^"]*)"\+)?\w+\.(\w*(?:xbrl|XBRL|Xbrl)\w*)""")
+_PREFIX_FIELD = re.compile(r""""([^"]*XBRLFILES/[^"]*)"\+\w+\.(\w+)""")
+
+
+def component_code(routes_js: str, path: str) -> tuple[str, str]:
+    """(code, chunk) of an eager route's component (`{component:X,path:"..."}`): the code from the class before
+    `X=class` to the next class, so its template functions (emitted before the class) come with it; or, when X is
+    imported, the chunk it comes from."""
+    m = re.search(r'\{component:([\w$]+),path:"' + re.escape(path) + '"', routes_js)
+    if not m:
+        return "", ""
+    cls = re.search(r"\b" + re.escape(m.group(1)) + r"=class\b", routes_js)
+    if not cls:  # imported from another chunk: `import{a as X}from"./chunk-..."`
+        alias = re.escape(m.group(1))
+        found = (ch for names, ch in _STATIC_IMPORT.findall(routes_js) if re.search(rf"\bas {alias}\b", names))
+        return "", next(found, "")
+    starts = [x.start() for x in re.finditer(r"\b[\w$]+=class\b", routes_js)]
+    prev = max((x for x in starts if x < cls.start()), default=0)
+    nxt = min((x for x in starts if x > cls.start()), default=len(routes_js))
+    return routes_js[prev:nxt], ""
+
+
+def lazy_routes(main_js: str) -> dict[str, str]:
+    return dict(_LAZY.findall(main_js))
+
+
+def url_map(js: str) -> dict[str, str]:
+    """`Key:"/Name/w..."` entries of an url-map module (any object literal: its exact shape is not known yet)."""
+    return dict(re.findall(r'([A-Za-z_]\w*):"(/?(?:BseIndiaAPI/api/)?[A-Za-z]\w*/w\b[^"]*)"', js))
+
+
+def url_map_chunks(js: str) -> list[str]:
+    """The chunks a component imports the alias of `<alias>.url.<Key>` from."""
+    aliases = {a for a, _ in _URLKEY.findall(js)}
+    out = []
+    for names, chunk in _STATIC_IMPORT.findall(js):
+        if any(re.search(rf"\bas {re.escape(a)}\b", names) for a in aliases):
+            out.append(chunk)
+    return list(dict.fromkeys(out))
+
+
+def calls_in(js: str, urls: dict[str, str]) -> dict[str, list[str]]:
+    """API name -> parameter keys, for template-literal, quoted and url-map calls; the keys are those of the query
+    template plus the last object literal within 600 characters before the call."""
+    out: dict[str, list[str]] = {}
+    found = [(m.start(), m.group(1), m.group(2) or "") for m in _TEMPLATE.finditer(js)]
+    found += [(m.start(), m.group(1), m.group(2) or "") for m in _ENDPOINT.finditer(js)]
+    for m in _URLKEY.finditer(js):
+        path = urls.get(m.group(2), "")
+        name = re.search(r"([A-Za-z][A-Za-z0-9_]{2,80})/w(\?.*)?$", path)
+        if name:
+            found.append((m.start(), name.group(1), name.group(2) or ""))
+    for pos, name, query in sorted(found):
+        if name in out or name in ("api", "BseIndiaAPI"):
+            continue
+        objs = re.findall(r"\{([^{}]{0,400})\}", js[max(0, pos - 600) : pos])
+        keys = re.findall(r"[?&]([A-Za-z_]\w*)=", query + js[pos : pos + 300].split(";")[0])
+        for o in reversed(objs):  # `new HttpParams({fromObject:n})` wraps the literal that holds the keys
+            ks = [k for k in re.findall(r"([A-Za-z_]\w*):", o) if k != "fromObject"]
+            if ks:
+                keys += ks
+                break
+        out[name] = list(dict.fromkeys(keys))
+    return out
+
+
+def _rows(v) -> list[dict]:
+    if isinstance(v, dict):
+        return [v] + [r for x in v.values() for r in _rows(x)]
+    if isinstance(v, list):
+        return [r for x in v for r in _rows(x)]
+    return []
+
+
+def answer_links(body: bytes, prefixes: list[tuple[str, str]], fields: set[str]) -> list[str]:
+    """XBRL file links in one API answer: XBRLFILES links anywhere, the values of the fields the page shows as XBRL
+    links, and a folder prefix + field value where the page builds the link that way."""
+    text = body.decode("utf-8", "replace")
+    links = xbrl_links(text)
+    try:
+        rows = _rows(json.loads(text))
+    except ValueError:
+        rows = []
+    for r in rows:
+        for f in fields:
+            v = r.get(f)
+            if isinstance(v, str) and v.strip():
+                links.append(urljoin(HOME, v.strip()))
+        for prefix, f in prefixes:
+            v = r.get(f)
+            if isinstance(v, str) and v.strip():
+                links.append(urljoin(HOME, prefix + v.strip()))
+    return list(dict.fromkeys(links))
+
+
+QTR = re.compile(r"qtr|quarter|quater", re.I)
+
+
+def scrip_value(key: str, code: str) -> str:
+    return code if re.search(r"scrip|scr_?cd|sc_cd|^code$|scode|scripcode", key, re.I) else ""
+
+
+def xbrl3_probe(c: BseClient, scrips: list[tuple[str, str]], max_chunks: int, max_endpoints: int) -> None:
+    codes = [code for code, _ in scrips]
+
+    def text(url: str) -> str | None:
+        try:
+            return c.fetch_url(url, {}, "site_js" if url.endswith(".js") else "site_page", {}, file=True).decode(
+                "utf-8", "replace"
+            )
+        except (Missing, BadRequest) as exc:
+            print(f"SKIP  {url}: {type(exc).__name__}: {exc}")
+            return None
+
+    shell = text(HOME + "corporates/xbrldetails")  # 1. the shell, its main bundle, the stock-page routes
+    mains = [urljoin(HOME, s) for s in _MAIN.findall(shell or "")]
+    main_js = text(mains[0]) if mains else None
+    lazy = lazy_routes(main_js or "")
+    print(f"OK    main bundle {mains[:1]}: lazy routes {lazy}")
+    if "stock-share-price" not in lazy:
+        print("NONE  no stock-share-price routes chunk")
+        return
+    routes_js = text(JS_DIR + lazy["stock-share-price"])
+    if routes_js is None:
+        return
+    routes = {
+        **route_chunks(routes_js, "financ"),
+        **route_chunks(routes_js, "annual"),
+        **route_chunks(routes_js, "result"),
+    }
+    print(f"OK    stock-share-price routes ({lazy['stock-share-price']}): {routes}")
+    comps: dict[str, str] = {}  # route paths -> component code (a lazy chunk, else the routes chunk itself)
+    by_chunk: dict[str, list[str]] = {}
+    for path, ch in routes.items():
+        by_chunk.setdefault(ch, []).append(path)
+    for path in by_chunk.pop("", []):  # eager components: their code in the routes chunk, else the chunk it imports
+        code, imported = component_code(routes_js, path)
+        if code:
+            comps[path] = code
+        elif imported:
+            by_chunk.setdefault(imported, []).append(path)
+        else:
+            print(f"NONE  component of route {path} not found")
+    for ch, paths in list(by_chunk.items())[:max_chunks]:  # 2. each lazy component chunk once
+        js = text(JS_DIR + ch)
+        if js is not None:
+            comps[",".join(paths)] = js
+    urls: dict[str, str] = {}
+    for ch in list(dict.fromkeys(x for js in comps.values() for x in url_map_chunks(js)))[:3]:  # 3. url maps
+        js = text(JS_DIR + ch)
+        urls.update(url_map(js or ""))
+    print(f"OK    url map entries: {len(urls)}; xbrl / result / annual ones: "
+          f"{ {k: v for k, v in urls.items() if _WANT.search(k + v)} }")  # fmt: skip
+    plan: list[tuple[str, str, list[str]]] = []  # (route path, API name, keys)
+    prefixes: list[tuple[str, str]] = []
+    fields: set[str] = set()
+    for path, js in comps.items():
+        calls = calls_in(js, urls)
+        prefixes += _PREFIX_FIELD.findall(js)
+        fields |= {f for _, f in _HREF_FIELD.findall(js)}
+        print(f"OK    component {path}: {len(js)} chars, calls {json.dumps(calls, sort_keys=True)}")
+        for ctx in _context(js, r"xbrl|XBRLFILES|/w`|/w\?|\.url\.", 16):
+            print(f"      ...{ctx!r}")
+        plan += [(path, n, k) for n, k in calls.items() if (path, n) not in {(p, m) for p, m, _ in plan}]
+    print(f"XBRL link fields {sorted(fields)}; folder + field {prefixes}")
+    ranked = sorted(plan, key=lambda p: ("financ" not in p[0].lower(), not re.search("xbrl", p[1], re.I),
+                                         not _WANT.search(p[1])))  # fmt: skip
+    named: dict[str, list[str]] = {"results_xbrl": [], "annual_xbrl": []}
+    qvals: dict[str, str] = {}  # scrip -> a quarter code seen in an earlier answer (for Qtr / QuarterID keys)
+    chosen = ranked[:max_endpoints]
+    chosen.sort(key=lambda p: any(QTR.search(k) for k in p[2]))  # calls without a quarter key first
+    for path, name, keys in chosen:  # 4. the calls, once per scrip
+        for code in codes:
+            params = {k: (qvals.get(code, "") if QTR.search(k) else scrip_value(k, code)) for k in keys}
+            params = params or {"scripcode": code}
+            try:
+                body = c.get(f"{name}/w", params, "xbrl_listing", {"api": name, "scrip": code, "route": path})
+            except (Missing, BadRequest) as exc:
+                print(f"SKIP  {name} {params}: {type(exc).__name__}: {exc}")
+                continue
+            links = answer_links(body, prefixes, fields)
+            if code not in qvals:
+                with contextlib.suppress(ValueError):
+                    for r in _rows(json.loads(body.decode("utf-8", "replace"))):
+                        q = next((str(v) for k, v in r.items() if QTR.search(k) and v not in (None, "")), None)
+                        if q:
+                            qvals[code] = q
+                            print(f"      quarter code for {code}: {q!r} (from {name})")
+                            break
+            head = body[:400].decode("utf-8", "replace")
+            _show(f"{name} {params}", body, f"{len(links)} links {links[:3]}; head {head!r}")
+            kind = "annual_xbrl" if re.search("annual", path + name, re.I) else "results_xbrl"
+            named[kind] += links
+    for dataset, links in named.items():  # 5. one file of each kind (+ the .xml beside an .html)
+        ok = False
+        for link in list(dict.fromkeys(links))[:3]:
+            for u in dict.fromkeys(x for x in (link, sibling_xml(link)) if x):
+                try:
+                    body = c.xbrl_file(u, dataset, {"from": "stock page"})
+                except (Missing, BadRequest) as exc:
+                    print(f"SKIP  {dataset} {u}: {type(exc).__name__}: {exc}")
+                    continue
+                t = body.decode("utf-8", errors="replace")
+                ns = sorted(set(re.findall(r'xmlns:[\w-]+="(http[^"]+)"', t[:20000])))
+                _show(f"{dataset} {u}", body, f"inline={'ix:header' in t} namespaces={ns[:12]}")
+                ok = True
+            if ok:
+                break
+        if not ok:
+            print(f"NONE  {dataset}: none of {len(links)} named files could be fetched")
+
+
 def _scrips(text: str) -> list[tuple[str, str]]:
     out = []
     for part in (p.strip() for p in text.split(",") if p.strip()):
@@ -378,19 +610,21 @@ def _summary(led: Ledger) -> None:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", type=Path, required=True)
-    ap.add_argument("--mode", choices=("reach", "xbrl", "xbrl2"), default="reach")
+    ap.add_argument("--mode", choices=("reach", "xbrl", "xbrl2", "xbrl3"), default="reach")
     ap.add_argument("--scrips", default="500488:A,505036:B,530745:T", help="--mode xbrl: CODE or CODE:GROUP list")
     ap.add_argument("--max-js", type=int, default=30)
     ap.add_argument("--max-endpoints", type=int, default=4)
     a = ap.parse_args(argv)
     led = Ledger(a.out)
     c = BseClient(ledger=led)
-    if a.mode in ("xbrl", "xbrl2"):
+    if a.mode in ("xbrl", "xbrl2", "xbrl3"):
         try:
             if a.mode == "xbrl":
                 xbrl_probe(c, _scrips(a.scrips), a.max_js, a.max_endpoints)
-            else:
+            elif a.mode == "xbrl2":
                 xbrl2_probe(c, _scrips(a.scrips), 6, a.max_endpoints)
+            else:
+                xbrl3_probe(c, _scrips(a.scrips), 6, max(a.max_endpoints, 8))
         except (Blocked, Failed) as exc:
             print(f"STOP  {type(exc).__name__}: {exc}")
         finally:

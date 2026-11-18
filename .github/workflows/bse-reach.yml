@@ -8,7 +8,7 @@ name: bse-reach
 # `import-bse` vaults and stages on the owner's machine. No database is read or written.
 # Dispatch with mode=xbrl (X240) for the results / annual XBRL probe (results RSS feed, stock pages and their scripts,
 # at most 4 candidate listing endpoints per scrip, one results and one annual file); see scripts/probe_bse_reach.py.
-# A push of the paths below runs mode xbrl2 (no inputs on push), so merging this change is itself the one probe.
+# A push of the paths below runs mode xbrl3 (no inputs on push), so merging this change is itself the one probe.
 on:
   push:
     paths:
@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "reach (the A18 calls), xbrl (X240) or xbrl2 (X242: the /corporates/xbrldetails page and its API calls)"
+        description: "reach (the A18 calls), xbrl (X240), xbrl2 (X242) or xbrl3 (X243: the stock page results / annual components and their calls)"
         default: "reach"
       scrips:
         description: "xbrl mode: CODE:GROUP list (list of securities group)"
@@ -40,7 +40,7 @@ jobs:
       - run: curl -s https://api.ipify.org; echo " (runner public IP)"
       - run: python scripts/probe_bse_reach.py --out bse_probe --mode "$MODE" --scrips "$SCRIPS"
         env:
-          MODE: ${{ inputs.mode || 'xbrl2' }}  # a push (no inputs) runs the X242 xbrl2 probe
+          MODE: ${{ inputs.mode || 'xbrl3' }}  # a push (no inputs) runs the X243 xbrl3 probe
           SCRIPS: ${{ inputs.scrips || '500488:A,505036:B,530745:T' }}
       - uses: actions/upload-artifact@v4
         if: always()

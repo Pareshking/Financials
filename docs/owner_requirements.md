@@ -613,3 +613,9 @@ My 19:31 (2026-11-17) recommendations, unanswered, applied:
 3. **Debt/equity for lending NBFCs** (X228): (debt securities + borrowings + deposits + subordinated liabilities) /
    total equity; banks and insurers stay NULL.
 4. **TTM is NULL on a proven mis-filed YTD** (X226 YTD_MISFILED_NO_BRIDGE) instead of the X106 bridge (NAZARA).
+5. **Restated TTM windows bridge the operating lines too** (X300 OPERATING_LINES_BRIDGE; main session, owner:
+   "continue doing what you are doing"): other income, D&A, finance costs, PBT before exceptional items, PBT and
+   labelled excise follow revenue and PAT through the YTD bridge (X106) when their own YTD identity breaks in
+   a restated row, so OPM, EBITDA, EBIT (ROCE) and interest coverage are on one basis (POLYPLEX TTM other income
+   105 Cr via the YTD instead of 158 Cr from the quarters). X226 (no bridge on a proven mis-filed YTD) and X173
+   hold for these lines; a row whose operating lines have no bridge on one basis keeps the quarter sums.

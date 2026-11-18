@@ -23,6 +23,16 @@ Period = tuple[date, date]
 # Design parameter (2026-11-14): on the live backfill 94% of 8,081 comparisons agree to the rupee, 4% within 0.5%.
 YTD_IDENTITY_REL_TOLERANCE = Decimal("0.005")
 YTD_GUARDED_TAGS = frozenset({"revenue_from_operations", "total_income", "pat", "pbt_incl_jv", "pat_owners"})
+# X300 (rule OPERATING_LINES_BRIDGE, decision 2026-11-18 item 5): the TTM lines behind EBITDA, OPM, ROCE and interest
+# coverage. In a restated window (a guarded tag breaks the YTD identity, X106) such a line whose own YTD identity also
+# breaks there is bridged through the YTD like revenue and PAT, not summed from the stale quarters (POLYPLEX
+# consolidated Q2 FY27: other income 158.18 Cr from the quarters, 105.31 Cr via H1 FY27 + FY26 - H1 FY26), when all
+# the row's breaking lines have a bridge on one basis (FactBook.bridged_operating_line). They are not restatement
+# triggers or YTD findings themselves (YTD_GUARDED_TAGS). `excise_duty|0` = FactBook.coalesced('excise_duty', None).
+YTD_BRIDGED_TAGS = frozenset({
+    "other_income", "depreciation_amortisation", "finance_costs", "profit_before_exceptional_and_tax", "pbt",
+    "excise_duty|0",
+})  # fmt: skip
 # X102: PBT including the share of associates / JVs, per period = filed PBT + filed JV share. Integrated Filing XBRL
 # puts the JV share after PBT, but filers also book it inside PBT as an exceptional item with the JV element 0
 # (FINCABLES Q1 FY26 PBT 176.37 + JV 26.18 = 202.55; Q2 PBT 206.20 incl. 38.11 exceptional, JV 0). Filed PBT then
@@ -334,8 +344,64 @@ class FactBook:
         """False when any YTD ending inside the 4 quarters to `end` breaks the identity (guarded tags only)."""
         if tag not in YTD_GUARDED_TAGS:
             return True
+        return not self._breaks_in_window(tag, end)
+
+    def _breaks_in_window(self, tag: str, end: date) -> bool:
         window = {_add_months(end, -3 * i) for i in range(4)}
-        return not any(date.fromisoformat(b["ytd_period"][1]) in window for b in self.ytd_breaks(tag))
+        return any(date.fromisoformat(b["ytd_period"][1]) in window for b in self.ytd_breaks(tag))
+
+    def bridged_operating_line(self, tag: str, end: date) -> bool:
+        """X300 OPERATING_LINES_BRIDGE: `tag` is an operating line (YTD_BRIDGED_TAGS) whose own YTD identity breaks
+        inside the 4 quarters to `end` while the row is restated: some guarded tag breaks there too (X106) and that
+        break is not provably the YTD's mis-filing (X226 evidence; then the quarters are right and stay summed).
+        The operating lines of a row move together, so EBITDA never adds a bridged line to a summed one: if any
+        breaking line has no bridge on one basis (no bridge periods, e.g. a prior-year YTD before the C9 cutoff, or
+        a prior year whose FY and YTD disagree on the basis, `prior_year_mixed_basis`), none is bridged and the
+        quarter sums stay. The rule never withholds a value the quarters give (only X226 on the line's own YTD)."""
+        if tag not in YTD_BRIDGED_TAGS or not self._breaks_in_window(tag, end):
+            return False
+        return self._row_restated(end) and self._operating_bridges_single_basis(end)
+
+    def _row_restated(self, end: date) -> bool:
+        """X300: a guarded tag breaks the YTD identity inside the window and that break is not a proven mis-filing."""
+        window = {_add_months(end, -3 * i) for i in range(4)}
+        for t in YTD_GUARDED_TAGS:
+            for b in self.ytd_breaks(t):
+                p = (date.fromisoformat(b["ytd_period"][0]), date.fromisoformat(b["ytd_period"][1]))
+                if p[1] in window and self.misfiled_ytd_evidence(t, p) is None:
+                    return True
+        return False
+
+    def _operating_bridges_single_basis(self, end: date) -> bool:
+        """X300: every operating line breaking inside the window has a bridge on one basis."""
+        if "revenue_from_operations" in self.durations:
+            self.coalesced("excise_duty", None)  # the derived excise line exists whatever the call order
+        for t in sorted(YTD_BRIDGED_TAGS):
+            if t in self.durations and self._breaks_in_window(t, end):
+                used = self._bridge_periods(t, end)
+                if not used or self.prior_year_mixed_basis(t, used):
+                    return False
+        return True
+
+    def prior_year_mixed_basis(self, tag: str, used: list[Period]) -> bool:
+        """X300: the bridge's prior-year FY and YTD of `tag` disagree on the basis: exactly one of them breaks the
+        YTD identity while the other provably holds it (all its quarters filed). Swiggy standalone FY26 PBT before
+        exceptional items 436 Cr on the continuing basis after the Instamart transfer vs H1 FY26 -1,872 Cr = Q1 + Q2
+        as filed (Vedanta standalone FY26 D&A 38 Cr after the demerger vs H1 FY26 2,050 Cr: FY - H1 would be a
+        negative D&A). FY - YTD is then no set of quarters, so the line is not bridged."""
+        if len(used) != 3:
+            return False
+        broken = {(date.fromisoformat(b["ytd_period"][0]), date.fromisoformat(b["ytd_period"][1]))
+                  for b in self.ytd_breaks(tag)}  # fmt: skip
+        state = []
+        for s, e in used[1:]:
+            if (s, e) in broken:
+                state.append("BREAKS")
+            elif None not in self._ytd_quarters(tag, s, e):
+                state.append("HOLDS")
+            else:
+                state.append("UNKNOWN")
+        return sorted(state) == ["BREAKS", "HOLDS"]
 
     # ── flows ──
     def quarter(self, tag: str, end: date) -> Decimal | None:
@@ -352,11 +418,12 @@ class FactBook:
 
     def ttm(self, tag: str, end: date) -> Decimal | None:
         """Sum of the 4 quarters ending `end`; falls back to the YTD bridge for H1/FY-only flows."""
-        if not self._ytd_consistent(tag, end):
+        if self.bridged_operating_line(tag, end) or not self._ytd_consistent(tag, end):
             # X106 (owner decision A, 2026-11-15): a restated quarter inside the window. Never sum mixed-basis
             # quarters; use the company's latest YTD for the current year plus the prior year's FY - YTD as filed
             # (Tata Motors FY26 standalone after the CV demerger: FY revenue 57,859 Cr as restated).
             # X226: unless a YTD the bridge reads is provably mis-filed: then the TTM is withheld (NULL).
+            # X300: the operating lines of a restated row (other income, D&A, finance costs, PBT) likewise.
             used = self._bridge_periods(tag, end)
             if used and any(self.misfiled_ytd_evidence(tag, p) for p in used):
                 return None

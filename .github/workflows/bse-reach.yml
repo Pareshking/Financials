@@ -6,6 +6,9 @@ name: bse-reach
 # ABBOTINDIA results announcements + one attachment, its shareholding filings + one inline XBRL). The ledger
 # (bytes as sent + one JSON line per answer) is a workflow artifact for 1 day (the repository is public), which
 # `import-bse` vaults and stages on the owner's machine. No database is read or written.
+# Dispatch with mode=xbrl (X240) for the results / annual XBRL probe (results RSS feed, stock pages and their scripts,
+# at most 4 candidate listing endpoints per scrip, one results and one annual file); see scripts/probe_bse_reach.py.
+# A push of the paths below runs mode xbrl too (no inputs on push), so merging this change is itself the one probe.
 on:
   push:
     paths:
@@ -13,6 +16,13 @@ on:
       - scripts/probe_bse_reach.py
       - src/financials/fetch/bse.py
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "reach (the A18 calls) or xbrl (X240: where BSE serves results / annual XBRL)"
+        default: "reach"
+      scrips:
+        description: "xbrl mode: CODE:GROUP list (list of securities group)"
+        default: "500488:A,505036:B,530745:T"
 
 permissions:
   contents: read
@@ -20,7 +30,7 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -28,7 +38,10 @@ jobs:
           python-version: "3.11"
       - run: python -m pip install -e ".[bse]"
       - run: curl -s https://api.ipify.org; echo " (runner public IP)"
-      - run: python scripts/probe_bse_reach.py --out bse_probe
+      - run: python scripts/probe_bse_reach.py --out bse_probe --mode "$MODE" --scrips "$SCRIPS"
+        env:
+          MODE: ${{ inputs.mode || 'xbrl' }}  # a push (no inputs) runs the X240 xbrl probe
+          SCRIPS: ${{ inputs.scrips || '500488:A,505036:B,530745:T' }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:

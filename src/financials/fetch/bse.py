@@ -22,6 +22,12 @@ fixtures are committed under tests/fixtures/bse/ [A17]):
   linking inline XBRL under `www.bseindia.com/XBRLFILES/SHPXBRLDataXML/`;
 - list of securities `ListofScripData/w` (`bse` package `listSecurities`: per group, `SCRIP_CD`, `ISIN_NUMBER`,
   `Mktcap` in Rs crore), the scrip-code / ISIN map and BSE's own market cap.
+- results XBRL [X240, UNVERIFIED]: the RSS feed `www.bseindia.com/Data/XML/FinancialResultsFeed.aspx` (latest
+  filings of every company, per a third-party project's measurement of 2026-10-01), whose items link Integrated Filing
+  (Finance) files under `XBRLFILES/IFIndasDuplicateUploadDocument/` (`.html` inline XBRL, reportedly with a plain
+  `.xml` instance beside it). No per-scrip results-XBRL or annual-XBRL listing is known; `probe_bse_reach.py --mode
+  xbrl` looks for one in BSE's own page code. Until a probe returns real files (committed as fixtures, tests pinned),
+  `import_ledger` vaults these answers raw only (`RESULTS_XBRL_VERIFIED`).
 
 `requests` and `selenium` are needed only here (`pip install -e ".[bse]"`), imported lazily.
 """
@@ -41,6 +47,10 @@ from urllib.parse import urlencode
 API = "https://api.bseindia.com/BseIndiaAPI/api/"
 HOME = "https://www.bseindia.com/"
 ATTACHMENT = "https://www.bseindia.com/xml-data/corpfiling/AttachLive/"
+RESULTS_FEED = "https://www.bseindia.com/Data/XML/FinancialResultsFeed.aspx"  # X240, UNVERIFIED
+# X240: flip to True only together with the tests on the probe's real BSE results / annual XBRL files (QB follow-up):
+# then `import_ledger` parses `.xml` instances of datasets results_xbrl / annual_xbrl with the NSE parsers.
+RESULTS_XBRL_VERIFIED = False
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
 HEADERS = {"User-Agent": UA, "Accept": "application/json, text/plain, */*", "Accept-Language": "en-US,en;q=0.5",
            "Origin": "https://www.bseindia.com", "Referer": HOME, "Connection": "keep-alive",
@@ -273,6 +283,18 @@ class BseClient:
                                                 "segment": "Equity", "status": "Active"},
                           "list_securities", {"group": group, "scrip": scrip})  # fmt: skip
 
+    def results_feed(self) -> bytes:
+        """BSE's financial results RSS feed, as sent [X240, UNVERIFIED]."""
+        return self.fetch_url(RESULTS_FEED, {}, "results_feed", {}, file=True)
+
+    def xbrl_file(self, url: str, dataset: str, covers: dict | None = None) -> bytes:
+        """One results (`results_xbrl`) or annual (`annual_xbrl`) XBRL file under www.bseindia.com, as sent."""
+        if dataset not in ("results_xbrl", "annual_xbrl"):
+            raise ValueError(f"not an XBRL dataset: {dataset}")
+        if url.startswith("/"):
+            url = HOME.rstrip("/") + url
+        return self.fetch_url(url, {}, dataset, covers, file=True)
+
     def close(self) -> None:
         if self.in_page is not None:
             self.in_page.close()
@@ -282,14 +304,21 @@ class BseClient:
 
 CATEGORY = {"announcements": "BSE_ANNOUNCEMENTS", "attachment": "BSE_ATTACHMENT",
             "shareholding_filings": "BSE_SHP_LISTING", "shareholding_xbrl": "BSE_SHP_XBRL",
-            "list_securities": "BSE_LIST_SECURITIES"}  # fmt: skip
+            "list_securities": "BSE_LIST_SECURITIES", "results_feed": "BSE_RESULTS_FEED",
+            "xbrl_listing": "BSE_XBRL_LISTING", "results_xbrl": "BSE_RESULTS_XBRL",
+            "annual_xbrl": "BSE_ANNUAL_XBRL"}  # fmt: skip  # X240: the last four raw only until RESULTS_XBRL_VERIFIED
 
 
 def _ext(rec: dict) -> tuple[str, str]:
     name = rec["url"].split("?", 1)[0].rsplit("/", 1)[-1].lower()
     ctype = (rec.get("content_type") or "").split(";")[0].strip().lower()
-    if rec["dataset"] in ("announcements", "shareholding_filings", "list_securities") or "json" in ctype:
+    if (
+        rec["dataset"] in ("announcements", "shareholding_filings", "list_securities", "xbrl_listing")
+        or "json" in ctype
+    ):
         return "json", "application/json"
+    if rec["dataset"] == "results_feed":
+        return "xml", "application/rss+xml"
     for ext, media in (("pdf", "application/pdf"), ("xml", "application/xml"), ("html", "text/html"),
                        ("zip", "application/zip"), ("csv", "text/csv")):  # fmt: skip
         if name.endswith("." + ext):
@@ -338,6 +367,15 @@ def import_ledger(vault, stage_root: Path, ledger_dir: Path) -> tuple[list[Path]
             ts = shp_broadcast.get(rec["url"].split("?", 1)[0])
             staged.append(stage_shareholding(vault, stage_root, data=data, source_url=rec["url"], fetched_at=fetched,
                                              broadcast_ts=ts, broadcast_ts_source="API_FIELD" if ts else "UNKNOWN",
+                                             exchange="BSE"))  # fmt: skip
+            continue
+        if rec["dataset"] in ("results_xbrl", "annual_xbrl") and RESULTS_XBRL_VERIFIED and ext == "xml":
+            # X240 (prepared, NOT yet enabled or tested: needs the probe's real files as fixtures first). A plain
+            # instance of the SEBI in-capmkt (results) or Reg. 34 (annual) taxonomy takes the NSE path unchanged:
+            # parse_integrated_results dispatches on the namespace. Inline `.html` copies stay raw only.
+            from financials.staging import stage_results_xbrl
+
+            staged.append(stage_results_xbrl(vault, stage_root, data=data, source_url=rec["url"], fetched_at=fetched,
                                              exchange="BSE"))  # fmt: skip
             continue
         staged.append(stage_raw_only(vault, stage_root, data=data, ext=ext, media_type=media,

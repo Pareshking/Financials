@@ -313,7 +313,7 @@ def test_r20_identical_upload_on_bse_and_nse_reads_to_the_same_canonical_facts()
     """R20 [X266]: HILINFRA 544477 Q2 FY27 consolidated, the same upload on BSE (inline XBRL, 17:50:59 IST) and NSE
     (XML, 17:51:50 IST). Every canonical fact the parser produces is identical (tag, period, scope, value). The raw
     instances differ only by BSE's display duplicates and NSE's extra `OtherComprehensiveIncome` element, whose line-
-    item row `li_other_comprehensive_income` equals the mapped `oci_net` (OtherComprehensiveIncomeNetOfTaxes) both carry."""
+    item row `li_other_comprehensive_income` equals the mapped `oci_net` both carry."""
     from financials.parsers.integrated import parse_integrated_results
 
     def canon(name):

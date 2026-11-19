@@ -86,7 +86,7 @@ from financials.timeutil import ist_to_utc, utc_now
 # Reader version of materialised rows. Bump it whenever features.py, fundamentals.py (or another file pinned by
 # tests/test_incremental_materialize.py) changes any output: `materialize --incremental` refuses days built by another
 # version, because only a full run then reproduces the history.
-FEATURES_VERSION = "2026.11.18-21I"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
+FEATURES_VERSION = "2026.11.19-21J"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
 # -21A: core profit (fundamentals._core) quantized to the paisa (Arrow decimal256 on the expanded universe)
 # -21B: gate G4 compares only securities present on the previous day (rule G4_NEW_ENTRANT; output unchanged)
 # -21C: X173 YTD copies of a quarter withheld (TTM sums the quarters); X194 roce_screener needs positive capital
@@ -96,6 +96,7 @@ FEATURES_VERSION = "2026.11.18-21I"  # -2: X106 restatement TTM bridge + flag, X
 # -21G: X273 fixed-asset lines of a year end from one filing (decision T)
 # -21H: X293 owners profit of a quarter derived from the owners YTD before falling back to total PAT
 # -21I: X300 operating lines bridge through the YTD; X301 no mixed-basis bridge (4-quarter sum), owners TTM guarded
+# -21J: X314 NBFC net fair-value line side (revenue break closed, quarters summed); X315 YTD copies prior year
 # -3: QoQ sales / profit growth, NPM, interest coverage, OPM same quarter last year, dividend yield / payout,
 #     promoter holding QoQ change (owner_requirements items 1, 3, 4)
 # -4A: period P&L family (features_pl: quarter / fiscal-year lines, quarter YoY growth, result dates, history-gated

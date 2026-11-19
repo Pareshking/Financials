@@ -31,6 +31,40 @@ axes:
     ReportableSegmentsFinanceCostsAxis:
       first_batch: rebuild
       mapped_to: null
+  IGAAP_CORP:
+    AuditorAxis:
+      first_batch: QG
+      mapped_to: null
+    DetailsOfOtherExpensesAxis:
+      first_batch: QG
+      mapped_to: null
+    ObjectAxis:
+      first_batch: QG
+      mapped_to: null
+    OtherCurrentAssetsAxis:
+      first_batch: QG
+      mapped_to: null
+    OtherCurrentLiabilitiesAxis:
+      first_batch: QG
+      mapped_to: null
+    OtherLongTermLiabilitiesAxis:
+      first_batch: QG
+      mapped_to: null
+    ReportableSegmentAssetsAxis:
+      first_batch: QG
+      mapped_to: null
+    ReportableSegmentLiabilitiesAxis:
+      first_batch: QG
+      mapped_to: null
+    ReportableSegmentsAxis:
+      first_batch: QG
+      mapped_to: null
+    ReportableSegmentsFinanceCostsAxis:
+      first_batch: QG
+      mapped_to: null
+    StatementOfDeviationAxis:
+      first_batch: QG
+      mapped_to: null
   INDAS_CORP:
     AuditQualificationAxis:
       first_batch: rebuild
@@ -972,6 +1006,12 @@ files:
 - INTEGRATED_FILING_NBFC_INDAS_1753151_04112026082408_WEB.xml
 - INTEGRATED_FILING_NBFC_INDAS_1756983_12112026083425_WEB.xml
 - INTEGRATED_FILING_NBFC_INDAS_1757118_13112026023256_WEB.xml
+- INTEGRATED_FILING_NONINDAS_1509526_12082025041915_WEB.xml
+- INTEGRATED_FILING_NONINDAS_1509532_12082025042000_WEB.xml
+- INTEGRATED_FILING_NONINDAS_1573202_13112025120518_WEB.xml
+- INTEGRATED_FILING_NONINDAS_1575526_14112025065604_WEB.xml
+- INTEGRATED_FILING_NONINDAS_1601469_15012026024456_WEB.xml
+- INTEGRATED_FILING_NONINDAS_1650266_13042026110130_WEB.xml
 - Integrated_Finance_Ind_As_500488_511202619052_IFIndAs.html
 - Integrated_Finance_Ind_As_504731_88202519641_IFIndAs.html
 - Integrated_Finance_Ind_As_513536_128202520028_IFIndAs.html
@@ -3280,6 +3320,2225 @@ profiles:
       - duration_3m
       filings: 9
       first_batch: B5
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+  IGAAP_CORP:
+    AdjustmentsForDecreaseIncreaseInInventories:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: cf_wc_inventories
+      numeric: true
+      parent_subtotal: cash_generated_from_operations
+      seen_negative: false
+    AdjustmentsForDecreaseIncreaseInOtherCurrentAssets:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: cf_wc_other_current_assets
+      numeric: true
+      parent_subtotal: cash_generated_from_operations
+      seen_negative: true
+    AdjustmentsForDecreaseIncreaseInTradeReceivables:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_adjustments_for_decrease_increase_in_trade_receivables
+      numeric: true
+      parent_subtotal: cf_adjustments_total
+      seen_negative: true
+    AdjustmentsForDepreciationAndAmortisationExpense:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: cf_adj_depreciation
+      numeric: true
+      parent_subtotal: cf_adjustments_total
+      seen_negative: false
+    AdjustmentsForDividendIncome:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: cf_adj_dividend_income_deducted
+      numeric: true
+      parent_subtotal: cf_adjustments_total
+      seen_negative: false
+    AdjustmentsForFinanceCosts:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: cf_adj_finance_costs
+      numeric: true
+      parent_subtotal: cf_adjustments_total
+      seen_negative: false
+    AdjustmentsForImpairmentLossReversalOfImpairmentLossRecognisedInProfitOrLoss:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_adjustments_for_impairment_loss_reversal_of_impairment_loss_recognised_in_profit_or_loss
+      numeric: true
+      parent_subtotal: cf_adjustments_total
+      seen_negative: false
+    AdjustmentsForIncreaseDecreaseInOtherCurrentLiabilities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: cf_wc_other_current_liabilities
+      numeric: true
+      parent_subtotal: cash_generated_from_operations
+      seen_negative: true
+    AdjustmentsForIncreaseDecreaseInTradePayables:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_adjustments_for_increase_decrease_in_trade_payables
+      numeric: true
+      parent_subtotal: cf_adjustments_total
+      seen_negative: true
+    AdjustmentsForProvisions:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_adjustments_for_provisions
+      numeric: true
+      parent_subtotal: cf_adjustments_total
+      seen_negative: false
+    AdjustmentsForReconcileProfitLoss:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: cf_adjustments_total
+      numeric: true
+      parent_subtotal: net_cash_flow
+      seen_negative: true
+    AdjustmentsForSharebasedPayments:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: share_based_payments_addback
+      numeric: true
+      parent_subtotal: cf_adjustments_total
+      seen_negative: false
+    AdjustmentsForUnrealisedForeignExchangeLossesGains:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_adjustments_for_unrealised_foreign_exchange_losses_gains
+      numeric: true
+      parent_subtotal: cf_adjustments_total
+      seen_negative: false
+    AdjustmentsForWorkingCapital:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: SUBTOTAL
+      mapped_to: li_adjustments_for_working_capital
+      numeric: true
+      parent_subtotal: null
+      seen_negative: true
+    AdjustmentsToProfitLoss:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: SUBTOTAL
+      mapped_to: li_adjustments_to_profit_loss
+      numeric: true
+      parent_subtotal: null
+      seen_negative: false
+    Assets:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: total_assets
+      numeric: true
+      parent_subtotal: null
+      seen_negative: false
+    BankBalanceOtherThanCashAndCashEquivalents:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: bank_balances_other
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PER_SHARE
+      mapped_to: eps_basic
+      numeric: true
+      parent_subtotal: pat
+      seen_negative: false
+    CashAdvancesAndLoansMadeToOtherPartiesClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_cash_advances_and_loans_made_to_other_parties_classified_as_investing_activities
+      numeric: true
+      parent_subtotal: cfi
+      seen_negative: false
+    CashAndCashEquivalents:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: cash_and_equivalents
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    CashAndCashEquivalentsCashFlowStatement:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: cash_cf_statement
+      numeric: true
+      parent_subtotal: net_cash_flow
+      seen_negative: false
+    CashFlowsFromLosingControlOfSubsidiariesOrOtherBusinessesClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_cash_flows_from_losing_control_of_subsidiaries_or_other_businesses_classified_as_investing_activities
+      numeric: true
+      parent_subtotal: cfi
+      seen_negative: false
+    CashFlowsFromUsedInFinancingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: cff
+      numeric: true
+      parent_subtotal: net_cash_flow
+      seen_negative: true
+    CashFlowsFromUsedInFinancingActivitiesBeforeExtraordinaryItems:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: SUBTOTAL
+      mapped_to: li_cash_flows_from_used_in_financing_activities_before_extraordinary_items
+      numeric: true
+      parent_subtotal: null
+      seen_negative: true
+    CashFlowsFromUsedInInvestingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: cfi
+      numeric: true
+      parent_subtotal: net_cash_flow
+      seen_negative: true
+    CashFlowsFromUsedInInvestingActivitiesBeforeExtraordinaryItems:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: SUBTOTAL
+      mapped_to: li_cash_flows_from_used_in_investing_activities_before_extraordinary_items
+      numeric: true
+      parent_subtotal: null
+      seen_negative: true
+    CashFlowsFromUsedInOperatingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: cfo
+      numeric: true
+      parent_subtotal: net_cash_flow
+      seen_negative: false
+    CashFlowsFromUsedInOperatingActivitiesBeforeExtraordinaryItems:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: SUBTOTAL
+      mapped_to: li_cash_flows_from_used_in_operating_activities_before_extraordinary_items
+      numeric: true
+      parent_subtotal: null
+      seen_negative: false
+    CashFlowsFromUsedInOperations:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: cash_generated_from_operations
+      numeric: true
+      parent_subtotal: net_cash_flow
+      seen_negative: true
+    CashFlowsUsedInObtainingControlOfSubsidiariesOrOtherBusinessesClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_cash_flows_used_in_obtaining_control_of_subsidiaries_or_other_businesses_classified_as_investing_activities
+      numeric: true
+      parent_subtotal: cfi
+      seen_negative: false
+    CashPaymentForInvestmentInPartnershipFirmOrAssociationOfPersonsOrLimitedLiabilityPartnerships:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_cash_payment_for_investment_in_partnership_firm_or_association_of_persons_or_limited_liability_partnerships
+      numeric: true
+      parent_subtotal: cfo
+      seen_negative: false
+    CashPaymentsForFutureContractsForwardContractsOptionContractsAndSwapContractsClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_cash_payments_for_future_contracts_forward_contracts_option_contracts_and_swap_contracts_classified_as_investing_activities
+      numeric: true
+      parent_subtotal: cfi
+      seen_negative: false
+    CashReceiptsFromFutureContractsForwardContractsOptionContractsAndSwapContractsClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_cash_receipts_from_future_contracts_forward_contracts_option_contracts_and_swap_contracts_classified_as_investing_activities
+      numeric: true
+      parent_subtotal: cfi
+      seen_negative: false
+    CashReceiptsFromRepaymentOfAdvancesAndLoansMadeToOtherPartiesClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_cash_receipts_from_repayment_of_advances_and_loans_made_to_other_parties_classified_as_investing_activities
+      numeric: true
+      parent_subtotal: cfi
+      seen_negative: false
+    CashReceiptsFromShareOfProfitsOfPartnershipFirmOrAssociationOfPersonsOrLimitedLiabilityPartnerships:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_cash_receipts_from_share_of_profits_of_partnership_firm_or_association_of_persons_or_limited_liability_partnerships
+      numeric: true
+      parent_subtotal: cfo
+      seen_negative: false
+    ChangesInInventoriesOfFinishedGoodsWorkInProgressAndStockInTrade:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PNL_EXPENSE
+      mapped_to: changes_in_inventories
+      numeric: true
+      parent_subtotal: total_expenses
+      seen_negative: true
+    ClassOfSecurity:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    CostOfMaterialsConsumed:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PNL_EXPENSE
+      mapped_to: cost_of_materials_consumed
+      numeric: true
+      parent_subtotal: total_expenses
+      seen_negative: false
+    CurrentAssets:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: current_assets
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    CurrentInvestments:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: current_investments
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    CurrentLiabilities:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: current_liabilities
+      numeric: true
+      parent_subtotal: total_liabilities
+      seen_negative: false
+    CurrentTax:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PNL
+      mapped_to: current_tax
+      numeric: true
+      parent_subtotal: pat
+      seen_negative: false
+    DateOfBoardMeetingWhenFinancialResultsWereApproved:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfEndOfBoardMeeting:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfEndOfFinancialYear:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfEndOfReportingPeriod:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfStartOfBoardMeeting:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfStartOfFinancialYear:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfStartOfReportingPeriod:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOfStatementOfDeviationOrVariationInUtilisationOfFundsRaised:
+      context_kinds:
+      - instant
+      filings: 3
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DateOnWhichPriorIntimationOfTheMeetingForConsideringFinancialResultsWasInformedToTheExchange:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DebtEquityRatio:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 3
+      first_batch: QG
+      line_item_category: MEMO
+      mapped_to: li_debt_equity_ratio
+      numeric: true
+      parent_subtotal: null
+      seen_negative: false
+    DebtServiceCoverageRatio:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 3
+      first_batch: QG
+      line_item_category: MEMO
+      mapped_to: li_debt_service_coverage_ratio
+      numeric: true
+      parent_subtotal: null
+      seen_negative: false
+    DeclarationOfUnmodifiedOpinionOrStatementOnImpactOfAuditQualification:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DeclarationPursuantToClauseDOfSubRegulation3OfRegulation33OfSEBILODRRegulation2015:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 3
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DeferredGovernmentGrants:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: li_deferred_government_grants
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    DeferredTax:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PNL
+      mapped_to: deferred_tax
+      numeric: true
+      parent_subtotal: pat
+      seen_negative: true
+    DeferredTaxAssetsNet:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: deferred_tax_assets
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    DeferredTaxLiabilitiesNet:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: deferred_tax_liabilities
+      numeric: true
+      parent_subtotal: total_liabilities
+      seen_negative: false
+    DepreciationAndAmortisationExpense:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PNL_EXPENSE
+      mapped_to: depreciation_amortisation
+      numeric: true
+      parent_subtotal: total_expenses
+      seen_negative: false
+    DescriptionOfPresentationCurrency:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DescriptionOfSingleSegment:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DesignationOfPersonOfStatementOfDeviationOrVariationInUtilisationOfFundsRaised:
+      context_kinds:
+      - duration_3m
+      filings: 3
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DilutedEarningsLossPerShareFromContinuingAndDiscontinuedOperations:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PER_SHARE
+      mapped_to: eps_diluted
+      numeric: true
+      parent_subtotal: pat
+      seen_negative: false
+    DisclosureOfNotesOnAssetsAndLiabilitiesExplanatoryTextBlock:
+      context_kinds:
+      - duration_6m
+      filings: 1
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DisclosureOfNotesOnFinancialResultsExplanatoryTextBlock:
+      context_kinds:
+      - duration_6m
+      filings: 1
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DisclosureOfNotesOnSegmentsExplanatoryTextBlock:
+      context_kinds:
+      - duration_6m
+      filings: 1
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    DividendsPaidClassifiedAsFinancingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: dividends_paid
+      numeric: true
+      parent_subtotal: cff
+      seen_negative: false
+    DividendsReceivedClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: dividends_received_investing
+      numeric: true
+      parent_subtotal: cfi
+      seen_negative: false
+    DividendsReceivedClassifiedAsOperatingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: dividends_received_operating
+      numeric: true
+      parent_subtotal: net_cash_flow
+      seen_negative: false
+    EffectOfExchangeRateChangesOnCashAndCashEquivalents:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: fx_effect_on_cash
+      numeric: true
+      parent_subtotal: net_cash_flow
+      seen_negative: false
+    EmployeeBenefitExpense:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PNL_EXPENSE
+      mapped_to: employee_benefit_expense
+      numeric: true
+      parent_subtotal: total_expenses
+      seen_negative: false
+    EndTimeOfBoardMeeting:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    EquityAndLiabilities:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: total_equity_and_liabilities
+      numeric: true
+      parent_subtotal: total_equity
+      seen_negative: false
+    ExceptionalItems:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PNL
+      mapped_to: exceptional_items
+      numeric: true
+      parent_subtotal: pat
+      seen_negative: true
+    Expenses:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PNL
+      mapped_to: total_expenses
+      numeric: true
+      parent_subtotal: pat
+      seen_negative: false
+    ExtraordinaryItems:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: extraordinary_items
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: true
+    FaceValueOfEquityShareCapital:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PER_SHARE
+      mapped_to: face_value_per_share
+      numeric: true
+      parent_subtotal: pat
+      seen_negative: false
+    FinanceCosts:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PNL_EXPENSE
+      mapped_to: finance_costs
+      numeric: true
+      parent_subtotal: total_expenses
+      seen_negative: false
+    ForeignCurrencyMonetaryItemTranslationDifferenceAssetAccount:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: li_foreign_currency_monetary_item_translation_difference_asset_account
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    ForeignCurrencyMonetaryItemTranslationDifferenceLiabilityAccount:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: li_foreign_currency_monetary_item_translation_difference_liability_account
+      numeric: true
+      parent_subtotal: total_liabilities
+      seen_negative: false
+    ISIN:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    Income:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PNL
+      mapped_to: total_income
+      numeric: true
+      parent_subtotal: pat
+      seen_negative: false
+    IncomeTaxesPaidRefundClassifiedAsFinancingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_income_taxes_paid_refund_classified_as_financing_activities
+      numeric: true
+      parent_subtotal: cff
+      seen_negative: false
+    IncomeTaxesPaidRefundClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_income_taxes_paid_refund_classified_as_investing_activities
+      numeric: true
+      parent_subtotal: cfi
+      seen_negative: false
+    IncomeTaxesPaidRefundClassifiedAsOperatingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: income_taxes_paid
+      numeric: true
+      parent_subtotal: net_cash_flow
+      seen_negative: true
+    IncreaseDecreaseInCashAndCashEquivalents:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: net_cash_flow_after_fx
+      numeric: true
+      parent_subtotal: net_cash_flow
+      seen_negative: true
+    IncreaseDecreaseInCashAndCashEquivalentsBeforeEffectOfExchangeRateChanges:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: net_cash_flow
+      numeric: true
+      parent_subtotal: null
+      seen_negative: true
+    IntangibleAssets:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: other_intangibles
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    IntangibleAssetsUnderDevelopmentOrWorkInProgress:
+      context_kinds:
+      - instant
+      filings: 3
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: intangibles_under_development
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    InterSegmentRevenue:
+      context_kinds:
+      - duration_3m
+      filings: 1
+      first_batch: QG
+      line_item_category: SEGMENT
+      mapped_to: li_inter_segment_revenue
+      numeric: true
+      parent_subtotal: revenue_from_operations
+      seen_negative: false
+    InterestPaidClassifiedAsFinancingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: interest_paid_financing
+      numeric: true
+      parent_subtotal: cff
+      seen_negative: false
+    InterestPaidClassifiedAsOperatingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: interest_paid_operating
+      numeric: true
+      parent_subtotal: net_cash_flow
+      seen_negative: false
+    InterestReceivedClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: interest_received_investing
+      numeric: true
+      parent_subtotal: cfi
+      seen_negative: false
+    InterestReceivedClassifiedAsOperatingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: interest_received_operating
+      numeric: true
+      parent_subtotal: net_cash_flow
+      seen_negative: true
+    InterestServiceCoverageRatio:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 3
+      first_batch: QG
+      line_item_category: MEMO
+      mapped_to: li_interest_service_coverage_ratio
+      numeric: true
+      parent_subtotal: null
+      seen_negative: false
+    Inventories:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: inventories
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    IsCompanyReportingMultisegmentOrSingleSegment:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    LatestDateOnWhichRelatedPartyTransactionsPolicyIsUpdated:
+      context_kinds:
+      - duration_3m
+      filings: 2
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    LevelOfRounding:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    LongTermBorrowings:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: borrowings_noncurrent
+      numeric: true
+      parent_subtotal: total_liabilities
+      seen_negative: false
+    LongTermLoansAndAdvances:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: li_long_term_loans_and_advances
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    LongTermProvisions:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: li_long_term_provisions
+      numeric: true
+      parent_subtotal: total_liabilities
+      seen_negative: false
+    MSEISymbol:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    MinorityInterest:
+      context_kinds:
+      - instant
+      filings: 2
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: non_controlling_interest
+      numeric: true
+      parent_subtotal: total_equity
+      seen_negative: true
+    MoneyReceivedAgainstShareWarrants:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: li_money_received_against_share_warrants
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    NameOfSignatoryOfStatementOfDeviationOrVariationInUtilisationOfFundsRaised:
+      context_kinds:
+      - duration_3m
+      filings: 3
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NameOfTheCompany:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NatureOfReportStandaloneConsolidated:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NetSegmentAssets:
+      context_kinds:
+      - instant
+      filings: 2
+      first_batch: QG
+      line_item_category: SEGMENT
+      mapped_to: li_net_segment_assets
+      numeric: true
+      parent_subtotal: revenue_from_operations
+      seen_negative: false
+    NetSegmentLiabilities:
+      context_kinds:
+      - instant
+      filings: 2
+      first_batch: QG
+      line_item_category: SEGMENT
+      mapped_to: li_net_segment_liabilities
+      numeric: true
+      parent_subtotal: revenue_from_operations
+      seen_negative: false
+    NoncurrentAssets:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: noncurrent_assets
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    NoncurrentInvestments:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: noncurrent_investments
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    NoncurrentLiabilities:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: noncurrent_liabilities
+      numeric: true
+      parent_subtotal: total_liabilities
+      seen_negative: false
+    NoteForNonApplicabilityOfTheDisclosureForTheDefaultOnLoansAndDebtSecuritiesToTheEntity:
+      context_kinds:
+      - duration_3m
+      filings: 3
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    NumberOfStatementsOfDeviationForTheCurrentQuarter:
+      context_kinds:
+      - duration_3m
+      filings: 3
+      first_batch: QG
+      line_item_category: COUNT
+      mapped_to: li_number_of_statements_of_deviation_for_the_current_quarter
+      numeric: true
+      parent_subtotal: null
+      seen_negative: false
+    OtherAdjustmentsForNoncashItems:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_other_adjustments_for_noncash_items
+      numeric: true
+      parent_subtotal: cf_adjustments_total
+      seen_negative: true
+    OtherAdjustmentsForWhichCashEffectsAreInvestingOrFinancingCashFlow:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_other_adjustments_for_which_cash_effects_are_investing_or_financing_cash_flow
+      numeric: true
+      parent_subtotal: cfi
+      seen_negative: false
+    OtherAdjustmentsToReconcileProfitLoss:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_other_adjustments_to_reconcile_profit_loss
+      numeric: true
+      parent_subtotal: cf_adjustments_total
+      seen_negative: false
+    OtherCashPaymentsToAcquireEquityOrDebtInstrumentsOfOtherEntitiesClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_other_cash_payments_to_acquire_equity_or_debt_instruments_of_other_entities_classified_as_investing_activities
+      numeric: true
+      parent_subtotal: cfi
+      seen_negative: false
+    OtherCashPaymentsToAcquireInterestsInJointVenturesClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_other_cash_payments_to_acquire_interests_in_joint_ventures_classified_as_investing_activities
+      numeric: true
+      parent_subtotal: cfi
+      seen_negative: false
+    OtherCashReceiptsFromSalesOfEquityOrDebtInstrumentsOfOtherEntitiesClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_other_cash_receipts_from_sales_of_equity_or_debt_instruments_of_other_entities_classified_as_investing_activities
+      numeric: true
+      parent_subtotal: cfi
+      seen_negative: false
+    OtherCashReceiptsFromSalesOfInterestsInJointVenturesClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_other_cash_receipts_from_sales_of_interests_in_joint_ventures_classified_as_investing_activities
+      numeric: true
+      parent_subtotal: cfi
+      seen_negative: false
+    OtherCurrentAssets:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: li_other_current_assets
+      numeric: true
+      parent_subtotal: current_assets
+      seen_negative: false
+    OtherCurrentLiabilities:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: li_other_current_liabilities
+      numeric: true
+      parent_subtotal: current_liabilities
+      seen_negative: false
+    OtherExpenses:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PNL_EXPENSE
+      mapped_to: other_expenses
+      numeric: true
+      parent_subtotal: total_expenses
+      seen_negative: false
+    OtherIncome:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PNL_INCOME
+      mapped_to: other_income
+      numeric: true
+      parent_subtotal: total_income
+      seen_negative: false
+    OtherInflowsOutflowsOfCashClassifiedAsFinancingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_other_inflows_outflows_of_cash_classified_as_financing_activities
+      numeric: true
+      parent_subtotal: cff
+      seen_negative: true
+    OtherInflowsOutflowsOfCashClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_other_inflows_outflows_of_cash_classified_as_investing_activities
+      numeric: true
+      parent_subtotal: cfi
+      seen_negative: false
+    OtherInflowsOutflowsOfCashClassifiedAsOperatingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_other_inflows_outflows_of_cash_classified_as_operating_activities
+      numeric: true
+      parent_subtotal: cfo
+      seen_negative: false
+    OtherLongTermLiabilities:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: li_other_long_term_liabilities
+      numeric: true
+      parent_subtotal: total_liabilities
+      seen_negative: false
+    OtherNoncurrentAssets:
+      context_kinds:
+      - instant
+      filings: 2
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: li_other_noncurrent_assets
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    OtherUnallocableExpenditureNetOffUnAllocableIncome:
+      context_kinds:
+      - duration_3m
+      filings: 1
+      first_batch: QG
+      line_item_category: SEGMENT
+      mapped_to: li_other_unallocable_expenditure_net_off_un_allocable_income
+      numeric: true
+      parent_subtotal: revenue_from_operations
+      seen_negative: false
+    PaidUpValueOfEquityShareCapital:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: paid_up_equity_capital
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    PaymentForExtraordinaryItemsClassifiedAsFinancingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_payment_for_extraordinary_items_classified_as_financing_activities
+      numeric: true
+      parent_subtotal: cff
+      seen_negative: false
+    PaymentForExtraordinaryItemsClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_payment_for_extraordinary_items_classified_as_investing_activities
+      numeric: true
+      parent_subtotal: cfi
+      seen_negative: false
+    PaymentForExtraordinaryItemsClassifiedAsOperatingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_payment_for_extraordinary_items_classified_as_operating_activities
+      numeric: true
+      parent_subtotal: cfo
+      seen_negative: false
+    PlaceOfStatementOfDeviationOrVariationInUtilisationOfFundsRaised:
+      context_kinds:
+      - duration_3m
+      filings: 3
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    PreproducingProperties:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: li_preproducing_properties
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    ProceedsFromBorrowingsClassifiedAsFinancingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: borrowings_proceeds
+      numeric: true
+      parent_subtotal: cff
+      seen_negative: true
+    ProceedsFromExtraordinaryItemsClassifiedAsFinancingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_proceeds_from_extraordinary_items_classified_as_financing_activities
+      numeric: true
+      parent_subtotal: cff
+      seen_negative: false
+    ProceedsFromExtraordinaryItemsClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_proceeds_from_extraordinary_items_classified_as_investing_activities
+      numeric: true
+      parent_subtotal: cfi
+      seen_negative: false
+    ProceedsFromExtraordinaryItemsClassifiedAsOperatingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_proceeds_from_extraordinary_items_classified_as_operating_activities
+      numeric: true
+      parent_subtotal: cfo
+      seen_negative: false
+    ProceedsFromGovernmentGrantsClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_proceeds_from_government_grants_classified_as_investing_activities
+      numeric: true
+      parent_subtotal: cfi
+      seen_negative: false
+    ProceedsFromIssuingDebenturesNotesBondsEtc:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_proceeds_from_issuing_debentures_notes_bonds_etc
+      numeric: true
+      parent_subtotal: cff
+      seen_negative: false
+    ProceedsFromIssuingOtherEquityInstruments:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_proceeds_from_issuing_other_equity_instruments
+      numeric: true
+      parent_subtotal: cff
+      seen_negative: false
+    ProceedsFromIssuingShares:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_proceeds_from_issuing_shares
+      numeric: true
+      parent_subtotal: cff
+      seen_negative: false
+    ProceedsFromSalesOfIntangibleAssetsClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_proceeds_from_sales_of_intangible_assets_classified_as_investing_activities
+      numeric: true
+      parent_subtotal: cfi
+      seen_negative: false
+    ProceedsFromSalesOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: ppe_disposals
+      numeric: true
+      parent_subtotal: cfi
+      seen_negative: false
+    ProducingProperties:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: li_producing_properties
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    ProfitBeforeExceptionalAndExtraordinaryItemsAndTax:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PNL
+      mapped_to: profit_before_exceptional_and_tax
+      numeric: true
+      parent_subtotal: pat
+      seen_negative: false
+    ProfitBeforeExtraordinaryItemsAndTax:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PNL
+      mapped_to: profit_before_extraordinary_and_tax
+      numeric: true
+      parent_subtotal: pat
+      seen_negative: false
+    ProfitBeforeTax:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PNL
+      mapped_to: pbt
+      numeric: true
+      parent_subtotal: pat
+      seen_negative: false
+    ProfitLossForPeriodBeforeMinorityInterest:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PNL
+      mapped_to: pat_before_minority
+      numeric: true
+      parent_subtotal: pat
+      seen_negative: false
+    ProfitLossForThePeriod:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PNL
+      mapped_to: pat_after_minority
+      numeric: true
+      parent_subtotal: pat
+      seen_negative: false
+    ProfitLossForThePeriodFromContinuingOperations:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PNL
+      mapped_to: pat_continuing
+      numeric: true
+      parent_subtotal: pat
+      seen_negative: false
+    ProfitLossFromDiscontinuingOperationAfterTax:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PNL
+      mapped_to: pat_discontinued
+      numeric: true
+      parent_subtotal: pat
+      seen_negative: false
+    ProfitLossFromDiscontinuingOperationsBeforeTax:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PNL
+      mapped_to: discontinued_pbt
+      numeric: true
+      parent_subtotal: pat
+      seen_negative: false
+    ProfitLossOfMinorityInterest:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 3
+      first_batch: QG
+      line_item_category: PNL
+      mapped_to: pat_minority_interest_line
+      numeric: true
+      parent_subtotal: pat
+      seen_negative: true
+    PropertyPlantAndEquipment:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: ppe_net
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    PropertyPlantAndEquipmentAndIntangibleAssets:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: SUBTOTAL
+      mapped_to: li_property_plant_and_equipment_and_intangible_assets
+      numeric: true
+      parent_subtotal: null
+      seen_negative: false
+    PropertyPlantAndEquipmentCapitalWorkInProgress:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: cwip
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    PurchaseOfIntangibleAssetsClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: capex_intangibles
+      numeric: true
+      parent_subtotal: cfi
+      seen_negative: false
+    PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: capex_ppe
+      numeric: true
+      parent_subtotal: cfi
+      seen_negative: false
+    PurchasesOfStockInTrade:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PNL_EXPENSE
+      mapped_to: purchases_of_stock_in_trade
+      numeric: true
+      parent_subtotal: total_expenses
+      seen_negative: false
+    RemarksForDebtEquityRatio:
+      context_kinds:
+      - duration_6m
+      filings: 1
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    RemarksForDebtServiceCoverageRatio:
+      context_kinds:
+      - duration_6m
+      filings: 1
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    RemarksForInterestServiceCoverageRatio:
+      context_kinds:
+      - duration_6m
+      filings: 1
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    RepaymentsOfBorrowingsClassifiedAsFinancingActivities:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: borrowings_repayments
+      numeric: true
+      parent_subtotal: cff
+      seen_negative: false
+    ReportingQuarter:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    ReserveExcludingRevaluationReserves:
+      context_kinds:
+      - duration_12m
+      filings: 1
+      first_batch: QG
+      line_item_category: MEMO
+      mapped_to: li_reserve_excluding_revaluation_reserves
+      numeric: true
+      parent_subtotal: null
+      seen_negative: false
+    ReservesAndSurplus:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: other_equity
+      numeric: true
+      parent_subtotal: total_equity
+      seen_negative: false
+    RevenueFromOperations:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PNL_INCOME
+      mapped_to: revenue_from_operations
+      numeric: true
+      parent_subtotal: total_income
+      seen_negative: false
+    ScripCode:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    SegmentAssets:
+      context_kinds:
+      - instant
+      filings: 2
+      first_batch: QG
+      line_item_category: SEGMENT
+      mapped_to: li_segment_assets
+      numeric: true
+      parent_subtotal: revenue_from_operations
+      seen_negative: false
+    SegmentFinanceCosts:
+      context_kinds:
+      - duration_3m
+      filings: 1
+      first_batch: QG
+      line_item_category: SEGMENT
+      mapped_to: li_segment_finance_costs
+      numeric: true
+      parent_subtotal: revenue_from_operations
+      seen_negative: false
+    SegmentLiabilities:
+      context_kinds:
+      - instant
+      filings: 2
+      first_batch: QG
+      line_item_category: SEGMENT
+      mapped_to: li_segment_liabilities
+      numeric: true
+      parent_subtotal: revenue_from_operations
+      seen_negative: false
+    SegmentProfitBeforeTax:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 2
+      first_batch: QG
+      line_item_category: SEGMENT
+      mapped_to: li_segment_profit_before_tax
+      numeric: true
+      parent_subtotal: revenue_from_operations
+      seen_negative: false
+    SegmentProfitLossBeforeTaxAndFinanceCosts:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 2
+      first_batch: QG
+      line_item_category: SEGMENT
+      mapped_to: li_segment_profit_loss_before_tax_and_finance_costs
+      numeric: true
+      parent_subtotal: revenue_from_operations
+      seen_negative: false
+    SegmentRevenue:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 2
+      first_batch: QG
+      line_item_category: SEGMENT
+      mapped_to: li_segment_revenue
+      numeric: true
+      parent_subtotal: revenue_from_operations
+      seen_negative: false
+    SegmentRevenueFromOperations:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 2
+      first_batch: QG
+      line_item_category: SEGMENT
+      mapped_to: li_segment_revenue_from_operations
+      numeric: true
+      parent_subtotal: revenue_from_operations
+      seen_negative: false
+    ShareApplicationMoneyPendingAllotment:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: li_share_application_money_pending_allotment
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    ShareCapital:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: equity_share_capital
+      numeric: true
+      parent_subtotal: total_equity
+      seen_negative: false
+    ShareOfProfitAndLossFromPartnershipFirmOrAssociationOfPersonsOrLimitedLiabilityPartnerships:
+      context_kinds:
+      - duration_12m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      line_item_category: CASH_FLOW
+      mapped_to: li_share_of_profit_and_loss_from_partnership_firm_or_association_of_persons_or_limited_liability_partnerships
+      numeric: true
+      parent_subtotal: cfo
+      seen_negative: false
+    ShareOfProfitLossOfAssociates:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 3
+      first_batch: QG
+      line_item_category: PNL
+      mapped_to: share_of_associates_jv
+      numeric: true
+      parent_subtotal: pat
+      seen_negative: false
+    ShareholdersFunds:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: equity_attributable_to_owners
+      numeric: true
+      parent_subtotal: total_equity
+      seen_negative: false
+    ShortTermBorrowings:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: borrowings_current
+      numeric: true
+      parent_subtotal: total_liabilities
+      seen_negative: false
+    ShortTermLoansAndAdvances:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: li_short_term_loans_and_advances
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    ShortTermProvisions:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: li_short_term_provisions
+      numeric: true
+      parent_subtotal: total_liabilities
+      seen_negative: false
+    StartTimeOfBoardMeeting:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    Symbol:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    TaxExpense:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PNL
+      mapped_to: tax_expense
+      numeric: true
+      parent_subtotal: pat
+      seen_negative: false
+    TaxExpenseOfDiscontinuingOperations:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      line_item_category: PNL
+      mapped_to: discontinued_tax
+      numeric: true
+      parent_subtotal: pat
+      seen_negative: false
+    TotalOutstandingDuesOfCreditorsOtherThanMicroEnterprisesAndSmallEnterprises:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: li_total_outstanding_dues_of_creditors_other_than_micro_enterprises_and_small_enterprises
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    TotalOutstandingDuesOfMicroEnterprisesAndSmallEnterprises:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: li_total_outstanding_dues_of_micro_enterprises_and_small_enterprises
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    TradePayables:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: trade_payables_current
+      numeric: true
+      parent_subtotal: total_liabilities
+      seen_negative: false
+    TradeReceivables:
+      context_kinds:
+      - instant
+      filings: 4
+      first_batch: QG
+      line_item_category: BALANCE_SHEET
+      mapped_to: trade_receivables_current
+      numeric: true
+      parent_subtotal: total_assets
+      seen_negative: false
+    TypeOfCashFlowStatement:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    TypeOfCompany:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    TypeOfReportingPeriod:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    UnAllocableAssets:
+      context_kinds:
+      - instant
+      filings: 2
+      first_batch: QG
+      line_item_category: SEGMENT
+      mapped_to: li_un_allocable_assets
+      numeric: true
+      parent_subtotal: revenue_from_operations
+      seen_negative: false
+    UnAllocableLiabilities:
+      context_kinds:
+      - instant
+      filings: 2
+      first_batch: QG
+      line_item_category: SEGMENT
+      mapped_to: li_un_allocable_liabilities
+      numeric: true
+      parent_subtotal: revenue_from_operations
+      seen_negative: false
+    ? WeDeclareThatTheAcceptanceOfFixedDepositsByTheBanksOrNonBankingFinanceCompanyAreAtTheTermsUniformlyApplicableOrOfferedToAllShareholdersOrPublic
+    : context_kinds:
+      - duration_3m
+      filings: 2
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    ? WeDeclareThatTheScheduledCommercialBankAsPerRBICircularRBIDBR20151619Dated03March2016HasAllowedAdditionalInterestOfOnePerCentPerAnnumOverAndAboveTheRateOfInterestMentionedInTheScheduleOfInterestRatesOnSavings
+    : context_kinds:
+      - duration_3m
+      filings: 2
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WebsiteLinkForUpdatedRelatedPartyTransactionsPolicyOfTheCompany:
+      context_kinds:
+      - duration_3m
+      filings: 2
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherCashFlowStatementIsApplicableOnCompany:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 4
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherResultsAreAuditedOrUnaudited:
+      context_kinds:
+      - duration_12m
+      - duration_3m
+      - duration_6m
+      filings: 6
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherResultsAreAuditedOrUnauditedForImpactOfAuditQualification:
+      context_kinds:
+      - duration_3m
+      - duration_6m
+      filings: 3
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    ? WhetherStatementOnDeviationOrVariationForProceedsOfPublicIssueOrRightIssueOrPreferentialIssueOrQIPEtcIsApplicableToTheCompanyForTheCurrentQuarter
+    : context_kinds:
+      - duration_3m
+      filings: 3
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheCompanyHasAnyRelatedParty:
+      context_kinds:
+      - duration_3m
+      filings: 2
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheCompanyHasEnteredIntoAnyRelatedPartyTransactionDuringThePeriod:
+      context_kinds:
+      - duration_3m
+      filings: 2
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheCompanyIsAHighValueDebtListedEntityAccordingTo1AOfRegulation15:
+      context_kinds:
+      - instant
+      filings: 2
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheDisclosureForTheDefaultOnLoansAndDebtSecuritiesIsApplicableToTheEntity:
+      context_kinds:
+      - duration_3m
+      filings: 3
+      first_batch: QG
+      mapped_to: null
+      numeric: false
+      seen_negative: false
+    WhetherTheUpdatedRelatedPartyTransactionsPolicyHasBeenUploadedOnTheWebsiteOfTheCompanyInComplianceWithRegulation23:
+      context_kinds:
+      - duration_3m
+      filings: 2
+      first_batch: QG
       mapped_to: null
       numeric: false
       seen_negative: false

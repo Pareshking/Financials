@@ -379,6 +379,7 @@ Element names are VERIFIED in the INDAS_CORP fixture unless marked otherwise.
 | `INDAS_CORP` | `IntegratedFinance_IndAS` | §8 (VERIFIED, one standalone Q2) | Consolidated fixture needed |
 | `INDAS_NBFC` | `IntegratedFinance_NBFC` | `InterestEarned`, `FeesAndCommissionIncome`, `NetGainOnFairValueChanges`, `FinanceCosts`, `ImpairmentOnFinancialInstruments` (tags VERIFIED [X20]) | Fixture is an investment company; lending behaviour UNVERIFIED |
 | `IGAAP_BANK` | `IntegratedFinance_Banking` | [X21] (VERIFIED, Q1) | No BS in Q1 [X22]; CASA not tagged [X23]; CRAR UNVERIFIED [X24] |
+| `IGAAP_CORP` | `IntegratedFinance_OtherThanBank` and `TypeOfCompany` = `SME` [X330] | Division I P&L with exceptional and extraordinary items, minority line, Division I balance sheet (VERIFIED [X331]) | `parsers/igaap_corp.py`; derived PAT / owners / NCI [X332]; Main Board filers on this template stay UNKNOWN_TAXONOMY (X89); own accounting basis in a FactBook [X334] |
 | `IRDAI_GENERAL` | `GeneralInsurance` namespace | `GrossPremiumsWritten`, `NetPremiumWritten`, `PremiumEarned`, `NetCommission`, `OperatingExpensesRelatedToInsuranceBusiness` (VERIFIED, legacy) | Context-date defect [X26] |
 | `IRDAI_LIFE` | `IntegratedFinance_LI` (2025-01-31) [X33] | premium, actuarial, benefits, surplus, policyholder investments (VERIFIED) | Parser not built; extra `OcurI`/`OprevI` instants |
 

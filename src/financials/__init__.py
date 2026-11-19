@@ -1,5 +1,8 @@
 """Indian equity research, screening and point-in-time backtesting engine."""
 
+# 0.10.11: X330-X333 IGAAP_CORP profile: SME-listed companies' results on SEBI's non-Ind AS template (Division I);
+#          AMOUNTS_AND_EPS_SCALED blocks a filing whose amounts and EPS are a power of ten too large; re-parses the
+#          results with open UNKNOWN_TAXONOMY findings;
 # 0.10.10: X317 OCI-shaped owners with NCI 0 chosen by EPS (X214 amended), X318 owners 0 with NCI within rounding
 #          (OWNERS_ZERO_NCI_WITHIN_ROUNDING); re-parses results with open ATTRIBUTION_WITHHELD findings;
 # 0.10.9: X285-X287 BSE results inline XBRL repairs (bare '<' in text blocks, omitted </tr>, unclosed empty audit-
@@ -21,4 +24,4 @@
 # 0.8.0: X83 visibility from listing creation / file-name time (re-promotes backdated re-filings);
 # 0.7.0: SHP16-SHP18 (old SHP taxonomy, event dates, percent scale); 0.6.0: zero-drop line items (C24);
 # 0.5.0: REG34_ANNUAL; audit mappings
-PARSER_VERSION = "0.10.10"
+PARSER_VERSION = "0.10.11"

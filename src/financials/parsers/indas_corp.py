@@ -197,6 +197,7 @@ SCOPES = {"standalone": "STANDALONE", "consolidated": "CONSOLIDATED"}
 
 IMPLEMENTED_PROFILES = (
     "INDAS_CORP", "INDAS_NBFC", "IGAAP_BANK", "IRDAI_LIFE", "IRDAI_GENERAL", "INDAS_INSURANCE", "REG34_ANNUAL",
+    "IGAAP_CORP",
 )  # fmt: skip
 
 # Named label rules [references X39, X40]: some lines exist only as a free-text label on a dimensional
@@ -285,6 +286,28 @@ def detect_profile(entity_ns: str | None) -> str | None:
     return None
 
 
+# X330: SEBI's non-Ind AS results template (`IntegratedFinance_OtherThanBank`, Schedule III Division I, Accounting
+# Standards) is the IGAAP_CORP profile only when the filing itself says the company is SME-listed (TypeOfCompany =
+# "SME"; SME-listed companies are exempt from Ind AS). A Main Board company on this template is an Ind AS company on
+# the wrong template (X89: MRPL, L&T, Rajesh Exports, Ruchira): it stays UNKNOWN_TAXONOMY until its Ind AS re-filing
+# closes the finding.
+IGAAP_CORP_NS = "/IntegratedFinance_OtherThanBank/"
+IGAAP_CORP_COMPANY_TYPE = "SME"
+
+
+def company_types(inst: Instance) -> list[str]:
+    return sorted({f.value_text.strip() for f in inst.facts if f.name == "TypeOfCompany"})
+
+
+def detect_instance_profile(inst: Instance) -> str | None:
+    """The profile of a parsed instance: its namespace's [X1], or IGAAP_CORP for an SME-listed company's filing on
+    the non-Ind AS template [X330] (None for any other filing on that template)."""
+    ns = inst.entity_namespace
+    if ns and IGAAP_CORP_NS in ns:
+        return "IGAAP_CORP" if company_types(inst) == [IGAAP_CORP_COMPANY_TYPE] else None
+    return detect_profile(ns)
+
+
 def period_months(start: date, end: date) -> int | None:
     """Whole calendar months for a period starting on the 1st and ending on a month end."""
     if start.day != 1 or end.day != calendar.monthrange(end.year, end.month)[1] or end < start:
@@ -366,9 +389,11 @@ def parse_indas_corp_results(data: bytes) -> ParsedResults:
 def parse_with_spec(data: bytes, spec: ProfileSpec) -> ParsedResults:
     inst = parse_instance(data)
     ns = inst.entity_namespace
-    profile = detect_profile(ns)
+    profile = detect_instance_profile(inst)
     result = ParsedResults(profile=profile, taxonomy_ns=ns)
     if profile is None:
+        # Details unchanged since X1 (the finding id derives from them): a Main Board filing on the non-Ind AS
+        # template [X330] re-parsed by a later parser hits its existing finding instead of opening a second one.
         result.issues.append(Issue("PARSE", "UNKNOWN_TAXONOMY", {"entity_namespace": ns}))
         return result
     if profile != spec.profile:
@@ -379,6 +404,8 @@ def parse_with_spec(data: bytes, spec: ProfileSpec) -> ParsedResults:
     if result.issues:
         return result
     _map_facts(inst, result, spec)
+    if not result.issues and spec.derive is not None:
+        spec.derive(result)
     if not result.issues:
         _check_critical(result, spec)
         if spec.identities is not None:
@@ -1156,6 +1183,7 @@ class ProfileSpec:
     missing_component_is_zero: bool = False
     post_process: Any = None
     identities: Any = None  # replaces the Ind AS identity set (banks: RBI format)
+    derive: Any = None  # profile-specific derived facts, before the critical-tag check (IGAAP_CORP: PAT, NCI)
 
 
 CORP_SPEC = ProfileSpec(

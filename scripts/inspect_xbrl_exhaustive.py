@@ -24,7 +24,8 @@ import yaml
 
 from financials.line_items import describe
 from financials.parsers.igaap_bank import BANK_DURATION_TAGS, BANK_INSTANT_TAGS
-from financials.parsers.indas_corp import DURATION_TAGS, IMPLEMENTED_PROFILES, INSTANT_TAGS, detect_profile
+from financials.parsers.igaap_corp import IGAAP_DURATION_TAGS, IGAAP_INSTANT_TAGS
+from financials.parsers.indas_corp import DURATION_TAGS, IMPLEMENTED_PROFILES, INSTANT_TAGS, detect_instance_profile
 from financials.parsers.indas_nbfc import NBFC_DURATION_TAGS, NBFC_INSTANT_TAGS
 from financials.parsers.integrated import parse_integrated_results
 from financials.parsers.irdai_insurance import SPECS as INSURER_SPECS
@@ -68,6 +69,7 @@ MAPPED_BY_PROFILE = {
     "INDAS_CORP": _mapped(DURATION_TAGS, INSTANT_TAGS),
     "INDAS_NBFC": _mapped(NBFC_DURATION_TAGS, NBFC_INSTANT_TAGS),
     "IGAAP_BANK": _mapped(BANK_DURATION_TAGS, BANK_INSTANT_TAGS),
+    "IGAAP_CORP": _mapped(IGAAP_DURATION_TAGS, IGAAP_INSTANT_TAGS),
     **{p: _mapped(spec.duration_tags, spec.instant_tags) for p, spec in INSURER_SPECS.items()},
     SHP_PROFILE: SHP_MAPPED,
     # Reg. 30 events: numeric elements read by parsers/reg30_events.py [E3-E7]
@@ -88,6 +90,7 @@ CURATED_BY_PROFILE = {
     "INDAS_CORP": {**DURATION_TAGS, **INSTANT_TAGS},
     "INDAS_NBFC": {**NBFC_DURATION_TAGS, **NBFC_INSTANT_TAGS},
     "IGAAP_BANK": {**BANK_DURATION_TAGS, **BANK_INSTANT_TAGS},
+    "IGAAP_CORP": {**IGAAP_DURATION_TAGS, **IGAAP_INSTANT_TAGS},
     **{p: {**spec.duration_tags, **spec.instant_tags} for p, spec in INSURER_SPECS.items()},
     "REG34_ANNUAL": {**DURATION_TAGS, **INSTANT_TAGS, **ANNUAL_DURATION_TAGS, **ANNUAL_INSTANT_TAGS},
 }
@@ -122,7 +125,7 @@ def inspect(path: Path, dump_dir: Path | None) -> dict:
     elif is_reg34(inst):
         profile = "REG34_ANNUAL"
     else:
-        profile = detect_profile(inst.entity_namespace) or "UNKNOWN"
+        profile = detect_instance_profile(inst) or "UNKNOWN"  # X330: IGAAP_CORP needs TypeOfCompany
     if dump_dir is not None:
         dump_dir.mkdir(parents=True, exist_ok=True)
         with (dump_dir / f"{path.stem}.facts.jsonl").open("w", encoding="utf-8") as fh:

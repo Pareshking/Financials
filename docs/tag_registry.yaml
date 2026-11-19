@@ -791,6 +791,7 @@ files:
 - INTEGRATED_FILING_INDAS_1447925_22052025091528_WEB.xml
 - INTEGRATED_FILING_INDAS_1449578_23052025092633_WEB.xml
 - INTEGRATED_FILING_INDAS_1449896_24052025124314_WEB.xml
+- INTEGRATED_FILING_INDAS_1451463_26052025071700_WEB.xml
 - INTEGRATED_FILING_INDAS_1454124_28052025104806_WEB.xml
 - INTEGRATED_FILING_INDAS_1456174_29052025103806_WEB.xml
 - INTEGRATED_FILING_INDAS_1461165_30052025115826_WEB.xml
@@ -808,6 +809,7 @@ files:
 - INTEGRATED_FILING_INDAS_1502813_05082025045022_WEB.xml
 - INTEGRATED_FILING_INDAS_1506803_08082025045458_WEB.xml
 - INTEGRATED_FILING_INDAS_1507427_08082025074055_WEB.xml
+- INTEGRATED_FILING_INDAS_1509540_12082025042301_WEB.xml
 - INTEGRATED_FILING_INDAS_1510310_12082025074319_WEB.xml
 - INTEGRATED_FILING_INDAS_1510585_12082025093306_WEB.xml
 - INTEGRATED_FILING_INDAS_1510629_12082025102624_WEB.xml
@@ -864,6 +866,7 @@ files:
 - INTEGRATED_FILING_INDAS_1672152_23052026112720_WEB.xml
 - INTEGRATED_FILING_INDAS_1672621_25052026073245_WEB.xml
 - INTEGRATED_FILING_INDAS_1673679_27052026125706_WEB.xml
+- INTEGRATED_FILING_INDAS_1674219_27052026063304_WEB.xml
 - INTEGRATED_FILING_INDAS_1674519_27052026092425_WEB.xml
 - INTEGRATED_FILING_INDAS_1677062_29052026111208_WEB.xml
 - INTEGRATED_FILING_INDAS_1678022_30052026094755_WEB.xml
@@ -949,6 +952,7 @@ files:
 - INTEGRATED_FILING_LI_1739360_15102026072721_WEB.xml
 - INTEGRATED_FILING_LI_1747186_27102026072642_WEB.xml
 - INTEGRATED_FILING_LI_1753945_05112026064353_WEB.xml
+- INTEGRATED_FILING_NBFC_INDAS_1424341_24042025111452_WEB.xml
 - INTEGRATED_FILING_NBFC_INDAS_1483684_15072025082343_WEB.xml
 - INTEGRATED_FILING_NBFC_INDAS_1574319_13112025084559_WEB.xml
 - INTEGRATED_FILING_NBFC_INDAS_1661603_29042026104724_WEB.xml
@@ -3284,7 +3288,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_inventories
@@ -3295,7 +3299,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_other_current_assets
@@ -3306,7 +3310,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_other_noncurrent_assets
@@ -3317,7 +3321,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_trade_receivables_current
@@ -3328,7 +3332,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_trade_receivables_noncurrent
@@ -3339,7 +3343,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: cf_adj_depreciation
@@ -3350,7 +3354,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: cf_adj_dividend_income_deducted
@@ -3361,7 +3365,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_adjustments_for_fair_value_gains_losses
@@ -3372,7 +3376,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: cf_adj_finance_costs
@@ -3383,7 +3387,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_adjustments_for_impairment_loss_reversal_of_impairment_loss_recognised_in_profit_or_loss
@@ -3394,7 +3398,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_other_current_liabilities
@@ -3405,7 +3409,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_other_noncurrent_liabilities
@@ -3416,7 +3420,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_trade_payables_current
@@ -3427,7 +3431,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_trade_payables_noncurrent
@@ -3438,7 +3442,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_adj_interest_income_deducted
@@ -3449,7 +3453,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_other_bank_balances
@@ -3460,7 +3464,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_other_financial_assets_current
@@ -3471,7 +3475,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_other_financial_assets_noncurrent
@@ -3482,7 +3486,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_other_financial_liabilities_current
@@ -3493,7 +3497,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_other_financial_liabilities_noncurrent
@@ -3504,7 +3508,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_provisions_current
@@ -3515,7 +3519,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_provisions_noncurrent
@@ -3526,7 +3530,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: cf_adjustments_total
@@ -3537,7 +3541,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: share_based_payments_addback
@@ -3548,7 +3552,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_adj_associates_deducted
@@ -3559,7 +3563,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_adjustments_for_unrealised_foreign_exchange_losses_gains
@@ -3592,7 +3596,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 99
+      filings: 100
       first_batch: B1
       line_item_category: OCI
       mapped_to: li_amount_of_item_that_will_be_reclassified_to_profit_and_loss
@@ -3605,7 +3609,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 139
+      filings: 141
       first_batch: B1
       line_item_category: OCI
       mapped_to: li_amount_of_item_that_will_not_be_reclassified_to_profit_and_loss
@@ -3636,7 +3640,7 @@ profiles:
     Assets:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: BALANCE_SHEET
       mapped_to: total_assets
@@ -3646,7 +3650,7 @@ profiles:
     BankBalanceOtherThanCashAndCashEquivalents:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: bank_balances_other
@@ -3659,7 +3663,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PER_SHARE
       mapped_to: eps_basic
@@ -3672,7 +3676,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PER_SHARE
       mapped_to: eps_basic_continuing
@@ -3685,7 +3689,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PER_SHARE
       mapped_to: li_basic_earnings_loss_per_share_from_discontinued_operations
@@ -3695,7 +3699,7 @@ profiles:
     BiologicalAssetsOtherThanBearerPlants:
       context_kinds:
       - instant
-      filings: 96
+      filings: 97
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: li_biological_assets_other_than_bearer_plants
@@ -3705,7 +3709,7 @@ profiles:
     BorrowingsCurrent:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: borrowings_current
@@ -3715,7 +3719,7 @@ profiles:
     BorrowingsNoncurrent:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: borrowings_noncurrent
@@ -3725,7 +3729,7 @@ profiles:
     CapitalWorkInProgress:
       context_kinds:
       - instant
-      filings: 125
+      filings: 127
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: cwip
@@ -3736,7 +3740,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_cash_advances_and_loans_made_to_other_parties_classified_as_investing_activities
@@ -3746,7 +3750,7 @@ profiles:
     CashAndCashEquivalents:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: cash_and_equivalents
@@ -3756,7 +3760,7 @@ profiles:
     CashAndCashEquivalentsCashFlowStatement:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: cash_cf_statement
@@ -3767,7 +3771,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_cash_flows_from_losing_control_of_subsidiaries_or_other_businesses_classified_as_investing_activities
@@ -3778,7 +3782,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: cff
@@ -3789,7 +3793,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: cfi
@@ -3800,7 +3804,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: cfo
@@ -3811,7 +3815,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: cash_generated_from_operations
@@ -3822,7 +3826,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_cash_flows_used_in_obtaining_control_of_subsidiaries_or_other_businesses_classified_as_investing_activities
@@ -3833,7 +3837,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_cash_payment_for_investment_in_partnership_firm_or_association_of_persons_or_limited_liability_partnerships
@@ -3844,7 +3848,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_cash_payments_for_future_contracts_forward_contracts_option_contracts_and_swap_contracts_classified_as_investing_activities
@@ -3855,7 +3859,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_cash_receipts_from_future_contracts_forward_contracts_option_contracts_and_swap_contracts_classified_as_investing_activities
@@ -3866,7 +3870,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_cash_receipts_from_repayment_of_advances_and_loans_made_to_other_parties_classified_as_investing_activities
@@ -3877,7 +3881,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_cash_receipts_from_share_of_profits_of_partnership_firm_or_association_of_persons_or_limited_liability_partnerships
@@ -3890,7 +3894,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PNL_EXPENSE
       mapped_to: changes_in_inventories
@@ -3901,7 +3905,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 176
+      filings: 179
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -3912,7 +3916,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: OCI
       mapped_to: total_comprehensive_income
@@ -3925,7 +3929,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 108
+      filings: 110
       first_batch: B1
       line_item_category: OCI
       mapped_to: li_comprehensive_income_for_the_period_attributable_to_owners_of_parent
@@ -3938,7 +3942,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 107
+      filings: 109
       first_batch: B1
       line_item_category: OCI
       mapped_to: li_comprehensive_income_for_the_period_attributable_to_owners_of_parent_non_controlling_interests
@@ -3951,7 +3955,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PNL_EXPENSE
       mapped_to: cost_of_materials_consumed
@@ -3961,7 +3965,7 @@ profiles:
     CurrentAssets:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: current_assets
@@ -3971,7 +3975,7 @@ profiles:
     CurrentFinancialAssets:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: SUBTOTAL
       mapped_to: li_current_financial_assets
@@ -3981,7 +3985,7 @@ profiles:
     CurrentFinancialLiabilities:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: SUBTOTAL
       mapped_to: li_current_financial_liabilities
@@ -3991,7 +3995,7 @@ profiles:
     CurrentInvestments:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: current_investments
@@ -4001,7 +4005,7 @@ profiles:
     CurrentLiabilities:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: current_liabilities
@@ -4014,7 +4018,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PNL
       mapped_to: current_tax
@@ -4024,7 +4028,7 @@ profiles:
     CurrentTaxAssets:
       context_kinds:
       - instant
-      filings: 92
+      filings: 94
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: li_current_tax_assets
@@ -4034,7 +4038,7 @@ profiles:
     CurrentTaxLiabilities:
       context_kinds:
       - instant
-      filings: 116
+      filings: 118
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: li_current_tax_liabilities
@@ -4045,7 +4049,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 176
+      filings: 179
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4054,7 +4058,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 176
+      filings: 179
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4063,7 +4067,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 176
+      filings: 179
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4074,7 +4078,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4091,7 +4095,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 176
+      filings: 179
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4100,7 +4104,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 176
+      filings: 179
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4111,7 +4115,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4128,7 +4132,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 175
+      filings: 178
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4139,7 +4143,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 57
+      filings: 58
       first_batch: B1
       line_item_category: MEMO
       mapped_to: li_debt_equity_ratio
@@ -4152,7 +4156,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 58
+      filings: 59
       first_batch: B1
       line_item_category: MEMO
       mapped_to: li_debt_service_coverage_ratio
@@ -4163,7 +4167,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 174
+      filings: 177
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4172,7 +4176,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 74
+      filings: 76
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4180,7 +4184,7 @@ profiles:
     DeferredGovernmentGrantsCurrent:
       context_kinds:
       - instant
-      filings: 72
+      filings: 73
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: li_deferred_government_grants_current
@@ -4190,7 +4194,7 @@ profiles:
     DeferredGovernmentGrantsNoncurrent:
       context_kinds:
       - instant
-      filings: 86
+      filings: 88
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: li_deferred_government_grants_noncurrent
@@ -4203,7 +4207,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PNL
       mapped_to: deferred_tax
@@ -4213,7 +4217,7 @@ profiles:
     DeferredTaxAssetsNet:
       context_kinds:
       - instant
-      filings: 107
+      filings: 109
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: deferred_tax_assets
@@ -4223,7 +4227,7 @@ profiles:
     DeferredTaxLiabilitiesNet:
       context_kinds:
       - instant
-      filings: 117
+      filings: 119
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: deferred_tax_liabilities
@@ -4236,7 +4240,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PNL_EXPENSE
       mapped_to: depreciation_amortisation
@@ -4247,7 +4251,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 176
+      filings: 179
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4256,7 +4260,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 80
+      filings: 82
       first_batch: B1
       mapped_to: null
       numeric: false
@@ -4275,7 +4279,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PER_SHARE
       mapped_to: eps_diluted
@@ -4288,7 +4292,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PER_SHARE
       mapped_to: li_diluted_earnings_loss_per_share_from_continuing_operations
@@ -4301,7 +4305,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PER_SHARE
       mapped_to: li_diluted_earnings_loss_per_share_from_discontinued_operations
@@ -4320,7 +4324,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 85
+      filings: 86
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4328,7 +4332,7 @@ profiles:
     DisclosureOfNotesOnSegmentsExplanatoryTextBlock:
       context_kinds:
       - duration_3m
-      filings: 29
+      filings: 30
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4337,7 +4341,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: dividends_paid
@@ -4348,7 +4352,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: dividends_received_investing
@@ -4359,7 +4363,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: dividends_received_operating
@@ -4370,7 +4374,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: fx_effect_on_cash
@@ -4383,7 +4387,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PNL_EXPENSE
       mapped_to: employee_benefit_expense
@@ -4394,7 +4398,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 176
+      filings: 179
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4402,7 +4406,7 @@ profiles:
     Equity:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: total_equity
@@ -4412,7 +4416,7 @@ profiles:
     EquityAndLiabilities:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: total_equity_and_liabilities
@@ -4422,7 +4426,7 @@ profiles:
     EquityAttributableToOwnersOfParent:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: equity_attributable_to_owners
@@ -4432,7 +4436,7 @@ profiles:
     EquityShareCapital:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: equity_share_capital
@@ -4445,7 +4449,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PNL
       mapped_to: exceptional_items
@@ -4458,7 +4462,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PNL
       mapped_to: total_expenses
@@ -4471,7 +4475,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: sc
       line_item_category: PER_SHARE
       mapped_to: face_value_per_share
@@ -4484,7 +4488,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PNL_EXPENSE
       mapped_to: finance_costs
@@ -4494,7 +4498,7 @@ profiles:
     Goodwill:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: goodwill
@@ -4505,7 +4509,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 176
+      filings: 179
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4524,7 +4528,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: sc
       line_item_category: PNL
       mapped_to: total_income
@@ -4537,7 +4541,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 155
+      filings: 158
       first_batch: B1
       line_item_category: OCI
       mapped_to: li_income_tax_relating_to_items_that_will_be_reclassified_to_profit_or_loss
@@ -4550,7 +4554,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 165
+      filings: 168
       first_batch: B1
       line_item_category: OCI
       mapped_to: li_income_tax_relating_to_items_that_will_not_be_reclassified_to_profit_or_loss
@@ -4561,7 +4565,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_income_taxes_paid_refund_classified_as_financing_activities
@@ -4572,7 +4576,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_income_taxes_paid_refund_classified_as_investing_activities
@@ -4583,7 +4587,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: income_taxes_paid
@@ -4594,7 +4598,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: net_cash_flow_after_fx
@@ -4605,7 +4609,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: net_cash_flow
@@ -4615,7 +4619,7 @@ profiles:
     IntangibleAssetsUnderDevelopment:
       context_kinds:
       - instant
-      filings: 106
+      filings: 107
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: intangibles_under_development
@@ -4628,7 +4632,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 76
+      filings: 77
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_inter_segment_revenue
@@ -4639,7 +4643,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: interest_paid_financing
@@ -4650,7 +4654,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: interest_paid_operating
@@ -4661,7 +4665,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: interest_received_investing
@@ -4672,7 +4676,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: interest_received_operating
@@ -4685,7 +4689,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 58
+      filings: 59
       first_batch: B1
       line_item_category: MEMO
       mapped_to: li_interest_service_coverage_ratio
@@ -4695,7 +4699,7 @@ profiles:
     Inventories:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: inventories
@@ -4705,7 +4709,7 @@ profiles:
     InvestmentProperty:
       context_kinds:
       - instant
-      filings: 108
+      filings: 110
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: investment_property
@@ -4715,7 +4719,7 @@ profiles:
     InvestmentsAccountedForUsingEquityMethod:
       context_kinds:
       - instant
-      filings: 104
+      filings: 106
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: equity_method_investments
@@ -4726,7 +4730,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 176
+      filings: 179
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4744,7 +4748,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 176
+      filings: 179
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4752,7 +4756,7 @@ profiles:
     Liabilities:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: total_liabilities
@@ -4762,7 +4766,7 @@ profiles:
     LiabilitiesDirectlyAssociatedWithAssetsInDisposalGroupClassifiedAsHeldForSale:
       context_kinds:
       - instant
-      filings: 70
+      filings: 71
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: li_liabilities_directly_associated_with_assets_in_disposal_group_classified_as_held_for_sale
@@ -4772,7 +4776,7 @@ profiles:
     LoansCurrent:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: loans_current
@@ -4782,7 +4786,7 @@ profiles:
     LoansNoncurrent:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: loans_noncurrent
@@ -4793,7 +4797,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 176
+      filings: 179
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4850,7 +4854,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 176
+      filings: 179
       first_batch: B1
       mapped_to: null
       numeric: false
@@ -4861,7 +4865,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -4872,7 +4876,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PNL
       mapped_to: regulatory_deferral_movement
@@ -4882,7 +4886,7 @@ profiles:
     NetSegmentAssets:
       context_kinds:
       - instant
-      filings: 96
+      filings: 97
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_net_segment_assets
@@ -4892,7 +4896,7 @@ profiles:
     NetSegmentLiabilities:
       context_kinds:
       - instant
-      filings: 96
+      filings: 97
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_net_segment_liabilities
@@ -4902,7 +4906,7 @@ profiles:
     NonControllingInterest:
       context_kinds:
       - instant
-      filings: 77
+      filings: 79
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: non_controlling_interest
@@ -4912,7 +4916,7 @@ profiles:
     NoncurrentAssets:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: noncurrent_assets
@@ -4922,7 +4926,7 @@ profiles:
     NoncurrentAssetsClassifiedAsHeldForSale:
       context_kinds:
       - instant
-      filings: 88
+      filings: 90
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: li_noncurrent_assets_classified_as_held_for_sale
@@ -4932,7 +4936,7 @@ profiles:
     NoncurrentFinancialAssets:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: SUBTOTAL
       mapped_to: li_noncurrent_financial_assets
@@ -4942,7 +4946,7 @@ profiles:
     NoncurrentFinancialLiabilities:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: SUBTOTAL
       mapped_to: li_noncurrent_financial_liabilities
@@ -4952,7 +4956,7 @@ profiles:
     NoncurrentInvestments:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: noncurrent_investments
@@ -4962,7 +4966,7 @@ profiles:
     NoncurrentLiabilities:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: noncurrent_liabilities
@@ -5000,7 +5004,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_other_adjustments_for_noncash_items
@@ -5011,7 +5015,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_other_adjustments_for_which_cash_effects_are_investing_or_financing_cash_flow
@@ -5022,7 +5026,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_other_adjustments_to_reconcile_profit_loss
@@ -5033,7 +5037,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_other_cash_payments_to_acquire_equity_or_debt_instruments_of_other_entities_classified_as_investing_activities
@@ -5044,7 +5048,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_other_cash_payments_to_acquire_interests_in_joint_ventures_classified_as_investing_activities
@@ -5055,7 +5059,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_other_cash_receipts_from_sales_of_equity_or_debt_instruments_of_other_entities_classified_as_investing_activities
@@ -5066,7 +5070,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_other_cash_receipts_from_sales_of_interests_in_joint_ventures_classified_as_investing_activities
@@ -5079,7 +5083,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 159
+      filings: 162
       first_batch: B1
       line_item_category: OCI
       mapped_to: li_other_comprehensive_income
@@ -5092,7 +5096,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: OCI
       mapped_to: oci_net
@@ -5102,7 +5106,7 @@ profiles:
     OtherCurrentAssets:
       context_kinds:
       - instant
-      filings: 127
+      filings: 129
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_current_assets
@@ -5112,7 +5116,7 @@ profiles:
     OtherCurrentFinancialAssets:
       context_kinds:
       - instant
-      filings: 127
+      filings: 129
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_current_financial_assets
@@ -5122,7 +5126,7 @@ profiles:
     OtherCurrentFinancialLiabilities:
       context_kinds:
       - instant
-      filings: 126
+      filings: 128
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_current_financial_liabilities
@@ -5132,7 +5136,7 @@ profiles:
     OtherCurrentLiabilities:
       context_kinds:
       - instant
-      filings: 127
+      filings: 128
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_current_liabilities
@@ -5142,7 +5146,7 @@ profiles:
     OtherEquity:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: other_equity
@@ -5155,7 +5159,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PNL_EXPENSE
       mapped_to: other_expenses
@@ -5168,7 +5172,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: sc
       line_item_category: PNL_INCOME
       mapped_to: other_income
@@ -5179,7 +5183,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_other_inflows_outflows_of_cash_classified_as_financing_activities
@@ -5190,7 +5194,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_other_inflows_outflows_of_cash_classified_as_investing_activities
@@ -5201,7 +5205,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_other_inflows_outflows_of_cash_classified_as_operating_activities
@@ -5211,7 +5215,7 @@ profiles:
     OtherIntangibleAssets:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: other_intangibles
@@ -5221,7 +5225,7 @@ profiles:
     OtherNoncurrentAssets:
       context_kinds:
       - instant
-      filings: 122
+      filings: 124
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_noncurrent_assets
@@ -5231,7 +5235,7 @@ profiles:
     OtherNoncurrentFinancialAssets:
       context_kinds:
       - instant
-      filings: 123
+      filings: 125
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_noncurrent_financial_assets
@@ -5251,7 +5255,7 @@ profiles:
     OtherNoncurrentLiabilities:
       context_kinds:
       - instant
-      filings: 98
+      filings: 100
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_noncurrent_liabilities
@@ -5264,7 +5268,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 90
+      filings: 91
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_other_unallocable_expenditure_net_off_un_allocable_income
@@ -5277,7 +5281,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: sc
       line_item_category: BALANCE_SHEET
       mapped_to: paid_up_equity_capital
@@ -5288,7 +5292,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_payments_from_changes_in_ownership_interests_in_subsidiaries
@@ -5299,7 +5303,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: lease_payments
@@ -5310,18 +5314,18 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_payments_of_other_equity_instruments
       numeric: true
       parent_subtotal: cff
-      seen_negative: false
+      seen_negative: true
     PaymentsToAcquireOrRedeemEntitysShares:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_payments_to_acquire_or_redeem_entitys_shares
@@ -5348,7 +5352,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_proceeds_from_biological_assets_other_than_bearer_plants_classified_as_investing_activities
@@ -5359,7 +5363,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: borrowings_proceeds
@@ -5370,7 +5374,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_proceeds_from_changes_in_ownership_interests_in_subsidiaries
@@ -5381,7 +5385,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_proceeds_from_exercise_of_stock_options
@@ -5392,7 +5396,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_proceeds_from_government_grants_classified_as_investing_activities
@@ -5403,7 +5407,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_proceeds_from_issuing_debentures_notes_bonds_etc
@@ -5414,7 +5418,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_proceeds_from_issuing_other_equity_instruments
@@ -5425,7 +5429,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: share_issue_proceeds
@@ -5436,7 +5440,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_proceeds_from_sales_of_goodwill_classified_as_investing_activities
@@ -5447,7 +5451,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_proceeds_from_sales_of_intangible_assets_classified_as_investing_activities
@@ -5458,7 +5462,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_proceeds_from_sales_of_intangible_assets_under_development
@@ -5469,7 +5473,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_proceeds_from_sales_of_investment_property_classified_as_investing_activities
@@ -5480,7 +5484,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_proceeds_from_sales_of_other_long_term_assets_classified_as_investing_activities
@@ -5491,7 +5495,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: ppe_disposals
@@ -5504,7 +5508,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PNL
       mapped_to: profit_before_exceptional_and_tax
@@ -5517,7 +5521,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PNL
       mapped_to: pbt
@@ -5530,7 +5534,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PNL
       mapped_to: pat
@@ -5543,7 +5547,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PNL
       mapped_to: pat_continuing
@@ -5556,7 +5560,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PNL
       mapped_to: pat_discontinued
@@ -5569,7 +5573,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PNL
       mapped_to: discontinued_pbt
@@ -5582,7 +5586,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 107
+      filings: 110
       first_batch: B1
       line_item_category: PNL
       mapped_to: pat_nci
@@ -5595,7 +5599,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 109
+      filings: 112
       first_batch: B1
       line_item_category: PNL
       mapped_to: pat_owners
@@ -5605,7 +5609,7 @@ profiles:
     PropertyPlantAndEquipment:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: ppe_net
@@ -5615,7 +5619,7 @@ profiles:
     ProvisionsCurrent:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: li_provisions_current
@@ -5625,7 +5629,7 @@ profiles:
     ProvisionsNoncurrent:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: li_provisions_noncurrent
@@ -5636,7 +5640,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_purchase_of_biological_assets_other_than_bearer_plants_classified_as_investing_activities
@@ -5647,7 +5651,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_purchase_of_goodwill_classified_as_investing_activities
@@ -5658,7 +5662,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: capex_intangibles
@@ -5669,7 +5673,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_purchase_of_intangible_assets_under_development
@@ -5680,7 +5684,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_purchase_of_investment_property_classified_as_investing_activities
@@ -5691,7 +5695,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_purchase_of_other_long_term_assets_classified_as_investing_activities
@@ -5702,7 +5706,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: capex_ppe
@@ -5715,7 +5719,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PNL_EXPENSE
       mapped_to: purchases_of_stock_in_trade
@@ -5725,7 +5729,7 @@ profiles:
     RegulatoryDeferralAccountCreditBalancesAndRelatedDeferredTaxLiability:
       context_kinds:
       - instant
-      filings: 67
+      filings: 68
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: li_regulatory_deferral_account_credit_balances_and_related_deferred_tax_liability
@@ -5735,7 +5739,7 @@ profiles:
     RegulatoryDeferralAccountDebitBalancesAndRelatedDeferredTaxAssets:
       context_kinds:
       - instant
-      filings: 75
+      filings: 77
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: li_regulatory_deferral_account_debit_balances_and_related_deferred_tax_assets
@@ -5770,7 +5774,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: borrowings_repayments
@@ -5781,7 +5785,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 176
+      filings: 179
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -5789,7 +5793,7 @@ profiles:
     ReserveExcludingRevaluationReserves:
       context_kinds:
       - duration_12m
-      filings: 45
+      filings: 47
       first_batch: q4
       line_item_category: MEMO
       mapped_to: li_reserve_excluding_revaluation_reserves
@@ -5802,7 +5806,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PNL_INCOME
       mapped_to: revenue_from_operations
@@ -5813,7 +5817,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 176
+      filings: 179
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -5821,7 +5825,7 @@ profiles:
     SegmentAssets:
       context_kinds:
       - instant
-      filings: 90
+      filings: 91
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_segment_assets
@@ -5834,7 +5838,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 86
+      filings: 87
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_segment_finance_costs
@@ -5844,7 +5848,7 @@ profiles:
     SegmentLiabilities:
       context_kinds:
       - instant
-      filings: 90
+      filings: 91
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_segment_liabilities
@@ -5857,7 +5861,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 96
+      filings: 97
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_segment_profit_before_tax
@@ -5870,7 +5874,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 90
+      filings: 91
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_segment_profit_loss_before_tax_and_finance_costs
@@ -5883,7 +5887,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 90
+      filings: 91
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_segment_revenue
@@ -5896,7 +5900,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 96
+      filings: 97
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_segment_revenue_from_operations
@@ -5907,7 +5911,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_share_of_profit_and_loss_from_partnership_firm_or_association_of_persons_or_limited_liability_partnerships
@@ -5920,7 +5924,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: PNL
       mapped_to: share_of_associates_jv
@@ -5931,7 +5935,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 176
+      filings: 179
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -5940,7 +5944,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 176
+      filings: 179
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -5951,7 +5955,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: sc
       line_item_category: PNL
       mapped_to: tax_expense
@@ -5964,7 +5968,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: B1
       line_item_category: DISCONTINUED
       mapped_to: li_tax_expense_of_discontinued_operations
@@ -5994,7 +5998,7 @@ profiles:
     TotalOutstandingDuesOfCreditorsOtherThanMicroEnterpriseAndSmallEnterpriseCurrent:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: li_total_outstanding_dues_of_creditors_other_than_micro_enterprise_and_small_enterprise_current
@@ -6004,7 +6008,7 @@ profiles:
     TotalOutstandingDuesOfCreditorsOtherThanMicroEnterpriseAndSmallEnterpriseNoncurrent:
       context_kinds:
       - instant
-      filings: 90
+      filings: 91
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: li_total_outstanding_dues_of_creditors_other_than_micro_enterprise_and_small_enterprise_noncurrent
@@ -6014,7 +6018,7 @@ profiles:
     TotalOutstandingDuesOfMicroEnterpriseAndSmallEnterpriseCurrent:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: li_total_outstanding_dues_of_micro_enterprise_and_small_enterprise_current
@@ -6024,7 +6028,7 @@ profiles:
     TotalOutstandingDuesOfMicroEnterpriseAndSmallEnterpriseNoncurrent:
       context_kinds:
       - instant
-      filings: 90
+      filings: 91
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: li_total_outstanding_dues_of_micro_enterprise_and_small_enterprise_noncurrent
@@ -6034,7 +6038,7 @@ profiles:
     TradePayablesCurrent:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: trade_payables_current
@@ -6044,7 +6048,7 @@ profiles:
     TradePayablesNoncurrent:
       context_kinds:
       - instant
-      filings: 90
+      filings: 91
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: trade_payables_noncurrent
@@ -6054,7 +6058,7 @@ profiles:
     TradeReceivablesCurrent:
       context_kinds:
       - instant
-      filings: 129
+      filings: 131
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: trade_receivables_current
@@ -6064,7 +6068,7 @@ profiles:
     TradeReceivablesNoncurrent:
       context_kinds:
       - instant
-      filings: 99
+      filings: 101
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: trade_receivables_noncurrent
@@ -6075,7 +6079,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -6084,7 +6088,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 176
+      filings: 179
       first_batch: B1
       mapped_to: null
       numeric: false
@@ -6093,7 +6097,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 176
+      filings: 179
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -6101,7 +6105,7 @@ profiles:
     UnAllocableAssets:
       context_kinds:
       - instant
-      filings: 96
+      filings: 97
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_un_allocable_assets
@@ -6111,7 +6115,7 @@ profiles:
     UnAllocableLiabilities:
       context_kinds:
       - instant
-      filings: 96
+      filings: 97
       first_batch: sc
       line_item_category: SEGMENT
       mapped_to: li_un_allocable_liabilities
@@ -6149,7 +6153,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 129
+      filings: 131
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -6160,7 +6164,7 @@ profiles:
       - duration_3m
       - duration_6m
       - duration_9m
-      filings: 176
+      filings: 179
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -6169,7 +6173,7 @@ profiles:
       context_kinds:
       - duration_3m
       - duration_6m
-      filings: 83
+      filings: 85
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -8385,7 +8389,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_inventories
@@ -8396,7 +8400,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_other_current_assets
@@ -8407,7 +8411,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_other_noncurrent_assets
@@ -8418,7 +8422,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_trade_receivables_current
@@ -8429,7 +8433,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_trade_receivables_noncurrent
@@ -8440,7 +8444,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: cf_adj_depreciation
@@ -8451,7 +8455,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: cf_adj_dividend_income_deducted
@@ -8462,7 +8466,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_adjustments_for_fair_value_gains_losses
@@ -8473,7 +8477,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: cf_adj_finance_costs
@@ -8484,7 +8488,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_adjustments_for_impairment_loss_reversal_of_impairment_loss_recognised_in_profit_or_loss
@@ -8495,7 +8499,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_other_current_liabilities
@@ -8506,7 +8510,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_other_noncurrent_liabilities
@@ -8517,7 +8521,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_trade_payables_current
@@ -8528,7 +8532,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_trade_payables_noncurrent
@@ -8539,7 +8543,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_adj_interest_income_deducted
@@ -8550,7 +8554,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_other_bank_balances
@@ -8561,7 +8565,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_other_financial_assets_current
@@ -8572,7 +8576,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_other_financial_assets_noncurrent
@@ -8583,7 +8587,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_other_financial_liabilities_current
@@ -8594,7 +8598,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_other_financial_liabilities_noncurrent
@@ -8605,7 +8609,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_provisions_current
@@ -8616,7 +8620,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_wc_provisions_noncurrent
@@ -8627,7 +8631,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: cf_adjustments_total
@@ -8638,7 +8642,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: share_based_payments_addback
@@ -8649,7 +8653,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: cf_adj_associates_deducted
@@ -8660,7 +8664,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_adjustments_for_unrealised_foreign_exchange_losses_gains
@@ -8684,7 +8688,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 19
+      filings: 20
       first_batch: B1
       line_item_category: OCI
       mapped_to: li_amount_of_item_that_will_not_be_reclassified_to_profit_and_loss
@@ -8704,7 +8708,7 @@ profiles:
     Assets:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: BALANCE_SHEET
       mapped_to: total_assets
@@ -8714,7 +8718,7 @@ profiles:
     BankBalanceOtherThanCashAndCashEquivalents:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: bank_balances_other
@@ -8726,7 +8730,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PER_SHARE
       mapped_to: eps_basic
@@ -8738,7 +8742,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PER_SHARE
       mapped_to: eps_basic_continuing
@@ -8750,7 +8754,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PER_SHARE
       mapped_to: li_basic_earnings_loss_per_share_from_discontinued_operations
@@ -8760,7 +8764,7 @@ profiles:
     BiologicalAssetsOtherThanBearerPlants:
       context_kinds:
       - instant
-      filings: 15
+      filings: 16
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: li_biological_assets_other_than_bearer_plants
@@ -8770,7 +8774,7 @@ profiles:
     Borrowings:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: BALANCE_SHEET
       mapped_to: borrowings_other_than_debt_securities
@@ -8780,7 +8784,7 @@ profiles:
     CapitalWorkInProgress:
       context_kinds:
       - instant
-      filings: 17
+      filings: 18
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: cwip
@@ -8791,7 +8795,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_cash_advances_and_loans_made_to_other_parties_classified_as_investing_activities
@@ -8801,7 +8805,7 @@ profiles:
     CashAndCashEquivalents:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: cash_and_equivalents
@@ -8811,7 +8815,7 @@ profiles:
     CashAndCashEquivalentsCashFlowStatement:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_cash_and_cash_equivalents_cash_flow_statement
@@ -8822,7 +8826,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_cash_flows_from_losing_control_of_subsidiaries_or_other_businesses_classified_as_investing_activities
@@ -8833,7 +8837,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: cff
@@ -8844,7 +8848,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: cfi
@@ -8855,7 +8859,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: cfo
@@ -8866,7 +8870,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: cash_generated_from_operations
@@ -8877,7 +8881,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_cash_flows_used_in_obtaining_control_of_subsidiaries_or_other_businesses_classified_as_investing_activities
@@ -8888,7 +8892,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_cash_payment_for_investment_in_partnership_firm_or_association_of_persons_or_limited_liability_partnerships
@@ -8899,7 +8903,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_cash_payments_for_future_contracts_forward_contracts_option_contracts_and_swap_contracts_classified_as_investing_activities
@@ -8910,7 +8914,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_cash_receipts_from_future_contracts_forward_contracts_option_contracts_and_swap_contracts_classified_as_investing_activities
@@ -8921,7 +8925,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_cash_receipts_from_repayment_of_advances_and_loans_made_to_other_parties_classified_as_investing_activities
@@ -8932,7 +8936,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_cash_receipts_from_share_of_profits_of_partnership_firm_or_association_of_persons_or_limited_liability_partnerships
@@ -8944,7 +8948,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PNL_EXPENSE
       mapped_to: changes_in_inventories
@@ -8954,7 +8958,7 @@ profiles:
     ClassOfSecurity:
       context_kinds:
       - duration_3m
-      filings: 23
+      filings: 24
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -8964,7 +8968,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: OCI
       mapped_to: total_comprehensive_income
@@ -8976,7 +8980,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 14
+      filings: 15
       first_batch: B1
       line_item_category: OCI
       mapped_to: li_comprehensive_income_for_the_period_attributable_to_owners_of_parent
@@ -8988,7 +8992,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 13
+      filings: 14
       first_batch: B1
       line_item_category: OCI
       mapped_to: li_comprehensive_income_for_the_period_attributable_to_owners_of_parent_non_controlling_interests
@@ -9000,7 +9004,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PNL_EXPENSE
       mapped_to: cost_of_materials_consumed
@@ -9012,7 +9016,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PNL
       mapped_to: current_tax
@@ -9022,7 +9026,7 @@ profiles:
     CurrentTaxAssetsNet:
       context_kinds:
       - instant
-      filings: 17
+      filings: 18
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: li_current_tax_assets_net
@@ -9032,7 +9036,7 @@ profiles:
     CurrentTaxLiabilities:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: li_current_tax_liabilities
@@ -9042,7 +9046,7 @@ profiles:
     DateOfBoardMeetingWhenFinancialResultsWereApproved:
       context_kinds:
       - duration_3m
-      filings: 23
+      filings: 24
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -9050,7 +9054,7 @@ profiles:
     DateOfEndOfBoardMeeting:
       context_kinds:
       - duration_3m
-      filings: 23
+      filings: 24
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -9058,7 +9062,7 @@ profiles:
     DateOfEndOfFinancialYear:
       context_kinds:
       - duration_3m
-      filings: 23
+      filings: 24
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -9068,7 +9072,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -9076,7 +9080,7 @@ profiles:
     DateOfStartOfBoardMeeting:
       context_kinds:
       - duration_3m
-      filings: 23
+      filings: 24
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -9084,7 +9088,7 @@ profiles:
     DateOfStartOfFinancialYear:
       context_kinds:
       - duration_3m
-      filings: 23
+      filings: 24
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -9094,7 +9098,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -9110,7 +9114,7 @@ profiles:
     DateOnWhichPriorIntimationOfTheMeetingForConsideringFinancialResultsWasInformedToTheExchange:
       context_kinds:
       - duration_3m
-      filings: 23
+      filings: 24
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -9129,7 +9133,7 @@ profiles:
     DebtSecurities:
       context_kinds:
       - instant
-      filings: 17
+      filings: 18
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: debt_securities
@@ -9150,7 +9154,7 @@ profiles:
     DeclarationOfUnmodifiedOpinionOrStatementOnImpactOfAuditQualification:
       context_kinds:
       - duration_3m
-      filings: 23
+      filings: 24
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -9158,7 +9162,7 @@ profiles:
     DeclarationPursuantToClauseDOfSubRegulation3OfRegulation33OfSEBILODRRegulation2015:
       context_kinds:
       - duration_3m
-      filings: 7
+      filings: 8
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -9168,7 +9172,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PNL
       mapped_to: deferred_tax
@@ -9178,7 +9182,7 @@ profiles:
     DeferredTaxAssetsNet:
       context_kinds:
       - instant
-      filings: 17
+      filings: 18
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: deferred_tax_assets
@@ -9188,7 +9192,7 @@ profiles:
     DeferredTaxLiabilitiesNet:
       context_kinds:
       - instant
-      filings: 17
+      filings: 18
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: deferred_tax_liabilities
@@ -9198,7 +9202,7 @@ profiles:
     Deposits:
       context_kinds:
       - instant
-      filings: 16
+      filings: 17
       first_batch: sc
       line_item_category: BALANCE_SHEET
       mapped_to: deposits
@@ -9210,7 +9214,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PNL_EXPENSE
       mapped_to: depreciation_amortisation
@@ -9220,7 +9224,7 @@ profiles:
     DerivativeFinancialInstrumentsFinancialAssets:
       context_kinds:
       - instant
-      filings: 17
+      filings: 18
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: derivative_assets
@@ -9230,7 +9234,7 @@ profiles:
     DerivativeFinancialInstrumentsFinancialLiabilities:
       context_kinds:
       - instant
-      filings: 17
+      filings: 18
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: derivative_liabilities
@@ -9240,7 +9244,7 @@ profiles:
     DescriptionOfPresentationCurrency:
       context_kinds:
       - duration_3m
-      filings: 23
+      filings: 24
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -9248,7 +9252,7 @@ profiles:
     DescriptionOfSingleSegment:
       context_kinds:
       - duration_3m
-      filings: 15
+      filings: 16
       first_batch: B1
       mapped_to: null
       numeric: false
@@ -9266,7 +9270,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PER_SHARE
       mapped_to: eps_diluted
@@ -9278,7 +9282,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PER_SHARE
       mapped_to: li_diluted_earnings_loss_per_share_from_continuing_operations
@@ -9290,7 +9294,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PER_SHARE
       mapped_to: li_diluted_earnings_loss_per_share_from_discontinued_operations
@@ -9308,7 +9312,7 @@ profiles:
     DisclosureOfNotesOnFinancialResultsExplanatoryTextBlock:
       context_kinds:
       - duration_3m
-      filings: 7
+      filings: 8
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -9326,7 +9330,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: dividend_income
@@ -9337,7 +9341,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: dividends_paid
@@ -9348,7 +9352,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: dividends_received_investing
@@ -9359,7 +9363,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: dividends_received_operating
@@ -9370,7 +9374,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: fx_effect_on_cash
@@ -9382,7 +9386,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PNL_EXPENSE
       mapped_to: employee_benefit_expense
@@ -9392,7 +9396,7 @@ profiles:
     EndTimeOfBoardMeeting:
       context_kinds:
       - duration_3m
-      filings: 23
+      filings: 24
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -9400,7 +9404,7 @@ profiles:
     Equity:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: total_equity
@@ -9410,7 +9414,7 @@ profiles:
     EquityAndLiabilities:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: total_equity_and_liabilities
@@ -9420,7 +9424,7 @@ profiles:
     EquityAttributableToOwnersOfParent:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: equity_attributable_to_owners
@@ -9430,7 +9434,7 @@ profiles:
     EquityShareCapital:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: equity_share_capital
@@ -9442,7 +9446,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PNL
       mapped_to: exceptional_items
@@ -9454,7 +9458,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PNL
       mapped_to: total_expenses
@@ -9466,7 +9470,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: sc
       line_item_category: PER_SHARE
       mapped_to: face_value_per_share
@@ -9478,7 +9482,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: fee_commission_expense
@@ -9490,7 +9494,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: fee_commission_income
@@ -9502,7 +9506,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PNL_EXPENSE
       mapped_to: finance_costs
@@ -9512,7 +9516,7 @@ profiles:
     FinancialLiabilities:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: financial_liabilities
@@ -9522,7 +9526,7 @@ profiles:
     FinanicalAssets:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: financial_assets
@@ -9532,7 +9536,7 @@ profiles:
     Goodwill:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: goodwill
@@ -9542,7 +9546,7 @@ profiles:
     ISIN:
       context_kinds:
       - duration_3m
-      filings: 23
+      filings: 24
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -9560,7 +9564,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: impairment_financial_instruments
@@ -9572,7 +9576,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: sc
       line_item_category: PNL
       mapped_to: total_income
@@ -9584,7 +9588,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 20
+      filings: 21
       first_batch: B1
       line_item_category: OCI
       mapped_to: li_income_tax_relating_to_items_that_will_be_reclassified_to_profit_or_loss
@@ -9596,7 +9600,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 22
+      filings: 23
       first_batch: B1
       line_item_category: OCI
       mapped_to: li_income_tax_relating_to_items_that_will_not_be_reclassified_to_profit_or_loss
@@ -9607,7 +9611,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_income_taxes_paid_refund_classified_as_financing_activities
@@ -9618,7 +9622,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_income_taxes_paid_refund_classified_as_investing_activities
@@ -9629,7 +9633,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: income_taxes_paid
@@ -9640,7 +9644,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: net_cash_flow_after_fx
@@ -9651,7 +9655,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: net_cash_flow
@@ -9661,7 +9665,7 @@ profiles:
     IntangibleAssetsUnderDevelopment:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: intangibles_under_development
@@ -9684,7 +9688,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: sc
       line_item_category: BALANCE_SHEET
       mapped_to: interest_earned
@@ -9695,7 +9699,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: interest_paid_financing
@@ -9706,7 +9710,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: interest_paid_operating
@@ -9717,7 +9721,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: interest_received_investing
@@ -9728,7 +9732,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: interest_received_operating
@@ -9749,7 +9753,7 @@ profiles:
     Inventories:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: inventories
@@ -9759,7 +9763,7 @@ profiles:
     InvestmentProperty:
       context_kinds:
       - instant
-      filings: 16
+      filings: 17
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: investment_property
@@ -9769,7 +9773,7 @@ profiles:
     Investments:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: BALANCE_SHEET
       mapped_to: investments_total
@@ -9779,7 +9783,7 @@ profiles:
     IsCompanyReportingMultisegmentOrSingleSegment:
       context_kinds:
       - duration_3m
-      filings: 23
+      filings: 24
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -9795,7 +9799,7 @@ profiles:
     LevelOfRounding:
       context_kinds:
       - duration_3m
-      filings: 23
+      filings: 24
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -9803,7 +9807,7 @@ profiles:
     Liabilities:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: total_liabilities
@@ -9813,7 +9817,7 @@ profiles:
     Loans:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: B6
       line_item_category: BALANCE_SHEET
       mapped_to: loans
@@ -9823,7 +9827,7 @@ profiles:
     MSEISymbol:
       context_kinds:
       - duration_3m
-      filings: 23
+      filings: 24
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -9839,7 +9843,7 @@ profiles:
     NameOfTheCompany:
       context_kinds:
       - duration_3m
-      filings: 23
+      filings: 24
       first_batch: B1
       mapped_to: null
       numeric: false
@@ -9849,7 +9853,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -9859,7 +9863,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: net_gain_derecognition
@@ -9871,7 +9875,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: net_gain_fair_value
@@ -9883,7 +9887,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: net_loss_derecognition
@@ -9895,7 +9899,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: net_loss_fair_value
@@ -9925,7 +9929,7 @@ profiles:
     NonControllingInterest:
       context_kinds:
       - instant
-      filings: 12
+      filings: 13
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: non_controlling_interest
@@ -9935,7 +9939,7 @@ profiles:
     NonFinancialAssets:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: non_financial_assets
@@ -9945,7 +9949,7 @@ profiles:
     NonFinancialLiabilities:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: non_financial_liabilities
@@ -9974,7 +9978,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_other_adjustments_for_noncash_items
@@ -9985,7 +9989,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_other_adjustments_for_which_cash_effects_are_investing_or_financing_cash_flow
@@ -9996,7 +10000,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_other_adjustments_to_reconcile_profit_loss
@@ -10007,7 +10011,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_other_cash_payments_to_acquire_equity_or_debt_instruments_of_other_entities_classified_as_investing_activities
@@ -10018,7 +10022,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_other_cash_payments_to_acquire_interests_in_joint_ventures_classified_as_investing_activities
@@ -10029,7 +10033,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_other_cash_receipts_from_sales_of_equity_or_debt_instruments_of_other_entities_classified_as_investing_activities
@@ -10040,7 +10044,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_other_cash_receipts_from_sales_of_interests_in_joint_ventures_classified_as_investing_activities
@@ -10052,7 +10056,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 22
+      filings: 23
       first_batch: B1
       line_item_category: OCI
       mapped_to: li_other_comprehensive_income
@@ -10064,7 +10068,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: OCI
       mapped_to: oci_net
@@ -10074,7 +10078,7 @@ profiles:
     OtherEquity:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: other_equity
@@ -10086,7 +10090,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PNL_EXPENSE
       mapped_to: other_expenses
@@ -10096,7 +10100,7 @@ profiles:
     OtherFinancialAssets:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: B6
       line_item_category: BALANCE_SHEET
       mapped_to: other_financial_assets
@@ -10106,7 +10110,7 @@ profiles:
     OtherFinancialLiabilities:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: B6
       line_item_category: BALANCE_SHEET
       mapped_to: other_financial_liabilities
@@ -10118,7 +10122,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: sc
       line_item_category: PNL_INCOME
       mapped_to: other_income
@@ -10129,7 +10133,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_other_inflows_outflows_of_cash_classified_as_financing_activities
@@ -10140,7 +10144,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_other_inflows_outflows_of_cash_classified_as_investing_activities
@@ -10151,7 +10155,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_other_inflows_outflows_of_cash_classified_as_operating_activities
@@ -10161,7 +10165,7 @@ profiles:
     OtherIntangibleAssets:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: other_intangibles
@@ -10171,7 +10175,7 @@ profiles:
     OtherNonFinancialAssets:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: other_non_financial_assets
@@ -10181,7 +10185,7 @@ profiles:
     OtherNonFinancialLiabilities:
       context_kinds:
       - instant
-      filings: 17
+      filings: 18
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: li_other_non_financial_liabilities
@@ -10191,7 +10195,7 @@ profiles:
     OtherReceivables:
       context_kinds:
       - instant
-      filings: 17
+      filings: 18
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: other_receivables
@@ -10226,7 +10230,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: sc
       line_item_category: BALANCE_SHEET
       mapped_to: paid_up_equity_capital
@@ -10247,7 +10251,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_payments_from_changes_in_ownership_interests_in_subsidiaries
@@ -10258,7 +10262,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: lease_payments
@@ -10269,7 +10273,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_payments_of_other_equity_instruments
@@ -10280,7 +10284,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_payments_to_acquire_or_redeem_entitys_shares
@@ -10299,7 +10303,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_proceeds_from_biological_assets_other_than_bearer_plants_classified_as_investing_activities
@@ -10310,7 +10314,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: borrowings_proceeds
@@ -10321,7 +10325,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_proceeds_from_changes_in_ownership_interests_in_subsidiaries
@@ -10332,7 +10336,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_proceeds_from_exercise_of_stock_options
@@ -10343,7 +10347,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_proceeds_from_government_grants_classified_as_investing_activities
@@ -10354,7 +10358,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_proceeds_from_issuing_debentures_notes_bonds_etc
@@ -10365,7 +10369,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_proceeds_from_issuing_other_equity_instruments
@@ -10376,7 +10380,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: share_issue_proceeds
@@ -10387,7 +10391,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_proceeds_from_sales_of_goodwill_classified_as_investing_activities
@@ -10398,7 +10402,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_proceeds_from_sales_of_intangible_assets_classified_as_investing_activities
@@ -10409,7 +10413,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_proceeds_from_sales_of_intangible_assets_under_development
@@ -10420,7 +10424,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_proceeds_from_sales_of_investment_property_classified_as_investing_activities
@@ -10431,7 +10435,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_proceeds_from_sales_of_other_long_term_assets_classified_as_investing_activities
@@ -10442,7 +10446,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: ppe_disposals
@@ -10454,7 +10458,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PNL
       mapped_to: profit_before_exceptional_and_tax
@@ -10466,7 +10470,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PNL
       mapped_to: pbt
@@ -10478,7 +10482,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PNL
       mapped_to: pat
@@ -10490,7 +10494,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PNL
       mapped_to: pat_continuing
@@ -10502,7 +10506,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PNL
       mapped_to: pat_discontinued
@@ -10514,7 +10518,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PNL
       mapped_to: discontinued_pbt
@@ -10526,7 +10530,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 15
+      filings: 16
       first_batch: B1
       line_item_category: PNL
       mapped_to: pat_nci
@@ -10538,7 +10542,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 15
+      filings: 16
       first_batch: B1
       line_item_category: PNL
       mapped_to: pat_owners
@@ -10548,7 +10552,7 @@ profiles:
     PropertyPlantAndEquipment:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: BALANCE_SHEET
       mapped_to: ppe_net
@@ -10558,7 +10562,7 @@ profiles:
     Provisions:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: B6
       line_item_category: BALANCE_SHEET
       mapped_to: provisions
@@ -10569,7 +10573,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_purchase_of_biological_assets_other_than_bearer_plants_classified_as_investing_activities
@@ -10580,7 +10584,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_purchase_of_goodwill_classified_as_investing_activities
@@ -10591,7 +10595,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: capex_intangibles
@@ -10602,7 +10606,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_purchase_of_intangible_assets_under_development
@@ -10613,7 +10617,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_purchase_of_investment_property_classified_as_investing_activities
@@ -10624,7 +10628,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: li_purchase_of_other_long_term_assets_classified_as_investing_activities
@@ -10635,7 +10639,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: B1
       line_item_category: CASH_FLOW
       mapped_to: capex_ppe
@@ -10647,7 +10651,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PNL_EXPENSE
       mapped_to: purchases_of_stock_in_trade
@@ -10675,7 +10679,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: rental_income
@@ -10686,7 +10690,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: borrowings_repayments
@@ -10696,7 +10700,7 @@ profiles:
     ReportingQuarter:
       context_kinds:
       - duration_3m
-      filings: 23
+      filings: 24
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -10704,7 +10708,7 @@ profiles:
     ReserveExcludingRevaluationReserves:
       context_kinds:
       - duration_12m
-      filings: 1
+      filings: 2
       first_batch: q4
       line_item_category: MEMO
       mapped_to: li_reserve_excluding_revaluation_reserves
@@ -10716,7 +10720,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PNL_INCOME
       mapped_to: revenue_from_operations
@@ -10728,7 +10732,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: sale_of_products
@@ -10740,7 +10744,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: sale_of_services
@@ -10750,7 +10754,7 @@ profiles:
     ScripCode:
       context_kinds:
       - duration_3m
-      filings: 23
+      filings: 24
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -10834,7 +10838,7 @@ profiles:
       context_kinds:
       - duration_12m
       - duration_6m
-      filings: 18
+      filings: 19
       first_batch: sc
       line_item_category: CASH_FLOW
       mapped_to: li_share_of_profit_and_loss_from_partnership_firm_or_association_of_persons_or_limited_liability_partnerships
@@ -10846,7 +10850,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: PNL
       mapped_to: share_of_associates_jv
@@ -10856,7 +10860,7 @@ profiles:
     StartTimeOfBoardMeeting:
       context_kinds:
       - duration_3m
-      filings: 23
+      filings: 24
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -10864,7 +10868,7 @@ profiles:
     SubordinatedLiabilities:
       context_kinds:
       - instant
-      filings: 17
+      filings: 18
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: subordinated_liabilities
@@ -10874,7 +10878,7 @@ profiles:
     Symbol:
       context_kinds:
       - duration_3m
-      filings: 23
+      filings: 24
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -10884,7 +10888,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: sc
       line_item_category: PNL
       mapped_to: tax_expense
@@ -10896,7 +10900,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: B1
       line_item_category: DISCONTINUED
       mapped_to: li_tax_expense_of_discontinued_operations
@@ -10906,7 +10910,7 @@ profiles:
     TotalOutstandingDuesOfCreditorsOtherThanMicroEnterpriseAndSmallEnterprise:
       context_kinds:
       - instant
-      filings: 17
+      filings: 18
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: li_total_outstanding_dues_of_creditors_other_than_micro_enterprise_and_small_enterprise
@@ -10916,7 +10920,7 @@ profiles:
     TotalOutstandingDuesOfCreditorsOtherThanMicroEnterpriseAndSmallEnterpriseOtherPayables:
       context_kinds:
       - instant
-      filings: 17
+      filings: 18
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: li_total_outstanding_dues_of_creditors_other_than_micro_enterprise_and_small_enterprise_other_payables
@@ -10926,7 +10930,7 @@ profiles:
     TotalOutstandingDuesOfMicroEnterpriseAndSmallEnterprise:
       context_kinds:
       - instant
-      filings: 17
+      filings: 18
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: li_total_outstanding_dues_of_micro_enterprise_and_small_enterprise
@@ -10936,7 +10940,7 @@ profiles:
     TotalOutstandingDuesOfMicroEnterpriseAndSmallEnterpriseOtherPayables:
       context_kinds:
       - instant
-      filings: 17
+      filings: 18
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: li_total_outstanding_dues_of_micro_enterprise_and_small_enterprise_other_payables
@@ -10946,7 +10950,7 @@ profiles:
     TradeReceivables:
       context_kinds:
       - instant
-      filings: 18
+      filings: 19
       first_batch: SCR
       line_item_category: BALANCE_SHEET
       mapped_to: trade_receivables
@@ -10956,7 +10960,7 @@ profiles:
     TypeOfCashFlowStatement:
       context_kinds:
       - duration_3m
-      filings: 18
+      filings: 19
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -10964,7 +10968,7 @@ profiles:
     TypeOfCompany:
       context_kinds:
       - duration_3m
-      filings: 23
+      filings: 24
       first_batch: B1
       mapped_to: null
       numeric: false
@@ -10972,7 +10976,7 @@ profiles:
     TypeOfReportingPeriod:
       context_kinds:
       - duration_3m
-      filings: 23
+      filings: 24
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -11024,7 +11028,7 @@ profiles:
     WhetherCashFlowStatementIsApplicableOnCompany:
       context_kinds:
       - duration_3m
-      filings: 18
+      filings: 19
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -11034,7 +11038,7 @@ profiles:
       - duration_12m
       - duration_3m
       - duration_6m
-      filings: 23
+      filings: 24
       first_batch: sc
       mapped_to: null
       numeric: false
@@ -11042,7 +11046,7 @@ profiles:
     WhetherResultsAreAuditedOrUnauditedForImpactOfAuditQualification:
       context_kinds:
       - duration_3m
-      filings: 7
+      filings: 8
       first_batch: sc
       mapped_to: null
       numeric: false

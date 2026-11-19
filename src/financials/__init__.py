@@ -1,5 +1,7 @@
 """Indian equity research, screening and point-in-time backtesting engine."""
 
+# 0.10.10: X317 OCI-shaped owners with NCI 0 chosen by EPS (X214 amended), X318 owners 0 with NCI within rounding
+#          (OWNERS_ZERO_NCI_WITHIN_ROUNDING); re-parses results with open ATTRIBUTION_WITHHELD findings;
 # 0.10.9: X285-X287 BSE results inline XBRL repairs (bare '<' in text blocks, omitted </tr>, unclosed empty audit-
 #         qualification table); NSE XML output unchanged; re-parses BSE results with open parse findings;
 # 0.10.8: X280-X283 BSE results inline XBRL (boolean "true" / "false" text, void <BR>, <thead> closed by </tbody>,
@@ -19,4 +21,4 @@
 # 0.8.0: X83 visibility from listing creation / file-name time (re-promotes backdated re-filings);
 # 0.7.0: SHP16-SHP18 (old SHP taxonomy, event dates, percent scale); 0.6.0: zero-drop line items (C24);
 # 0.5.0: REG34_ANNUAL; audit mappings
-PARSER_VERSION = "0.10.9"
+PARSER_VERSION = "0.10.10"

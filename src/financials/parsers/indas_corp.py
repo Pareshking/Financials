@@ -901,6 +901,13 @@ def _apply_attribution_recovery_rules(result: ParsedResults) -> None:
                                                                 and (f.period_start, f.period_end) == p)]  # fmt: skip
             applied.setdefault("ATTRIBUTION_BY_EPS", []).append([str(p[0]), str(p[1])])
             continue
+        if owners == 0 and nci != 0 and abs(nci) <= tol:
+            # X318 OWNERS_ZERO_NCI_WITHIN_ROUNDING: owners filed 0 (a placeholder, as in X48 / X214) with an NCI
+            # share within the identity tolerance: owners := PAT - NCI as filed is within that tolerance of PAT
+            # whatever the NCI's sign (Prime Securities FY25: owners 0, NCI 3 lakh, PAT 3,830 lakh).
+            _replace_attribution(result, p, pat - nci, nci, "OWNERS_ZERO_NCI_WITHIN_ROUNDING")
+            applied.setdefault("OWNERS_ZERO_NCI_WITHIN_ROUNDING", []).append([str(p[0]), str(p[1])])
+            continue
         withheld.append((p, owners, nci, pat))
     for p, owners, nci, pat in withheld:
         kept = [
@@ -948,8 +955,13 @@ def _attribution_by_eps(result: ParsedResults, p: tuple, owners: Decimal, nci: D
     if not shares or shares <= 0 or not eps:
         return None
     oci, tol = result.value("oci_net", *p), identity_tolerance(result.meta["level_of_rounding"], ATTRIBUTION_TERMS)
-    if owners and oci is not None and abs(oci) > tol and abs(owners + nci - oci) <= tol:
-        return None  # both lines carry the OCI attribution (X84 shape, TCI split untagged): neither is usable
+    # Both lines carry the OCI attribution (X84 shape, TCI split untagged): neither is usable (TECHM Q4 FY25), except
+    # with the NCI filed 0 and no NCI share of TCI [X317]: owners alone carry OCI, and the only other candidate is
+    # owners := PAT, which EPS must confirm (Indo Borax Q1 FY26: owners = OCI 107.44 lakh, PAT 1,020.41 lakh, EPS
+    # 3.18 x 32,090,000 = 1,020.46 lakh).
+    oci_shaped = owners and oci is not None and abs(oci) > tol and abs(owners + nci - oci) <= tol
+    if oci_shaped and (nci != 0 or result.value(TCI_NCI_KEY, *p) not in (None, 0)):
+        return None
     implied, r = eps * shares, EPS_HALF_PAISA * shares
     # Owners as filed: EPS vouches for owners only, so NCI is not derived (PAT itself may be the wrong line: Nilkamal
     # FY25 PAT 1,832 Cr with tax filed as a credit, Supreme Infrastructure H1 FY27 owners repeated as the JV share).

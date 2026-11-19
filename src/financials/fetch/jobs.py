@@ -184,7 +184,14 @@ class Jobs:
             return False
         from financials.ids import stable_id
 
-        return (self.stage_root / job / stable_id("fil", "NSE", url, last["sha256"])).exists()
+        fid = stable_id("fil", "NSE", url, last["sha256"])
+        if (self.stage_root / job / fid).exists():
+            return True
+        if getattr(self, "_promoted", None) is None:  # X345: promoted filings whose staging directory is gone
+            from financials import promoted_ledger
+
+            self._promoted = promoted_ledger.read(self.stage_root)
+        return fid in self._promoted
 
     def is_vaulted(self, url: str) -> bool:
         last = self.vault.last_fetch(url)

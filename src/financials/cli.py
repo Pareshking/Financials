@@ -95,6 +95,9 @@ def promote_pending(con, stage_root: Path, out=sys.stdout, vault: Vault | None =
     if n := close_resolved_annual_share_findings(con):
         print(f"{'FIXED_BY_RULE':16s} {'shares':14s} {n} annual share-count finding(s) agree on re-check [X181]",
               file=out)  # fmt: skip
+    from financials import promoted_ledger
+
+    promoted_ledger.write(con, stage_root)  # X345: discovery skips promoted filings whose staging dir is gone
     return pending
 
 

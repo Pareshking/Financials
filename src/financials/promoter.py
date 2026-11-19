@@ -484,7 +484,8 @@ INACTIVITY_TRADING_DAYS = 20  # CHOICE: an open interval with no bar in the last
 def close_inactive_securities(con, exchange: str, as_of: date, threshold: int | None = None) -> int:
     """P1-11: close the open identifier interval of a security that has not traded in the last `threshold`
     promoted sessions (delisted, merged, suspended, moved to a series outside the universe). valid_to = the day
-    after its last bar. A security that trades again reopens through its FinInstrmId (identity.py)."""
+    after its last bar. A security that trades again reopens through its FinInstrmId, or, back in another series
+    with a new FinInstrmId, through the ISIN of its latest interval (rule X320, identity.py)."""
     n = INACTIVITY_TRADING_DAYS if threshold is None else threshold
     recent = [r[0] for r in con.execute(
         "SELECT DISTINCT trade_date FROM ohlcv WHERE exchange = ? AND trade_date <= ? ORDER BY 1 DESC LIMIT ?",

@@ -22,7 +22,9 @@ Rule U1 (`RULE_VERSION`):
   exception is X311 for members admitted before it: an RE was never a valid member, so it is deleted, its row logged
   in full in admin_log (UNIVERSE_REMOVE_RIGHTS_ENTITLEMENT; reversible) and counted as `rights_entitlements_removed`.
 - A qualifying row whose symbol / series resolves to no security on W (security_identifier_history) is quarantined
-  (UNIVERSE / UNRESOLVED_SYMBOL, one finding per symbol and series), never guessed.
+  (UNIVERSE / UNRESOLVED_SYMBOL, one finding per symbol and series), never guessed. One named exception, rule
+  X323: the mcap file lists a symbol in its new series a few sessions before the bhavcopy switches it; the row is
+  the security whose own identifier history makes that switch within 5 sessions (`_resolve_series_switch_ahead`).
 """
 
 from __future__ import annotations
@@ -111,6 +113,7 @@ def update_universe(con, start: date, end: date, *, now: datetime | None = None)
            ORDER BY m.trade_date, m.symbol, m.series""",
         [sorted(have), sorted(UNIVERSE_SERIES), THRESHOLD_INR, list(ELIGIBLE_CATEGORIES)],
     )
+    switched = _resolve_series_switch_ahead(con, [r for r in rows if r["security_id"] is None])
     first: dict[str, dict] = {}
     unresolved: dict[tuple[str, str], dict] = {}
     skipped_re = {r["security_id"] for r in rows if r["rights_entitlement"]}
@@ -143,7 +146,7 @@ def update_universe(con, start: date, end: date, *, now: datetime | None = None)
         finally:
             con.unregister("_earlier")
     findings = _quarantine_unresolved(con, unresolved.values(), now)
-    closed = _close_resolved(con, now)
+    closed = _close_series_switched(con, switched - set(unresolved), now) + _close_resolved(con, now)
     total = con.execute("SELECT count(*) FROM universe_membership WHERE universe = ?", [UNIVERSE]).fetchone()[0]
     result = {"universe": UNIVERSE, "rule_version": RULE_VERSION, "seeded": seeded, "joined": len(new),
               "moved_earlier": len(earlier), "rights_entitlements_skipped": len(skipped_re),
@@ -153,6 +156,7 @@ def update_universe(con, start: date, end: date, *, now: datetime | None = None)
                   [UNIVERSE, PERMITTED]).fetchone()[0], "listing_category_filled": categorised, "week_ends": len(weeks),
               "week_ends_without_mcap_file": [str(w) for w in missing],
               "days_with_unknown_week_end": [str(d) for d in unknown], "unresolved": len(unresolved),
+              "series_switch_resolved": len(switched),
               "unresolved_findings": findings, "findings_closed": closed}  # fmt: skip
     con.execute(
         "INSERT OR IGNORE INTO admin_log VALUES (?, 'UPDATE_UNIVERSE', ?, ?, NULL, ?)",
@@ -269,6 +273,71 @@ def bse_members(con, as_of: date) -> list[dict]:
            ORDER BY h.symbol""",
         [as_of, UNIVERSE, as_of, PERMITTED],
     )
+
+
+SERIES_SWITCH_SESSIONS = 5  # X323 CHOICE: observed lags 1-3 sessions (2025-10-31 / 2026-10-30 files)
+SERIES_SWITCH_NOTE = "X323: the mcap file lists the new series before the bhavcopy switches; same security"
+
+
+def _resolve_series_switch_ahead(con, rows: list[dict]) -> set[tuple[str, str]]:
+    """Rule X323 (in place on `rows`, which resolved to no security): the mcap file of week end W lists a symbol in
+    a new series (EQ -> BE) a few sessions before the bhavcopy moves it (GFLLIMITED, NSIL, TVSHLTD...: BE in
+    PR301026, BE in the bhavcopy from 2 or 3 Nov 2026). Such a row is the security that holds the same symbol on W in
+    another universe series when that security's identifier history opens an interval with the same symbol and the
+    row's series within SERIES_SWITCH_SESSIONS promoted sessions after W. Exactly one such security is required; else
+    the row stays unresolved. The mcap file carries no ISIN, so the key is the symbol plus the bhavcopy's own later
+    switch (whose FinInstrmId / ISIN matching is identity.py's). One batched query. Returns the resolved keys."""
+    if not rows:
+        return set()
+    import pyarrow as pa
+
+    keys = pa.Table.from_pylist([{"trade_date": r["trade_date"], "symbol": r["symbol"], "series": r["series"]}
+                                 for r in rows])  # fmt: skip
+    con.register("_x323", keys)
+    try:
+        hits = con.execute(
+            """WITH sess AS (SELECT DISTINCT trade_date AS d FROM ohlcv WHERE exchange = 'NSE'),
+               cand AS (
+                 SELECT DISTINCT k.trade_date, k.symbol, k.series, h.security_id
+                 FROM _x323 k
+                 JOIN security_identifier_history h ON h.exchange = 'NSE' AND h.symbol = k.symbol
+                      AND h.series <> k.series AND h.series IN (SELECT unnest(?)) AND h.valid_from <= k.trade_date
+                      AND (h.valid_to IS NULL OR h.valid_to > k.trade_date)
+                 JOIN security_identifier_history n ON n.security_id = h.security_id AND n.exchange = 'NSE'
+                      AND n.symbol = k.symbol AND n.series = k.series AND n.valid_from > k.trade_date
+                 WHERE (SELECT count(*) FROM sess WHERE d > k.trade_date AND d <= n.valid_from) <= ?)
+               SELECT c.trade_date, c.symbol, c.series, any_value(c.security_id) AS security_id,
+                      any_value(s.entity_id) AS entity_id
+               FROM cand c JOIN securities s USING (security_id)
+               GROUP BY 1, 2, 3 HAVING count(DISTINCT c.security_id) = 1""",
+            [sorted(UNIVERSE_SERIES), SERIES_SWITCH_SESSIONS],
+        ).fetchall()
+    finally:
+        con.unregister("_x323")
+    found = {(d, sym, ser): (sec, ent) for d, sym, ser, sec, ent in hits}
+    for r in rows:
+        hit = found.get((r["trade_date"], r["symbol"], r["series"]))
+        if hit is not None:
+            r["security_id"], r["entity_id"] = hit
+    return {(sym, ser) for _, sym, ser in found}
+
+
+def _close_series_switched(con, keys: set[tuple[str, str]], now: datetime) -> int:
+    """Close open UNRESOLVED_SYMBOL findings of (symbol, series) keys that rule X323 resolved in this run."""
+    if not keys:
+        return 0
+    ids = [q for (q,) in con.execute(
+        "SELECT quarantine_id FROM quarantine_queue WHERE stage = 'UNIVERSE' AND reason_code = 'UNRESOLVED_SYMBOL' "
+        "AND resolved_at IS NULL AND json_extract_string(details, '$.symbol') || '|' || "
+        "json_extract_string(details, '$.series') IN (SELECT unnest(?))",
+        [[f"{sym}|{ser}" for sym, ser in sorted(keys)]]).fetchall()]  # fmt: skip
+    if ids:
+        con.execute(
+            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ? "
+            "WHERE quarantine_id IN (SELECT unnest(?))",
+            [now, SERIES_SWITCH_NOTE, ids],
+        )
+    return len(ids)
 
 
 def _quarantine_unresolved(con, rows, now: datetime) -> list[str]:

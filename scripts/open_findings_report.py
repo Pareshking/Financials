@@ -258,7 +258,8 @@ CAUSES: dict[str, tuple[str, str, str]] = {
         "AMBIGUOUS_ISIN",
         "OURS",
         "The filed ISIN belongs to two of our entities with the same legal name: we created a second entity when the "
-        "security came back in another series (e.g. BZ to BE after a suspension).",
+        "security came back in another series (e.g. BZ to BE after a suspension). Fixed by X320; repair with "
+        "merge-duplicate-entity (X321), then quarantine reprocess.",
     ),
     "ID_ISIN_SHARED_BY_ENTITIES": (
         "AMBIGUOUS_ISIN",
@@ -290,9 +291,9 @@ CAUSES: dict[str, tuple[str, str, str]] = {
     # UNIVERSE / UNRESOLVED_SYMBOL
     "UN_SERIES_SWITCH_AHEAD_OF_BHAVCOPY": (
         "UNRESOLVED_SYMBOL",
-        "OURS",
-        "The mcap file lists the symbol in its new series a few days before the bhavcopy switches; the security is "
-        "already a member, so no data is lost, but the resolver matches symbol + series strictly by date.",
+        "NO_ACTION",
+        "The mcap file lists the symbol in a new series and the security is already a member (no data is lost), but "
+        "no bhavcopy switch within 5 sessions is on record, so rule X323 cannot settle it (e.g. no bar since).",
     ),
     "UN_SYMBOL_UNKNOWN": ("UNRESOLVED_SYMBOL", "NO_ACTION", "The symbol is not a security we track."),
     # PARSE / UNKNOWN_TAXONOMY, INVALID_XBRL
@@ -320,13 +321,16 @@ CAUSES: dict[str, tuple[str, str, str]] = {
     ),
     "PX_EMPTY_BLOB": (
         "INVALID_XBRL",
-        "OURS",
-        "The vaulted file is 0 bytes: the fetch accepted an empty response; re-fetch.",
+        "REFILE",
+        "The vaulted file is 0 bytes because the archive serves it so (200, content-length 0; X322): nothing to parse "
+        "until NSE replaces it; then fetch-results URL --refetch.",
     ),
     "PX_TRUNCATED_BLOB": (
         "INVALID_XBRL",
-        "OURS",
-        "The vaulted file ends mid-token at a 4 KiB boundary: a truncated download; re-fetch.",
+        "OWNER",
+        "The vaulted file ends mid-token at a 4 KiB multiple. A body shorter than its Content-Length raises "
+        "IncompleteRead and is retried, so the archive most likely served it so (X322); check its size on the live "
+        "path and re-fetch with fetch-results URL --refetch.",
     ),
     "PX_DUPLICATE_FACT_CONFLICT": (
         "INVALID_XBRL",

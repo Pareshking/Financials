@@ -150,6 +150,8 @@ def build_parser() -> argparse.ArgumentParser:
     fr.add_argument("--symbols", nargs="+", default=[])
     fr.add_argument("--universe", choices=UNIVERSES)
     fr.add_argument("--broadcast-utc", type=datetime.fromisoformat)
+    fr.add_argument("--refetch", action="store_true",
+                    help="X322: download URL again although vaulted (served empty or cut short)")  # fmt: skip
     df = sub.add_parser("discover-filings", help="results, annual, shareholding listings + Reg. 30 RSS; new files only")
     df.add_argument("--symbols", nargs="+", default=[])
     df.add_argument("--universe", choices=UNIVERSES)
@@ -299,6 +301,11 @@ def build_parser() -> argparse.ArgumentParser:
     bf.add_argument("--manifest", type=Path, required=True)
     bf.add_argument("--index", default="NIFTY 500")
     bf.add_argument("--expected-count", type=int, default=500)
+    md = sub.add_parser("merge-duplicate-entity",
+                        help="X321: merge an ISIN's second security/entity into the original (audited)")  # fmt: skip
+    md.add_argument("--isin", help="the ISIN to repair (omit with --list)")
+    md.add_argument("--list", action="store_true", help="list ISINs held by more than one security, write nothing")
+    md.add_argument("--note", default="")
     so = sub.add_parser("scope-override", help="pin (or --clear) a company's default scopes (audited)")
     so.add_argument("--entity", required=True)
     so.add_argument("--quarterly", choices=("CONSOLIDATED", "STANDALONE"))
@@ -718,6 +725,18 @@ def write_command(args, db_path: Path, stage_root: Path, out) -> int:
                 return 2
             print(f"saved custom ratio {args.name!r} = {args.expression}", file=out)
             return 0
+        if args.cmd == "merge-duplicate-entity":
+            from financials.admin import AdminError, duplicate_entity_isins, merge_duplicate_entity
+
+            if args.list or not args.isin:
+                print(json.dumps(duplicate_entity_isins(con), default=str), file=out)
+                return 0
+            try:
+                print(json.dumps(merge_duplicate_entity(con, args.isin, note=args.note), default=str), file=out)
+            except AdminError as exc:
+                print(f"error: {exc}", file=out)
+                return 2
+            return 0
         if args.cmd == "scope-override":
             from financials.admin import AdminError, set_scope_override
 
@@ -892,7 +911,7 @@ def run_fetch(args, jobs: Jobs, db_path: Path, out) -> tuple[list[Path], list[st
     elif args.cmd == "fetch-results":
         if args.url:
             src = "API_FIELD" if args.broadcast_utc else "UNKNOWN"
-            staged += jobs.results_xbrl(args.url, args.broadcast_utc, src)
+            staged += jobs.results_xbrl(args.url, args.broadcast_utc, src, refetch=args.refetch)
         staged_r, errors = jobs.discover(_symbols(args, db_path, args.symbols), ["results"], events=False)
         staged += staged_r
     elif args.cmd == "discover-filings":

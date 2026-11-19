@@ -806,6 +806,114 @@ def _merge_securities(con, q: dict, details: dict, note: str) -> dict:
     return {"kept": keep, "merged": drop, "bars_loaded": loaded}
 
 
+# ── duplicate entity repair (X321) ─────────────────────────────────────────
+
+# Derived tables: rows of the merged security are deleted and both entities marked dirty, so materialisation
+# recomputes them under the kept security. Everything else that names the merged security or entity is rebound.
+_DERIVED_TABLES = ("features_daily", "features_events", "screener_features")
+_NOT_REBOUND = ("securities", "entity_master", "materialize_dirty", "entity_lineage", *_DERIVED_TABLES)
+
+
+def duplicate_entity_isins(con, exchange: str = "NSE") -> list[dict]:
+    """X321 candidates: ISINs whose identifier history names more than one security (read-only)."""
+    return fetch_dicts(
+        con,
+        "SELECT h.isin, list(DISTINCT h.security_id ORDER BY h.security_id) AS securities, "
+        "list(DISTINCT e.legal_name) AS names FROM security_identifier_history h JOIN securities s USING (security_id) "
+        "JOIN entity_master e USING (entity_id) WHERE h.exchange = ? GROUP BY 1 "
+        "HAVING count(DISTINCT h.security_id) > 1 ORDER BY 1",
+        [exchange],
+    )
+
+
+def merge_duplicate_entity(con, isin: str, *, note: str, exchange: str = "NSE") -> dict:
+    """Rule X321: merge the second security (and entity) that the pre-X320 resolver created for an ISIN that came
+    back after inactivity in another series into the original one (audited). See `_merge_duplicate`."""
+    if not note.strip():
+        raise AdminError("a note is required")
+    return _transaction(con, _merge_duplicate, isin, note.strip(), exchange)
+
+
+def _merge_duplicate(con, isin: str, note: str, exchange: str) -> dict:
+    """The kept security is the one whose identifier history starts first: the id a replay under X320 assigns
+    (stable_id of the first row seen), so the repair and a rebuild agree. Refused unless the ISIN has exactly two
+    securities with the same legal name, the kept one's intervals all end on or before the duplicate's first day,
+    no trading day has bars for both, and neither entity is in entity_lineage. Raw tables are not touched (they hold
+    source identifiers, not ours); every other row naming the duplicate security or entity is rebound, derived
+    feature rows of the duplicate are deleted, and both entities are marked dirty from the first trade date. The
+    duplicate's first bar is gap-audited against the kept security's last close, as promotion under X320 does."""
+    secs = [r[0] for r in con.execute(
+        "SELECT security_id FROM security_identifier_history WHERE exchange = ? AND isin = ? GROUP BY 1 "
+        "ORDER BY min(valid_from), 1", [exchange, isin]).fetchall()]  # fmt: skip
+    if len(secs) != 2:
+        raise AdminError(f"{isin}: {len(secs)} securities, X321 merges exactly two")
+    keep, drop = secs
+    ent = dict(con.execute("SELECT security_id, entity_id FROM securities WHERE security_id IN (?, ?)",
+                           secs).fetchall())  # fmt: skip
+    keep_ent, drop_ent = ent[keep], ent[drop]
+    names = {r[0] for r in con.execute("SELECT upper(trim(legal_name)) FROM entity_master WHERE entity_id IN (?, ?)",
+                                       [keep_ent, drop_ent]).fetchall()}  # fmt: skip
+    if keep_ent == drop_ent or len(names) != 1:
+        raise AdminError(f"{isin}: entities {keep_ent}, {drop_ent} are not same-name duplicates")
+    if con.execute("SELECT count(*) FROM securities WHERE entity_id = ? AND security_id <> ?",
+                   [drop_ent, drop]).fetchone()[0]:  # fmt: skip
+        raise AdminError(f"{drop_ent} has other securities: manual surgery needed")
+    drop_start = con.execute("SELECT min(valid_from) FROM security_identifier_history WHERE security_id = ?",
+                             [drop]).fetchone()[0]  # fmt: skip
+    if con.execute("SELECT count(*) FROM security_identifier_history WHERE security_id = ? "
+                   "AND (valid_to IS NULL OR valid_to > ?)", [keep, drop_start]).fetchone()[0]:  # fmt: skip
+        raise AdminError(f"{keep} has identifier history after {drop} starts on {drop_start}: not a duplicate")
+    if con.execute("SELECT count(*) FROM ohlcv a JOIN ohlcv b USING (exchange, trade_date) WHERE a.security_id = ? "
+                   "AND b.security_id = ?", [keep, drop]).fetchone()[0]:  # fmt: skip
+        raise AdminError("some trading days have bars for both securities: not a duplicate")
+    if con.execute("SELECT count(*) FROM entity_lineage WHERE ? IN (parent_entity_id, child_entity_id) "
+                   "OR ? IN (parent_entity_id, child_entity_id)", [keep_ent, drop_ent]).fetchone()[0]:  # fmt: skip
+        raise AdminError("an entity_lineage edge names one of the entities: decide by hand")
+
+    cols = con.execute(
+        "SELECT c.table_name, c.column_name FROM information_schema.columns c JOIN information_schema.tables t "
+        "USING (table_schema, table_name) WHERE c.table_schema = 'main' AND t.table_type = 'BASE TABLE' "
+        "AND c.column_name IN ('security_id', 'entity_id') ORDER BY 1, 2"
+    ).fetchall()
+    moved: dict[str, int] = {}
+    for table, col in cols:
+        old, new = (drop, keep) if col == "security_id" else (drop_ent, keep_ent)
+        if table in _DERIVED_TABLES:
+            n = len(con.execute(f"DELETE FROM {table} WHERE {col} = ? RETURNING 1", [old]).fetchall())
+            key = f"{table}.deleted"
+        elif table in _NOT_REBOUND:
+            continue
+        else:
+            n = len(con.execute(f"UPDATE {table} SET {col} = ? WHERE {col} = ? RETURNING 1", [new, old]).fetchall())
+            key = f"{table}.{col}"
+        if n:
+            moved[key] = moved.get(key, 0) + n
+    # Tombstone, never delete (as _merge_securities): the duplicate security stays unreferenced, its entity MERGED.
+    con.execute(
+        "UPDATE entity_master SET status = 'MERGED', inactive_date = ?, exit_reason = ? WHERE entity_id = ?",
+        [drop_start, f"duplicate of {keep_ent} (X321 duplicate entity repair)", drop_ent],
+    )
+    _override(con, keep_ent, "merged_security", {"merged": drop, "into": keep, "rule": "X321"}, drop_start, note)
+    dirty.mark_entities(con, {keep_ent, drop_ent}, MIN_TRADE_DATE, "MERGE_DUPLICATE_ENTITY", isin)
+
+    gap = None
+    first = con.execute("SELECT trade_date, open FROM ohlcv WHERE security_id = ? AND trade_date >= ? "
+                        "ORDER BY 1 LIMIT 1", [keep, drop_start]).fetchone()  # fmt: skip
+    if first is not None:
+        prev = _prev_closes(con, exchange, first[0]).get(keep)
+        acts = _actions(con, "security_id = ? AND ex_date = ?", [keep, first[0]])
+        for f in audit_day(keep, first[0], first[1], prev, acts, False):
+            gap = _quarantine(con, stage="GAP", reason_code=f.reason_code, security_id=keep,
+                              details={"trade_date": first[0], "gap": f.gap, "prev_close": prev,
+                                       "open": first[1]})  # fmt: skip
+    out = {"isin": isin, "kept": keep, "merged": drop, "kept_entity": keep_ent, "merged_entity": drop_ent,
+           "rebound": moved, "gap_finding": gap}  # fmt: skip
+    con.execute("INSERT INTO admin_log VALUES (?, 'MERGE_DUPLICATE_ENTITY', ?, ?, ?, ?)",
+                [stable_id("adm", "X321", isin, keep, drop), json.dumps({"isin": isin, "exchange": exchange}),
+                 json.dumps(out, default=str), note, utc_now()])  # fmt: skip
+    return out
+
+
 # ── scope override (Mandate 3) ─────────────────────────────────────────────
 
 SCOPE_VALUES = ("CONSOLIDATED", "STANDALONE")

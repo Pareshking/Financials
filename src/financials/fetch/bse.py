@@ -27,8 +27,10 @@ fixtures are committed under tests/fixtures/bse/ [A17]):
   (IST), `XMLName` (standalone) and `Consol_XMLName` (consolidated) under `www.bseindia.com/XBRLFILES/`: the
   Integrated Filing (Finance) as inline XBRL (`IFIndasDuplicateUploadDocument/..._IFIndAs.html`), the SEBI `in-capmkt`
   taxonomy of NSE's XML instances. `import_ledger` stages these `.html` files through `stage_results_xbrl`, the NSE
-  path (`parse_instance` reads inline XBRL as the instance it denotes, parsers.ixbrl). A plain `.xml` copy and annual
-  XBRL (`annual_xbrl`, X241) stay raw only: no real file of either has been seen. The RSS feed
+  path (`parse_instance` reads inline XBRL as the instance it denotes, parsers.ixbrl). NBFCs file plain XML instances
+  instead (`IFNBFCDuplicateUploadDocument/Integrated_Finance_NBFC_<code>_<stamp>_IFNBFC.xml`), NSE's NBFC
+  Integrated Filing XML byte for byte in form [X313]: they take the same path. A plain `.xml` of any other profile and
+  annual XBRL (`annual_xbrl`, X241) stay raw only: no real file of either has been seen. The RSS feed
   `www.bseindia.com/Data/XML/FinancialResultsFeed.aspx` [X240, X242] is kept as a raw-only dataset.
 
 `requests` and `selenium` are needed only here (`pip install -e ".[bse]"`), imported lazily.
@@ -54,8 +56,12 @@ RESULTS_FEED = "https://www.bseindia.com/Data/XML/FinancialResultsFeed.aspx"  # 
 XBRL_FILES = "https://www.bseindia.com/XBRLFILES/"  # + a results row's XMLName / Consol_XMLName [X247, X265]
 # X265: BSE results inline XBRL (`.html`, dataset results_xbrl) is parsed with the NSE results parser (fixtures
 # tests/fixtures/bse/Integrated_Finance_Ind_As_*.html, tests/test_bse_results_ixbrl.py). Plain `.xml` copies and
-# annual XBRL stay raw only (never seen).
+# annual XBRL stay raw only (never seen), except the profiles below.
 RESULTS_XBRL_VERIFIED = True
+# X313: BSE's plain XML results instances of these profiles are NSE's Integrated Filing XML of the same taxonomy
+# (IFNBFC V2.1, in-capmkt 2025-01-31 / 2026-01-31; fixtures tests/fixtures/bse/Integrated_Finance_NBFC_*_IFNBFC.xml,
+# tests/test_x313_bse_nbfc_xml.py) and take the NSE path unchanged. Any other profile stays raw only until seen.
+PLAIN_RESULTS_PROFILES = ("INDAS_NBFC",)
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
 HEADERS = {"User-Agent": UA, "Accept": "application/json, text/plain, */*", "Accept-Language": "en-US,en;q=0.5",
            "Origin": "https://www.bseindia.com", "Referer": HOME, "Connection": "keep-alive",
@@ -339,7 +345,7 @@ CATEGORY = {"announcements": "BSE_ANNOUNCEMENTS", "attachment": "BSE_ATTACHMENT"
             "shareholding_filings": "BSE_SHP_LISTING", "shareholding_xbrl": "BSE_SHP_XBRL",
             "list_securities": "BSE_LIST_SECURITIES", "results_feed": "BSE_RESULTS_FEED",
             "xbrl_listing": "BSE_XBRL_LISTING", "results_xbrl": "BSE_RESULTS_XBRL",
-            "annual_xbrl": "BSE_ANNUAL_XBRL"}  # fmt: skip  # raw only but results .html (parsed, X265)
+            "annual_xbrl": "BSE_ANNUAL_XBRL"}  # fmt: skip  # raw only but results .html (X265) and NBFC .xml (X313)
 
 
 def _ext(rec: dict) -> tuple[str, str]:
@@ -404,9 +410,14 @@ def import_ledger(vault, stage_root: Path, ledger_dir: Path) -> tuple[list[Path]
                                              broadcast_ts=ts, broadcast_ts_source="API_FIELD" if ts else "UNKNOWN",
                                              exchange="BSE"))  # fmt: skip
             continue
-        if rec["dataset"] == "results_xbrl" and RESULTS_XBRL_VERIFIED and is_inline(data):
+        if (
+            rec["dataset"] == "results_xbrl"
+            and RESULTS_XBRL_VERIFIED
+            and (is_inline(data) or plain_results_profile(data) in PLAIN_RESULTS_PROFILES)
+        ):
             # X265: BSE's inline XBRL of the SEBI in-capmkt results taxonomy takes the NSE path unchanged
             # (parse_instance reads it as the instance it denotes; parse_integrated_results dispatches on the profile).
+            # X313: so does a plain XML instance of a profile seen in that form (NBFC).
             from financials.staging import stage_results_xbrl
 
             ts = results_broadcast.get(rec["url"].split("?", 1)[0])
@@ -418,6 +429,22 @@ def import_ledger(vault, stage_root: Path, ledger_dir: Path) -> tuple[list[Path]
                                      category=CATEGORY[rec["dataset"]], source_url=rec["url"], fetched_at=fetched,
                                      exchange="BSE"))  # fmt: skip
     return staged, errors
+
+
+def plain_results_profile(data: bytes) -> str | None:
+    """Accounting profile of a plain (not inline) XBRL instance from its entity namespace [X313], None for inline
+    XBRL, anything that does not read as an XBRL instance, or an unknown namespace."""
+    from financials.parsers import ParseError
+    from financials.parsers.indas_corp import detect_profile
+    from financials.parsers.ixbrl import is_inline
+    from financials.parsers.xbrl import parse_instance
+
+    if is_inline(data):
+        return None
+    try:
+        return detect_profile(parse_instance(data).entity_namespace)
+    except ParseError:
+        return None
 
 
 _QUARTER_CODE = re.compile(r"^([JSDM])([QHNC])(\d{4})-(\d{4})$")
@@ -455,13 +482,13 @@ def results_files(rows: list[dict], min_period_end: date) -> tuple[list[tuple[st
     return list(out.items()), skipped
 
 
-_FILE_STAMP = re.compile(r"_(\d{11,16})_IFIndAs\.html$", re.IGNORECASE)
+_FILE_STAMP = re.compile(r"_(\d{11,16})_(?:IFIndAs\.html|IFNBFC\.xml)$", re.IGNORECASE)
 
 
 def file_stamps(url: str) -> list[datetime]:
-    """Every IST time a BSE results file name `..._<D><M><YYYY><H><MM><SS>_IFIndAs.html` can encode: the parts are
-    not zero-padded (X240), so `511202619052` reads as 5-11-2026 19:05:02 or 19:00:52 (its row's Fld_CreateDate is
-    19:00:52.8). Only valid dates and times, years 20xx."""
+    """Every IST time a BSE results file name `..._<D><M><YYYY><H><MM><SS>_IFIndAs.html` (or `_IFNBFC.xml`, X313) can
+    encode: the parts are not zero-padded (X240), so `511202619052` reads as 5-11-2026 19:05:02 or 19:00:52 (its row's
+    Fld_CreateDate is 19:00:52.8). Only valid dates and times, years 20xx."""
     m = _FILE_STAMP.search(url.split("?", 1)[0])
     if not m:
         return []

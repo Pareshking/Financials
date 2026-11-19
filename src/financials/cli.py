@@ -334,9 +334,16 @@ def restage_rows(con, category: str, mode: str = "OPEN_FINDINGS") -> list[tuple]
     VISIBILITY = promoted filings whose visibility rule now gives a later time [X83]; ALL = every results and annual
     filing that has filing_meta (parsed, not OUT_OF_SCOPE) or an open finding. Other categories: every filing, or
     with OPEN_FINDINGS_ONLY (`restage --open-findings`) only those with open findings."""
-    from financials.promoter import FILING_FINDING_STAGES
+    from financials.promoter import (
+        FILING_BROADCAST_SOURCE_SQL,
+        FILING_BROADCAST_SQL,
+        FILING_FINDING_STAGES,
+        RESULTS_FILING_CATEGORIES,
+    )
 
-    where, params = "", [category]
+    # RESULTS_XBRL takes BSE results filings vaulted raw only before X313 too (their broadcast time from filing_meta)
+    cats = list(RESULTS_FILING_CATEGORIES) if category == "RESULTS_XBRL" else [category]
+    where, params = "", [cats]
     open_findings = (
         "f.filing_id IN (SELECT filing_id FROM quarantine_queue WHERE resolved_at IS NULL "
         f"AND stage IN {FILING_FINDING_STAGES}) "
@@ -344,15 +351,15 @@ def restage_rows(con, category: str, mode: str = "OPEN_FINDINGS") -> list[tuple]
     if category == "RESULTS_XBRL" and mode == "VISIBILITY":
         from financials.promoter import filings_with_later_visibility
 
-        where, params = "AND f.filing_id IN (SELECT unnest(?)) ", [category, filings_with_later_visibility(con)]
+        where, params = "AND f.filing_id IN (SELECT unnest(?)) ", [cats, filings_with_later_visibility(con)]
     elif category == "RESULTS_XBRL" and mode == "ALL":
         where = "AND (f.filing_id IN (SELECT filing_id FROM filing_meta) OR " + open_findings + ") "
     elif category == "RESULTS_XBRL" or mode == "OPEN_FINDINGS_ONLY":
         where = "AND " + open_findings
     return con.execute(
-        "SELECT f.source_url, f.fetched_at, b.storage_path, b.sha256, f.broadcast_ts, f.broadcast_ts_source, "
-        "f.exchange FROM filings f JOIN blobs b USING (sha256) WHERE f.category = ? " + where
-        + "ORDER BY f.source_url", params).fetchall()  # fmt: skip
+        "SELECT f.source_url, f.fetched_at, b.storage_path, b.sha256, " + FILING_BROADCAST_SQL + ", "
+        + FILING_BROADCAST_SOURCE_SQL + ", f.exchange FROM filings f JOIN blobs b USING (sha256) "
+        "WHERE f.category IN (SELECT unnest(?)) " + where + "ORDER BY f.source_url", params).fetchall()  # fmt: skip
 
 
 def main(argv: Sequence[str] | None = None, *, transport: Transport | None = None, out=sys.stdout) -> int:

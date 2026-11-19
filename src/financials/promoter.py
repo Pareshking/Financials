@@ -1429,12 +1429,30 @@ def filing_overrides(con, filing_id: str) -> dict[str, str]:
     return dict(rows)
 
 
+# X313: BSE results XBRL vaulted raw only before its form was proven (NBFC plain XML) keeps the raw-only category and
+# no broadcast_ts in `filings` (append-only); the re-import that parses it stages the ledger's broadcast time, so its
+# visibility sits in filing_meta (visible_from_source BROADCAST). Readers of results filings take both categories,
+# and that broadcast time where the filings row has none.
+RESULTS_FILING_CATEGORIES = ("RESULTS_XBRL", "BSE_RESULTS_XBRL")
+RESULTS_CATEGORY_SQL = "f.category IN ('RESULTS_XBRL', 'BSE_RESULTS_XBRL')"
+FILING_BROADCAST_SQL = (
+    "coalesce(f.broadcast_ts, CASE WHEN f.category = 'BSE_RESULTS_XBRL' THEN (SELECT min(x.visible_from_ts) "
+    "FROM filing_meta x WHERE x.filing_id = f.filing_id AND x.visible_from_source = 'BROADCAST') END)"
+)
+FILING_BROADCAST_SOURCE_SQL = (
+    "CASE WHEN f.broadcast_ts IS NULL AND " + FILING_BROADCAST_SQL + " IS NOT NULL THEN 'API_CREATION' "
+    "ELSE f.broadcast_ts_source END"
+)
+
+
 def filings_with_later_visibility(con) -> list[str]:
     """Promoted results filings whose current visibility rule [X83] gives a later time than their latest
     filing_meta row (backdated re-filings). `restage --category RESULTS_XBRL --visibility` re-parses these."""
     rows = con.execute(
-        "SELECT m.filing_id, f.exchange, f.broadcast_ts, f.source_url, m.board_meeting_end_ts, m.visible_from_ts "
-        "FROM filing_meta m JOIN filings f USING (filing_id) WHERE f.category = 'RESULTS_XBRL' AND m.parser_version = "
+        "SELECT m.filing_id, f.exchange, " + FILING_BROADCAST_SQL + ", f.source_url, m.board_meeting_end_ts, "
+        "m.visible_from_ts FROM filing_meta m JOIN filings f USING (filing_id) WHERE "
+        + RESULTS_CATEGORY_SQL
+        + " AND m.parser_version = "
         "(SELECT arg_max(x.parser_version, " + version_key("x.parser_version") + ") FROM filing_meta x "
         "WHERE x.filing_id = m.filing_id) ORDER BY m.filing_id"
     ).fetchall()

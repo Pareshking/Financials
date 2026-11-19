@@ -22,6 +22,7 @@ from financials.ids import stable_id
 from financials.index_changes import IndexEvent, reconstruct_backward
 from financials.level_slip import level_slip, rescaled, usual_level
 from financials.promoter import (
+    RESULTS_CATEGORY_SQL,
     _actions,
     _prev_closes,
     _quarantine,
@@ -975,7 +976,9 @@ def find_level_slips(con) -> list[dict]:
     Reg. 34 annual filing it rescales (X235, `_annual_level_slips`)."""
     meta = con.execute(
         "SELECT m.filing_id, m.entity_id, m.scope, m.level_of_rounding, m.period_end, f.source_url FROM filing_meta m "
-        "JOIN filings f USING (filing_id) WHERE f.category = 'RESULTS_XBRL' AND m.accounting_profile <> 'REG34_ANNUAL' "
+        "JOIN filings f USING (filing_id) WHERE "
+        + RESULTS_CATEGORY_SQL
+        + " AND m.accounting_profile <> 'REG34_ANNUAL' "
         "QUALIFY row_number() OVER (PARTITION BY m.filing_id ORDER BY " + version_key("m.parser_version") + " DESC) = 1"
     ).fetchall()
     quarter = {}

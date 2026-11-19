@@ -789,3 +789,14 @@ Read by `tests/test_x311_universe_rights_entitlements.py`. The bhavcopy also joi
 |---|---|---|---|
 | `pr_zip/PR061224.zip` | PR zip of 06-Dec-2024 (a Friday, week end): UPL-RE, series BE, Category Permitted, Issue Size 93,680,642 x 190.25 = Market Cap Rs 17,822,742,140.50 (>= Rs 500 Cr: admitted by rule U1-P); UPL EQ Listed Rs 422,329,389,208.65 [X311] | https://nsearchives.nseindia.com/archives/equities/bhavcopy/pr/PR061224.zip | `d01ea415887c77a22ed606bf7a5d3c96fcaf486851060d881d61e994df921124` |
 | `bhavcopy/BhavCopy_NSE_CM_0_0_0_20241206_F_0000.csv.zip` | UDiFF bhavcopy of 06-Dec-2024: identity of UPL-RE (`INE628A20010`, BE) and UPL (`INE628A01036`, EQ) for the PR zip of the same day [X311] | https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20241206_F_0000.csv.zip | `ae4eff2154d4260cbb7fa8946554eb67ae7270c5a1e62fb8cbbf8cceca1c9ed8` |
+
+## QB9: BSE NBFC results as plain XML instances (X313; blobs of the bse-fetch runner ledger r14 of 2026-11-18, copied unmodified, sha256 verified = ledger blob)
+
+Read by `tests/test_x313_bse_nbfc_xml.py`. Kept in `bse/` so the end-to-end fixture glob (`xbrl/*.xml`) and its
+pinned counts are unchanged.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `bse/Integrated_Finance_NBFC_530245_1482026171926_IFNBFC.xml` | X313: Aryaman Financial Services (530245, Permitted, INE032E01017) Q1 FY27 standalone, plain XML `<!--IFNBFC V2.1 (26-06-2026)-->`, IntegratedFinance_NBFC 2026-01-31, LevelOfRounding Lakhs (smallest IFNBFC file of the ledger) | `https://www.bseindia.com/XBRLFILES/IFNBFCDuplicateUploadDocument/Integrated_Finance_NBFC_530245_1482026171926_IFNBFC.xml` | `4a28c54bfccf34b12ffbd362da1e816e4a914273fff9a489793d9e61fd2f9d8e` |
+| `bse/Integrated_Finance_NBFC_530245_1482026172036_IFNBFC.xml` | X313: the same company and quarter, consolidated | `https://www.bseindia.com/XBRLFILES/IFNBFCDuplicateUploadDocument/Integrated_Finance_NBFC_530245_1482026172036_IFNBFC.xml` | `bab83ddd5dbe2fac7336ebb2cd6350bd76d597ac35a265b9635ecab7426edbe8` |
+| `bse/bse_Corp_FinanceResult_ng_new_530245_flagdur6_20261118.json` | X313: the scrip's results listing (FlagDur 6) naming both files (`XMLName` / `Consol_XMLName`, `Fld_CreateDate` 2026-08-14T17:19:26.623 for JQ2026-2027) | `https://api.bseindia.com/BseIndiaAPI/api/Corp_FinanceResult_ng_new/w?SCRIP_CD=530245&FlagDur=6&HFQ=&ISUBGROUP_CODE=&segment=C` | `fbd32a3d88eaea319cc714e388381cd38473333d21a8691c3b728a33e87bc116` |

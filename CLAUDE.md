@@ -19,6 +19,7 @@ and `docs/tag_registry.yaml` (every XBRL element seen per profile + named label 
 ```bash
 python -m pip install -e ".[dev]"   # Python 3.11+
 python -m pytest                    # must pass before every commit
+python -m pytest -n 4 --deselect tests/test_benchmarks.py && python -m pytest tests/test_benchmarks.py  # same suite, ~17 min instead of ~38 (benchmarks time themselves: run them alone)
 ruff check src tests && ruff format --check src tests   # CI runs both
 
 # local operation (network; never in tests or CI)

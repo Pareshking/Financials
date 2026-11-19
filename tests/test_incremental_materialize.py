@@ -440,6 +440,7 @@ def _check_shared_results(monkeypatch):
 # (so `materialize --incremental` refuses days built by the old rules) and update both values here together.
 PINNED_SOURCES = (
     "src/financials/features.py",
+    "src/financials/run_memo.py",
     "src/financials/features_bs.py",
     "src/financials/features_price.py",
     "src/financials/features_pl.py",
@@ -459,7 +460,7 @@ PINNED_SOURCES = (
     "reference/valuation_archetypes.csv",
     "reference/cyclical_symbols.csv",
 )
-PINNED = ("2026.11.19-21J", "6dd1b0bd91363c9afbca30330b011d8832d1d3cf94978135d3da25e341243091")
+PINNED = ("2026.11.19-21K", "dd0875dea1cfd599395b1d6daca0dcc10adc045ac16da4dfc04ba2a027159bc4")
 
 
 def sources_sha256() -> str:

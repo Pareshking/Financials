@@ -642,3 +642,8 @@ My 19:31 (2026-11-17) recommendations, unanswered, applied:
    Reversible: re-insert the logged rows, or re-run rule U1-2026.11.17-P.
 
 8. **Owners' profit = PAT less NCI when owners is filed 0 and NCI is within rounding** (X318 OWNERS_ZERO_NCI_WITHIN_ROUNDING, with X317 widening X214; main session, owner: "use agents where needed"). Industry practice: with nil minority interest, profit attributable to owners equals PAT (EPS and P/E use it). This supersedes the earlier ACCEPT note on 4 KAYNES findings ("X86 withholding is correct"); those filings have no open finding and stay withheld until they are restaged. Owners + NCI = continuing profit only (AURUM, NAZARA, UNIECOM, URAVI) stays withheld: the X52 assumption is wrong for NAZARA FY25 (annual owners 758.2 Mn vs 753.5 Mn). Reversible: drop X318 and re-parse.
+
+## Owner decisions (2026-11-19)
+
+- **Done criterion for Phases 1-2 (expanded universe):** done when the random-sample accuracy is >= 98% (QD2: 99.54% adjudicated, met) and every open finding carries a stated cause, even where it stays withheld. Withheld numbers are NULL in screens, never shown wrong. Stop chasing the long tail of filer errors after the in-flight reviews (QY3, QA2).
+- **DVR:** ignored (to-do 11b dropped).

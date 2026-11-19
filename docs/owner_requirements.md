@@ -441,7 +441,7 @@ None open. Decided 2026-11-15: no paid sources at all (G74, by the owner); E-H b
 11. **DONE (2026-11-16)** G11, G39, G49, G59, G75, G77, G87 and the BRSR tag count / nine-RSS-feed list (G323) are UNVERIFIED rows R14-R22 in `docs/references.md`, each with what would verify it. G32 is OUT_OF_SCOPE_BY_DECISION (G74); G279 stays MISSING. No code.
 
 11a. **DONE (2026-11-15)** ~~the `restatement_suspected` flag (architecture §7.6).~~ YTD trigger (X106), discontinued operations (X108), logged merger / demerger (X109); Reg. 34 prior-year comparison as a finding (X110).
-11b. Documented but not implemented: market cap summed across share classes (architecture §8; the code creates only COMMON securities). The two-class listing exists (P17: JISLDVREQS / JISLJALEQS, FELDVR / FEL, GATECHDVR / GATECH in the bhavcopy fixtures). **BLOCKED**: needs the share count per class (a DVR issuer's Reg. 31 pattern, none committed or vaulted) and, for partly-paid, an owner decision to admit series E1.
+11b. **Dropped (owner, 2026-11-19: "Ignore DVR")** ~~market cap summed across share classes (architecture §8).~~ Each listed security keeps its own market cap (rule U1 already: owner "ignore DVR", no share-class aggregation); the code creates only COMMON securities; partly-paid series E1 stays outside the universe (P17).
 
 **Phase 2 completion**
 12. **DONE (2026-11-15, batch G; cash-flow element only, Reg. 30 acquisition events unparsed)** G276: organic vs inorganic perimeter flag. Verify: a Reg. 34 fixture with a business-combination cash-flow element and a Reg. 30 acquisition XBRL fixture.

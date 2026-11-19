@@ -108,9 +108,13 @@ data/                  local only, gitignored: vault/, staging/, market.duckdb
    Absolute financials are never multiplied by any factor.
    (Exception, owner decision R: a filing's wrong declared unit, proven by rule X201, is corrected in
    `fact_corrections`; that fixes a label, it is not an adjustment.)
-9. **Quarantine over auto-heal.** Unknown taxonomy, missing critical tag, failed identity, period
-   conflict, unexplained >10% open gap or ISIN change → `quarantine_queue`; keep raw data (the vault blob and
-   its `filings` row; raw market tables), freeze derived data. A recurring defect may only be fixed by a named deterministic rule with its own fixture and test.
+9. **Quarantine over auto-heal** for raw data and identity. Unknown taxonomy, missing critical tag, failed identity,
+   period conflict, unexplained >10% open gap or ISIN change → `quarantine_queue`; keep raw data (the vault blob and
+   its `filings` row; raw market tables); a failed identity, unknown taxonomy or undetermined period parses nothing.
+   **Show and flag** (owner decision V, X325): a derived value the filings state is shown and flagged
+   (`dq_flags` / `dq_suspect`), never blanked; an unresolved gap keeps adjusted price returns frozen and flags the row.
+   Genuine absence stays NULL (no filing, fewer than 4 quarters, pre-cutoff windows, undefined ratios).
+   A recurring defect may only be fixed by a named deterministic rule with its own fixture and test.
 10. **Single writer.** Fetchers and parsers write vault files and staging Parquet only. Only the
     promoter opens `data/market.duckdb` for writing, and promotes atomically after gates G1–G5.
 11. Timestamps are `TIMESTAMP` columns holding UTC; convert to/from IST only at parse and display boundaries.

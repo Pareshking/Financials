@@ -346,7 +346,41 @@ The Reg. 34 comparison runs at promotion and raises CONSISTENCY / ANNUAL_PRIOR_Y
 not yet a flag input, classed SCALE / RESTATED / REGROUPED for triage [X182]. Because the outcome at promotion depends on
 what was promoted before, `audit-annual` re-runs it and the annual share-count check on the stored data [X180].
 
-YoY growth across a flagged boundary is set to NULL in screens (with a reason). The PDF anchor-locking extractor from the original blueprint is **deferred**. If built, it must prove its numbers against the same filing's XBRL `OneD`/`FourD` before any row is promoted.
+YoY growth across a flagged boundary is set to NULL in screens (with a reason). The PDF anchor-locking extractor from the original blueprint is **deferred**.
+
+### 7.7 Show and flag: withheld values and open findings (owner decision V, 2026-11-19) [X325]
+"Show everything for all companies; if required flag the suspect one." A number a filing states is never blanked
+because a check failed: the feature row shows the best stated figure and names the reason in `dq_flags`
+(sorted, comma-separated codes; NULL when none) and `dq_suspect` (any flag). This is the practice of financial data
+vendors (the reported figure with a data-quality footnote). Precedence per value: the validated value; else the figure
+as filed. Rule SHOW_AND_FLAG (`FactBook.withheld`, `fill_as_filed`, `dq`): load_factbook still applies every
+withholding rule, but keeps what it removed beside the book with its class code. Only the feature layer reads in
+as-filed mode (`features._fundamentals`; `resolve_scope` tries it only after no scope has its flows on validated
+values). A reader (`quarter`, `ttm`, `stated`, the annual-year inputs) first computes on the validated values; only
+when that gives NULL does it recompute with the withheld values restored, and records the code. Validated readers
+(promotion audits, statements, tests of the rules) are unchanged.
+
+| Withholding point (rule) | Validated value | Shown instead (as filed) | Flag |
+|---|---|---|---|
+| X86 ATTRIBUTION_WITHHELD (owners + NCI != PAT, no recovery) | owners' profit NULL: EPS, P/E, ROE, NPM, net profit NULL | PAT as filed for that period (the stated total profit; the owners line as filed is the defective one: 0 placeholders, OCI) | `ATTRIBUTION_AS_FILED` |
+| X94 tax copied from the prior year | tax, PAT, TCI of the period NULL | the period's values as filed | `TAX_COPY_AS_FILED` |
+| X173 / X315 YTD copies a quarter / the prior year | the copied YTD values NULL (TTM sums the quarters) | the YTD as filed, only where no validated path exists (e.g. an FY ratio whose 12-month figure is the copy) | `YTD_AS_FILED` |
+| X226 bridge reads a proven mis-filed YTD | TTM NULL | the sum of the 4 latest quarters as filed, derived quarters included (never the refused bridge; NULL when a quarter is missing) | `TTM_MISFILED_YTD` |
+| X301 bridge on two bases | 4-quarter sum (NULL when a derived quarter is mis-filed) | the 4-quarter sum as filed | `TTM_MIXED_BASIS` (also on every X301 quarter sum) |
+| open non-blocking finding (YTD_QUARTER_MISMATCH, ANNUAL_PRIOR_YEAR_DIFFERS, ATTRIBUTION_WITHHELD, CROSS_CHECK_FAILED, ANNUAL_SHARE_COUNT_DIFFERS, TAX_COPIED_FROM_PRIOR_YEAR) | value already shown | unchanged | `OPEN_FINDING:<reason>` when its period end lies in the row's 5-quarter window (`RESTATEMENT_QUARTERS`) on the row's scope |
+| open GAP finding (unexplained > 10% gap) | adjusted price columns NULL from the gap | unchanged: a return across a possibly missed split is no figure anyone stated; the raw close, volume and market cap stay shown | `PRICE_GAP_UNRESOLVED` |
+
+Genuine absence stays NULL and is never flagged into a number: fewer than 4 quarters for TTM (invariant 6), windows
+before the cutoff (invariant 14, `min_periods_required`), no filing, a ratio undefined by its definition (a zero or
+negative denominator, X194), lender / insurer columns that do not apply. Blocking quarantines still parse nothing
+(unknown taxonomy, invalid XBRL, failed identity, undetermined period): there is no entity, or no period, to show a
+number for. Open findings are read with today's resolution state ("valid" knowledge, §11.9, as the GAP freeze and PDF
+corrections): a rebuilt history flags every as-of date from the finding's filing visibility while the finding is
+open, and none once it is resolved, so a backtest sees today's judgement of each date's filings. Findings change
+outside the fundamentals inputs, so the two columns are DAILY (§4.1) and `materialize --incremental` diffs the open
+findings against `features_dq_findings` (the set the stored rows reflect) and marks each changed finding's entity from
+its period end (`dirty.mark_finding_changes`). Screens include flagged rows; `Data Suspect = 0` excludes them,
+`Data Flag <code> = 1` selects one code (§14), and `screen` prints `dq_suspect` / `dq_flags` with every match. If built, it must prove its numbers against the same filing's XBRL `OneD`/`FourD` before any row is promoted.
 
 ## 8. Canonical building blocks (defined once; every ratio uses these)
 
@@ -1003,6 +1037,10 @@ ALIAS      := a name in financials.dsl.ALIASES or user_custom_ratios (case-insen
   comma-separated arithmetic expression (aliases, saved custom ratios, arithmetic) to every match, labelled by its
   normalised text; `--order-by EXPR [--desc]` sorts (NULLs last, then symbol); `--limit N`. Custom ratios are saved with
   `save-ratio NAME EXPRESSION` (validated by compiling it; built-in names refused) and listed with `ratios`.
+- Data quality (X325, owner decision V, §7.7): every match carries `dq_suspect` and `dq_flags`. Screens include
+  flagged rows by default; `Data Suspect = 0` excludes them, `Data Open Finding = 1` keeps rows an open finding
+  concerns, and `Data Flag <code> = 1` one code, written in words ("Data Flag Attribution As Filed", "Data Flag Ttm
+  Mixed Basis", "Data Flag Open Finding Ytd Quarter Mismatch"). These aliases read a missing flag as 0.
 
 - Aliases map **only** to whitelisted `screener_features` columns or saved custom ratios.
 - Saved custom ratios are expanded before compilation; cycles are rejected.

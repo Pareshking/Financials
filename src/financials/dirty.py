@@ -126,3 +126,53 @@ def mark_market_changes(con, before: dict[str, set[tuple]], reason: str, source_
     old = dict(before["securities"])
     moved = {e for sec, ent in after["securities"] ^ before["securities"] if sec in old for e in (ent, old[sec])}
     return n + mark_entities(con, moved, MIN_TRADE_DATE, reason, source_id)
+
+
+# X325 (rule SHOW_AND_FLAG): open findings carrying an entity flag that entity's rows whose window holds the
+# finding's period end (features.dq_columns). Findings are opened and resolved by many writers (promotion, audits,
+# admin resolutions), so instead of a hook in each, `materialize --incremental` diffs the open set against the set
+# the stored rows reflect (features_dq_findings) and marks every changed finding's entity from its period end: a
+# row can carry the flag only on an as-of date on or after that end.
+FINDING_PERIOD_END_SQL = (
+    "coalesce(TRY_CAST(json_extract_string(q.details, '$.ytd_period[1]') AS DATE), "
+    "TRY_CAST(json_extract_string(q.details, '$.period[1]') AS DATE), "
+    "TRY_CAST(json_extract_string(q.details, '$.as_of') AS DATE), fm.period_end)"
+)
+FINDING_FILING_JOIN = (
+    "LEFT JOIN (SELECT filing_id, any_value(scope) AS scope, max(period_end) AS period_end, "
+    "min(visible_from_ts) AS vis FROM filing_meta WHERE filing_id IN (SELECT filing_id FROM quarantine_queue "
+    "WHERE resolved_at IS NULL) GROUP BY filing_id) fm USING (filing_id)"
+)
+OPEN_ENTITY_FINDING = "q.resolved_at IS NULL AND q.entity_id IS NOT NULL AND q.stage <> 'GAP'"
+
+
+def _open_findings(con) -> set[tuple[str, str, date | None]]:
+    return set(con.execute(
+        f"SELECT q.quarantine_id, q.entity_id, {FINDING_PERIOD_END_SQL} FROM quarantine_queue q "
+        f"{FINDING_FILING_JOIN} WHERE {OPEN_ENTITY_FINDING}"
+    ).fetchall())  # fmt: skip
+
+
+def mark_finding_changes(con) -> int:
+    """Mark the entity of every open finding the stored rows do not reflect, and of every reflected one that is no
+    longer open, from the finding's period end (MIN_TRADE_DATE when it names none or an earlier one)."""
+    stored = set(con.execute("SELECT quarantine_id, entity_id, period_end FROM features_dq_findings").fetchall())
+    out: dict[str, date] = {}
+    for _qid, ent, end in stored ^ _open_findings(con):
+        d = max(end or MIN_TRADE_DATE, MIN_TRADE_DATE)
+        out[ent] = min(out.get(ent, date.max), d)
+    return mark(con, out, "DQ_FINDINGS")
+
+
+def store_finding_state(con) -> None:
+    """The open findings the materialised rows now reflect (after a successful run over every stale row)."""
+    rows = sorted(_open_findings(con), key=lambda r: r[0])
+    con.execute("BEGIN TRANSACTION")
+    try:
+        con.execute("DELETE FROM features_dq_findings")
+        insert_rows(con, "features_dq_findings",
+                    [{"quarantine_id": q, "entity_id": e, "period_end": d} for q, e, d in rows])  # fmt: skip
+    except BaseException:
+        con.execute("ROLLBACK")
+        raise
+    con.execute("COMMIT")

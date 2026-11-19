@@ -457,6 +457,7 @@ PINNED_SOURCES = (
     "src/financials/money.py",
     "src/financials/price_history.py",
     "src/financials/features_store.py",
+    "src/financials/dirty.py",  # X325: the open-finding period end of dq_flags
     "reference/valuation_archetypes.csv",
     "reference/cyclical_symbols.csv",
 )

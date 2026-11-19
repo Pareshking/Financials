@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
+from financials.db import table_columns
 from financials.timeutil import utc_now
 
 # alias (lower-case, single-spaced) -> (SQL over screener_features columns, unit note)
@@ -475,6 +476,31 @@ def _audit_aliases() -> dict[str, tuple[str, str]]:
 
 ALIASES.update(_audit_aliases())
 
+
+def _dq_aliases() -> dict[str, tuple[str, str]]:
+    """X325 (rule SHOW_AND_FLAG, owner decision V): screens include flagged rows by default; `Data Suspect = 0`
+    excludes them, `Data Flag <code> = 1` keeps only rows carrying one code (code words lower-case, spaces for
+    underscores and the colon, e.g. "Data Flag Open Finding Ytd Quarter Mismatch"). Missing flags read as 0."""
+    from financials.features import DQ_CODES, DQ_FINDING_REASONS
+
+    out = {
+        "data suspect": ("CAST(coalesce(dq_suspect, FALSE) AS INTEGER)", "1/0, any data-quality flag (X325)"),
+        "data open finding": (
+            "CAST(coalesce(dq_flags LIKE '%OPEN_FINDING:%', FALSE) AS INTEGER)",
+            "1/0, an open finding concerns the row's window (X325)",
+        ),
+    }
+    for code in (*DQ_CODES, *(f"OPEN_FINDING:{r}" for r in DQ_FINDING_REASONS)):
+        name = "data flag " + code.lower().replace("_", " ").replace(":", " ")
+        out[name] = (
+            f"CAST(coalesce(list_contains(string_split(dq_flags, ','), '{code}'), FALSE) AS INTEGER)",
+            f"1/0, row flagged {code} (X325)",
+        )
+    return out
+
+
+ALIASES.update(_dq_aliases())
+
 KEYWORDS = {"and", "or", "not"}
 COMPARATORS = {"<", "<=", ">", ">=", "=", "!="}
 NAME_RE = re.compile(r"^[a-z][a-z0-9 ]{0,62}$")
@@ -811,7 +837,10 @@ def run_screen(
             extra_cols.append((label, sql, params))
     select_params = [p for _, _, ps in extra_cols for p in ps]
     extra = ", ".join(f'{sql} AS "{label}"' for label, sql, _ in extra_cols)
-    select = "as_of_date, symbol, series, close" + (f", {extra}" if extra else "")
+    # X325: every match shows its data-quality flags (a database not yet upgraded has none to show)
+    table = "screener_features" if as_of is None else "screener_features_history"
+    dq = ", dq_suspect, dq_flags" if "dq_flags" in table_columns(con, table) else ""
+    select = "as_of_date, symbol, series, close" + dq + (f", {extra}" if extra else "")
     order, order_params = "symbol", []
     if order_by:
         ((_, order_sql, order_params),) = compile_columns([order_by], custom)

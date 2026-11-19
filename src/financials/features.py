@@ -25,6 +25,7 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
 from financials import (
+    dirty,
     features_audit,
     features_bs,
     features_disclosures,
@@ -44,8 +45,14 @@ from financials.fundamentals import (
     BANK_COLUMNS,
     CASH_CONVERSION_COLUMNS,
     CURRENT_VERSION,
+    DQ_ATTRIBUTION,
+    DQ_TAX_COPY,
+    DQ_TTM_MISFILED,
+    DQ_TTM_MIXED,
+    DQ_YTD,
     INSURER_COLUMNS,
     NBFC_COLUMNS,
+    RESTATEMENT_QUARTERS,
     REVERSE_DCF_TERMINAL_G,
     REVERSE_DCF_WACC,
     SCREENER_CONVENTION_COLUMNS,
@@ -700,6 +707,7 @@ def compute_rows(
     issues = issue_sizes(con, as_of, exchange, entities)  # rule SHARES_REG31_OUTLIER [X221]
     dividends = _dividends(con, as_of, knowledge, as_of_ts, secs)
     events = _event_counts(con, as_of, as_of_ts, entities)
+    findings = open_findings(con, as_of_ts, entities)  # X325 OPEN_FINDING flags
     kpis = supplemental_kpi_columns(con, as_of_ts, entities)
     run_cache = prices.fundamentals if prices is not None else None
     if run_cache is not None:  # one read per quarter of the run (it reads only days before the quarter)
@@ -723,7 +731,7 @@ def compute_rows(
     try:
         rows = _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all, paid_up, quarter_end,
                      events, kpis, history, curated, arch_override, fundamentals_cache, dividends, prices,
-                     issues)  # fmt: skip
+                     issues, findings)  # fmt: skip
         if run_cache is not None:
             run_cache.store({e: (k, fundamentals_cache[e]) for e, k in keys.items() if e in stale})
     finally:
@@ -745,7 +753,7 @@ def compute_rows(
 
 def _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all, paid_up, quarter_end, events, kpis,
           history, curated, arch_override, fundamentals_cache, dividends=None, prices=None,
-          issues=None) -> list[dict]:  # fmt: skip
+          issues=None, findings=None) -> list[dict]:  # fmt: skip
     rows = []
     for sec, ent, symbol, series in universe:
         b = bars.get(sec, [])
@@ -833,8 +841,65 @@ def _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all,
         public = shp.get("PUBLIC", (None, None))[1]
         a5 = row["deliv_avg_5d"]
         row["float_turnover_pct"] = a5 / public * 100 if a5 is not None and public else None
+        row.update(dq_columns(fund, (findings or {}).get(ent, ()), frozen.get(sec), as_of))
         rows.append(row)
     return rows
+
+
+# X325 (rule SHOW_AND_FLAG, owner decision V): an open finding flags the rows whose fundamentals window it concerns.
+# The window is the restatement window (fundamentals.RESTATEMENT_QUARTERS: the 4 TTM quarters and the year-ago
+# quarter they are compared with), on the row's scope when the finding names one.
+DQ_FINDING_MONTHS = 3 * RESTATEMENT_QUARTERS
+DQ_PRICE_GAP = "PRICE_GAP_UNRESOLVED"  # an open GAP finding freezes the back-adjusted series (returns stay NULL)
+DQ_CODES = (DQ_ATTRIBUTION, DQ_YTD, DQ_TAX_COPY, DQ_TTM_MISFILED, DQ_TTM_MIXED, DQ_PRICE_GAP)
+# Reasons of the non-blocking findings that carry an entity (the DSL names one alias per reason; a flag is written
+# for any open entity finding, named or not).
+DQ_FINDING_REASONS = (
+    "YTD_QUARTER_MISMATCH", "ANNUAL_PRIOR_YEAR_DIFFERS", "ATTRIBUTION_WITHHELD", "CROSS_CHECK_FAILED",
+    "ANNUAL_SHARE_COUNT_DIFFERS", "TAX_COPIED_FROM_PRIOR_YEAR",
+)  # fmt: skip
+
+
+def open_findings(con, as_of_ts: datetime, entities=None) -> dict[str, list[tuple[str, str | None, date | None]]]:
+    """X325: open (unresolved) findings attributed to an entity, as (reason_code, scope or None, period end), whose
+    filing (if any) is visible at `as_of_ts`. The period end is the finding's own period (YTD period, period,
+    share-count date) or its filing's period end. Read with today's resolution state ("valid" knowledge, as the GAP
+    freeze and PDF corrections): a finding resolved later flags no as-of date, an open one flags every as-of date
+    from its filing's visibility, so a rebuilt history shows what is known now about each date's filings."""
+    only, params = entity_filter("q.entity_id", entities)
+    out: dict[str, list] = defaultdict(list)
+    for ent, reason, scope, end in con.execute(
+        "SELECT q.entity_id, q.reason_code, coalesce(json_extract_string(q.details, '$.scope'), fm.scope), "
+        + dirty.FINDING_PERIOD_END_SQL
+        + " FROM quarantine_queue q "
+        + dirty.FINDING_FILING_JOIN
+        + " WHERE "
+        + dirty.OPEN_ENTITY_FINDING
+        + " AND (q.filing_id IS NULL OR fm.vis <= ?)"
+        + only
+        + " ORDER BY 1, 2, 3, 4",
+        [as_of_ts, *params],
+    ).fetchall():
+        out[ent].append((reason, scope, end))
+    return out
+
+
+def dq_columns(fund: dict, findings, frozen_from: date | None, as_of: date) -> dict:
+    """X325: `dq_flags` = sorted, comma-separated codes of the row (NULL when none); `dq_suspect` = any flag.
+    Codes: the as-filed values the fundamentals block used (fundamentals.DQ_*), OPEN_FINDING:<reason> for each open
+    finding of the entity whose period end lies in the row's window (on the row's scope when the finding names
+    one), PRICE_GAP_UNRESOLVED while an open GAP finding freezes the price series."""
+    codes = set(fund.get("_dq", ()))
+    end, scope = fund.get("fundamentals_end"), fund.get("scope_used")
+    for reason, f_scope, f_end in findings:
+        if f_end is None or end is None or not (_add_months(end, -DQ_FINDING_MONTHS) < f_end <= end):
+            continue
+        if f_scope is not None and scope is not None and f_scope != scope:
+            continue
+        codes.add(f"OPEN_FINDING:{reason}")
+    if frozen_from is not None and frozen_from <= as_of:
+        codes.add(DQ_PRICE_GAP)
+    return {"dq_suspect": bool(codes), "dq_flags": ",".join(sorted(codes)) or None}
 
 
 _EMPTY_FUNDAMENTALS: dict = {
@@ -916,6 +981,7 @@ def _fundamentals(con, entity_id: str, as_of_ts: datetime, end: date) -> dict:
     if decision is None:
         return {**empty, "fundamentals_end": end}
     scope, book = decision.scope, decision.book
+    book.fill_as_filed = True  # X325 SHOW_AND_FLAG: validated values first, else as filed (flagged in book.dq)
     scope_cols = {
         "scope_reason": decision.reason,
         "restatement_suspected": decision.book.restatement_suspected(end),
@@ -972,6 +1038,7 @@ def _fundamentals(con, entity_id: str, as_of_ts: datetime, end: date) -> dict:
     out["_gems"] = features_gems.period_values(book, end, b)  # batch D: core profit, TTM core earnings, stability
     out["_extra"] = features_extra.period_values(con, book, end, b, as_of_ts)  # batch G (remaining Phase 2 ratios)
     out["_more"] = features_more.period_values(book, end, b, industrial)  # batch I (last catalogue rows)
+    out["_dq"] = tuple(sorted(book.dq))  # X325: as-filed values this block used
     return out
 
 
@@ -1378,6 +1445,9 @@ def settle_full_run(con, days: list[date]) -> int:
     if not stored <= set(days):
         return 0
     prev = con.execute("SELECT max(as_of_date) FROM features_daily WHERE as_of_date < ?", [lo]).fetchone()[0]
+    last = con.execute("SELECT max(as_of_date) FROM features_daily").fetchone()[0]
+    if prev is None and last is not None and last <= hi:  # X325: every stored row now reflects today's findings
+        dirty.store_finding_state(con)
     return settle_dirty(con, _dirty_rows(con), None if prev is None else prev + timedelta(days=1), hi)
 
 
@@ -1588,8 +1658,10 @@ def materialize_incremental(con, to: date | None = None, exchange: str = "NSE") 
     msg = version_mismatch(con)
     if msg is not None:
         return IncrementalResult("REFUSED", [], msg)
+    dirty.mark_finding_changes(con)  # X325: findings opened / resolved since the rows were flagged
     rows = _dirty_rows(con)
     if not rows:
+        dirty.store_finding_state(con)
         return IncrementalResult("NOTHING", [], "no dirty entities")
     if to is not None:
         rows = [r for r in rows if r[2] <= to]
@@ -1611,4 +1683,5 @@ def materialize_incremental(con, to: date | None = None, exchange: str = "NSE") 
         r = results[-1]
         return IncrementalResult("ABORTED", results, f"{r.as_of_date}: {r.gate} {r.message}; dirty markers kept")
     settle_dirty(con, rows, None, to)
+    dirty.store_finding_state(con)  # markers left after `to` keep those rows stale until a later run
     return IncrementalResult("DONE", results, f"{len(days)} day(s)", len({r[1] for r in rows}))

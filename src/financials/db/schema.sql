@@ -758,6 +758,12 @@ CREATE TABLE IF NOT EXISTS features_daily (
     has_dvr_shares                           BOOLEAN,         -- equity shares with differential voting rights
     has_sbo                                  BOOLEAN,         -- any significant beneficial owner
     is_psu                                   BOOLEAN,         -- public sector undertaking
+    -- X325 (rule SHOW_AND_FLAG, owner decision V): data-quality flags of the row (DAILY: open findings are read
+    -- with today's resolution state, outside the fundamentals-cache key). dq_flags = sorted comma-separated codes
+    -- (ATTRIBUTION_AS_FILED, YTD_AS_FILED, TAX_COPY_AS_FILED, TTM_MISFILED_YTD, TTM_MIXED_BASIS,
+    -- OPEN_FINDING:<reason>, PRICE_GAP_UNRESOLVED), NULL when none; dq_suspect = any flag.
+    dq_suspect                               BOOLEAN,
+    dq_flags                                 VARCHAR,
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -1882,6 +1888,12 @@ CREATE TABLE IF NOT EXISTS screener_features (
     audit_opinion_quarterly                  VARCHAR,         -- latest results filing stating an opinion
     audit_opinion_quarter_end                DATE,
     roe_screener                             DOUBLE,          -- Screener ROE: last FY owners' PAT / avg owners' equity [X227]
+    -- X325 (rule SHOW_AND_FLAG, owner decision V): data-quality flags of the row (DAILY: open findings are read
+    -- with today's resolution state, outside the fundamentals-cache key). dq_flags = sorted comma-separated codes
+    -- (ATTRIBUTION_AS_FILED, YTD_AS_FILED, TAX_COPY_AS_FILED, TTM_MISFILED_YTD, TTM_MIXED_BASIS,
+    -- OPEN_FINDING:<reason>, PRICE_GAP_UNRESOLVED), NULL when none; dq_suspect = any flag.
+    dq_suspect                               BOOLEAN,
+    dq_flags                                 VARCHAR,
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -1987,6 +1999,16 @@ CREATE TABLE IF NOT EXISTS materialize_dirty (
     reason      VARCHAR NOT NULL,            -- RESULTS | SHAREHOLDING | REG30_EVENT | KPI | MARKET_DAY | ...
     source_id   VARCHAR NOT NULL,            -- filing_id / quarantine_id / stage path / '' when none
     created_at  TIMESTAMP NOT NULL
+);
+
+-- X325 (rule SHOW_AND_FLAG): the open entity findings the materialised OPEN_FINDING flags reflect (dirty.py). A
+-- finding opened or resolved by any writer differs from this set; `materialize --incremental` marks its entity
+-- from the finding's period end and stores the current set once the run has succeeded (a full run from the first
+-- materialised day to the last stores it too).
+CREATE TABLE IF NOT EXISTS features_dq_findings (
+    quarantine_id VARCHAR PRIMARY KEY,
+    entity_id     VARCHAR NOT NULL,
+    period_end    DATE                       -- the finding's period end (window anchor); NULL when it names none
 );
 
 -- Reader version of each materialised day (features.FEATURES_VERSION); `materialize --incremental` refuses when
@@ -2364,7 +2386,7 @@ SELECT d.as_of_date, d.security_id, d.entity_id, d.symbol, d.series, d.price_dat
        d.has_partly_paid, d.has_locked_in, d.has_dvr_shares, d.has_sbo, d.is_psu, e.subsidiary_fy_end,
        e.parent_profit_share, e.largest_subsidiary_profit_share, e.largest_subsidiary_name, e.consolidated_entities_count,
        e.audit_opinion, e.audit_opinion_fy_end, e.audit_opinion_conflict, e.going_concern_uncertainty, e.emphasis_of_matter,
-       e.audit_opinion_quarterly, e.audit_opinion_quarter_end, e.roe_screener
+       e.audit_opinion_quarterly, e.audit_opinion_quarter_end, e.roe_screener, d.dq_suspect, d.dq_flags
 FROM features_daily d
 LEFT JOIN features_events e ON e.security_id = d.security_id AND e.valid_from_date <= d.as_of_date
      AND d.as_of_date < coalesce(e.valid_to_date, DATE '9999-12-31');  -- open interval; an OR here is ~400x slower

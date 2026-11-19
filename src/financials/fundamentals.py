@@ -82,6 +82,15 @@ NET_LINE_LOSS_TAGS = ("net_loss_fair_value", "net_loss_derecognition")
 # X273 (owner decision T): the fixed-asset lines of a balance sheet. Net block (Screener layout, S10) = PPE +
 # right-of-use + other intangibles + goodwill + investment property; CWIP = CWIP + intangibles under development.
 # One definition per line across all balance-sheet dates of an entity: FactBook.align_fixed_assets.
+# X325 (rule SHOW_AND_FLAG, owner decision V, 2026-11-19): a value a named rule withholds is kept beside the book
+# (FactBook.withheld) with the code of its class. A reader in as-filed mode (FactBook.fill_as_filed, set by the
+# feature layer) first computes on the validated values; only when that gives NULL does it recompute with the
+# withheld values restored, and the row is flagged (FactBook.dq). Validated values always win; nothing is invented.
+DQ_ATTRIBUTION = "ATTRIBUTION_AS_FILED"  # X86: owners' profit of a withheld split = PAT as filed
+DQ_YTD = "YTD_AS_FILED"  # X173 / X315: a YTD context that copies another context, as filed
+DQ_TAX_COPY = "TAX_COPY_AS_FILED"  # X94: tax / PAT / TCI of a period whose tax copies the prior year, as filed
+DQ_TTM_MISFILED = "TTM_MISFILED_YTD"  # X226: TTM whose bridge reads a proven mis-filed YTD: quarters as filed
+DQ_TTM_MIXED = "TTM_MIXED_BASIS"  # X301: TTM summed over quarters that may be on two bases
 FIXED_ASSET_LINES = (
     "ppe_net", "right_of_use_assets", "other_intangibles", "goodwill", "investment_property", "cwip",
     "intangibles_under_development",
@@ -121,6 +130,61 @@ class FactBook:
     # X273 (decision T): balance-sheet date -> how its fixed-asset lines were chosen (RESULTS_DEFINITION /
     # ANNUAL_ONE_SOURCE), only for dates where a Reg. 34 annual report ranked first on one of those lines.
     fixed_asset_rule: dict[date, str] = field(default_factory=dict)
+    # X325 (SHOW_AND_FLAG): values withheld by a named rule, tag -> period -> (value as filed, DQ code); readers use
+    # them only in as-filed mode (`fill_as_filed`) and only where the validated values give NULL, recording the
+    # code in `dq` (the row's data-quality flags).
+    withheld: dict[str, dict[Period, tuple[Decimal, str]]] = field(default_factory=dict)
+    fill_as_filed: bool = False
+    dq: set[str] = field(default_factory=set)
+    _depth: int = 0  # > 0 inside a reader: nested quarter() calls never fill on their own
+
+    def _withhold(self, tag: str, period: Period, value: Decimal, code: str) -> None:
+        self.withheld.setdefault(tag, {}).setdefault(period, (value, code))
+
+    def _flag(self, code: str) -> None:
+        if self.fill_as_filed:
+            self.dq.add(code)
+
+    def _filled(self, tags: tuple[str, ...], fn):
+        """X325: `fn()` with the withheld values of `tags` restored (validated values are never replaced); the
+        restored values and any derived tag built meanwhile are removed again. The codes are recorded when the
+        result is not None."""
+        before = set(self.durations)
+        added, codes = [], set()
+        for t in tags:
+            for p, (v, code) in self.withheld.get(t, {}).items():
+                d = self.durations.setdefault(t, {})
+                if p not in d:
+                    d[p] = v
+                    added.append((t, p))
+                    codes.add(code)
+        if not added:
+            return None
+        self._depth += 1
+        try:
+            out = fn()
+        finally:
+            self._depth -= 1
+            for t, p in added:
+                self.durations.get(t, {}).pop(p, None)
+            for k in set(self.durations) - before:
+                del self.durations[k]
+        if out is not None:
+            self.dq.update(codes)
+        return out
+
+    def _can_fill(self, tag: str) -> bool:
+        return self.fill_as_filed and not self._depth and bool(self.withheld.get(tag))
+
+    def stated(self, tag: str, period: Period) -> Decimal | None:
+        """The validated value of `tag` for `period`; in as-filed mode, else the withheld value as filed (flagged)."""
+        v = self.durations.get(tag, {}).get(period)
+        if v is None and self.fill_as_filed and not self._depth:
+            w = self.withheld.get(tag, {}).get(period)
+            if w is not None:
+                self.dq.add(w[1])
+                return w[0]
+        return v
 
     def tax_copy_breaks(self) -> list[dict]:
         """X94: periods whose current and deferred tax both equal, to the rupee and non-zero, those of the same-length
@@ -145,7 +209,9 @@ class FactBook:
         for b in self.tax_copied:
             p = (date.fromisoformat(b["period"][0]), date.fromisoformat(b["period"][1]))
             for tag in TAX_COPY_WITHHELD_TAGS:
-                self.durations.get(tag, {}).pop(p, None)
+                v = self.durations.get(tag, {}).pop(p, None)
+                if v is not None:
+                    self._withhold(tag, p, v, DQ_TAX_COPY)
 
     def ytd_copy_periods(self) -> list[dict]:
         """X173: YTD periods (6 / 9 / 12 months from a fiscal-year start) whose total income, PBT and PAT equal those
@@ -200,9 +266,9 @@ class FactBook:
             q = (_add_months(date(e.year, e.month, 1), -2), e)
             if "copied_period" in b:
                 q = tuple(date.fromisoformat(x) for x in b["copied_period"])
-            for d in self.durations.values():
+            for tag, d in self.durations.items():
                 if (s, e) in d and q in d and d[(s, e)] == d[q]:
-                    del d[(s, e)]
+                    self._withhold(tag, (s, e), d.pop((s, e)), DQ_YTD)
 
     def is_ytd_start(self, start: date) -> bool:
         return not self.fy_starts or start in self.fy_starts
@@ -478,7 +544,14 @@ class FactBook:
 
     # ── flows ──
     def quarter(self, tag: str, end: date) -> Decimal | None:
-        """3-month value ending `end`: reported, or YTD_k − YTD_{k−1} within one fiscal year (§6.2)."""
+        """3-month value ending `end`: reported, or YTD_k − YTD_{k−1} within one fiscal year (§6.2). In as-filed mode
+        (X325) a NULL on the validated values is recomputed with the withheld values of `tag`, flagged."""
+        v = self._quarter(tag, end)
+        if v is None and self._can_fill(tag):
+            v = self._filled((tag,), lambda: self._quarter(tag, end))
+        return v
+
+    def _quarter(self, tag: str, end: date) -> Decimal | None:
         d = self.durations.get(tag, {})
         q_start = _add_months(date(end.year, end.month, 1), -2)
         if (q_start, end) in d:
@@ -490,7 +563,33 @@ class FactBook:
         return None
 
     def ttm(self, tag: str, end: date) -> Decimal | None:
-        """Sum of the 4 quarters ending `end`; falls back to the YTD bridge for H1/FY-only flows."""
+        """Sum of the 4 quarters ending `end`; falls back to the YTD bridge for H1/FY-only flows. In as-filed mode
+        (X325) a NULL on the validated values is recomputed with the withheld values of `tag`, flagged; the quarters
+        it reads never fill on their own (a validated bridge wins over an as-filed quarter)."""
+        if not self.fill_as_filed or self._depth:
+            return self._ttm(tag, end)
+        self._depth += 1
+        try:
+            v = self._ttm(tag, end)
+        finally:
+            self._depth -= 1
+        if v is None and self.withheld.get(tag):
+            v = self._filled((tag,), lambda: self._ttm(tag, end))
+        return v
+
+    def _as_filed_ttm(self, tag: str, end: date, code: str) -> Decimal | None:
+        """X325: where X226 / X301 withhold a TTM, the figure as filed: the sum of the 4 quarters to `end` at their
+        latest visible values (a quarter derived from a mis-filed YTD included), flagged `code`. Never the bridge it
+        refused. None in validated mode, or when a quarter is missing (fewer than 4 quarters: genuine absence)."""
+        if not self.fill_as_filed:
+            return None
+        qs = [self._quarter(tag, _add_months(end, -3 * i)) for i in range(4)]
+        if None in qs:
+            return None
+        self._flag(code)
+        return sum(qs, Decimal(0))
+
+    def _ttm(self, tag: str, end: date) -> Decimal | None:
         if self.bridged_operating_line(tag, end) or not self._ytd_consistent(tag, end):
             # X106 (owner decision A, 2026-11-15): a restated quarter inside the window. Never sum mixed-basis
             # quarters; use the company's latest YTD for the current year plus the prior year's FY - YTD as filed
@@ -499,10 +598,11 @@ class FactBook:
             # X300: the operating lines of a restated row (other income, D&A, finance costs, PBT) likewise.
             used = self._bridge_periods(tag, end)
             if used and any(self._misfiled(tag, p) for p in used):
-                return None
+                return self._as_filed_ttm(tag, end, DQ_TTM_MISFILED)  # validated: NULL; X325: as filed, flagged
             srcs = OWNERS_TTM_TAGS.get(tag, ())
             if any(self.misfiled_ytd_evidence(t, p) for t in srcs for p in self._bridge_periods(t, end)):
-                return None  # X301: owners' profit is withheld with PAT's (or filed owners' profit's) bridge
+                # X301: owners' profit is withheld with PAT's (or filed owners' profit's) bridge; X325 as filed
+                return self._as_filed_ttm(tag, end, DQ_TTM_MISFILED)
             if (
                 self.prior_year_mixed_basis(tag, used)
                 if tag in YTD_GUARDED_TAGS
@@ -517,7 +617,11 @@ class FactBook:
                 # FY26 revenue 8,258 Cr continuing vs H1 FY26 5,693 Cr as first filed): FY - YTD is no set of
                 # quarters, so no bridge; the latest 4 quarters as filed instead (industry practice). Owners' profit
                 # follows PAT there, and sums its quarters when it has no bridge of its own (attribution withheld, X86).
-                return self.mixed_basis_quarter_sum(tag, end)
+                v = self.mixed_basis_quarter_sum(tag, end)
+                if v is not None:
+                    self._flag(DQ_TTM_MIXED)
+                    return v
+                return self._as_filed_ttm(tag, end, DQ_TTM_MIXED)  # a derived quarter is mis-filed: X325 as filed
             return self.ttm_from_ytd(tag, end)
         qs = [self.quarter(tag, _add_months(end, -3 * i)) for i in range(4)]
         if None not in qs:
@@ -541,7 +645,7 @@ class FactBook:
                         if self._misfiled(tag, (s, e)) or self._misfiled(tag, (s, prev_end)):
                             return None
                         break
-            q = self.quarter(tag, e)
+            q = self._quarter(tag, e)
             if q is None:
                 return None
             total += q
@@ -608,7 +712,26 @@ class FactBook:
                             break
             out.update(primary)
             self.durations[key] = out
+            if fallback:
+                self._withhold_derived(key, tag, fallback, out, blocked)
         return key
+
+    def _withhold_derived(self, key: str, tag: str, fallback: str, out: dict, blocked: dict) -> None:
+        """X325: the as-filed values of a coalesced tag for the periods it lacks: COALESCE(tag, fallback) over the
+        withheld values too (a tax copy, X94; a YTD copy, X173), and the fallback (PAT) for a period whose owners /
+        NCI split is withheld (X86 ATTRIBUTION_WITHHELD: owners + NCI != PAT, so PAT, the period's stated total
+        profit, is the best stated figure; flagged ATTRIBUTION_AS_FILED)."""
+        wp, wb = self.withheld.get(tag, {}), self.withheld.get(fallback, {})
+        base = self.durations.get(fallback, {})
+        for p in {*base, *wb, *wp}:
+            if p in out:
+                continue
+            if p in wp:
+                self._withhold(key, p, *wp[p])
+            elif p in base and p in blocked:
+                self._withhold(key, p, base[p], DQ_ATTRIBUTION)
+            elif p in wb:
+                self._withhold(key, p, wb[p][0], DQ_ATTRIBUTION if p in blocked else wb[p][1])
 
     def continuing_owners(self) -> str:
         """Derived tag: COALESCE(owners, total) - discontinued, per period (per filing) [C10, X52].
@@ -621,6 +744,8 @@ class FactBook:
             owners = self.durations[self.coalesced("pat_owners", "pat")]
             disc = self.durations.get("pat_discontinued", {})
             self.durations[key] = {p: v - disc.get(p, Decimal(0)) for p, v in owners.items()}
+            for p, (v, code) in self.withheld.get(self.coalesced("pat_owners", "pat"), {}).items():
+                self._withhold(key, p, v - disc.get(p, Decimal(0)), code)  # X325
         return key
 
     def latest_flow_end(self, tag: str) -> date | None:
@@ -1078,6 +1203,19 @@ def resolve_scope(con, entity_id: str, as_of: datetime, end: date, *, quarters: 
     for s in order:
         if books[s].ttm(_anchor(books[s]), end) is not None:
             return ScopeDecision(s, books[s], "YTD_BRIDGE", policy)
+    # X325 (SHOW_AND_FLAG): no scope has its flows on validated values; the same order on the values as filed
+    # (withheld values restored where the validated ones give NULL; the book stays in as-filed mode, flagged).
+    for s in order:
+        books[s].fill_as_filed = True
+    for i, s in enumerate(order):
+        if _has_quarters(books[s], end, quarters):
+            return ScopeDecision(s, books[s], default_reason if i == 0 else "FALLBACK_DEFAULT_INCOMPLETE", policy)
+    for s in order:
+        if books[s].ttm(_anchor(books[s]), end) is not None:
+            return ScopeDecision(s, books[s], "YTD_BRIDGE", policy)
+    for s in order:
+        books[s].fill_as_filed = False
+        books[s].dq.clear()
     for s in order:
         if books[s].latest_instant("total_assets", end) is not None:
             return ScopeDecision(s, books[s], "BALANCE_SHEET_ONLY", policy)
@@ -1708,7 +1846,7 @@ def latest_fiscal_year(book: FactBook, on_or_before: date) -> tuple[date, date] 
 
 
 def _fy(book: FactBook, tag: str, p: tuple[date, date]) -> Decimal | None:
-    return book.durations.get(tag, {}).get(p)
+    return book.stated(tag, p)  # X325: as filed (flagged) in as-filed mode when a rule withheld it
 
 
 def _at(book: FactBook, tag: str, d: date) -> Decimal | None:
@@ -1733,12 +1871,25 @@ def _year(book: FactBook, p: tuple[date, date]) -> dict[str, Decimal | None]:
         "ltd": _at(book, "borrowings_noncurrent", end), "rec": _at(book, "trade_receivables_current", end),
         "share_capital": _at(book, "equity_share_capital", end),
         "equity_owners": _at(book, "equity_attributable_to_owners", end) or _at(book, "total_equity", end),
-        "pat_owners": None if _fy(book, ATTRIBUTION_WITHHELD_TAG, p)
-        else (_fy(book, "pat_owners", p) or _fy(book, "pat", p)),
+        "pat_owners": _owners_fy(book, p),
         "goodwill": _at(book, "goodwill", end), "intangibles": _at(book, "other_intangibles", end),
         "cwip": _at(book, "cwip", end), "gross_block": _at(book, "ppe_gross_block", end),
         "contingent": _at(book, "contingent_liabilities", end),
     }  # fmt: skip
+
+
+def _owners_fy(book: FactBook, p: tuple[date, date]) -> Decimal | None:
+    """One fiscal year's owners' profit: filed owners, else PAT. Where the split is withheld (X86) and no filing
+    states the owners: NULL on validated values; PAT as filed, flagged ATTRIBUTION_AS_FILED, in as-filed mode (X325)."""
+    owners = _fy(book, "pat_owners", p)
+    if _fy(book, ATTRIBUTION_WITHHELD_TAG, p) and owners is None:
+        if not book.fill_as_filed:
+            return None
+        pat = _fy(book, "pat", p)
+        if pat is not None:
+            book.dq.add(DQ_ATTRIBUTION)
+        return pat
+    return owners or _fy(book, "pat", p)
 
 
 PIOTROSKI_SIGNALS = (
@@ -1877,7 +2028,7 @@ def roe_screener(book: FactBook, on_or_before: date) -> Decimal | None:
     fy = latest_fiscal_year(book, on_or_before)
     if fy is None:
         return None
-    profit = book.durations.get(book.coalesced("pat_owners", "pat"), {}).get(fy)
+    profit = book.stated(book.coalesced("pat_owners", "pat"), fy)  # X325: as filed (flagged) in as-filed mode
 
     def owners_equity(d: date) -> Decimal | None:
         return _at(book, "equity_attributable_to_owners", d) or _at(book, "total_equity", d)

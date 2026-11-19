@@ -27,7 +27,7 @@ Promote includes identity resolution, G1/G2, `ohlcv`, corporate-action verificat
 
 Full universe for 2026-11-12: **2,981 rows in 2044 ms** (PROMOTED), including G4 (null-spike vs 2025-10-14) and G5 (atomic swap).
 
-Incremental (`materialize --incremental`, DONE): one dirty entity over 2 materialised days **1783 ms**; 300 dirty entities on 2026-11-12 **1348 ms** (restricted batch reads, then G5/G4 on the merged day).
+Incremental (`materialize --incremental`, DONE): one dirty entity over 2 materialised days **451 ms**; 300 dirty entities on 2026-11-12 **394 ms** (restricted batch reads, then G5/G4 on the merged day). (Refreshed 2026-11-19 with section 7, QS2.)
 
 ## 4. DSL screen latency (50 runs each, warm)
 
@@ -73,5 +73,16 @@ Per-day legacy path (`FINANCIALS_MATERIALIZE_LEGACY=1`: every day re-reads and r
 | 2025-06-16 | 2,427 | 14.61 | 1.92 | 7.6x |
 | 2026-02-27 | 2,427 | 21.93 | 2.02 | 10.9x |
 | 2026-11-12 | 3,020 | 28.91 | 2.96 | 9.8x |
+
+## 7. Incremental runs over the synthetic history (`--incremental-entities N --incremental-days D`)
+
+`materialize --incremental` on the history of section 6 (architecture §11.10): N dirty entities over the last D materialised days. *unchanged*: markers whose change left their rows as they were (a re-parse, a BSE mirror of a filing): each day recomputes the entities' rows through the run's slices and visibility memo and compares them with the stored rows; nothing is published. *split*: an accepted 1:2 split of each entity's security on the first of those days, so every day from it is published (G5, G4, write, cross-section of the whole day).
+
+| Scenario | Dirty entities | Days | Days published | Status | Run s | s / day |
+|---|---|---|---|---|---|---|
+| unchanged | 50 | 363 | 0 | DONE | 27.1 | 0.075 |
+| split | 50 | 363 | 363 | DONE | 214.5 | 0.591 |
+
+Section 7 and the incremental line of section 3 were refreshed on 2026-11-19 (QS2) by `python -m financials.bench --synthetic 3000 --legacy-days 1` (defaults `--incremental-entities 50 --incremental-days 363`); the other sections are from the run named in the header.
 
 Regression guards with generous margins live in `tests/test_benchmarks.py`.

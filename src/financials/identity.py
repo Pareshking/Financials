@@ -6,7 +6,15 @@ Evidence (docs/references.md):
 
 So a row continues an existing security if **either** its `FinInstrmId` has belonged to it
 or its ISIN is currently held by it. If the two keys point at different securities the row
-is quarantined (`ISIN_COLLISION`). A split coinciding with a series change on the same day
+is quarantined (`ISIN_COLLISION`).
+
+Rule X320: a row whose two keys are both unknown reopens the security whose interval was closed by
+inactivity (promoter.close_inactive_securities) when that security's latest interval carries the row's
+ISIN: a security that comes back after a suspension in another series, with a new FinInstrmId (BCG: BZ
+23580 until 30 Dec 2024, BE 8841 from 14 Jul 2025). Without it the returning row created a second
+security and entity for the same ISIN. Two such candidates are quarantined (`AMBIGUOUS_REOPEN`).
+
+A split coinciding with a series change on the same day
 would create a new security; that is rare and surfaces through the gap auditor.
 """
 
@@ -65,7 +73,7 @@ class IdentityEvent:
 
 @dataclass(frozen=True)
 class IdentityIssue:
-    reason_code: str  # MISSING_FIN_INSTRM_ID | ISIN_COLLISION | OUT_OF_ORDER | DUPLICATE_IN_FILE
+    reason_code: str  # MISSING_FIN_INSTRM_ID | ISIN_COLLISION | OUT_OF_ORDER | DUPLICATE_IN_FILE | AMBIGUOUS_REOPEN
     trade_date: date
     details: dict
 
@@ -89,6 +97,7 @@ class SecurityRegistry:
         self._fid_owner: dict[str, str] = {}  # every FinInstrmId ever seen -> security_id
         self._isin_owner: dict[str, str] = {}  # ISIN of an open interval -> security_id
         self._last_seen: dict[str, date] = {}
+        latest: dict[str, Interval] = {}  # security_id -> its latest interval (X320)
         for iv in intervals:
             if iv.exchange != exchange:
                 continue
@@ -99,6 +108,13 @@ class SecurityRegistry:
             if iv.valid_to is None:
                 self._current[iv.security_id] = iv
                 self._isin_owner[iv.isin] = iv.security_id
+            if iv.security_id not in latest or iv.valid_from > latest[iv.security_id].valid_from:
+                latest[iv.security_id] = iv
+        # X320: a closed security -> the ISIN of its latest interval, and that ISIN -> its closed holders.
+        self._closed_isin: dict[str, str] = {s: iv.isin for s, iv in latest.items() if s not in self._current}
+        self._closed_isin_owners: dict[str, set[str]] = {}
+        for s, isin in self._closed_isin.items():
+            self._closed_isin_owners.setdefault(isin, set()).add(s)
 
     def current(self, security_id: str) -> Interval | None:
         return self._current.get(security_id)
@@ -121,6 +137,18 @@ class SecurityRegistry:
                 continue
             by_fid = self._fid_owner.get(fid)
             by_isin = self._isin_owner.get(row.isin)
+            if by_fid is None and by_isin is None:  # X320: back after inactivity, in another series
+                closed = sorted(self._closed_isin_owners.get(row.isin, ()))
+                if len(closed) > 1:
+                    out.issues.append(
+                        IdentityIssue(
+                            "AMBIGUOUS_REOPEN",
+                            row.trade_date,
+                            {"fin_instrm_id": fid, "isin": row.isin, "symbol": row.symbol, "candidates": closed},
+                        )
+                    )
+                    continue
+                by_isin = closed[0] if closed else None
             sec_id = by_fid or by_isin
             if sec_id is not None:
                 last = self._last_seen.get(sec_id)
@@ -203,6 +231,8 @@ class SecurityRegistry:
                     self._current[sec_id] = new_iv
             self._fid_owner[fid] = sec_id
             self._isin_owner[row.isin] = sec_id
+            if sec_id in self._closed_isin:  # reopened (by FinInstrmId or X320): no longer a closed holder
+                self._closed_isin_owners[self._closed_isin.pop(sec_id)].discard(sec_id)
             self._last_seen[sec_id] = row.trade_date
             seen_today.add(sec_id)
             out.resolved[(row.symbol, row.series)] = sec_id

@@ -316,6 +316,25 @@ OVERRIDES: dict[tuple[str, str], str] = {
     ("REG34_ANNUAL", "HireChargesAssetsContracts"): "ANNUAL_EXPENSE_DETAIL",
     # Seen first in the QF4 fixtures (auditors' remuneration note: cost auditor, reimbursement of expenses).
     ("REG34_ANNUAL", "PaymentToCostAuditorForReimbursementOfExpenses"): "ANNUAL_EXPENSE_DETAIL",
+    # IGAAP_CORP (QG, X331): Schedule III Division I balance-sheet components of the mapped totals (shareholders'
+    # funds, non-current / current liabilities and assets); the tangible + intangible subtotal of mapped lines.
+    **{
+        ("IGAAP_CORP", e): "BALANCE_SHEET_DETAIL"
+        for e in (
+            "ForeignCurrencyMonetaryItemTranslationDifferenceAssetAccount",
+            "ForeignCurrencyMonetaryItemTranslationDifferenceLiabilityAccount",
+            "LongTermLoansAndAdvances",
+            "LongTermProvisions",
+            "MoneyReceivedAgainstShareWarrants",
+            "OtherLongTermLiabilities",
+            "PreproducingProperties",
+            "ProducingProperties",
+            "ShareApplicationMoneyPendingAllotment",
+            "ShortTermLoansAndAdvances",
+            "ShortTermProvisions",
+        )
+    },
+    ("IGAAP_CORP", "PropertyPlantAndEquipmentAndIntangibleAssets"): "DERIVED_SUBTOTAL",
 }
 
 

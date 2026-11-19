@@ -816,9 +816,10 @@ CURRENT_VERSION = (
 
 # Accounting basis of a profile (invariant 6: never combine profiles). Go Digit and Star Health moved from IRDAI
 # Indian-GAAP insurer filings to Ind AS in FY27; their Q1 IRDAI PBT and the Ind AS H1 cannot be combined [X90].
+# SME-listed companies on the non-Ind AS template (IGAAP_CORP) move to Ind AS on migrating to the Main Board [X334].
 _BASIS = (
     "CASE accounting_profile WHEN 'IRDAI_GENERAL' THEN 'IRDAI' WHEN 'IRDAI_LIFE' THEN 'IRDAI' "
-    "WHEN 'IGAAP_BANK' THEN 'IGAAP_BANK' ELSE 'INDAS' END"
+    "WHEN 'IGAAP_BANK' THEN 'IGAAP_BANK' WHEN 'IGAAP_CORP' THEN 'IGAAP_CORP' ELSE 'INDAS' END"
 )
 SAME_BASIS = (
     "(NOT EXISTS (SELECT 1 FROM filing_meta b WHERE b.filing_id = fact_observations.filing_id) OR "

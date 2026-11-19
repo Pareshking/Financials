@@ -258,7 +258,8 @@ CAUSES: dict[str, tuple[str, str, str]] = {
         "AMBIGUOUS_ISIN",
         "OURS",
         "The filed ISIN belongs to two of our entities with the same legal name: we created a second entity when the "
-        "security came back in another series (e.g. BZ to BE after a suspension).",
+        "security came back in another series (e.g. BZ to BE after a suspension). Fixed by X320; repair with "
+        "merge-duplicate-entity (X321), then quarantine reprocess.",
     ),
     "ID_ISIN_SHARED_BY_ENTITIES": (
         "AMBIGUOUS_ISIN",
@@ -290,9 +291,9 @@ CAUSES: dict[str, tuple[str, str, str]] = {
     # UNIVERSE / UNRESOLVED_SYMBOL
     "UN_SERIES_SWITCH_AHEAD_OF_BHAVCOPY": (
         "UNRESOLVED_SYMBOL",
-        "OURS",
-        "The mcap file lists the symbol in its new series a few days before the bhavcopy switches; the security is "
-        "already a member, so no data is lost, but the resolver matches symbol + series strictly by date.",
+        "NO_ACTION",
+        "The mcap file lists the symbol in a new series and the security is already a member (no data is lost), but "
+        "no bhavcopy switch within 5 sessions is on record, so rule X323 cannot settle it (e.g. no bar since).",
     ),
     "UN_SYMBOL_UNKNOWN": ("UNRESOLVED_SYMBOL", "NO_ACTION", "The symbol is not a security we track."),
     # PARSE / UNKNOWN_TAXONOMY, INVALID_XBRL
@@ -300,13 +301,20 @@ CAUSES: dict[str, tuple[str, str, str]] = {
     "TX_WRONG_TEMPLATE_NO_INDAS_REFILE": (
         "UNKNOWN_TAXONOMY",
         "REFILE",
-        "An Ind AS results filing made on SEBI's non-Ind AS template (IntegratedFinance_OtherThanBank) with no Ind AS "
-        "re-file for the same period (X89 closes it once one arrives).",
+        "An Ind AS results filing made on SEBI's non-Ind AS template (IntegratedFinance_OtherThanBank) by a company "
+        "that is not SME-listed (X330), with no Ind AS re-file for the same period (X89 closes it once one arrives).",
     ),
     "TX_NON_INDAS_RESULTS_MEMBER": (
         "UNKNOWN_TAXONOMY",
-        "OWNER",
-        "A member that files results on the non-Ind AS (Indian GAAP) template: we have no parser for it.",
+        "OURS",
+        "A member's results on the non-Ind AS (Indian GAAP) template not yet re-parsed by parser >= 0.10.11, which "
+        "reads an SME-listed company's filing (IGAAP_CORP, X330): restage (ops/live/QG_apply.sh).",
+    ),
+    "PX_AMOUNTS_SCALED": (
+        "AMOUNTS_SCALED",
+        "REFILE",
+        "Every amount of the filing and its EPS are a power of ten too large (X333): quarantined whole, never "
+        "rescaled; the company's re-filing of the period is what counts.",
     ),
     "TX_NON_INDAS_ANNUAL_MEMBER": (
         "UNKNOWN_TAXONOMY",
@@ -320,13 +328,16 @@ CAUSES: dict[str, tuple[str, str, str]] = {
     ),
     "PX_EMPTY_BLOB": (
         "INVALID_XBRL",
-        "OURS",
-        "The vaulted file is 0 bytes: the fetch accepted an empty response; re-fetch.",
+        "REFILE",
+        "The vaulted file is 0 bytes because the archive serves it so (200, content-length 0; X322): nothing to parse "
+        "until NSE replaces it; then fetch-results URL --refetch.",
     ),
     "PX_TRUNCATED_BLOB": (
         "INVALID_XBRL",
-        "OURS",
-        "The vaulted file ends mid-token at a 4 KiB boundary: a truncated download; re-fetch.",
+        "OWNER",
+        "The vaulted file ends mid-token at a 4 KiB multiple. A body shorter than its Content-Length raises "
+        "IncompleteRead and is retried, so the archive most likely served it so (X322); check its size on the live "
+        "path and re-fetch with fetch-results URL --refetch.",
     ),
     "PX_DUPLICATE_FACT_CONFLICT": (
         "INVALID_XBRL",
@@ -423,6 +434,19 @@ def _d(v) -> Decimal | None:
 
 def _agree(a: Decimal | None, b: Decimal | None, tol: Decimal = SHARE_TOL) -> bool:
     return a is not None and b is not None and b != 0 and abs(a - b) <= tol * abs(b)
+
+
+IGAAP_CORP_PARSER = (0, 10, 11)  # first parser version with the IGAAP_CORP profile (X330)
+
+
+def _reparsed_since(con, version: tuple[int, ...]) -> set[str]:
+    """Filings with a promotion batch staged by `restage` at parser `version` or later (`<filing_id>-<version>`)."""
+    out = set()
+    for path, fid in con.execute("SELECT stage_path, message FROM promotion_log WHERE job = 'results_xbrl'").fetchall():
+        parts = path.rsplit("-", 1)[-1].split(".") if "-" in path else []
+        if fid and len(parts) == 3 and all(p.isdigit() for p in parts) and tuple(map(int, parts)) >= version:
+            out.add(fid)
+    return out
 
 
 def _load(con) -> list[dict]:
@@ -623,6 +647,7 @@ def classify(con) -> list[dict]:
     shares = _share_context(con)
     isin_ents, sym_ents, sym_isins, sym_first, names, cohort, member_syms, ent_symbol, listing = _identity_maps(con)
     period_files = Counter(r["filing_id"] for r in rows if r["reason_code"] == "IRREGULAR_PERIOD")
+    igaap_reparsed = _reparsed_since(con, IGAAP_CORP_PARSER)
     out = []
     for r in rows:
         d, reason = r["d"], r["reason_code"]
@@ -784,12 +809,17 @@ def classify(con) -> list[dict]:
                 cause = "TX_OUT_OF_SCOPE_PERIOD"
             elif coh == "NONE":
                 cause = "TX_NOT_IN_UNIVERSE"
-            elif "IntegratedFinance_OtherThanBank" in ns and "_NONINDAS_" not in r["file"]:
-                cause = "TX_WRONG_TEMPLATE_NO_INDAS_REFILE"
+            elif "IntegratedFinance_OtherThanBank" in ns and (
+                "_NONINDAS_" not in r["file"] or r["filing_id"] in igaap_reparsed
+            ):
+                cause = "TX_WRONG_TEMPLATE_NO_INDAS_REFILE"  # X330: re-parsed and still unknown = not SME-listed
             elif "_NONINDAS_" in r["file"]:
                 cause = "TX_NON_INDAS_RESULTS_MEMBER"
             elif r["file"].startswith("AR_XBRL_NI_"):
                 cause = "TX_NON_INDAS_ANNUAL_MEMBER"
+        elif reason == "AMOUNTS_SCALED":
+            evidence = f"{r['file']}: EPS {d.get('eps_basic')} on face value {d.get('face_value')}, x{d.get('factor')}"
+            cause = "PX_AMOUNTS_SCALED"
         elif reason == "INVALID_XBRL":
             err = d.get("error") or ""
             evidence = f"{r['file']} ({r['byte_size']} bytes): {err}"

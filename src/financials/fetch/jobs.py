@@ -147,10 +147,18 @@ class Jobs:
         name = url.rsplit("/", 1)[-1]
         return "csv.zip" if name.endswith(".csv.zip") else name.rsplit(".", 1)[-1] if "." in name else "bin"
 
-    def _get(self, url: str, *, accept: str = "*/*", allow_404: bool = False, asked_for: date | None = None):
-        """Bytes, or None for an allowed 404. Archive files already vaulted are not downloaded again."""
+    def _get(
+        self, url: str, *, accept: str = "*/*", allow_404: bool = False, asked_for: date | None = None,
+        refetch: bool = False,
+    ):  # fmt: skip
+        """Bytes, or None for an allowed 404. Archive files already vaulted are not downloaded again, except on an
+        explicit `refetch` (rule X322, `fetch-results URL --refetch`): the archive served a file that was empty or cut
+        short when it was first fetched. The old blob and its ledger line stay; the new answer is ledgered after it,
+        and different bytes are a new blob and so a new filing (invariant 2)."""
         immutable = url.startswith(IMMUTABLE_PREFIXES)
-        last = self.vault.last_fetch(url) if immutable else None
+        last = self.vault.last_fetch(url) if immutable and not refetch else None
+        if refetch and immutable and self.vault.last_fetch(url):
+            self.warnings.append(f"refetch (X322): {url} downloaded again on request; the vaulted blob is kept")
         if last and last["status"] == 200 and self.vault.exists(last["storage_path"]):
             return self.vault.read_path(last["storage_path"], last["sha256"])
         if last and last["status"] == 404 and allow_404 and asked_for is not None:
@@ -410,9 +418,11 @@ class Jobs:
             )  # fmt: skip
         return out
 
-    def results_xbrl(self, url: str, broadcast_ts: datetime | None = None, source: str = "UNKNOWN") -> list[Path]:
-        """A results XBRL by URL (when the URL is known from elsewhere)."""
-        data = self._get(url)
+    def results_xbrl(
+        self, url: str, broadcast_ts: datetime | None = None, source: str = "UNKNOWN", *, refetch: bool = False
+    ) -> list[Path]:
+        """A results XBRL by URL (when the URL is known from elsewhere); `refetch`: see `_get` (X322)."""
+        data = self._get(url, refetch=refetch)
         return [
             stage_results_xbrl(self.vault, self.stage_root, data=data, source_url=url, fetched_at=utc_now(),
                                broadcast_ts=broadcast_ts, broadcast_ts_source=source)

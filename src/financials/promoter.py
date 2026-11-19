@@ -1129,21 +1129,24 @@ def audit_ytd_identity(con, pairs: Iterable[tuple[str, str]]) -> list[str]:
     filing that restores the identity is the only fix."""
     from financials.fundamentals import YTD_GUARDED_TAGS, load_factbook
 
-    rows, pairs, rounding_only = [], list(pairs), set()
+    rows, pairs, rule_notes = [], list(pairs), {}
     for entity_id, scope in pairs:
         book = load_factbook(con, entity_id, scope, datetime(9999, 12, 31))
         for tag in sorted(YTD_GUARDED_TAGS):
             for b in book.ytd_breaks(tag):
                 rows.append(_quarantine_row(stage="CONSISTENCY", reason_code="YTD_QUARTER_MISMATCH",
                                             entity_id=entity_id, details={"scope": scope, **b}))  # fmt: skip
-            for b in book.ytd_rounding_only(tag):  # X260: the id the finding had, to name the rule when closing it
-                row = _quarantine_row(stage="CONSISTENCY", reason_code="YTD_QUARTER_MISMATCH",
-                                      entity_id=entity_id, details={"scope": scope, **b})  # fmt: skip
-                rounding_only.add(row["quarantine_id"])
+            # X260 / X314: the id the finding had, to name the rule when closing it
+            ruled = ((ROUNDING_ONLY_NOTE, book.ytd_rounding_only), (NET_LINE_SIDE_NOTE, book.ytd_net_line_side))
+            for note, found in ((n, f(tag)) for n, f in ruled):
+                for b in found:
+                    row = _quarantine_row(stage="CONSISTENCY", reason_code="YTD_QUARTER_MISMATCH",
+                                          entity_id=entity_id, details={"scope": scope, **b})  # fmt: skip
+                    rule_notes[row["quarantine_id"]] = note
         for b in book.tax_copied:  # X94: already withheld by load_factbook; the finding makes it visible
             rows.append(_quarantine_row(stage="CONSISTENCY", reason_code="TAX_COPIED_FROM_PRIOR_YEAR",
                                         entity_id=entity_id, details={"scope": scope, **b}))  # fmt: skip
-    _close_stale_ytd_findings(con, pairs, {r["quarantine_id"] for r in rows}, rounding_only)
+    _close_stale_ytd_findings(con, pairs, {r["quarantine_id"] for r in rows}, rule_notes=rule_notes)
     return _quarantine_many(con, rows) if rows else []
 
 
@@ -1151,14 +1154,25 @@ ROUNDING_ONLY_NOTE = (
     "ROUNDING_ONLY [X260]: the difference is within the rounding of the figures compared (half a unit of the "
     "coarser LevelOfRounding per rounded figure)"
 )
+NET_LINE_SIDE_NOTE = (
+    "NBFC_NET_LINE_SIDE [X314]: the identity holds with every period's net loss on fair value changes / on "
+    "derecognition netted against revenue; the NBFC template shows that net result in revenue in a period with a net "
+    "gain and in expenses in a period with a net loss, so revenue and total income are not additive across periods"
+)
 
 
 def _close_stale_ytd_findings(
-    con, pairs: list[tuple[str, str]], current: set[str], rounding_only: set[str] = frozenset()
+    con,
+    pairs: list[tuple[str, str]],
+    current: set[str],
+    rounding_only: set[str] = frozenset(),
+    rule_notes: dict[str, str] | None = None,
 ) -> None:
     """An open YTD_QUARTER_MISMATCH of an audited (entity, scope) that the audit no longer raises is closed: a
     corrected filing or a later rule (X82: a non-FY-start duration is not a YTD) removed the break. One whose
-    difference is a rounding difference (`rounding_only`, rule X260) is closed with a note naming the rule."""
+    difference is a rounding difference (`rounding_only`, rule X260) or that another named rule explains
+    (`rule_notes`: id -> note, X314) is closed with a note naming the rule."""
+    notes = {q: ROUNDING_ONLY_NOTE for q in rounding_only} | dict(rule_notes or {})
     if not pairs:
         return
     open_rows = con.execute(
@@ -1169,12 +1183,16 @@ def _close_stale_ytd_findings(
     audited = set(pairs)
     stale = [q for q, e, s in open_rows if (e, s) in audited and q not in current]
     if stale:
-        con.execute(
-            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = CASE "
-            "WHEN quarantine_id IN (SELECT unnest(?)) THEN ? ELSE 'consistency holds on re-audit' END "
-            "WHERE quarantine_id IN (SELECT unnest(?))",
-            [utc_now(), sorted(rounding_only) or [""], ROUNDING_ONLY_NOTE, stale],
-        )
+        by_note: dict[str, list[str]] = {}
+        for q in stale:
+            by_note.setdefault(notes.get(q, "consistency holds on re-audit"), []).append(q)
+        now = utc_now()
+        for note, ids in sorted(by_note.items()):
+            con.execute(
+                "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ? "
+                "WHERE quarantine_id IN (SELECT unnest(?))",
+                [now, note, sorted(ids)],
+            )
 
 
 def _entities_by_staged_scrip_code(con, stage_dir: Path) -> list[tuple[str]]:

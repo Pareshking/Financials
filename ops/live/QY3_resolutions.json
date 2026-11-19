@@ -1,0 +1,22 @@
+[
+ {
+  "ids": ["q_718345213759bb90ba8f045e"],
+  "bucket": "X92 stated error PERM",
+  "note": "Owner decision 2026-11-14 (X92 OWNERS_AND_NCI_TAGGED_AS_TCI: recover with stated error) [QY3]: ARYAMAN CONSOLIDATED pat_owners 2025-04-01..2025-09-30: YTD 18.10 Cr vs quarters 17.53 Cr. The Q1 FY26 consolidated XBRL (Integrated_Finance_NBFC_530245_7820252051_IFNBFC.xml) files owners 122,485,000 + NCI 37,454,000 = total comprehensive income 159,939,000 (the TCI split; profit 132,243,000), so X92 sets owners = 132,243,000 - 37,454,000 = 94,789,000. The H1 FY26 filing (Integrated_Finance_NBFC_530245_13112025201250_IFNBFC.xml) implies Q1 owners 180,963,000 - 80,543,000 = 100,420,000 and Q1 NCI 31,823,000, while its TCI NCI gives Q1 71,577,000 - 34,124,000 = 37,453,000 (the filed Q1 NCI): the 56.31 lakh gap is the NCI's share of Q1 OCI, the error X92 states. PAT ties (13.22 + 10.29 = 23.51 Cr). X106 TTM uses the YTD bridge."
+ },
+ {
+  "ids": ["q_82cc1b7caa717297bc26b7c8"],
+  "bucket": "X92 stated error PERM",
+  "note": "Owner decision 2026-11-14 (X92 OWNERS_AND_NCI_TAGGED_AS_TCI: recover with stated error) [QY3]: ARYAMAN CONSOLIDATED pat_owners 2025-04-01..2025-12-31: YTD 24.98 Cr vs quarters 24.42 Cr, the same 56.31 lakh as H1 FY26 (9M - H1 = 688.84 lakh = Q3 as filed): Q1 FY26 owners are PAT - the TCI NCI (X92; the Q1 file's owners 122,485,000 + NCI 37,454,000 = TCI 159,939,000); the later filings imply Q1 owners 100,420,000 vs 94,789,000. PAT ties. X106 TTM uses the YTD bridge."
+ },
+ {
+  "ids": ["q_b47edb2892ba1d7556017c27"],
+  "bucket": "X92 stated error PERM",
+  "note": "Owner decision 2026-11-14 (X92 OWNERS_AND_NCI_TAGGED_AS_TCI: recover with stated error) [QY3]: ARYAMAN CONSOLIDATED pat_owners 2025-04-01..2026-03-31: YTD 29.57 Cr vs quarters 29.01 Cr, the same 56.30 lakh as H1 / 9M FY26 (FY - 9M = 458.55 lakh = Q4 as filed 458.56): Q1 FY26 owners are PAT - the TCI NCI (X92); the later filings imply Q1 owners 100,420,000 vs 94,789,000. PAT ties. X106 TTM uses the YTD bridge."
+ },
+ {
+  "ids": ["q_529bdc32eec7dec391481b18"],
+  "bucket": "presentation other income PERM",
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QY3]: presentation, not an error: revenue ties and the whole total-income gap is other income. BNAGROCHEM CONSOLIDATED total_income 2025-04-01..2026-03-31: YTD 873.66 Cr vs quarters as filed 882.42 Cr (-0.99%). Revenue FY 87,327.86 lakh = 9M 61,192.20 + Q4 26,135.66 (Integrated_Finance_Ind_As_526125_305202620131_IFIndAs.html; 9M from Integrated_Finance_Ind_As_526125_1322026183433_IFIndAs.html); other income 9M 877.60 + Q4 36.59 lakh vs FY 38.03 lakh: the 876.16 lakh gap is other income the FY column presents elsewhere. X106 TTM uses the YTD bridge."
+ }
+]

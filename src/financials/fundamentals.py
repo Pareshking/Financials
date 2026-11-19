@@ -65,6 +65,20 @@ STRUCTURAL_ACTION_TYPES = ("MERGER", "DEMERGER")
 # quarters (all filed) carry more total income than the "YTD" itself, which no real YTD can (it would need a negative
 # quarter). The copied YTD values are withheld; the quarters stay, so TTM sums them instead of bridging on the copy.
 YTD_COPY_EVIDENCE_TAGS = ("total_income", "pbt", "pat")
+# X315 (rule YTD_COPIES_PRIOR_YEAR, extends X173): a 6- or 9-month YTD context that repeats the previous fiscal
+# year's full-year column. Andrew Yule consolidated Q3 FY26 (BSE 526173) files Apr-Dec 2025 with exactly the FY25
+# values of its Q4 FY25 filing (revenue 31,170.97, total income 37,527.39, PBT -2,850.57, PAT -283.82 lakh) while its
+# own quarters sum to 20,256.26 / 28,292.04 lakh. A part-year cannot equal the whole prior year to the rupee on total
+# income, PBT and PAT together; the copied values are withheld like X173's.
+YTD_COPY_PRIOR_YEAR_MONTHS = (6, 9)
+# X314 (rule NBFC_NET_LINE_SIDE): Schedule III Division III presents the net gain / net loss on fair value changes
+# (and on derecognition of amortised-cost instruments) as one net line, in revenue when a gain and in expenses when a
+# loss, decided per period. A quarter's loss is therefore inside the YTD's netted revenue: Ashika Credit standalone
+# Q2 FY27 files a net loss on fair value changes of 2,833.49 lakh as an expense, its H1 FY27 a net gain of 8,931.50
+# lakh in revenue, and H1 revenue (10,800.17) = Q1 (12,421.55) + Q2 (1,212.11) - 2,833.49. Revenue and total income
+# are compared net of these loss lines; a break that the netted figures close is presentation, not a restatement.
+NET_LINE_SIDE_TAGS = frozenset({"revenue_from_operations", "total_income"})
+NET_LINE_LOSS_TAGS = ("net_loss_fair_value", "net_loss_derecognition")
 # X273 (owner decision T): the fixed-asset lines of a balance sheet. Net block (Screener layout, S10) = PPE +
 # right-of-use + other intangibles + goodwill + investment property; CWIP = CWIP + intangibles under development.
 # One definition per line across all balance-sheet dates of an entity: FactBook.align_fixed_assets.
@@ -155,15 +169,37 @@ class FactBook:
                 continue
             out.append({"ytd_period": [str(s), str(e)], "total_income": str(v),
                         "earlier_quarters_total_income": str(sum(earlier, Decimal(0)))})  # fmt: skip
+        return out + self.prior_year_copy_periods()
+
+    def prior_year_copy_periods(self) -> list[dict]:
+        """X315 (rule YTD_COPIES_PRIOR_YEAR): 6- or 9-month YTD periods from a fiscal-year start whose total income,
+        PBT and PAT equal, to the rupee and non-zero, those of the previous fiscal year's 12-month period (ending the
+        day before the YTD starts). A part-year equal to the whole prior year on three figures is a copied column."""
+        ti = self.durations.get("total_income", {})
+        out = []
+        for (s, e), v in ti.items():
+            m = period_months(s, e)
+            if m not in YTD_COPY_PRIOR_YEAR_MONTHS or not self.is_ytd_start(s):
+                continue
+            prior = (_add_months(s, -12), s - timedelta(days=1))
+            if all(
+                self.durations.get(t, {}).get((s, e)) == self.durations.get(t, {}).get(prior) not in (None, ZERO)
+                for t in YTD_COPY_EVIDENCE_TAGS
+            ):
+                out.append({"ytd_period": [str(s), str(e)], "total_income": str(v), "rule": "YTD_COPIES_PRIOR_YEAR",
+                            "copied_period": [str(prior[0]), str(prior[1])]})  # fmt: skip
         return out
 
     def withhold_ytd_copies(self) -> None:
-        """X173: drop every duration value of a copied YTD period that equals its quarter's value (the copied
-        context); values the quarter does not carry (YTD-only cash flow, X13) stay."""
+        """X173 / X315: drop every duration value of a copied YTD period that equals the copied context's value (its
+        quarter, or for X315 the prior fiscal year); values the copied context does not carry (YTD-only cash flow,
+        X13) stay."""
         self.ytd_copies = self.ytd_copy_periods()
         for b in self.ytd_copies:
             s, e = (date.fromisoformat(x) for x in b["ytd_period"])
             q = (_add_months(date(e.year, e.month, 1), -2), e)
+            if "copied_period" in b:
+                q = tuple(date.fromisoformat(x) for x in b["copied_period"])
             for d in self.durations.values():
                 if (s, e) in d and q in d and d[(s, e)] == d[q]:
                     del d[(s, e)]
@@ -175,13 +211,35 @@ class FactBook:
         """Every filed YTD (> 3 months, from a fiscal-year start) whose quarters were all filed directly, and whose
         value differs from their sum by more than the tolerance. A break means a restated or mis-filed quarter
         (or YTD); which one is wrong cannot be told from the numbers, so nothing is corrected [X80]. A difference
-        within the rounding of the figures compared (rule ROUNDING_ONLY, X260) is no break."""
-        return [b for b, rounding_only in self._ytd_identity_failures(tag) if not rounding_only]
+        within the rounding of the figures compared (rule ROUNDING_ONLY, X260) is no break, nor is one that the
+        NBFC net fair-value / derecognition line explains (rule NBFC_NET_LINE_SIDE, X314)."""
+        return [b for b, cls in self._ytd_identity_failures(tag) if cls is None]
 
     def ytd_rounding_only(self, tag: str) -> list[dict]:
         """X260: the comparisons that exceed the identity tolerance but not the rounding of the figures compared
         (`rounded_figures`, see `_ytd_rounded_figures`): the break details `ytd_breaks` would have returned."""
-        return [b for b, rounding_only in self._ytd_identity_failures(tag) if rounding_only]
+        return [b for b, cls in self._ytd_identity_failures(tag) if cls == "ROUNDING_ONLY"]
+
+    def ytd_net_line_side(self, tag: str) -> list[dict]:
+        """X314: the comparisons of revenue / total income that hold once the net-loss lines of the NBFC template
+        are netted in every period compared (`_net_line_side_holds`): the break details `ytd_breaks` would have
+        returned."""
+        return [b for b, cls in self._ytd_identity_failures(tag) if cls == "NBFC_NET_LINE_SIDE"]
+
+    def _net_line_side_holds(self, tag: str, periods: list[Period], ytd: Period, gap: Decimal, tol: Decimal) -> bool:
+        """X314 (rule NBFC_NET_LINE_SIDE): Schedule III Division III shows the net fair-value (and derecognition)
+        result as one line, in revenue in a period with a net gain and in expenses in a period with a net loss. With
+        every period's loss lines netted against revenue (revenue - net loss), the identity holds within the same
+        tolerance. Needs the loss lines filed in every period compared (the NBFC template) and one of them non-zero."""
+        if tag not in NET_LINE_SIDE_TAGS:
+            return False
+        loss = {p: [self.durations.get(t, {}).get(p) for t in NET_LINE_LOSS_TAGS] for p in [*periods, ytd]}
+        if any(all(v is None for v in vs) for vs in loss.values()):
+            return False
+        net = {p: sum((v for v in vs if v is not None), ZERO) for p, vs in loss.items()}
+        if not any(net.values()):
+            return False
+        return abs(gap - net[ytd] + sum(net[p] for p in periods)) <= tol
 
     def _ytd_rounded_figures(self, tag: str, periods: list[Period]) -> int:
         """X260: rounded figures behind `tag` over `periods`: one per period, two for pbt_incl_jv in a period whose
@@ -191,8 +249,9 @@ class FactBook:
         jv = self.durations.get("share_of_associates_jv", {})
         return len(periods) + sum(1 for p in periods if jv.get(p))
 
-    def _ytd_identity_failures(self, tag: str) -> list[tuple[dict, bool]]:
-        """(break details, within rounding only [X260]) of every YTD failing the identity tolerance."""
+    def _ytd_identity_failures(self, tag: str) -> list[tuple[dict, str | None]]:
+        """(break details, class) of every YTD failing the identity tolerance: ROUNDING_ONLY (within the rounding of
+        the figures compared, X260), NBFC_NET_LINE_SIDE (X314) or None (a break)."""
         d = self.durations.get(tag, {})
         out = []
         for (s, e), ytd in d.items():
@@ -210,7 +269,12 @@ class FactBook:
                 figures = self._ytd_rounded_figures(tag, [*periods, (s, e)])
                 b = {"tag": tag, "ytd_period": [str(s), str(e)], "ytd": str(ytd), "quarters_sum": str(total),
                      "quarters": len(qs), "tolerance": str(tol)}  # fmt: skip
-                out.append((b, within_rounding_only(ytd - total, [self.rounding_unit] * figures)))
+                if within_rounding_only(ytd - total, [self.rounding_unit] * figures):
+                    out.append((b, "ROUNDING_ONLY"))
+                elif self._net_line_side_holds(tag, periods, (s, e), ytd - total, tol):
+                    out.append((b, "NBFC_NET_LINE_SIDE"))
+                else:
+                    out.append((b, None))
         return out
 
     def _ytd_quarters(self, tag: str, s: date, e: date) -> list[Decimal | None]:

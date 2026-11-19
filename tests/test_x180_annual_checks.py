@@ -52,6 +52,13 @@ def _open(m, reason):
     ).fetchall()
 
 
+def _written(m, reason):
+    return m.con.execute(
+        "SELECT quarantine_id, filing_id, details FROM quarantine_queue WHERE reason_code = ? ORDER BY quarantine_id",
+        [reason],
+    ).fetchall()
+
+
 # ── X180: promotion order ──────────────────────────────────────────────────────────────────────────────────────
 
 
@@ -63,8 +70,10 @@ def test_prior_year_check_rerun_does_not_depend_on_promotion_order(market):
     assert not _open(market, PRIOR_YEAR_REASON)  # FY25's own report has no in-scope prior year (C9)
 
     r = audit_annual_checks(market.con)
-    assert r["annual_filings"] == 2 and r["findings"] == 1 and r["closed"] == 0 and r["open_prior_year"] == 1
-    [(_, fid, details)] = _open(market, PRIOR_YEAR_REASON)
+    assert r["annual_filings"] == 2 and r["findings"] == 1 and r["closed"] == 0
+    # X312: REGROUPED with every statement total compared is written and resolved ACCEPTED in the same run
+    assert r["accepted_by_class"] == 1 and r["open_prior_year"] == 0
+    [(_, fid, details)] = _written(market, PRIOR_YEAR_REASON)
     d = json.loads(details)
     tcs26 = market.con.execute("SELECT filing_id FROM filings WHERE source_url LIKE ?", ["%" + TCS26]).fetchone()[0]
     assert fid == tcs26
@@ -77,7 +86,8 @@ def test_prior_year_check_rerun_does_not_depend_on_promotion_order(market):
     }
     assert d["class"] == "REGROUPED" and d["totals_differ"] == [] and d["scale_lines"] == []  # X182
     again = audit_annual_checks(market.con)  # idempotent: same deterministic id, nothing closed
-    assert again["findings"] == 1 and again["closed"] == 0 and len(_open(market, PRIOR_YEAR_REASON)) == 1
+    assert again["findings"] == 1 and again["closed"] == 0 and again["accepted_by_class"] == 0
+    assert len(_written(market, PRIOR_YEAR_REASON)) == 1 and not _open(market, PRIOR_YEAR_REASON)
 
 
 # ── X182: triage class ─────────────────────────────────────────────────────────────────────────────────────────

@@ -13,6 +13,10 @@
   values in the comparison. X306-X307: a CASH_FLOW_RESTATED finding whose net cash flow moved only because the
   comparative's cash and cash equivalents were redefined (CASH_EQUIVALENTS_RECLASSIFIED) or because the exchange
   difference on cash moved into or out of the net change (FX_EFFECT_RECLASSIFIED) is a reclassification too.
+  X312: `audit-annual` records the owner-accepted classes as resolved ACCEPTED when it writes them (rule
+  PRIOR_YEAR_ACCEPTED_CLASS), and a re-keyed RESTATED finding whose differing totals are those of an earlier ACCEPTED
+  finding of the same filing inherits that acceptance (rule PRIOR_YEAR_ACCEPTANCE_CARRIED); see
+  `prior_year_resolutions`. Nothing is suppressed: the finding is written and stays visible.
 - G79 [X111]: the BSE scrip code stated inside a results filing (`ScripCode`, X7; from disclosure_facts) fills
   `security_identifier_history.bse_scrip_code` of the NSE identifier rows that match the filing's own ISIN and
   symbol. A different code already on such a row is an IDENTIFIER / BSE_SCRIP_CODE_CONFLICT finding; nothing is
@@ -297,3 +301,97 @@ def apply_bse_scrip_codes_by_isin(con, filing_id: str) -> tuple[int, list[dict]]
             [filing_id],
         )
     return todo, conflicts
+
+
+# X312: owner decision 2026-11-18 (delegated; X236 for REGROUPED / X233 / X234, applied by QF4 to X306 / X307):
+# these classes are accepted as reclassifications; the check keeps running and each finding stays visible.
+ACCEPTED_CLASS_RULE = "PRIOR_YEAR_ACCEPTED_CLASS"
+CARRIED_RULE = "PRIOR_YEAR_ACCEPTANCE_CARRIED"
+_SUBCLASS_REF = {  # sub-class: (its rule, the review that accepted it)
+    "RECLASSIFIED": ("X233", "X236"), "DISCONTINUED_REPRESENTED": ("X234", "X236"),
+    "CASH_EQUIVALENTS_RECLASSIFIED": ("X306", "QF4, as X233"), "FX_EFFECT_RECLASSIFIED": ("X307", "QF4, as X233"),
+}  # fmt: skip
+assert set(_SUBCLASS_REF) == RESTATED_ACCEPTABLE
+# X312 carry-forward: the lines whose amounts must be the same for a case-by-case acceptance to carry forward (the
+# statement totals and bottom lines, the net change after the exchange difference, the discontinued profit).
+CARRY_TAGS = PRIOR_YEAR_TOTALS | {NET_CASH_AFTER_FX, DISCONTINUED_PROFIT_TAG}
+
+
+def accepted_class_note(details: dict, context: dict | None) -> str | None:
+    """X312 rule PRIOR_YEAR_ACCEPTED_CLASS: the resolution note of a finding whose class the owner accepted, else
+    None. REGROUPED only when every PRIOR_YEAR_TOTALS tag was compared (and, being REGROUPED, agrees); RESTATED only
+    for the sub-classes RESTATED_ACCEPTABLE. SCALE, CASH_FLOW_RESTATED and BOTTOM_LINE_RESTATED never."""
+    compared = (context or {}).get("compared", set())
+    head = f"Rule X312 {ACCEPTED_CLASS_RULE} (owner decision 2026-11-18, delegated): X182 class "
+    tail = "; recorded by audit-annual, the check keeps running."
+    if details.get("class") == "REGROUPED" and set(compared) >= PRIOR_YEAR_TOTALS:
+        return head + "REGROUPED accepted (X236): every PRIOR_YEAR_TOTALS tag was compared and agrees" + tail
+    sub = details.get("subclass")
+    if details.get("class") == "RESTATED" and sub in RESTATED_ACCEPTABLE:
+        ref, why = _SUBCLASS_REF[sub]
+        return head + f"RESTATED, sub-class {sub} ({ref}) accepted ({why}): no amount restated" + tail
+    return None
+
+
+def _carry_lines(details: dict) -> dict:
+    return {(d["tag"], d.get("period_type"), tuple(d.get("period") or ())): d
+            for d in details.get("differences", ()) if d["tag"] in CARRY_TAGS}  # fmt: skip
+
+
+def same_totals(new: dict, old: dict) -> bool:
+    """X312: the two findings differ on the same CARRY_TAGS lines (tag, period type, period) and each line's annual
+    and stored amounts are the same within that line's tolerance (the larger of the two findings' rounding bounds:
+    one figure's rounding, X260). A line that differs in one finding only, or moved by more, is a change."""
+    a, b = _carry_lines(new), _carry_lines(old)
+    if set(a) != set(b) or not a:
+        return False
+    for key, x in a.items():
+        y = b[key]
+        tol = max(Decimal(x.get("tolerance") or 0), Decimal(y.get("tolerance") or 0))
+        for side in ("annual", "stored"):
+            if abs(Decimal(x[side]) - Decimal(y[side])) > tol:
+                return False
+    return True
+
+
+def carried_acceptance(details: dict, earlier: list[tuple[str, dict]]) -> str | None:
+    """X312 rule PRIOR_YEAR_ACCEPTANCE_CARRIED: the quarantine id of an earlier ACCEPTED finding (`earlier`: (id,
+    details) of the same filing, latest first) whose acceptance this re-keyed RESTATED finding inherits: same scope,
+    class and sub-class, and `same_totals`. Only RESTATED: REGROUPED and the accepted sub-classes are settled by
+    `accepted_class_note` on their own proof, SCALE lines are not totals."""
+    if details.get("class") != "RESTATED":
+        return None
+    for qid, old in earlier:
+        if (old.get("scope"), old.get("class"), old.get("subclass")) == (
+            details.get("scope"),
+            details.get("class"),
+            details.get("subclass"),
+        ) and same_totals(details, old):
+            return qid
+    return None
+
+
+def carried_note(earlier_id: str) -> str:
+    return (
+        f"Rule X312 {CARRIED_RULE}: the earlier ACCEPTED finding {earlier_id} of this filing (same scope, class "
+        "and sub-class) differs on the same statement totals and bottom lines by the same amounts, within each "
+        "line's tolerance; its acceptance carries forward. Recorded by audit-annual, the check keeps running."
+    )
+
+
+def prior_year_resolutions(findings: list[tuple[str, str, dict, dict]], accepted: list[tuple[str, str, dict]]) -> dict:
+    """X312: {quarantine_id: note} for the findings (id, filing_id, details, comparison context) that rule
+    PRIOR_YEAR_ACCEPTED_CLASS or PRIOR_YEAR_ACCEPTANCE_CARRIED resolves ACCEPTED. `accepted`: (id, filing_id,
+    details) of the earlier ACCEPTED findings of these filings, latest first. Pure: the caller reads and writes."""
+    by_filing: dict[str, list[tuple[str, dict]]] = {}
+    for qid, fid, det in accepted:
+        by_filing.setdefault(fid, []).append((qid, det))
+    out = {}
+    for qid, fid, det, ctx in findings:
+        note = accepted_class_note(det, ctx)
+        if note is None:
+            prev = carried_acceptance(det, [(q, d) for q, d in by_filing.get(fid, ()) if q != qid])
+            note = carried_note(prev) if prev else None
+        if note:
+            out[qid] = note
+    return out

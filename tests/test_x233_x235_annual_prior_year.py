@@ -81,7 +81,16 @@ def test_x235_annual_level_slip_is_found_rescaled_and_rechecked(market):
     assert raw == Decimal("187659.91")  # the filed fact is kept
     closed = con.execute("SELECT resolution FROM quarantine_queue WHERE quarantine_id = ?", [qid]).fetchone()[0]
     assert closed == "FIXED_BY_RULE"
-    [(_, fid2, after)] = _open(con)  # compared at the corrected scale: every total agrees, lines regrouped
+    # compared at the corrected scale: every total agrees, lines regrouped (X312: resolved ACCEPTED by class)
+    [(_, fid2, after)] = [
+        (q, f, json.loads(d))
+        for q, f, d in con.execute(
+            "SELECT quarantine_id, filing_id, details FROM quarantine_queue WHERE reason_code = ? AND resolution = "
+            "'ACCEPTED' AND resolution_note LIKE 'Rule X312 PRIOR_YEAR_ACCEPTED_CLASS%'",
+            [PRIOR_YEAR_REASON],
+        ).fetchall()
+    ]
+    assert not _open(con)
     assert fid2 == annual and after["class"] == "REGROUPED" and after["totals_differ"] == []
     assert after["scale_lines"] == [] and {"employee_benefit_expense", "other_expenses"} <= {
         x["tag"] for x in after["differences"]

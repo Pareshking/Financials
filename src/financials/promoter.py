@@ -1864,7 +1864,9 @@ def audit_annual_checks(con, entity_ids=None) -> dict[str, int]:
     became visible), so a re-run gives the answer promotion in broadcast order would have given. New findings are
     queued (deterministic ids: an unchanged finding, or one a human resolved, is kept as it is); an open finding of
     the same reason and filing that the re-run no longer produces is closed FIXED_BY_RULE. Returns counts.
-    `entity_ids`: re-run only those entities' annuals (X235: after rule X201 rescaled one of their filings)."""
+    `entity_ids`: re-run only those entities' annuals (X235: after rule X201 rescaled one of their filings).
+    X312: in the same write, open findings of an owner-accepted class, or with the same totals as an earlier
+    ACCEPTED finding of the filing, are resolved ACCEPTED (`accept_prior_year_findings`); they stay visible."""
     from financials import filing_checks as fc
     from financials.share_capital import REASON as SHARE_REASON
     from financials.share_capital import annual_share_disagreement
@@ -1877,16 +1879,17 @@ def audit_annual_checks(con, entity_ids=None) -> dict[str, int]:
     if entity_ids is not None:
         wanted = set(entity_ids)
         metas = [m for m in metas if m[2] in wanted]
-    rows = []
+    rows, prior = [], []
     for fid, pv, ent, scope, fy_start, fy_end, lor, visible in metas:
         diffs, ctx = fc.annual_prior_year_comparison(
             con, filing_id=fid, parser_version=pv, entity_id=ent, scope=scope, fy_start=fy_start,
             level_of_rounding=lor, visible_from_ts=visible,
         )  # fmt: skip
         if diffs:
+            details = {"scope": scope, "differences": diffs, **fc.prior_year_class(diffs, ctx)}
             rows.append(_quarantine_row(stage="CONSISTENCY", reason_code=fc.PRIOR_YEAR_REASON, filing_id=fid,
-                                        entity_id=ent, details={"scope": scope, "differences": diffs,
-                                                                **fc.prior_year_class(diffs, ctx)}))  # fmt: skip
+                                        entity_id=ent, details=details))  # fmt: skip
+            prior.append((rows[-1]["quarantine_id"], fid, details, ctx))
         share = annual_share_disagreement(con, fid, ent, fy_end)
         if share is not None:
             rows.append(_quarantine_row(stage="SHARES", reason_code=SHARE_REASON, entity_id=ent, filing_id=fid,
@@ -1903,12 +1906,40 @@ def audit_annual_checks(con, entity_ids=None) -> dict[str, int]:
         [utc_now(), ANNUAL_RECHECK_NOTE, fc.PRIOR_YEAR_REASON, fc.PRIOR_YEAR_REASON, SHARE_REASON,
          [m[0] for m in metas], keep],
     ).fetchall()  # fmt: skip
+    accepted = accept_prior_year_findings(con, prior)  # X312, after the insert: also an unchanged open finding
     open_now = dict(con.execute(
         "SELECT reason_code, count(*) FROM quarantine_queue WHERE resolved_at IS NULL AND reason_code IN (?, ?) "
         "GROUP BY 1", [fc.PRIOR_YEAR_REASON, SHARE_REASON]).fetchall())  # fmt: skip
-    return {"annual_filings": len(metas), "findings": len(rows), "closed": len(closed),
+    return {"annual_filings": len(metas), "findings": len(rows), "closed": len(closed), **accepted,
             "open_prior_year": open_now.get(fc.PRIOR_YEAR_REASON, 0),
             "open_share_counts": open_now.get(SHARE_REASON, 0)}  # fmt: skip
+
+
+def accept_prior_year_findings(con, findings: list[tuple[str, str, dict, dict]]) -> dict[str, int]:
+    """X312: resolve ACCEPTED, in one batched write, the open findings among `findings` (id, filing_id, details,
+    comparison context) that rule PRIOR_YEAR_ACCEPTED_CLASS (owner-accepted class / sub-class) or
+    PRIOR_YEAR_ACCEPTANCE_CARRIED (same totals as an earlier ACCEPTED finding of the filing) settles. One read of the
+    earlier ACCEPTED findings of these filings; a finding already resolved (by a human or an earlier run) is kept as
+    it is, so a re-run changes nothing. Returns counts by rule."""
+    from financials import filing_checks as fc
+
+    if not findings:
+        return {"accepted_by_class": 0, "accepted_carried": 0}
+    earlier = [(q, f, json.loads(d)) for q, f, d in con.execute(
+        "SELECT quarantine_id, filing_id, details FROM quarantine_queue WHERE reason_code = ? AND resolution = "
+        "'ACCEPTED' AND filing_id IN (SELECT unnest(?)) ORDER BY resolved_at DESC, quarantine_id",
+        [fc.PRIOR_YEAR_REASON, sorted({f for _, f, _, _ in findings})]).fetchall()]  # fmt: skip
+    notes = fc.prior_year_resolutions(findings, earlier)
+    done = []
+    if notes:
+        done = con.execute(
+            "UPDATE quarantine_queue AS q SET resolved_at = $1, resolution = 'ACCEPTED', resolution_note = v.note "
+            "FROM (SELECT unnest($2) AS id, unnest($3) AS note) AS v WHERE q.quarantine_id = v.id "
+            "AND q.resolved_at IS NULL RETURNING q.resolution_note",
+            [utc_now(), list(notes), list(notes.values())],
+        ).fetchall()
+    carried = sum(1 for (n,) in done if fc.CARRIED_RULE in n)
+    return {"accepted_by_class": len(done) - carried, "accepted_carried": carried}
 
 
 def close_resolved_annual_share_findings(con) -> int:

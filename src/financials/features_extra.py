@@ -73,6 +73,7 @@ from financials.fundamentals import (
     safe_div,
 )
 from financials.parsers.indas_corp import period_months
+from financials.run_memo import by_visibility
 
 # ── columns (schema order: `-- batch G (remaining Phase 2 ratios)` in db/schema.sql) ──────────────────────────────
 
@@ -387,6 +388,7 @@ _RANKED_SHP = """WITH f AS (
     r AS (SELECT *, row_number() OVER (PARTITION BY entity_id ORDER BY as_of_date DESC) AS r FROM f)"""
 
 
+@by_visibility  # read once per visibility interval of an incremental run (run_memo)
 def shareholding_flow_inputs(con, as_of_ts: datetime, entities=None) -> dict[str, dict]:
     """Per entity, for the two latest visible Reg. 31 patterns (rank 1 = latest): as-of date, FII + DII shares,
     promoter shares, pledged shares; and the count of named public holders above 1% in the latest. Two queries."""
@@ -457,6 +459,7 @@ def event_inputs(con, as_of: date, as_of_ts: datetime, entities=None) -> dict[st
     return out
 
 
+@by_visibility  # read once per visibility interval of an incremental run (run_memo)
 def kpi_inputs(con, as_of_ts: datetime, entities=None) -> dict[str, dict[str, dict]]:
     """{entity: {kpi: {(start, end): value}}} for KPI_NAMES, latest visible version per period (one query)."""
     only, only_p = entity_filter("entity_id", entities)

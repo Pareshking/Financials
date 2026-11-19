@@ -742,7 +742,44 @@ was and every marker stays, so a rerun resumes. After a successful run the consu
 to `D + 1` when materialised days after `D` exist. A full `materialize --from/--to` consumes the markers whose date
 falls in the range (or after the last materialised day before it), provided every materialised day in the range was
 rebuilt. Equivalence with a full rebuild, row for row, is pinned by `tests/test_incremental_materialize.py` for a
-results filing, a shareholding filing, a corporate-action batch, a gap resolution and a scope override.
+results filing, a shareholding filing, a corporate-action batch, a gap resolution and a scope override, for
+markers whose change left every row as it was, and for both mixed in one run.
+
+**Per-day cost (2026-11-19, QS2).** The run's cost used to be a fixed ~1.1 s per materialised day whatever the
+number of dirty entities (live: 2 entities over 363 days took 6 min): each of a day's ~60 batched reads scanned the
+full fact / disclosure / shareholding tables for a handful of entities, and every day was gated, written and
+cross-sectioned. Four run-scoped devices, none of which changes a value, cut it to 0.08-0.15 s a day for 12-50
+entities on the live-size database (docs/benchmarks.md section 7 has the synthetic numbers):
+
+- *Entity slices* (`features.entity_slices`): for the run, a TEMP table of the same name shadows each of
+  `features.SLICED_TABLES` (fact_observations, filing_meta, fact_corrections, disclosure_facts, the shareholding
+  tables, segments, RPT, audit opinions) with the rows of the run's entities plus every row of a filing any of them
+  has a row in (a filing whose versions moved between entities keeps all its versions). Every compute_rows read of
+  those tables is restricted to the requested entities or reaches rows through such a filing, so it returns the same
+  rows (checked on the 2026-11-19 snapshot: 137 entities on 5 days and 77 entities on 43 days, every column equal).
+  Only compute_rows reads them; the run writes only the feature tables; the slices are dropped (by their
+  `temp.main.` name) when the run ends. `ohlcv`, `raw_nse_mcap`, `corp_actions` and the identifier tables are not
+  sliced (the gates and the issue-size pick read them for every security or every file).
+- *Visibility memo* (`financials.run_memo`): the readers that depend on the as-of only through `visible_from_ts <=
+  as_of_ts` on the slices (or `supplemental_kpis`) and return per-entity results keep each entity's part with the
+  number of its visibility timestamps (its rows' and its filings' rows') <= the as-of; a day re-reads only the
+  entities whose number moved. Parts are shared read-only, as FundamentalsCache blocks are (the tests run with
+  `CHECK_MUTATIONS`, which fails a run whose consumer changed one). The valuation-history reads
+  (`_valuation_history`, `features_more.valuation_history`) read only days before the as-of's quarter and are read
+  once per quarter of a run (`FundamentalsCache.per_quarter`, full runs too); fundamentals prefetches are skipped
+  when every entity's block is reused.
+- *Unchanged days*: a day whose recomputed rows equal the stored rows the publish would replace (same securities,
+  equal values in every column compute_rows sets; read ahead in 32-day chunks) is left as stored, status
+  `UNCHANGED`: publishing it would rewrite the same rows, recompute the cross-section from the same inputs and pass
+  the same gates. Every other day is published as before, and so is the day after it (its G4 compares with the
+  changed day). A value that storage would cast compares unequal, so the check can only cost a publish, never skip
+  a change.
+- `financials.db` records once that pandas is not installed: DuckDB's binding tried `import pandas` for every
+  bound parameter (~0.3 ms a 3-parameter query).
+
+A day that does change still costs ~0.6 s (G5 / G4 reads of the whole day, the write including the EVENT
+intervals, the three cross-section refreshes of the whole day): 10-50 entities with new results over the ~9 days
+since their filings took 10-15 s; a change that really moves rows over a year of days takes minutes.
 
 **Reader changes**: `FEATURES_VERSION` must be bumped whenever `features.py`, `fundamentals.py`, `scope.py`,
 `money.py`, `price_history.py`, `features_store.py` or `reference/valuation_archetypes.csv` changes; a test pins a hash of those files together with the

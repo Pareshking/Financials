@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import importlib.util
 import re
+import sys
 from collections.abc import Iterable, Mapping, Sequence
 from importlib.resources import files
 from pathlib import Path
@@ -10,6 +12,13 @@ from typing import Any
 
 import duckdb
 import pyarrow as pa
+
+# DuckDB's Python binding tries `import pandas` for every bound parameter (to recognise a DataFrame). pandas is not a
+# dependency: without it each attempt searches sys.path again (~0.1 ms a parameter; a 3-parameter query cost 0.55 ms
+# instead of 0.23 ms, ~20 ms of every incremental materialised day). Recording the absence once makes the attempt
+# fail at once (ModuleNotFoundError, as before). Nothing changes when pandas is installed.
+if importlib.util.find_spec("pandas") is None:
+    sys.modules.setdefault("pandas", None)
 
 SCHEMA_SQL = files(__package__).joinpath("schema.sql").read_text(encoding="utf-8")
 VIEWS_MARKER = "-- views (after column upgrade)\n"  # schema.sql: views run after upgrade_columns

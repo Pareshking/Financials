@@ -52,6 +52,7 @@ from decimal import Decimal
 
 from financials.db import version_key
 from financials.fundamentals import CURRENT_VERSION, entity_filter, safe_div
+from financials.run_memo import by_visibility
 
 INSIDER_COLUMNS = ("insider_receivables_as_of", "insider_receivables", "insider_receivables_to_receivables",
                    "has_insider_receivables")  # fmt: skip
@@ -158,6 +159,7 @@ def insider_total(by_element: dict[str, list[tuple[dict[str, str], Decimal]]]) -
     return sum((element_total(by_element[e]) for e in (DIRECTORS, OFFICERS, *firms) if by_element.get(e)), ZERO)
 
 
+@by_visibility  # read once per visibility interval of an incremental run (run_memo)
 def insider_inputs(con, as_of_ts: datetime, entities=None) -> dict[tuple[str, str], dict]:
     only, only_p = entity_filter("entity_id", entities)
     cells: dict[tuple[str, str, date], dict] = {}
@@ -206,6 +208,7 @@ def declaration(values: dict[str, bool | None], element: str) -> bool | None:
     return False if variants and all(v is False for v in variants) else None
 
 
+@by_visibility  # read once per visibility interval of an incremental run (run_memo)
 def shp_inputs(con, as_of_ts: datetime, entities=None) -> dict[str, dict[str, bool | None]]:
     only, only_p = entity_filter("entity_id", entities)
     wanted = [e + v for e in SHP_DECLARATIONS.values() for v in ("", *SHP_VARIANTS)]
@@ -248,6 +251,7 @@ def entity_role(name: str | None, kind: str | None) -> str:
     return "OTHER"
 
 
+@by_visibility  # read once per visibility interval of an incremental run (run_memo)
 def subsidiary_inputs(con, as_of_ts: datetime, entities=None) -> dict[str, dict]:
     only, only_p = entity_filter("entity_id", entities)
     years: dict[tuple[str, date], dict] = {}

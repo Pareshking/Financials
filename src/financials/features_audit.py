@@ -28,11 +28,13 @@ from datetime import datetime
 from financials.db import version_key
 from financials.fundamentals import entity_filter
 from financials.parsers.audit_report import MODIFIED, worst
+from financials.run_memo import by_visibility
 
 COLUMNS = ("audit_opinion", "audit_opinion_fy_end", "audit_opinion_conflict", "going_concern_uncertainty",
            "emphasis_of_matter", "audit_opinion_quarterly", "audit_opinion_quarter_end")  # fmt: skip
 
 
+@by_visibility  # read once per visibility interval of an incremental run (run_memo)
 def inputs(con, as_of_ts: datetime, entities=None) -> dict[str, dict[str, list[tuple]]]:
     """{entity: {'ANNUAL' | 'RESULTS': [(period_end, opinion, conflict, going concern, emphasis)] of the scopes of the
     latest period end}}: one read (module doc)."""

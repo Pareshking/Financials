@@ -51,6 +51,7 @@ from financials.fundamentals import (
     quarters_available_since,
     safe_div,
 )
+from financials.run_memo import by_visibility
 from financials.scope import MIN_TRADE_DATE
 
 # ── columns (schema order: `-- batch D (ownership / hidden gems)` in db/schema.sql) ─────────────────────────────────
@@ -231,6 +232,7 @@ def period_values(book, end: date, b: dict) -> dict:
 # ── stage 2: batched reads and per-row columns ────────────────────────────────────────────────────────────────────
 
 
+@by_visibility  # read once per visibility interval of an incremental run (run_memo)
 def ownership_inputs(con, as_of_ts: datetime, entities=None) -> dict[str, dict]:
     """Per entity: {"dates": {rank: as_of_date}, "cats": {rank: {category: (pct, holders)}}, "members": {member:
     pct}} for the five latest visible Reg. 31 patterns (latest visible revision per as-of date, as features._preload)

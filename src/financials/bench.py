@@ -225,11 +225,12 @@ def extend_synthetic(path: Path, n_secs: int, start: date, end: date, seed: int 
     return out
 
 
-def run_synthetic(db: Path, work: Path, n_secs: int, legacy_days: int = 3) -> dict:
+def run_synthetic(db: Path, work: Path, n_secs: int, legacy_days: int = 3, incremental=None) -> dict:
     """Materialise every day of the fixture market extended with `n_secs` synthetic histories (2024-10-01 to
     2026-11-11): one full run on the run-level path (per-day timings), then the per-day legacy path
     (FINANCIALS_MATERIALIZE_LEGACY=1) for `legacy_days` days spread over the history on a copy holding the same
-    earlier days (each rewrites one day of a copy that holds the run's history)."""
+    earlier days (each rewrites one day of a copy that holds the run's history). `incremental` = (entities,
+    days): then the incremental scenarios of `run_incremental` on the materialised history (section 7)."""
     from financials import features, features_store
     from financials.price_history import LEGACY_ENV
 
@@ -281,7 +282,52 @@ def run_synthetic(db: Path, work: Path, n_secs: int, legacy_days: int = 3) -> di
         fast_s = next(s for x, s, _ in res["per_day"] if x == d)
         res["legacy"].append((d, r.rows, legacy_s, fast_s))
     lcon.close()
+    if incremental:
+        res["incremental"] = run_incremental(path, *incremental)
     return res
+
+
+def run_incremental(path: Path, n_entities: int, n_days: int) -> list[dict]:
+    """`materialize --incremental` on the fully materialised synthetic history (architecture §11.10): `n_entities`
+    dirty entities over the last `n_days` materialised days, twice. First the markers of a change that changed none
+    of their rows (a re-parse, a BSE mirror of a filing): every day recomputes the entities' rows and compares them
+    with the stored ones. Then a real change: an accepted 1:2 split of each entity's security on the first of those
+    days (marked by the market-state diff, as a promoted corporate-action batch does), so every day from it is
+    recomputed and published (G5, G4, write, cross-section)."""
+    from financials import dirty
+    from financials.features import materialize_incremental
+
+    con = connect(path)
+    days = [d for (d,) in con.execute("SELECT DISTINCT as_of_date FROM features_daily ORDER BY 1").fetchall()]
+    start = days[-min(n_days, len(days))]
+    picked = con.execute(
+        "SELECT entity_id, min(security_id) FROM features_daily WHERE as_of_date = ? GROUP BY 1 ORDER BY 1 LIMIT ?",
+        [start, n_entities],
+    ).fetchall()
+    out = []
+    for kind in ("unchanged", "split"):
+        con.execute("DELETE FROM materialize_dirty")
+        if kind == "unchanged":
+            dirty.mark_entities(con, [e for e, _ in picked], start, "BENCH")
+        else:
+            before = dirty.market_state(con)
+            fid = con.execute("SELECT min(filing_id) FROM filings").fetchone()[0]
+            for ent, sec in picked:
+                con.execute(
+                    "INSERT INTO corp_actions (action_id, entity_id, security_id, action_type, ex_date, price_factor, "
+                    "eps_factor, status, source_filing_id, decided_at) VALUES (?, ?, ?, 'SPLIT', ?, 0.5, 0.5, "
+                    "'VERIFIED', ?, ?)",
+                    [f"bench-inc-{sec}", ent, sec, start, fid, start],
+                )
+            dirty.mark_market_changes(con, before, "BENCH")
+        t = time.perf_counter()
+        r = materialize_incremental(con)
+        s = time.perf_counter() - t
+        published = sum(d.status == "PROMOTED" for d in r.days)
+        out.append({"kind": kind, "entities": len(picked), "days": len(r.days), "published": published,
+                    "status": r.status, "s": s})  # fmt: skip
+    con.close()
+    return out
 
 
 def _rss_mb() -> float:
@@ -384,6 +430,24 @@ def render(res: dict) -> str:
             "|---|---|---|---|---|",
         ]
         lines += [f"| {d} | {n:,} | {lt:.2f} | {ft:.2f} | {lt / ft:.1f}x |" for d, n, lt, ft in syn["legacy"]]
+    inc = (syn or {}).get("incremental")
+    if inc:
+        lines += [
+            "",
+            "## 7. Incremental runs over the synthetic history (`--incremental-entities N --incremental-days D`)",
+            "",
+            "`materialize --incremental` on the history of section 6 (architecture §11.10): N dirty entities over the "
+            "last D materialised days. *unchanged*: markers whose change left their rows as they were (a re-parse, "
+            "a BSE mirror of a filing): each day recomputes the entities' rows through the run's slices and "
+            "visibility memo and compares them with the stored rows; nothing is published. *split*: an accepted "
+            "1:2 split of each entity's security on the first of those days, so every day from it is published "
+            "(G5, G4, write, cross-section of the whole day).",
+            "",
+            "| Scenario | Dirty entities | Days | Days published | Status | Run s | s / day |",
+            "|---|---|---|---|---|---|---|",
+        ]
+        lines += [f"| {x['kind']} | {x['entities']} | {x['days']} | {x['published']} | {x['status']} | {x['s']:.1f} "
+                  f"| {x['s'] / max(1, x['days']):.3f} |" for x in inc]  # fmt: skip
     lines += ["", "Regression guards with generous margins live in `tests/test_benchmarks.py`.", ""]
     return "\n".join(lines)
 
@@ -400,11 +464,19 @@ def main(argv: list[str] | None = None) -> int:
         help="also time a full run over N synthetic 2-year histories (section 6; N=3000: ~30 min)",
     )
     p.add_argument("--legacy-days", type=int, default=3, help="days timed on the legacy path in section 6")
+    p.add_argument("--incremental-entities", type=int, default=50, help="dirty entities in section 7 (--synthetic)")
+    p.add_argument("--incremental-days", type=int, default=363, help="materialised days they span in section 7")
     args = p.parse_args(argv)
     with tempfile.TemporaryDirectory() as tmp:
         res = run(args.fixtures, Path(tmp))
         if args.synthetic:
-            res["synthetic"] = run_synthetic(Path(tmp) / "market.duckdb", Path(tmp), args.synthetic, args.legacy_days)
+            res["synthetic"] = run_synthetic(
+                Path(tmp) / "market.duckdb",
+                Path(tmp),
+                args.synthetic,
+                args.legacy_days,
+                (args.incremental_entities, args.incremental_days),
+            )
         text = render(res)
     if args.out:
         args.out.write_text(text, encoding="utf-8")

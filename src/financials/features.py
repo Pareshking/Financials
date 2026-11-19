@@ -80,6 +80,7 @@ from financials.fundamentals import (
 from financials.identity import UNIVERSE_SERIES
 from financials.price_history import PriceHistory
 from financials.price_history import legacy as legacy_materialize
+from financials.run_memo import by_visibility, visibility_memo
 from financials.scope import MIN_PERIOD_END_DATE, MIN_TRADE_DATE
 from financials.timeutil import ist_to_utc, utc_now
 
@@ -300,6 +301,7 @@ KPI_COLUMNS = ("vnb_margin", "embedded_value", "ape_growth", "gov", "take_rate",
 _KPI_RUPEES = ("embedded_value", "gov")
 
 
+@by_visibility  # read once per visibility interval of an incremental run (run_memo)
 def supplemental_kpi_columns(con, as_of_ts: datetime, entities=None) -> dict[str, dict]:
     """Per entity: each KPI for its latest period visible at `as_of_ts`, latest visible version (one query)."""
     only, only_p = entity_filter("entity_id", entities)
@@ -539,6 +541,7 @@ def _event_counts(con, as_of: date, as_of_ts: datetime, entities=None) -> dict[s
     }  # fmt: skip
 
 
+@by_visibility  # read once per visibility interval of an incremental run (run_memo)
 def _preload(con, as_of_ts: datetime, entities=None):
     """Bulk point-in-time lookups keyed by entity (avoids per-security queries)."""
     only, only_p = entity_filter("entity_id", entities)
@@ -697,20 +700,24 @@ def compute_rows(
     dividends = _dividends(con, as_of, knowledge, as_of_ts, secs)
     events = _event_counts(con, as_of, as_of_ts, entities)
     kpis = supplemental_kpi_columns(con, as_of_ts, entities)
-    history = _valuation_history(con, as_of, secs)
+    run_cache = prices.fundamentals if prices is not None else None
+    if run_cache is not None:  # one read per quarter of the run (it reads only days before the quarter)
+        history = run_cache.per_quarter("valuation", as_of, secs, lambda: _valuation_history(con, as_of, secs))
+    else:
+        history = _valuation_history(con, as_of, secs)
     curated = _curated_archetypes()
     arch_override = dict(con.execute("SELECT entity_id, valuation_archetype FROM entity_archetype_override").fetchall())
     fundamentals_cache: dict[str, dict] = {}
     rows = []
-    run_cache = prices.fundamentals if prices is not None else None
     keys: dict[str, tuple] = {}
     stale = entities
     if run_cache is not None:  # reuse the entities' blocks of an earlier day of the run when no input changed
         keys = {e: run_cache.key(e, as_of, as_of_ts, quarter_end[e]) for (_, e, _, _) in universe if e in quarter_end}
         fundamentals_cache.update(run_cache.hits(keys))
         stale = frozenset(keys.keys() - fundamentals_cache.keys())
-    prefetch_fundamentals(con, as_of_ts, stale)  # one pass instead of a per-entity scan [benchmarks]
-    features_pl.prefetch(con, as_of_ts, stale)
+    if stale is None or stale:  # nothing to prefetch when every entity's block is reused
+        prefetch_fundamentals(con, as_of_ts, stale)  # one pass instead of a per-entity scan [benchmarks]
+        features_pl.prefetch(con, as_of_ts, stale)
     features_bs.prefetch(con, as_of_ts, entities)
     try:
         rows = _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all, paid_up, quarter_end,
@@ -1074,6 +1081,7 @@ def materialize(
     prices: PriceHistory | None = None,
     snapshot: bool = True,
     snapshot_due: bool = False,
+    rows: list[dict] | None = None,
 ) -> MaterializeResult:
     """Compute, gate and atomically publish features for `as_of`. Caller must be the single writer.
 
@@ -1082,10 +1090,12 @@ def materialize(
     `prices`: the run's PriceHistory (`materialize_run`), so a multi-day run reads the bars once.
     `snapshot=False` (every day of a run but the last, `materialize_days`): the live `screener_features` table is not
     rewritten; the result's `snapshot_due` says whether it would have been. `snapshot_due=True` (the run's last day):
-    an earlier day of the run deferred it, so this day's transaction rewrites it in any case (architecture §11.11)."""
-    rows = compute_rows(con, as_of, exchange, entities=entities, prices=prices)
-    if prices is not None:
-        prices.settle()
+    an earlier day of the run deferred it, so this day's transaction rewrites it in any case (architecture §11.11).
+    `rows`: the day's rows already computed by `compute_rows` with the same `entities` (`materialize_incremental`)."""
+    if rows is None:
+        rows = compute_rows(con, as_of, exchange, entities=entities, prices=prices)
+        if prices is not None:
+            prices.settle()
     universe = _universe(con, exchange, as_of)
     merged = rows
     if entities is not None:
@@ -1227,6 +1237,7 @@ class FundamentalsCache:
         structural = _structural_actions(con, through_ts, only.replace("entity_id", "e"), only_p)
         self._structural = {e: [d for d, _ in v] for e, v in structural.items()}
         self._blocks: dict[str, tuple[tuple, dict]] = {}
+        self._quarterly: dict[tuple, object] = {}
 
     def key(self, entity_id: str, as_of: date, as_of_ts: datetime, end: date) -> tuple:
         return (end, self._bisect(self._vis.get(entity_id, ()), as_of_ts),
@@ -1242,6 +1253,17 @@ class FundamentalsCache:
 
     def store(self, blocks: dict[str, tuple[tuple, dict]]) -> None:
         self._blocks.update(blocks)
+
+    def per_quarter(self, name: str, as_of: date, securities, read):
+        """`read()` once per (name, calendar quarter of as_of, securities) in the run, for the valuation-history
+        reads (`_valuation_history`, `features_more.valuation_history`): they read only stored days before the
+        quarter of as_of. A run materialises its days ascending and writes only the day it publishes, so those
+        days are final before the run's first day of the quarter reads them. The result is shared: read only."""
+        key = (name, date(as_of.year, 3 * ((as_of.month - 1) // 3) + 1, 1),
+               None if securities is None else frozenset(securities))  # fmt: skip
+        if key not in self._quarterly:
+            self._quarterly[key] = read()
+        return self._quarterly[key]
 
 
 # Checkpoint threshold for the length of a materialize run. Each day commits ~30 MB of WAL (the day's rows and the
@@ -1358,6 +1380,201 @@ def settle_full_run(con, days: list[date]) -> int:
     return settle_dirty(con, _dirty_rows(con), None if prev is None else prev + timedelta(days=1), hi)
 
 
+# Tables that compute_rows (and the run's FundamentalsCache) reads only for the requested entities: every read is
+# restricted by an entity_id filter, or reaches rows through the filing_id of such rows (current parser version,
+# the filing's basis, its REG34_ANNUAL profile, the disclosure / RPT denominators of the same filing). An
+# incremental run reads them through run-scoped slices (`entity_slices`).
+SLICED_TABLES = (
+    "filing_meta", "fact_observations", "fact_corrections", "disclosure_facts", "segment_observations",
+    "related_party_transactions", "audit_opinions", "shareholding_meta", "shareholding_observations",
+    "shareholding_line_items", "shareholding_major_holders",
+)  # fmt: skip
+_VISIBLE = frozenset(SLICED_TABLES) - {"fact_corrections"}  # with a visible_from_ts (corrections: their filing's)
+
+
+@contextmanager
+def entity_slices(con, entities) -> Iterator[None]:
+    """Run-scoped slices of SLICED_TABLES for an incremental run over `entities` (architecture §11.10): a TEMP table
+    of the same name holding every row of those entities plus every row of a filing any of them has a row in (so a
+    filing whose versions moved between entities, X83, keeps all its versions). DuckDB resolves an unqualified name
+    to the temp table first, so compute_rows reads the slice; its reads are restricted to the same entities, so they
+    return exactly the rows they return from the full tables, from a few thousand rows instead of millions (each of
+    a day's ~60 reads used to scan the full table: a fixed ~0.6 s a day whatever the number of entities). Nothing
+    in the run writes these tables (the run writes only the feature tables). The slices are dropped when the run
+    ends, by their catalog-qualified name. While they are held fixed, the run's visibility memo (`run_memo`) is
+    active: a reader that depends on the as-of only through visibility is read once per visibility interval.
+    `entities=None` (a FULL marker): no slices, no memo."""
+    if entities is None:
+        yield
+        return
+    db = con.execute("SELECT current_database()").fetchone()[0].replace('"', '""')
+    sql, params = in_list("entity_id", entities)
+    created: list[str] = []
+    try:
+        con.execute(
+            "CREATE TEMP TABLE _slice_filings AS SELECT DISTINCT filing_id FROM ("
+            + " UNION ALL ".join(f'SELECT filing_id FROM "{db}".main.{t} WHERE {sql}' for t in SLICED_TABLES)
+            + ")",
+            params * len(SLICED_TABLES),
+        )
+        created.append("_slice_filings")
+        for t in SLICED_TABLES:
+            con.execute(
+                f'CREATE TEMP TABLE {t} AS SELECT * FROM "{db}".main.{t} '
+                f"WHERE {sql} OR filing_id IN (SELECT filing_id FROM temp.main._slice_filings)",
+                params,
+            )
+            created.append(t)
+        # Per entity, every visibility timestamp the run's readers filter on (run_memo): of its rows in the slices,
+        # of the other rows of its filings, of its KPIs.
+        own = " UNION ".join(f"SELECT entity_id, filing_id FROM temp.main.{t}" for t in SLICED_TABLES)
+        stamps: dict[str, list[datetime]] = defaultdict(list)
+        for ent, ts in con.execute(
+            f"WITH fe AS (SELECT DISTINCT entity_id, filing_id FROM ({own}) WHERE {sql}) "
+            + " UNION ".join(
+                f"SELECT entity_id, visible_from_ts FROM temp.main.{t} WHERE {sql} UNION "
+                f"SELECT fe.entity_id, x.visible_from_ts FROM temp.main.{t} x JOIN fe USING (filing_id)"
+                for t in SLICED_TABLES
+                if t in _VISIBLE
+            )
+            + f' UNION SELECT entity_id, visible_from_ts FROM "{db}".main.supplemental_kpis WHERE {sql}',
+            params * (2 + len(_VISIBLE)),
+        ).fetchall():
+            stamps[ent].append(ts)
+        with visibility_memo(con, stamps):
+            yield
+    finally:
+        for t in reversed(created):
+            con.execute(f"DROP TABLE IF EXISTS temp.main.{t}")
+
+
+PUBLISHED = ("PROMOTED", "UNCHANGED")  # day statuses of a successful incremental run
+# Columns set by the cross-section refresh after a day's rows are written (from the day's stored rows): never
+# computed by compute_rows, so not compared.
+_CROSS = (
+    frozenset(features_gems.CROSS_COLUMNS)
+    | frozenset(features_peers.CROSS_COLUMNS)
+    | frozenset(features_more.CROSS_COLUMNS)
+)
+
+
+class _StoredRows:
+    """The stored rows an incremental run may replace, for `equal`: the daily rows of the run's entities and their
+    securities, read in chunks of STORED_CHUNK_DAYS days, and those securities' EVENT intervals, read once (one
+    query per chunk instead of a read per day). Read ahead of the writes, they stay valid: the run handles its days
+    ascending and publishing day D' replaces only D''s daily rows and the EVENT values on [D', the security's next
+    materialised day), so the rows of a later day are untouched until that day itself is published."""
+
+    def __init__(self, con, days: list[date], entities: frozenset[str]) -> None:
+        self._con, self._days = con, days
+        self._daily = [c for c in features_store.DAILY_COLUMNS if c not in _CROSS and c != "security_id"]
+        self._ent_pos = self._daily.index("entity_id")
+        by_ent = in_list("entity_id", entities)
+        self._secs = {s for (s,) in con.execute(
+            "SELECT security_id FROM securities WHERE " + by_ent[0] + " UNION "
+            "SELECT DISTINCT security_id FROM features_daily WHERE as_of_date >= ? AND " + by_ent[0],
+            [*by_ent[1], days[0], *by_ent[1]],
+        ).fetchall()}  # fmt: skip
+        self._filter = in_list("security_id", self._secs)
+        self._chunk: dict[date, dict[str, tuple]] = {}
+        self._events: dict[str, list[tuple]] = defaultdict(list)
+        for sec, start, end, *vals in con.execute(
+            "SELECT security_id, valid_from_date, coalesce(valid_to_date, DATE '9999-12-31'), "
+            + ", ".join(features_store.EVENT_COLUMNS)
+            + " FROM features_events WHERE "
+            + self._filter[0]
+            + " AND coalesce(valid_to_date, DATE '9999-12-31') > ? ORDER BY 1, 2",
+            [*self._filter[1], days[0]],
+        ).fetchall():
+            self._events[sec].append((start, end, tuple(vals)))
+
+    def _day(self, d: date) -> dict[str, tuple]:
+        if d not in self._chunk:
+            i = self._days.index(d)
+            chunk = self._days[i : i + STORED_CHUNK_DAYS]
+            self._chunk = {x: {} for x in chunk}
+            for sec, day, *vals in self._con.execute(
+                "SELECT security_id, as_of_date, " + ", ".join(self._daily) + " FROM features_daily "
+                "WHERE as_of_date >= ? AND as_of_date <= ? AND " + self._filter[0],
+                [chunk[0], chunk[-1], *self._filter[1]],
+            ).fetchall():
+                if day in self._chunk:
+                    self._chunk[day][sec] = tuple(vals)
+        return self._chunk[d]
+
+    def _event_values(self, sec: str, d: date) -> tuple | None:
+        for start, end, vals in self._events.get(sec, ()):
+            if start <= d < end:
+                return vals
+        return None
+
+    def equal(self, d: date, entities: frozenset[str], rows: list[dict]) -> bool:
+        """True when publishing `rows` for `entities` on `d` would store exactly the rows already stored: the rows
+        `features_store.write_day` would replace (the day's rows of those entities and of the rows' securities)
+        are the same securities with equal values in every column compute_rows sets (not the cross-section
+        columns, which the publish recomputes from those values). Equal is value equality (NaN equals NaN); a value
+        that would be cast on storage (a Decimal with more places than its column) compares unequal, so the day is
+        published: a False only costs the publish."""
+        secs = {r["security_id"] for r in rows}
+        if len(rows) != len(secs) or not secs <= self._secs:
+            return False
+        day = self._day(d)
+        replaced = {s for s, v in day.items() if v[self._ent_pos] in entities or s in secs}
+        if replaced != secs:
+            return False
+        none = (None,) * len(features_store.EVENT_COLUMNS)
+        for r in rows:
+            sec = r["security_id"]
+            events = self._event_values(sec, d)
+            for cols, vals in ((self._daily, day[sec]), (features_store.EVENT_COLUMNS, events or none)):
+                for c, v in zip(cols, vals, strict=True):
+                    w = r.get(c)
+                    if w is v:
+                        continue
+                    if w is None or v is None or not (w == v or (w != w and v != v)):
+                        return False
+        return True
+
+
+STORED_CHUNK_DAYS = 32
+
+
+def _incremental_days(con, days, exchange, prices, entities_for) -> list[MaterializeResult]:
+    """The days of an incremental run, ascending. Each day computes its dirty rows (one batched compute_rows). A day
+    whose rows equal the stored ones (a re-parse, a mirror or re-send of a filing, a revision that changed nothing
+    these entities' rows read) is left as stored: publishing it would rewrite the same rows, recompute the same
+    cross-section from the same inputs and pass the same gates as when it was published. Every other day is gated
+    (G5, G4 on the merged day) and published as before, and so is the day after a published day, whose G4 compares
+    with the changed previous day. The first day that fails a gate stops the run (the days before it stay
+    published). The live table is rewritten as `materialize_days` does: once, by the run's last day."""
+    results: list[MaterializeResult] = []
+    changed_prev = due = False
+    every = entities_for(days[-1]) if days else None  # the run's entities (the markers due by its last day)
+    stored = _StoredRows(con, days, every) if every is not None else None
+    try:
+        for i, d in enumerate(days):
+            last = i == len(days) - 1
+            ents = entities_for(d)
+            rows = compute_rows(con, d, exchange, entities=ents, prices=prices)
+            if prices is not None:
+                prices.settle()
+            same = stored is not None and ents is not None and stored.equal(d, ents, rows)
+            if same and not changed_prev:
+                results.append(MaterializeResult("UNCHANGED", d, len(rows), message="dirty rows equal stored rows"))
+                continue
+            r = materialize(con, d, exchange, entities=ents, prices=prices, snapshot=last, snapshot_due=due,
+                            rows=rows)  # fmt: skip
+            results.append(r)
+            if r.status != "PROMOTED":
+                break
+            changed_prev = not same
+            due = (due or r.snapshot_due) and not last
+    finally:
+        if due:  # a deferred live-table rewrite the run's last day did not make
+            publish_snapshot(con)
+    return results
+
+
 def materialize_incremental(con, to: date | None = None, exchange: str = "NSE") -> IncrementalResult:
     """Recompute only the rows `materialize_dirty` marks, on every already-materialised day >= the earliest marker
     (<= `to`), ascending so each day's PE / EV-EBITDA percentile history sees the recomputed earlier days. Per day:
@@ -1387,9 +1604,9 @@ def materialize_incremental(con, to: date | None = None, exchange: str = "NSE") 
         due = [r for r in rows if r[2] <= d]
         return None if any(r[1] == FULL for r in due) else frozenset(r[1] for r in due)
 
-    with materialize_run(con, days, exchange, every) as prices:
-        results = materialize_days(con, days, exchange, prices=prices, entities_for=entities_for)
-    if results and results[-1].status != "PROMOTED":
+    with entity_slices(con, every), materialize_run(con, days, exchange, every) as prices:
+        results = _incremental_days(con, days, exchange, prices, entities_for)
+    if results and results[-1].status not in PUBLISHED:
         r = results[-1]
         return IncrementalResult("ABORTED", results, f"{r.as_of_date}: {r.gate} {r.message}; dirty markers kept")
     settle_dirty(con, rows, None, to)

@@ -4,6 +4,7 @@ These catch order-of-magnitude regressions such as per-row/per-security query lo
 2026-11-12 promotion that took 11.2 s before gap quarantines were bulk-inserted (now < 1 s locally).
 """
 
+import io
 import statistics
 import time
 from datetime import date
@@ -87,3 +88,27 @@ def test_incremental_materialization_recomputes_a_subset_fast(full_market):
     elapsed = time.perf_counter() - t
     assert r.status == "DONE" and [d.as_of_date for d in r.days] == [day], r
     assert elapsed < 1.5, f"incremental (300 entities, 1 day) took {elapsed:.2f}s (full day {full:.2f}s)"
+
+
+def test_incremental_cost_per_unchanged_day_is_small(full_market):
+    """50 dirty entities over every materialised day, none of whose inputs changed (a re-parse, a BSE mirror): each
+    day computes their rows through the run's slices and visibility memo, finds them equal to the stored rows and
+    publishes nothing (architecture §11.10). Guards the per-day overhead that made a 2-entity, 363-day run take
+    6 minutes (~1.1 s a day before the slices; ~0.12 s now on the live-size database)."""
+    from financials import dirty
+    from financials.cli import materialize_dates
+    from financials.features import materialize_incremental
+
+    con = full_market.con
+    out = io.StringIO()
+    assert materialize_dates(con, None, date(2025, 9, 19), None, out) == 0, out.getvalue()
+    n_days = con.execute("SELECT count(DISTINCT as_of_date) FROM features_daily").fetchone()[0]
+    ents = [e for (e,) in con.execute(
+        "SELECT DISTINCT entity_id FROM features_daily ORDER BY 1 LIMIT 50").fetchall()]  # fmt: skip
+    con.execute("DELETE FROM materialize_dirty")
+    dirty.mark_entities(con, ents, date(2025, 9, 19), "BENCH")
+    t = time.perf_counter()
+    r = materialize_incremental(con)
+    elapsed = time.perf_counter() - t
+    assert r.status == "DONE" and len(r.days) == n_days >= 5 and {d.status for d in r.days} == {"UNCHANGED"}, r
+    assert elapsed / n_days < 0.5, f"incremental (50 entities, {n_days} days) took {elapsed:.2f}s"

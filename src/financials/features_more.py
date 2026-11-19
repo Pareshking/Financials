@@ -77,6 +77,7 @@ from financials.fundamentals import (
     piotroski_signals,
     safe_div,
 )
+from financials.run_memo import by_visibility
 from financials.scope import MIN_TRADE_DATE
 
 # ── columns (schema order: `-- batch I (last catalogue rows)` in db/schema.sql) ───────────────────────────────────
@@ -444,6 +445,7 @@ def action_columns(actions: list[tuple], as_of: date) -> dict:
     return out
 
 
+@by_visibility  # read once per visibility interval of an incremental run (run_memo)
 def segment_inputs(con, as_of_ts: datetime, entities=None) -> dict[tuple[str, str], list[tuple]]:
     """(entity, scope) -> [(metric, period, months, key, label, value, member)] of BUSINESS SEGMENT members, point in
     time (the `load_segments` rule: per axis / element / period, every member of the latest visible filing), in a
@@ -544,7 +546,11 @@ def add_columns(con, rows: list[dict], as_of: date, as_of_ts: datetime, fundamen
     from financials.features_price import index_closes
 
     secs = None if entities is None else {r["security_id"] for r in rows}
-    hist = valuation_history(con, as_of, secs)
+    run = prices.fundamentals if prices is not None else None
+    if run is not None:  # one read per quarter of the run (features.FundamentalsCache.per_quarter)
+        hist = run.per_quarter("more_valuation", as_of, secs, lambda: valuation_history(con, as_of, secs))
+    else:
+        hist = valuation_history(con, as_of, secs)
     bars = {} if prices is not None else load_bars(con, exchange, as_of, secs)
     index = prices.index if prices is not None else index_closes(con, as_of)
     events = index_events(con, as_of, secs)

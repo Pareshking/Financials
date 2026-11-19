@@ -640,3 +640,5 @@ My 19:31 (2026-11-17) recommendations, unanswered, applied:
    were never valid members; each removed row is logged in full in admin_log (UNIVERSE_REMOVE_RIGHTS_ENTITLEMENT)
    and `update-universe` reports the count. Members 2,070 -> 2,065 (Permitted 128 -> 123); no other member changes.
    Reversible: re-insert the logged rows, or re-run rule U1-2026.11.17-P.
+
+8. **Owners' profit = PAT less NCI when owners is filed 0 and NCI is within rounding** (X318 OWNERS_ZERO_NCI_WITHIN_ROUNDING, with X317 widening X214; main session, owner: "use agents where needed"). Industry practice: with nil minority interest, profit attributable to owners equals PAT (EPS and P/E use it). This supersedes the earlier ACCEPT note on 4 KAYNES findings ("X86 withholding is correct"); those filings have no open finding and stay withheld until they are restaged. Owners + NCI = continuing profit only (AURUM, NAZARA, UNIECOM, URAVI) stays withheld: the X52 assumption is wrong for NAZARA FY25 (annual owners 758.2 Mn vs 753.5 Mn). Reversible: drop X318 and re-parse.

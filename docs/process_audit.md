@@ -36,5 +36,7 @@ spent on code changes: each rule that changes stored numbers bumps FEATURES_VERS
 
 ## Next speed items (not done)
 
-- X103 share re-check in promote: one query per open CROSS_CHECK_FAILED finding (6.8 s per run); batch it.
+- X103 share re-check in promote: one query per open CROSS_CHECK_FAILED finding. 6.8 s per run with 111 open
+  findings; 33 open after QZ2 (2026-11-19), so about 2 s by proportion (not measured). Not batched: a set-based
+  rewrite of `share_disagreement` would touch the logic the share findings depend on, for about 2 s per promote.
 - A changed day still costs ~0.6 s in incremental; a version bump still needs the ~40 min full rebuild.

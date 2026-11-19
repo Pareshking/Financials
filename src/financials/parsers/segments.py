@@ -31,7 +31,7 @@ from decimal import Decimal
 
 from financials.money import ROUNDING_UNITS
 from financials.parsers import ParseError
-from financials.parsers.indas_corp import period_months
+from financials.parsers.indas_corp import first_period_months, period_months
 from financials.parsers.xbrl import Instance, parse_instance
 
 SEGMENT_ELEMENTS = (
@@ -127,7 +127,11 @@ class SegmentFact:
 
     @property
     def period_months(self) -> int | None:
-        return None if self.period_start is None else period_months(self.period_start, self.period_end)
+        if self.period_start is None:
+            return None
+        return period_months(self.period_start, self.period_end) or first_period_months(
+            self.period_start, self.period_end
+        )  # X337
 
 
 @dataclass
@@ -253,7 +257,7 @@ def parse_segments(
             report.warnings.append({"code": "SEGMENT_SUBPAISE", "element": f.name, "value": str(value)})
             continue
         if start is not None:
-            months = period_months(start, end)
+            months = period_months(start, end) or first_period_months(start, end)  # X337: a validated first period
             if months is None or not 1 <= months <= 18:
                 outside.append({"element": f.name, "context_id": c.id, "dates": [str(start), str(end)]})
                 continue

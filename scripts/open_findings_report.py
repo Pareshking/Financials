@@ -304,6 +304,13 @@ CAUSES: dict[str, tuple[str, str, str]] = {
         "An Ind AS results filing made on SEBI's non-Ind AS template (IntegratedFinance_OtherThanBank) by a company "
         "that is not SME-listed (X330), with no Ind AS re-file for the same period (X89 closes it once one arrives).",
     ),
+    "TX_WRONG_TEMPLATE_ANNUAL_ONLY": (
+        "UNKNOWN_TAXONOMY",
+        "REFILE",
+        "Wrong-template results (as TX_WRONG_TEMPLATE_NO_INDAS_REFILE) whose only Ind AS filing for the period end is "
+        "the Reg. 34 annual report: it states the fiscal year, not the quarter, so X89 does not close the finding "
+        "(the Q4 quarter is in no parsed filing; the 9M comparative is pre-cutoff, so no FY - 9M bridge) (X339).",
+    ),
     "TX_NON_INDAS_RESULTS_MEMBER": (
         "UNKNOWN_TAXONOMY",
         "OURS",
@@ -648,6 +655,10 @@ def classify(con) -> list[dict]:
     isin_ents, sym_ents, sym_isins, sym_first, names, cohort, member_syms, ent_symbol, listing = _identity_maps(con)
     period_files = Counter(r["filing_id"] for r in rows if r["reason_code"] == "IRREGULAR_PERIOD")
     igaap_reparsed = _reparsed_since(con, IGAAP_CORP_PARSER)
+    annual_ends = set(
+        con.execute("SELECT DISTINCT entity_id, period_end FROM qz_meta WHERE accounting_profile = 'REG34_ANNUAL'")
+        .fetchall()
+    )  # fmt: skip
     out = []
     for r in rows:
         d, reason = r["d"], r["reason_code"]
@@ -813,6 +824,8 @@ def classify(con) -> list[dict]:
                 "_NONINDAS_" not in r["file"] or r["filing_id"] in igaap_reparsed
             ):
                 cause = "TX_WRONG_TEMPLATE_NO_INDAS_REFILE"  # X330: re-parsed and still unknown = not SME-listed
+                if (ent, pe) in annual_ends:  # X339: only the annual covers the period end (FY, not the quarter)
+                    cause = "TX_WRONG_TEMPLATE_ANNUAL_ONLY"
             elif "_NONINDAS_" in r["file"]:
                 cause = "TX_NON_INDAS_RESULTS_MEMBER"
             elif r["file"].startswith("AR_XBRL_NI_"):

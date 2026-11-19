@@ -19,6 +19,7 @@ in fact_observations beside quarterly ones and load_factbook picks the latest vi
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import re
 from collections import defaultdict
@@ -42,6 +43,7 @@ from financials.parsers.indas_corp import (
     _check_eps,
     _check_identities,
     enrich_line_items,
+    first_period_months,
     map_line_items,
     period_months,
     preserve_withheld,
@@ -133,6 +135,8 @@ ANNUAL_ROUNDING_ALIASES = {"Actual": "Rupees"}
 ACTUAL_ROUNDING_RULE = "ACTUAL_ROUNDING_IS_RUPEES"
 UNDECLARED_PRE_CUTOFF_RULE = "UNDECLARED_PRE_CUTOFF_CONTEXT"
 IRREGULAR_STUB_RULE = "IRREGULAR_COMPARATIVE_STUB"
+FIRST_PERIOD_RULE = "FIRST_PERIOD_LONG"  # X337
+PRE_CUTOFF_PERIOD_RULE = "PRE_CUTOFF_DECLARED_PERIOD_IGNORED"  # X338
 
 CRITICAL = ("revenue_from_operations", "total_income", "total_expenses", "pbt", "pat", "total_assets", "total_equity")
 
@@ -179,10 +183,23 @@ def parse_reg34_annual(data: bytes, file_name: str | None = None) -> ParsedResul
     preserve_withheld(inst, result, durations=set(result.meta["in_scope_periods"]),
                       instants=set(result.meta["in_scope_instants"]))  # fmt: skip
     enrich_line_items(result)
+    _first_period_months(result)
     if result.issues:
         return result
     _identities(result)
     return result
+
+
+def _first_period_months(result: ParsedResults) -> None:
+    """X337: every duration fact of a FIRST_PERIOD_LONG period carries its 13..18 months (whole-month
+    `period_months` is None for a period starting mid-month)."""
+    first = set(result.meta.get("first_periods") or ())
+    if first:
+        result.facts[:] = [
+            dataclasses.replace(f, period_months=first_period_months(f.period_start, f.period_end))
+            if f.period_type == "DURATION" and (f.period_start, f.period_end) in first else f
+            for f in result.facts
+        ]  # fmt: skip
 
 
 def _meta(inst: Instance, result: ParsedResults, file_name: str | None) -> None:
@@ -213,29 +230,36 @@ def _meta(inst: Instance, result: ParsedResults, file_name: str | None) -> None:
             continue
         if f.name in ("DateOfStartOfReportingPeriod", "DateOfEndOfReportingPeriod"):
             declared[f.context_id][f.name] = date.fromisoformat(f.value_text.strip())
-    periods, irregular = set(), set()
+    periods, irregular, first, conflicts = set(), set(), set(), []
     for cid, d in declared.items():
         c = inst.contexts[cid]
         start, end = d.get("DateOfStartOfReportingPeriod"), d.get("DateOfEndOfReportingPeriod")
         if (start, end) != (c.start, c.end):  # never trust context dates blindly (invariant 6)
-            result.issues.append(
-                Issue(
-                    "PERIOD",
-                    "CONTEXT_CONFLICT",
-                    {"context_id": cid, "context": [str(c.start), str(c.end)], "declared": [str(start), str(end)]},
-                )
-            )
+            conflicts.append({"context_id": cid, "context": [str(c.start), str(c.end)],
+                              "declared": [str(start), str(end)]})  # fmt: skip
             continue
         months = period_months(start, end)
+        if months is None and first_period_months(start, end) is not None:
+            first.add((start, end))  # FIRST_PERIOD_LONG [X337]: a regular, one-off period
+            periods.add((start, end))
+            continue
         if months is None or not 1 <= months <= 18:
             irregular.add((start, end))
             continue
         periods.add((start, end))
     stubs = _comparative_stubs(irregular, periods)  # IRREGULAR_COMPARATIVE_STUB [X152]
-    for start, end in sorted(irregular - stubs):
+    ignored = _pre_cutoff_comparatives(irregular - stubs, conflicts, periods)  # X338
+    for x in conflicts:
+        if x["context_id"] not in ignored["context_ids"]:
+            result.issues.append(Issue("PERIOD", "CONTEXT_CONFLICT", x))
+    for start, end in sorted(irregular - stubs - ignored["periods"]):
         result.issues.append(Issue("PERIOD", "IRREGULAR_PERIOD", {"dates": [str(start), str(end)]}))
     if stubs:
         rules.append(IRREGULAR_STUB_RULE)
+    if first:
+        rules.append(FIRST_PERIOD_RULE)
+    if ignored["context_ids"] or ignored["periods"]:
+        rules.append(PRE_CUTOFF_PERIOD_RULE)
     if not periods:
         result.issues.append(Issue("PERIOD", "NO_DECLARED_PERIOD", {}))
         return
@@ -256,6 +280,7 @@ def _meta(inst: Instance, result: ParsedResults, file_name: str | None) -> None:
         ytd_period=(fy_start, fy_end),
         declared_periods=sorted(periods),
         stub_periods=sorted(stubs),
+        first_periods=sorted(first),
         in_scope_periods=in_scope,
         in_scope_instants=instants,
         reporting_quarter=None,
@@ -274,6 +299,25 @@ def _meta(inst: Instance, result: ParsedResults, file_name: str | None) -> None:
         warnings=[],
         rules_applied=rules,
     )
+
+
+def _pre_cutoff_comparatives(irregular: set, conflicts: list[dict], regular: set) -> dict:
+    """PRE_CUTOFF_DECLARED_PERIOD_IGNORED [X338]: a declared comparative period that is irregular, or whose declared
+    dates disagree with its context's, is out of scope when both its declared and its context dates end before
+    MIN_PERIOD_END_DATE (C9, invariant 14) and the filing declares a regular in-scope period ending later. Nothing of
+    it would be parsed anyway, so it no longer blocks the filing: BLUSPRING's carve-out comparative 2023-04-01..
+    2024-02-10 (an X152 stub once its first period is regular), TRANSRAILL FY25's comparative declared 2023-01-04..
+    2024-03-31 for context D_01042023_31032024 (day and month swapped). Its facts then fall under X151 (undeclared
+    pre-cutoff context) or X152; an in-scope irregular or conflicting period still quarantines the filing."""
+    out: dict = {"periods": set(), "context_ids": set()}
+    if not any(p[1] >= MIN_PERIOD_END_DATE for p in regular):
+        return out
+    out["periods"] = {p for p in irregular if p[1] < MIN_PERIOD_END_DATE}
+    for x in conflicts:
+        ends = [x["context"][1], x["declared"][1]]
+        if all(e != "None" and date.fromisoformat(e) < MIN_PERIOD_END_DATE for e in ends):
+            out["context_ids"].add(x["context_id"])
+    return out
 
 
 def _comparative_stubs(irregular: set, regular: set) -> set:

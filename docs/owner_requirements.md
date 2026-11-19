@@ -643,6 +643,17 @@ My 19:31 (2026-11-17) recommendations, unanswered, applied:
 
 8. **Owners' profit = PAT less NCI when owners is filed 0 and NCI is within rounding** (X318 OWNERS_ZERO_NCI_WITHIN_ROUNDING, with X317 widening X214; main session, owner: "use agents where needed"). Industry practice: with nil minority interest, profit attributable to owners equals PAT (EPS and P/E use it). This supersedes the earlier ACCEPT note on 4 KAYNES findings ("X86 withholding is correct"); those filings have no open finding and stay withheld until they are restaged. Owners + NCI = continuing profit only (AURUM, NAZARA, UNIECOM, URAVI) stays withheld: the X52 assumption is wrong for NAZARA FY25 (annual owners 758.2 Mn vs 753.5 Mn). Reversible: drop X318 and re-parse.
 
+9. **A long first financial period is stored as a one-off period** (X337 FIRST_PERIOD_LONG, X338
+   PRE_CUTOFF_DECLARED_PERIOD_IGNORED; work QF5, 2026-11-19, delegated by the main session). Industry practice: a
+   newly incorporated (e.g. demerged) company's first financial year runs from incorporation to the next 31 March and
+   may exceed 12 months (Companies Act 2013 s. 2(41)); it is reported as such and never annualised or compared.
+   A declared period starting mid-month with 13..18 calendar months (invariant 6 allows 1..18) is a regular period
+   with `period_months` 13..18; no TTM, YoY or annual-on-annual reader uses it (they take 3- / 12-month periods);
+   its year-end balance sheet is ordinary. A pre-cutoff comparative that is irregular, or whose declared dates
+   disagree with its context (TRANSRAILL: day and month swapped), is out of scope (invariant 14) and ignored instead
+   of holding the filing back. Releases 4 annual reports (BLUSPRING, DIGITIDE x2, TRANSRAILL; 8 PERIOD findings).
+   Reversible: drop the two rules and re-parse.
+
 ## Owner decisions (2026-11-19)
 
 - **Done criterion for Phases 1-2 (expanded universe):** done when the random-sample accuracy is >= 98% (QD2: 99.54% adjudicated, met) and every open finding carries a stated cause, even where it stays withheld. Withheld numbers are NULL in screens, never shown wrong. Stop chasing the long tail of filer errors after the in-flight reviews (QY3, QA2).

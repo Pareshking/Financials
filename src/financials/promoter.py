@@ -822,6 +822,76 @@ def resolve_unregistered_isin(
     return [sec]
 
 
+ISIN_ONE_CHAR_RULE = "ISIN_ONE_CHAR_SYMBOL_NAME_MATCH"
+_LEADING_ARTICLE = re.compile(r"^THE\s+")
+_TRAILING_SUFFIX = re.compile(r"(LIMITED|LTD)$")
+
+
+def compact_name(name: str | None) -> str:
+    """X336: a company name reduced to its letters and digits, upper case, without a leading THE and a trailing
+    LIMITED / LTD: "J.KUMAR INFRAPROJECTS LIMITED" -> JKUMARINFRAPROJECTS, exchange "JKUMAR INFR.LTD." -> JKUMARINFR,
+    "THE ANDHRA SUGARS LIMITED" and "ANDHRA SUGARS LTD" -> ANDHRASUGARS."""
+    s = _LEADING_ARTICLE.sub("", (name or "").upper().strip())
+    return _TRAILING_SUFFIX.sub("", re.sub(r"[^A-Z0-9]", "", s))
+
+
+def company_names_match(stated: str | None, legal: str | None) -> bool:
+    """X336: the filed company name matches the entity's (exchange, often abbreviated) name: names_agree (X88), or
+    the compact exchange name is the compact filed name or a prefix of it ("JKUMARINFR" of "JKUMARINFRAPROJECTS")."""
+    if names_agree(stated, legal):
+        return True
+    a, b = compact_name(stated), compact_name(legal)
+    return bool(a) and bool(b) and a.startswith(b)
+
+
+def _hamming1(a: str, b: str) -> bool:
+    return len(a) == len(b) and sum(x != y for x, y in zip(a, b, strict=True)) == 1
+
+
+def isin_one_char_match(con, exchange: str, isin: str | None, symbol: str | None, company_name: str | None,
+                        on_date: date) -> tuple[str, str, str] | None:  # fmt: skip
+    """The decision of rule ISIN_ONE_CHAR_SYMBOL_NAME_MATCH [X336] (read-only): (security_id, its ISIN, legal name)
+    or None. See resolve_isin_one_char."""
+    if not symbol or not isin:
+        return None
+    if con.execute("SELECT count(*) FROM security_identifier_history WHERE isin = ?", [isin]).fetchone()[0]:
+        return None
+    rows = con.execute(
+        "SELECT DISTINCT h.security_id, h.isin, e.legal_name FROM security_identifier_history h "
+        "JOIN securities s USING (security_id) JOIN entity_master e USING (entity_id) WHERE h.exchange = ? "
+        "AND h.symbol = ? AND h.valid_from <= ? AND (h.valid_to IS NULL OR h.valid_to > ?)",
+        [exchange, symbol, on_date, on_date],
+    ).fetchall()
+    if len(rows) != 1:
+        return None
+    sec, actual, legal = rows[0]
+    if not _hamming1(isin, actual) or not company_names_match(company_name, legal):
+        return None
+    return sec, actual, legal
+
+
+def resolve_isin_one_char(
+    con, exchange: str, isin: str, symbol: str | None, company_name: str | None, on_date: date, filing_id: str
+) -> list[str]:
+    """Rule ISIN_ONE_CHAR_SYMBOL_NAME_MATCH [X336], in the X88 family: the stated ISIN belongs to no security we know
+    (any exchange, any time), the stated symbol held exactly one ISIN on `on_date` (no any-interval fallback), the
+    stated ISIN differs from it in exactly one character (Hamming distance 1), and the filed company name matches
+    the entity's name (company_names_match). J. Kumar Infraprojects files INE576101022 (digit 1 for the letter I of
+    INE576I01022, 10 results filings Q4 FY25..Q1 FY27); Andhra Sugars Q4 FY26 files INE715N01021 for INE715B01021.
+    X81 (O / 0, adjacent swap) and X88 (same issuer code or names_agree) do not cover them: the typo is inside the
+    issuer code and the exchange name is abbreviated ("JKUMAR INFR.LTD.") or lacks the filed "THE". Anything else
+    stays quarantined. Logged in admin_log; raw keeps the ISIN as sent (invariant 3)."""
+    hit = isin_one_char_match(con, exchange, isin, symbol, company_name, on_date)
+    if hit is None:
+        return []
+    sec, actual, _ = hit
+    params = json.dumps({"filing_id": filing_id, "stated_isin": isin, "symbol": symbol, "isin": actual,
+                         "security_id": sec, "company_name": company_name}, sort_keys=True)  # fmt: skip
+    row = [stable_id("adm", ISIN_ONE_CHAR_RULE, params), "RULE:" + ISIN_ONE_CHAR_RULE, params, "X336", utc_now()]
+    con.execute("INSERT OR IGNORE INTO admin_log VALUES (?, ?, ?, NULL, ?, ?)", row)
+    return [sec]
+
+
 ISIN_OF_OTHER_ISSUER_RULE = "ISIN_OF_OTHER_ISSUER"
 
 
@@ -1272,6 +1342,8 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
             typo = resolve_isin_typo(con, ix, meta["stated_isin"], meta["stated_symbol"], meta["period_end"], fid)
             typo = typo or resolve_unregistered_isin(con, ix, meta["stated_isin"], meta["stated_symbol"],
                                                      meta.get("company_name"), meta["period_end"], fid)  # fmt: skip
+            typo = typo or resolve_isin_one_char(con, ix, meta["stated_isin"], meta["stated_symbol"],
+                                                 meta.get("company_name"), meta["period_end"], fid)  # fmt: skip
             ent = con.execute("SELECT entity_id FROM securities WHERE security_id IN (SELECT unnest(?))",
                               [typo]).fetchall()  # fmt: skip
         if not ent and filing["exchange"] == "BSE":
@@ -2145,6 +2217,8 @@ def _promote_shareholding(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
         secs = resolve_isin_typo(con, ix, meta["stated_isin"], meta["stated_symbol"], meta["as_of_date"], fid)
         secs = secs or resolve_unregistered_isin(con, ix, meta["stated_isin"], meta["stated_symbol"],
                                                  meta.get("company_name"), meta["as_of_date"], fid)  # fmt: skip
+        secs = secs or resolve_isin_one_char(con, ix, meta["stated_isin"], meta["stated_symbol"],
+                                             meta.get("company_name"), meta["as_of_date"], fid)  # fmt: skip
     entities = sorted(
         {con.execute("SELECT entity_id FROM securities WHERE security_id = ?", [s_]).fetchone()[0] for s_ in secs}
     )

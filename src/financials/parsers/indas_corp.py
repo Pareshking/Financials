@@ -315,6 +315,27 @@ def period_months(start: date, end: date) -> int | None:
     return (end.year - start.year) * 12 + end.month - start.month + 1
 
 
+FIRST_PERIOD_MONTHS = range(13, 19)  # invariant 6 allows 1..18; 13..18 only for a company's first financial period
+
+
+def first_period_months(start: date, end: date) -> int | None:
+    """FIRST_PERIOD_LONG [X337]: a newly incorporated company's first financial period runs from its incorporation
+    date (any day) to a financial year end (a month end), so it can exceed 12 months (Companies Act 2013 s. 2(41):
+    a company incorporated on or after 1 January may end its first financial year on 31 March of the following
+    year; invariant 6 caps any period at 18 months). Demerged companies file it as their first annual report:
+    BLUSPRING 2024-02-11..2025-03-31, DIGITIDE
+    2024-02-10..2025-03-31. Months are the calendar months the period touches (Feb 2024..Mar 2025 = 14). Only a
+    period starting after the 1st of a month with 13..18 such months qualifies; one starting on the 1st already has
+    whole-month `period_months`, and a shorter mid-month period stays irregular (or an X152 comparative stub).
+    The period is stored as a one-off: every TTM, YoY and annual-on-annual reader takes 3- or 12-month periods only
+    (and `period_months` recomputed from the dates is None), so it is never combined with any other period
+    (invariant 6); its balance sheet is an ordinary year-end balance sheet."""
+    if start.day == 1 or end < start or end.day != calendar.monthrange(end.year, end.month)[1]:
+        return None
+    months = (end.year - start.year) * 12 + end.month - start.month + 1
+    return months if months in FIRST_PERIOD_MONTHS else None
+
+
 def _parse_date(text: str | None) -> date | None:
     return date.fromisoformat(text) if text else None
 
@@ -737,14 +758,27 @@ def enrich_line_items(result: ParsedResults) -> None:
 def preserve_withheld(inst: Instance, result: ParsedResults, *, durations: set, instants: set) -> None:
     """Zero-drop (C24): a value a named rule withheld or replaced (placeholder owners/NCI [X48], owners tagged as
     TCI, contingent-liability placeholders [X73]) is kept as filed under `asfiled_<element>`; the canonical tag
-    keeps the corrected value."""
+    keeps the corrected value.
+
+    ATTRIBUTION_WITHHELD_AS_FILED [X335]: an element still mapped for another period would be skipped, so the owners
+    / NCI elements of an X86 withheld period are kept as filed even when the filing uses them for a period that
+    reconciles (FCL 9M FY26: NCI 4.08 Cr as filed for the withheld 9M, Q3 NCI 3.77 Cr canonical); X325 then shows
+    owners = PAT - NCI as filed, flagged."""
     from financials.line_items import snake
 
     have = {f.source_element for f in result.facts}
-    seen = set()
+    withheld = {(f.period_start, f.period_end) for f in result.facts if f.canonical_tag == ATTRIBUTION_WITHHELD_TAG}
+    # kept by an earlier call (results profiles with a post_process call this twice): never twice
+    seen = {
+        (f.canonical_tag, f.period_start, f.period_end) for f in result.facts if f.canonical_tag.startswith("asfiled_")
+    }
     for f in inst.facts:
         c = inst.contexts[f.context_id]
-        if not f.is_numeric or c.dimensions or f.name in have:
+        if not f.is_numeric or c.dimensions:
+            continue
+        if f.name in have and not (
+            f.name in ATTRIBUTION_ELEMENTS and c.instant is None and (c.start, c.end) in withheld
+        ):
             continue
         inside = c.instant in instants if c.instant is not None else (c.start, c.end) in durations
         if not inside:
@@ -850,6 +884,7 @@ ATTRIBUTION_TERMS = 6
 TCI_OWNERS_KEY = "li_comprehensive_income_for_the_period_attributable_to_owners_of_parent"
 TCI_NCI_KEY = "li_comprehensive_income_for_the_period_attributable_to_owners_of_parent_non_controlling_interests"
 ATTRIBUTION_WITHHELD_TAG = "attribution_withheld"  # marker (PURE 1): owners/NCI for the period are not usable [X86]
+ATTRIBUTION_ELEMENTS = ("ProfitOrLossAttributableToOwnersOfParent", "ProfitOrLossAttributableToNonControllingInterests")
 
 
 def _replace_attribution(result: ParsedResults, p: tuple, owners: Decimal, nci: Decimal, rule: str) -> None:

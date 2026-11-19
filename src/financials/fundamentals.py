@@ -86,7 +86,12 @@ NET_LINE_LOSS_TAGS = ("net_loss_fair_value", "net_loss_derecognition")
 # (FactBook.withheld) with the code of its class. A reader in as-filed mode (FactBook.fill_as_filed, set by the
 # feature layer) first computes on the validated values; only when that gives NULL does it recompute with the
 # withheld values restored, and the row is flagged (FactBook.dq). Validated values always win; nothing is invented.
-DQ_ATTRIBUTION = "ATTRIBUTION_AS_FILED"  # X86: owners' profit of a withheld split = PAT as filed
+DQ_ATTRIBUTION = "ATTRIBUTION_AS_FILED"  # X86 with NCI filed 0: owners' profit of a withheld split = PAT as filed
+DQ_ATTRIBUTION_NCI = "ATTRIBUTION_PAT_LESS_NCI"  # X86 with a non-zero NCI: owners = PAT - NCI as filed
+# X86 keeps the NCI as filed of a withheld period under this tag (preserve_withheld, C24) when the filing uses the NCI
+# element for no other period; otherwise the NCI is not in the facts and owners' profit stays NULL (PAT would put the
+# NCI share into owners').
+ASFILED_NCI_TAG = "asfiled_profit_or_loss_attributable_to_non_controlling_interests"
 DQ_YTD = "YTD_AS_FILED"  # X173 / X315: a YTD context that copies another context, as filed
 DQ_TAX_COPY = "TAX_COPY_AS_FILED"  # X94: tax / PAT / TCI of a period whose tax copies the prior year, as filed
 DQ_TTM_MISFILED = "TTM_MISFILED_YTD"  # X226: TTM whose bridge reads a proven mis-filed YTD: quarters as filed
@@ -170,7 +175,7 @@ class FactBook:
             for k in set(self.durations) - before:
                 del self.durations[k]
         if out is not None:
-            self.dq.update(codes)
+            self.dq.update(c for code in codes for c in code.split(","))
         return out
 
     def _can_fill(self, tag: str) -> bool:
@@ -182,7 +187,7 @@ class FactBook:
         if v is None and self.fill_as_filed and not self._depth:
             w = self.withheld.get(tag, {}).get(period)
             if w is not None:
-                self.dq.add(w[1])
+                self.dq.update(w[1].split(","))
                 return w[0]
         return v
 
@@ -714,24 +719,60 @@ class FactBook:
             self.durations[key] = out
             if fallback:
                 self._withhold_derived(key, tag, fallback, out, blocked)
+            else:  # excise etc. (absent = 0) over the base's withheld periods
+                self.withhold_combined(key, (tag, "revenue_from_operations"), lambda v: v[tag] or ZERO,
+                                       require=("revenue_from_operations",))  # fmt: skip
         return key
+
+    def withhold_combined(self, key: str, inputs: tuple[str, ...], fn, require: tuple[str, ...] | None = None) -> None:
+        """X325: as-filed values of a derived per-period tag `key` = fn({input: value}) for the periods `key` lacks
+        where some input is withheld: each input at its validated value, else as filed (None when neither). Only
+        periods whose `require` inputs (default: all) are known; flagged with the withheld inputs' codes."""
+        out = self.durations.get(key, {})
+        need = inputs if require is None else require
+        periods = {p for t in inputs for p in self.withheld.get(t, {})} - set(out)
+        for p in sorted(periods):
+            vals, codes = {}, set()
+            for t in inputs:
+                v = self.durations.get(t, {}).get(p)
+                if v is None and p in self.withheld.get(t, {}):
+                    v, c = self.withheld[t][p]
+                    codes.update(c.split(","))
+                vals[t] = v
+            if not codes or any(vals[t] is None for t in need):
+                continue
+            r = fn(vals)
+            if r is not None:
+                self._withhold(key, p, r, ",".join(sorted(codes)))
+
+    def attribution_as_filed(self, pat: Decimal, period: Period) -> tuple[Decimal, str] | None:
+        """X325 for an X86 period (owners / NCI split withheld): owners = PAT - NCI as filed (the attribution
+        identity, ATTRIBUTION_PAT_LESS_NCI) when the NCI as filed is non-zero, PAT (ATTRIBUTION_AS_FILED) when it is
+        0; None when the NCI as filed is not in the facts (X86 only withholds where an NCI is filed)."""
+        nci = self.durations.get(ASFILED_NCI_TAG, {}).get(period)
+        if nci is None:
+            return None
+        return (pat, DQ_ATTRIBUTION) if nci == 0 else (pat - nci, DQ_ATTRIBUTION_NCI)
 
     def _withhold_derived(self, key: str, tag: str, fallback: str, out: dict, blocked: dict) -> None:
         """X325: the as-filed values of a coalesced tag for the periods it lacks: COALESCE(tag, fallback) over the
         withheld values too (a tax copy, X94; a YTD copy, X173), and the fallback (PAT) for a period whose owners /
-        NCI split is withheld (X86 ATTRIBUTION_WITHHELD: owners + NCI != PAT, so PAT, the period's stated total
-        profit, is the best stated figure; flagged ATTRIBUTION_AS_FILED)."""
+        NCI split is withheld (X86 ATTRIBUTION_WITHHELD: owners + NCI != PAT): PAT - NCI as filed, or PAT when the
+        NCI is filed 0 (`attribution_as_filed`); nothing when the NCI as filed is unknown."""
         wp, wb = self.withheld.get(tag, {}), self.withheld.get(fallback, {})
         base = self.durations.get(fallback, {})
-        for p in {*base, *wb, *wp}:
+        for p in sorted({*base, *wb, *wp}):
             if p in out:
                 continue
             if p in wp:
                 self._withhold(key, p, *wp[p])
-            elif p in base and p in blocked:
-                self._withhold(key, p, base[p], DQ_ATTRIBUTION)
+            elif p in blocked and (p in base or p in wb):
+                pat, code = (base[p], None) if p in base else wb[p]
+                a = self.attribution_as_filed(pat, p)
+                if a is not None:
+                    self._withhold(key, p, a[0], a[1] if code is None else f"{a[1]},{code}")
             elif p in wb:
-                self._withhold(key, p, wb[p][0], DQ_ATTRIBUTION if p in blocked else wb[p][1])
+                self._withhold(key, p, *wb[p])
 
     def continuing_owners(self) -> str:
         """Derived tag: COALESCE(owners, total) - discontinued, per period (per filing) [C10, X52].
@@ -966,6 +1007,12 @@ def _build_book(entity_id: str, scope: str, rows, unit, fy_starts, structural=()
     if "pbt" in book.durations:
         book.durations[PBT_INCL_JV] = {p: v + jv.get(p, Decimal(0)) for p, v in book.durations["pbt"].items()}
     book.withhold_tax_copies()
+    book.withhold_combined(
+        PBT_INCL_JV,
+        ("pbt", "share_of_associates_jv"),
+        lambda v: v["pbt"] + (v["share_of_associates_jv"] or ZERO),
+        require=("pbt",),
+    )  # X325
     return book
 
 
@@ -1880,15 +1927,18 @@ def _year(book: FactBook, p: tuple[date, date]) -> dict[str, Decimal | None]:
 
 def _owners_fy(book: FactBook, p: tuple[date, date]) -> Decimal | None:
     """One fiscal year's owners' profit: filed owners, else PAT. Where the split is withheld (X86) and no filing
-    states the owners: NULL on validated values; PAT as filed, flagged ATTRIBUTION_AS_FILED, in as-filed mode (X325)."""
+    states the owners: NULL on validated values; in as-filed mode (X325) PAT - NCI as filed (ATTRIBUTION_PAT_LESS_NCI),
+    PAT when the NCI is filed 0 (ATTRIBUTION_AS_FILED), NULL when the NCI as filed is unknown."""
     owners = _fy(book, "pat_owners", p)
     if _fy(book, ATTRIBUTION_WITHHELD_TAG, p) and owners is None:
         if not book.fill_as_filed:
             return None
         pat = _fy(book, "pat", p)
-        if pat is not None:
-            book.dq.add(DQ_ATTRIBUTION)
-        return pat
+        a = None if pat is None else book.attribution_as_filed(pat, p)
+        if a is None:
+            return None
+        book.dq.add(a[1])
+        return a[0]
     return owners or _fy(book, "pat", p)
 
 

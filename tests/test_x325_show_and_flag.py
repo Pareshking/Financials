@@ -81,22 +81,41 @@ def _techm() -> FactBook:
     return book
 
 
-def test_x86_owners_profit_shows_pat_as_filed_flagged():
+def test_x86_owners_profit_is_pat_less_nci_as_filed_flagged():
+    """Tech Mahindra Q4 FY25 files NCI 3.4 Cr (FY 5.0 Cr), kept as filed (C24): owners = PAT - NCI as filed, never PAT
+    (owner 2026-11-19, follow-up to decision V). The NCI as filed is itself wrong here (PDF -24.8 Cr): flagged."""
     q4, fy = (date(2025, 1, 1), date(2025, 3, 31)), (date(2024, 4, 1), date(2025, 3, 31))
     book = _techm()
     owners = book.coalesced("pat_owners", "pat")
     assert q4 not in book.durations[owners] and fy not in book.durations[owners]  # X86 unchanged: no fallback
     assert book.quarter(owners, q4[1]) is None and F._owners_fy(book, fy) is None
     book.fill_as_filed = True
-    pat = book.durations["pat"]
-    assert book.quarter(owners, q4[1]) == pat[q4] == Decimal("11418960000")
-    assert book.stated(owners, fy) == pat[fy]
-    assert F._owners_fy(book, fy) == pat[fy]
-    assert book.stated(book.continuing_owners(), fy) == pat[fy] - book.durations.get("pat_discontinued", {}).get(
-        fy, Decimal(0)
-    )
-    assert book.dq == {F.DQ_ATTRIBUTION}
-    assert owners not in book.durations or q4 not in book.durations[owners]  # the book itself is not changed
+    pat, nci = book.durations["pat"], book.durations[F.ASFILED_NCI_TAG]
+    assert nci == {q4: Decimal("34000000"), fy: Decimal("50000000")}
+    assert book.quarter(owners, q4[1]) == pat[q4] - nci[q4] == Decimal("11384960000")
+    assert book.stated(owners, fy) == pat[fy] - nci[fy]
+    assert F._owners_fy(book, fy) == pat[fy] - nci[fy]
+    disc = book.durations.get("pat_discontinued", {}).get(fy, Decimal(0))
+    assert book.stated(book.continuing_owners(), fy) == pat[fy] - nci[fy] - disc
+    assert book.dq == {F.DQ_ATTRIBUTION_NCI}
+    assert q4 not in book.durations[owners]  # the book itself is not changed
+
+
+def test_x86_nci_filed_zero_gives_pat_and_unknown_nci_stays_null():
+    q4 = (date(2026, 1, 1), date(2026, 3, 31))
+    b = FactBook("e", "CONSOLIDATED")
+    b.durations["pat"] = {q4: Decimal(120)}
+    b.durations["attribution_withheld"] = {q4: Decimal(1)}
+    b.durations[F.ASFILED_NCI_TAG] = {q4: Decimal(0)}
+    b.fill_as_filed = True
+    assert b.quarter(b.coalesced("pat_owners", "pat"), q4[1]) == Decimal(120)
+    assert b.dq == {F.DQ_ATTRIBUTION}
+    u = FactBook("e", "CONSOLIDATED")  # NCI filed (X86 withholds only then) but not kept in the facts
+    u.durations["pat"] = {q4: Decimal(120)}
+    u.durations["attribution_withheld"] = {q4: Decimal(1)}
+    u.fill_as_filed = True
+    assert u.quarter(u.coalesced("pat_owners", "pat"), q4[1]) is None and F._owners_fy(u, q4) is None
+    assert not u.dq
 
 
 def test_x86_filed_owners_of_another_filing_win_and_are_not_flagged():
@@ -141,6 +160,22 @@ def test_x173_validated_quarters_win_the_copied_ytd_is_shown_only_where_nothing_
     assert book.dq == {F.DQ_YTD}
     book.fill_as_filed = False
     assert book.stated(REV, M9) is None  # validated: withheld
+
+
+def test_x173_derived_lines_of_the_copied_ytd_from_as_filed_inputs():
+    from financials import features_pl
+
+    book = ajax()
+    book.withhold_ytd_copies()
+    book.fill_as_filed = True
+    features_pl._derive(book)
+    assert M9 not in book.durations[features_pl.EBITDA]  # validated: the inputs are withheld
+    assert book.quarter(features_pl.EBITDA, Q3P[1]) is not None and not book.dq  # the filed quarter
+    ebitda = book.stated(features_pl.EBITDA, M9)
+    assert ebitda == book.quarter(features_pl.EBITDA, Q3P[1])  # the copy repeats the quarter's lines
+    assert book.stated(features_pl.EBIT, M9) == ebitda - book.stated("depreciation_amortisation", M9)
+    assert book.stated(features_pl.REV_OPS, M9) == Decimal("4335480000")
+    assert book.dq == {F.DQ_YTD}
 
 
 # ── X301: bridge on two bases ────────────────────────────────────────────────────────────────────────────────────

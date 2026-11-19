@@ -760,7 +760,7 @@ CREATE TABLE IF NOT EXISTS features_daily (
     is_psu                                   BOOLEAN,         -- public sector undertaking
     -- X325 (rule SHOW_AND_FLAG, owner decision V): data-quality flags of the row (DAILY: open findings are read
     -- with today's resolution state, outside the fundamentals-cache key). dq_flags = sorted comma-separated codes
-    -- (ATTRIBUTION_AS_FILED, YTD_AS_FILED, TAX_COPY_AS_FILED, TTM_MISFILED_YTD, TTM_MIXED_BASIS,
+    -- (ATTRIBUTION_AS_FILED, ATTRIBUTION_PAT_LESS_NCI, YTD_AS_FILED, TAX_COPY_AS_FILED, TTM_MISFILED_YTD, TTM_MIXED_BASIS,
     -- OPEN_FINDING:<reason>, PRICE_GAP_UNRESOLVED), NULL when none; dq_suspect = any flag.
     dq_suspect                               BOOLEAN,
     dq_flags                                 VARCHAR,
@@ -1890,7 +1890,7 @@ CREATE TABLE IF NOT EXISTS screener_features (
     roe_screener                             DOUBLE,          -- Screener ROE: last FY owners' PAT / avg owners' equity [X227]
     -- X325 (rule SHOW_AND_FLAG, owner decision V): data-quality flags of the row (DAILY: open findings are read
     -- with today's resolution state, outside the fundamentals-cache key). dq_flags = sorted comma-separated codes
-    -- (ATTRIBUTION_AS_FILED, YTD_AS_FILED, TAX_COPY_AS_FILED, TTM_MISFILED_YTD, TTM_MIXED_BASIS,
+    -- (ATTRIBUTION_AS_FILED, ATTRIBUTION_PAT_LESS_NCI, YTD_AS_FILED, TAX_COPY_AS_FILED, TTM_MISFILED_YTD, TTM_MIXED_BASIS,
     -- OPEN_FINDING:<reason>, PRICE_GAP_UNRESOLVED), NULL when none; dq_suspect = any flag.
     dq_suspect                               BOOLEAN,
     dq_flags                                 VARCHAR,

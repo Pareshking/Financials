@@ -192,7 +192,7 @@ def depreciation_ratios(book, fy: tuple[date, date]) -> tuple[Decimal | None, De
     """(FY D&A / average gross block, accumulated depreciation / gross block at the FY end) (B2.12)."""
     at = lambda t, d: book.instants.get(t, {}).get(d)  # noqa: E731
     gb1, gb0 = at("ppe_gross_block", fy[1]), at("ppe_gross_block", _add_months(fy[1], -12))
-    dep = book.durations.get("depreciation_amortisation", {}).get(fy)
+    dep = book.stated("depreciation_amortisation", fy)  # X325: as filed (flagged) where a rule withheld it
     rate = None if None in (dep, gb1, gb0) or gb1 + gb0 <= 0 else dep / ((gb1 + gb0) / 2)
     acc = at("ppe_accumulated_depreciation", fy[1])
     return rate, (safe_div(acc, gb1) if gb1 and gb1 > 0 else None)

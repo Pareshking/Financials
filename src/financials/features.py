@@ -46,6 +46,7 @@ from financials.fundamentals import (
     CASH_CONVERSION_COLUMNS,
     CURRENT_VERSION,
     DQ_ATTRIBUTION,
+    DQ_ATTRIBUTION_NCI,
     DQ_TAX_COPY,
     DQ_TTM_MISFILED,
     DQ_TTM_MIXED,
@@ -851,7 +852,7 @@ def _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all,
 # quarter they are compared with), on the row's scope when the finding names one.
 DQ_FINDING_MONTHS = 3 * RESTATEMENT_QUARTERS
 DQ_PRICE_GAP = "PRICE_GAP_UNRESOLVED"  # an open GAP finding freezes the back-adjusted series (returns stay NULL)
-DQ_CODES = (DQ_ATTRIBUTION, DQ_YTD, DQ_TAX_COPY, DQ_TTM_MISFILED, DQ_TTM_MIXED, DQ_PRICE_GAP)
+DQ_CODES = (DQ_ATTRIBUTION, DQ_ATTRIBUTION_NCI, DQ_YTD, DQ_TAX_COPY, DQ_TTM_MISFILED, DQ_TTM_MIXED, DQ_PRICE_GAP)
 # Reasons of the non-blocking findings that carry an entity (the DSL names one alias per reason; a flag is written
 # for any open entity finding, named or not).
 DQ_FINDING_REASONS = (

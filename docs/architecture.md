@@ -346,7 +346,7 @@ The Reg. 34 comparison runs at promotion and raises CONSISTENCY / ANNUAL_PRIOR_Y
 not yet a flag input, classed SCALE / RESTATED / REGROUPED for triage [X182]. Because the outcome at promotion depends on
 what was promoted before, `audit-annual` re-runs it and the annual share-count check on the stored data [X180].
 
-YoY growth across a flagged boundary is set to NULL in screens (with a reason). The PDF anchor-locking extractor from the original blueprint is **deferred**.
+YoY growth across a flagged boundary is set to NULL in screens (with a reason). The PDF anchor-locking extractor from the original blueprint is **deferred**. If built, it must prove its numbers against the same filing's XBRL `OneD`/`FourD` before any row is promoted.
 
 ### 7.7 Show and flag: withheld values and open findings (owner decision V, 2026-11-19) [X325]
 "Show everything for all companies; if required flag the suspect one." A number a filing states is never blanked
@@ -362,8 +362,9 @@ when that gives NULL does it recompute with the withheld values restored, and re
 
 | Withholding point (rule) | Validated value | Shown instead (as filed) | Flag |
 |---|---|---|---|
-| X86 ATTRIBUTION_WITHHELD (owners + NCI != PAT, no recovery) | owners' profit NULL: EPS, P/E, ROE, NPM, net profit NULL | PAT as filed for that period (the stated total profit; the owners line as filed is the defective one: 0 placeholders, OCI) | `ATTRIBUTION_AS_FILED` |
+| X86 ATTRIBUTION_WITHHELD (owners + NCI != PAT, no recovery) | owners' profit NULL: EPS, P/E, ROE, NPM, net profit NULL | owners = PAT - NCI as filed (the attribution identity; the owners line is the defective one: 0 placeholders, OCI), from the NCI kept as filed (`asfiled_..._non_controlling_interests`, C24); PAT only when the NCI is filed 0; never PAT when a non-zero NCI is filed (owner 2026-11-19). NULL when the NCI as filed is not in the facts (preserve_withheld skips an element the filing uses for another period) | `ATTRIBUTION_PAT_LESS_NCI` / `ATTRIBUTION_AS_FILED` |
 | X94 tax copied from the prior year | tax, PAT, TCI of the period NULL | the period's values as filed | `TAX_COPY_AS_FILED` |
+| Derived per-period lines (sales net of excise, EBITDA, EBIT, material cost, PBT incl. JV, coalesced owners / excise) and the single-period reads of features_bs / _extra / _more (`stated`) | NULL when a withheld input is missing | the same formula on the inputs as filed (`FactBook.withhold_combined`), only where the withholding is the reason | the input's code |
 | X173 / X315 YTD copies a quarter / the prior year | the copied YTD values NULL (TTM sums the quarters) | the YTD as filed, only where no validated path exists (e.g. an FY ratio whose 12-month figure is the copy) | `YTD_AS_FILED` |
 | X226 bridge reads a proven mis-filed YTD | TTM NULL | the sum of the 4 latest quarters as filed, derived quarters included (never the refused bridge; NULL when a quarter is missing) | `TTM_MISFILED_YTD` |
 | X301 bridge on two bases | 4-quarter sum (NULL when a derived quarter is mis-filed) | the 4-quarter sum as filed | `TTM_MIXED_BASIS` (also on every X301 quarter sum) |
@@ -374,13 +375,13 @@ Genuine absence stays NULL and is never flagged into a number: fewer than 4 quar
 before the cutoff (invariant 14, `min_periods_required`), no filing, a ratio undefined by its definition (a zero or
 negative denominator, X194), lender / insurer columns that do not apply. Blocking quarantines still parse nothing
 (unknown taxonomy, invalid XBRL, failed identity, undetermined period): there is no entity, or no period, to show a
-number for. Open findings are read with today's resolution state ("valid" knowledge, §11.9, as the GAP freeze and PDF
+number for. Not filled, with the reason: the choice of the last fiscal year (`latest_fiscal_year`, a period choice from filed PAT: an FY whose PAT a tax copy withholds is not picked as the last FY); X86 periods whose NCI as filed was not kept (needs a parser change: keep the withheld period's NCI under `asfiled_` whatever other periods use, then a re-parse); lines read as whole dictionaries (paid-up capital, face value, EPS, RPT totals: no rule withholds them). Open findings are read with today's resolution state ("valid" knowledge, §11.9, as the GAP freeze and PDF
 corrections): a rebuilt history flags every as-of date from the finding's filing visibility while the finding is
-open, and none once it is resolved, so a backtest sees today's judgement of each date's filings. Findings change
+open, and none once it is resolved, so a backtest sees today's judgement of each date's filings. This is a known non-bitemporal choice (owner 2026-11-19): the history does not record when a finding was opened or resolved, so `screen --as-of D` cannot reproduce the flags a screen run on D itself showed (the same holds for the GAP freeze and PDF corrections). Findings change
 outside the fundamentals inputs, so the two columns are DAILY (§4.1) and `materialize --incremental` diffs the open
 findings against `features_dq_findings` (the set the stored rows reflect) and marks each changed finding's entity from
 its period end (`dirty.mark_finding_changes`). Screens include flagged rows; `Data Suspect = 0` excludes them,
-`Data Flag <code> = 1` selects one code (§14), and `screen` prints `dq_suspect` / `dq_flags` with every match. If built, it must prove its numbers against the same filing's XBRL `OneD`/`FourD` before any row is promoted.
+`Data Flag <code> = 1` selects one code (§14), and `screen` prints `dq_suspect` / `dq_flags` with every match.
 
 ## 8. Canonical building blocks (defined once; every ratio uses these)
 

@@ -78,5 +78,6 @@ def test_causes_from_details_and_unknown_reason_is_unclassified(ofr, market, tmp
     assert ofr.main([str(tmp_path / "market.duckdb"), "--out", str(out)]) == 1  # UNCLASSIFIED > 0 fails
     assert "| all | UNCLASSIFIED | - | 1 | 0 | 0 | 0 | 1 |" not in out.read_text()  # q6 has no member: NONE
     assert "| all | UNCLASSIFIED | - | 0 | 0 | 0 | 1 | 1 |" in out.read_text()
-    assert (tmp_path / "report.csv").read_text().count("\n") == 9
+    assert not (tmp_path / "report.csv").exists()  # the CSV is never written next to the committed report
+    assert (tmp_path / "open_findings.csv").read_text().count("\n") == 9  # next to the database (gitignored)
     market.con = ofr.duckdb.connect(str(tmp_path / "market.duckdb"))  # the fixture closes it at teardown

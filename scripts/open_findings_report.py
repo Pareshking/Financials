@@ -915,7 +915,7 @@ def to_markdown(rows: list[dict], db_label: str, csv_name: str) -> str:
         f"Open findings: **{n}**. UNCLASSIFIED: **{sum(1 for r in rows if r['cause'] == 'UNCLASSIFIED')}** "
         "(must be 0). Cohorts: OLD = Nifty 500 seed, NEW = admitted at >= Rs 500 Cr (Listed), PERM = admitted from "
         "a Permitted row, NONE = not a universe member. Every finding with its cause and evidence: "
-        f"[`{csv_name}`]({csv_name}).",
+        f"`{csv_name}` (written locally next to the database; not committed: it carries per-filing amounts).",
         "",
         "## By action",
         "",
@@ -952,7 +952,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("db")
     ap.add_argument("--out", help="write the Markdown report here (and the CSV next to it)")
-    ap.add_argument("--csv", help="CSV path (default: the --out path with .csv)")
+    ap.add_argument("--csv", help="CSV path (default: data/open_findings.csv, gitignored)")
     args = ap.parse_args(argv)
     con = duckdb.connect(args.db, read_only=True)
     try:
@@ -962,11 +962,11 @@ def main(argv: list[str] | None = None) -> int:
         con.close()
     if args.out:
         out = Path(args.out)
-        csv_path = Path(args.csv) if args.csv else out.with_suffix(".csv")
-        out.write_text(to_markdown(rows, f"data/{Path(args.db).name}", csv_path.name))
+        csv_path = Path(args.csv) if args.csv else Path(args.db).parent / "open_findings.csv"
+        out.write_text(to_markdown(rows, f"data/{Path(args.db).name}", f"data/{csv_path.name}"))
         csv_path.write_text(to_csv(rows))
     else:
-        sys.stdout.write(to_markdown(rows, f"data/{Path(args.db).name}", "open_findings.csv"))
+        sys.stdout.write(to_markdown(rows, f"data/{Path(args.db).name}", "data/open_findings.csv"))
     unc = sum(1 for r in rows if r["cause"] == "UNCLASSIFIED")
     print(f"{len(rows)} open findings, {unc} UNCLASSIFIED", file=sys.stderr)
     return 1 if unc else 0

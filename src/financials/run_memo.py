@@ -9,7 +9,10 @@ run, an entity's part can only change on a day whose as-of passes one of that en
 the memo keeps each entity's part with the number of its timestamps <= the as-of it was read at, and a call reads
 only the entities whose number moved (one batched read for them, as compute_rows does), instead of re-reading every
 entity every day (an incremental run used to repeat ~15 of these ~10 ms reads on every one of hundreds of days).
-Outside a run (`active() is None`) or for all entities (`entities=None`, a full run) the reader runs as before.
+Outside a run (`active() is None`) or for all entities (`entities=None`) the reader runs as before, except in a
+full run's memo (`everyone`, features._FullRunSlices): there `entities=None` means every entity of `everyone`, and
+the entities whose number moved are read through `reader(stale)`, the connection holding run-scoped slices of the
+batch's changing entities (or the database itself when they are not all in the slices).
 
 The result is shared while nothing moves, as the run's FundamentalsCache shares an entity's fundamentals block: its
 consumers only read it (`.get`, indexing, iteration). `CHECK_MUTATIONS` (tests/test_incremental_materialize.py)
@@ -61,14 +64,23 @@ def _split(result, entities) -> tuple[Callable, dict]:
 
 
 class VisibilityMemo:
-    def __init__(self, con, timestamps: Mapping[str, list[datetime]]) -> None:
-        """`timestamps`: per entity, every visibility timestamp of its rows and of its filings' rows."""
+    def __init__(self, con, timestamps: Mapping[str, list[datetime]], everyone: frozenset[str] | None = None,
+                 reader: Callable | None = None) -> None:  # fmt: skip
+        """`timestamps`: per entity, every visibility timestamp of its rows and of its filings' rows. `everyone`
+        (a full run): the entities an `entities=None` read stands for (every entity a row can belong to); `reader`:
+        `reader(stale)` = the connection to read those entities' parts with (default: `con`)."""
         self.con = con
+        self.everyone = everyone
+        self._reader = reader
         self._ts = {e: sorted(set(v)) for e, v in timestamps.items()}
         self._parts: dict[str, dict[str, tuple[int, object]]] = defaultdict(dict)
         self._rebuild: dict[str, Callable] = {}
         self._last: dict[str, tuple[dict, object]] = {}
         self._pristine: dict[tuple, object] = {}
+
+    def source(self, stale) -> object:
+        """The connection to read the entities `stale` with (`reader`, else `con`)."""
+        return self.con if self._reader is None else self._reader(stale)
 
     def interval(self, entity: str, as_of_ts: datetime) -> int:
         """The number of the entity's visibility timestamps <= as_of_ts (equal for two as-ofs = the same rows)."""
@@ -82,7 +94,7 @@ class VisibilityMemo:
         parts = self._parts[name]
         stale = frozenset(e for e, k in want.items() if e not in parts or parts[e][0] != k)
         if stale:
-            rebuild, fresh = _split(fn(self.con, as_of_ts, stale), stale)
+            rebuild, fresh = _split(fn(self.source(stale), as_of_ts, stale), stale)
             self._rebuild.setdefault(name, rebuild)
             for e, p in fresh.items():
                 parts[e] = (want[e], p)
@@ -108,8 +120,9 @@ def active() -> VisibilityMemo | None:
 
 
 @contextmanager
-def visibility_memo(con, timestamps: Mapping[str, list[datetime]]) -> Iterator[VisibilityMemo]:
-    memo = VisibilityMemo(con, timestamps)
+def visibility_memo(con, timestamps: Mapping[str, list[datetime]], everyone: frozenset[str] | None = None,
+                    reader: Callable | None = None) -> Iterator[VisibilityMemo]:  # fmt: skip
+    memo = VisibilityMemo(con, timestamps, everyone, reader)
     token = _ACTIVE.set(memo)
     try:
         yield memo
@@ -126,7 +139,11 @@ def by_visibility(fn: Callable) -> Callable:
     @functools.wraps(fn)
     def reader(con, as_of_ts: datetime, entities=None):
         memo = _ACTIVE.get()
-        if memo is None or entities is None or con is not memo.con or not entities:
+        if memo is None or con is not memo.con:
+            return fn(con, as_of_ts, entities)
+        if entities is None:
+            entities = memo.everyone  # a full run's memo: every entity (None outside one)
+        if entities is None or not entities:
             return fn(con, as_of_ts, entities)
         return memo.read(name, fn, as_of_ts, entities)
 

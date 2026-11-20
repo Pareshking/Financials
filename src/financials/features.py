@@ -16,10 +16,11 @@ Fundamentals are read point-in-time at the end of `as_of_date` (IST).
 
 from __future__ import annotations
 
+import bisect
 import statistics
 from collections import defaultdict
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
@@ -36,10 +37,11 @@ from financials import (
     features_pl,
     features_rpt,
     features_store,
+    run_memo,
 )
 from financials.corp_actions import ACCEPTED_STATUSES
 from financials.db import version_key
-from financials.features_price import add_price_columns, refresh_breadth
+from financials.features_price import add_price_columns, refresh_breadth, refresh_breadth_days
 from financials.fundamentals import (
     ANNUAL_COLUMNS,
     BANK_COLUMNS,
@@ -677,6 +679,7 @@ def compute_rows(
     knowledge: str = "valid",
     entities: frozenset[str] | None = None,
     prices: PriceHistory | None = None,
+    cross: bool = True,
 ) -> list[dict]:
     """Feature rows for `as_of`. `knowledge` selects how price adjustments and gap freezes are read (see
     `_price_inputs`); materialised history always uses the default "valid" knowledge. `entities` computes only the
@@ -685,7 +688,10 @@ def compute_rows(
 
     Price columns ("valid" knowledge) come from a `PriceHistory` (read once per run, sliced per day; `prices`, or one
     read here for this day); FINANCIALS_MATERIALIZE_LEGACY=1 (and knowledge="system") re-read and recompute the
-    whole history per day instead. Both give identical rows (tests/test_materialize_fast_path.py)."""
+    whole history per day instead. Both give identical rows (tests/test_materialize_fast_path.py).
+
+    `cross=False` leaves out the day's cross-section columns (features_gems / _peers / _more CROSS_COLUMNS): for a
+    caller that publishes the whole day, whose refresh recomputes them from the stored rows (`_materialize_batched`)."""
     as_of_ts = ist_to_utc(as_of + timedelta(days=1), time(0, 0))  # end of as_of day, IST
     universe = _universe(con, exchange, as_of, entities)
     if entities is not None and not universe:
@@ -728,8 +734,10 @@ def compute_rows(
         fundamentals_cache.update(run_cache.hits(keys))
         stale = frozenset(keys.keys() - fundamentals_cache.keys())
     if stale is None or stale:  # nothing to prefetch when every entity's block is reused
-        prefetch_fundamentals(con, as_of_ts, stale)  # one pass instead of a per-entity scan [benchmarks]
-        features_pl.prefetch(con, as_of_ts, stale)
+        memo = run_memo.active()  # a full run reads the recomputed entities from its slices (_FullRunSlices)
+        src = memo.source(stale) if memo is not None and memo.con is con and stale is not None else con
+        prefetch_fundamentals(src, as_of_ts, stale, key=con)  # one pass instead of a per-entity scan [benchmarks]
+        features_pl.prefetch(src, as_of_ts, stale, key=con)
     features_bs.prefetch(con, as_of_ts, entities)
     try:
         rows = _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all, paid_up, quarter_end,
@@ -743,11 +751,11 @@ def compute_rows(
         features_bs.clear(con, as_of_ts)
     add_price_columns(con, rows, as_of, exchange, factors, frozen, secs, prices)  # batch B (price/technicals)
     features_audit.add_columns(con, rows, as_of_ts, entities)  # 20A (audit opinions, X121; before forensic_clean)
-    features_gems.add_columns(con, rows, as_of, as_of_ts, fundamentals_cache, entities)  # batch D (hidden gems)
-    features_peers.add_columns(con, rows, as_of, as_of_ts, entities)  # batch H (industry / peers)
+    features_gems.add_columns(con, rows, as_of, as_of_ts, fundamentals_cache, entities, cross)  # batch D
+    features_peers.add_columns(con, rows, as_of, as_of_ts, entities, cross)  # batch H (industry / peers)
     features_extra.add_columns(con, rows, as_of, as_of_ts, fundamentals_cache, factors, entities)  # batch G
     features_more.add_columns(
-        con, rows, as_of, as_of_ts, fundamentals_cache, factors, frozen, entities, prices=prices
+        con, rows, as_of, as_of_ts, fundamentals_cache, factors, frozen, entities, prices=prices, cross=cross
     )  # batch I
     features_rpt.add_columns(con, rows, as_of_ts, entities)  # batch J (related-party leak, X113)
     features_disclosures.add_columns(con, rows, as_of_ts, entities)  # 18D (disclosure_facts, X116-X119)
@@ -1114,13 +1122,49 @@ def _window_reaches_before_cutoff(end: date | None) -> bool:
     return end is not None and _add_months(end, -9) < MIN_PERIOD_END_DATE
 
 
-def _c9_expected_nulls(con, prev: date, rows: list[dict]) -> set[tuple[str, str]]:
+@dataclass
+class DaySummary:
+    """What gate G4 reads of a published day (the previous day of the day it gates): per security, its
+    fundamentals_end and whether each TTM column (sorted TTM_COLUMNS) is NULL; the day's CRITICAL_COLUMNS null rates
+    over all its rows. From the stored day (`stored`), or from the rows a run just published (`of_rows`: the same
+    values, which a run keeps instead of reading them back)."""
+
+    day: date
+    null_rates: dict[str, float]
+    fundamentals: dict[str, tuple]
+
+    @classmethod
+    def stored(cls, con, day: date) -> DaySummary:
+        ttm = ", ".join(f"{c} IS NULL" for c in sorted(TTM_COLUMNS))
+        crit = ", ".join(f"{c} IS NULL" for c in CRITICAL_COLUMNS)
+        rows = con.execute(
+            f"SELECT security_id, fundamentals_end, {ttm}, {crit} FROM screener_features_history WHERE as_of_date = ?",
+            [day],
+        ).fetchall()
+        k = 2 + len(TTM_COLUMNS)
+        return cls._of(day, [(r[0], r[1:k], r[k:]) for r in rows])
+
+    @classmethod
+    def of_rows(cls, day: date, rows: list[dict]) -> DaySummary:
+        ttm = sorted(TTM_COLUMNS)
+        return cls._of(day, [(r["security_id"], (r.get("fundamentals_end"), *(r.get(c) is None for c in ttm)),
+                              tuple(r.get(c) is None for c in CRITICAL_COLUMNS)) for r in rows])  # fmt: skip
+
+    @classmethod
+    def _of(cls, day: date, rows: list[tuple]) -> DaySummary:
+        # avg(CASE WHEN c IS NULL THEN 1 ELSE 0 END) as DuckDB computes it: the exact count over the exact row count
+        rates = {c: sum(r[2][i] for r in rows) / len(rows) if rows else None for i, c in enumerate(CRITICAL_COLUMNS)}
+        return cls(day, rates, {r[0]: r[1] for r in rows})
+
+
+def _summary(con, prev: date | DaySummary) -> DaySummary:
+    return prev if isinstance(prev, DaySummary) else DaySummary.stored(con, prev)
+
+
+def _c9_expected_nulls(con, prev: date | DaySummary, rows: list[dict]) -> set[tuple[str, str]]:
     """Rule G4_C9_WINDOW: (security, TTM column) pairs that were non-NULL on `prev` and are NULL now only because
     `fundamentals_end` moved to a newer quarter whose window needs pre-cutoff quarters. One query for all rows."""
-    cols = ", ".join(f"{c} IS NULL" for c in sorted(TTM_COLUMNS))
-    before = {r[0]: r[1:] for r in con.execute(
-        f"SELECT security_id, fundamentals_end, {cols} FROM screener_features_history WHERE as_of_date = ?", [prev]
-    ).fetchall()}  # fmt: skip
+    before = _summary(con, prev).fundamentals
     out = set()
     for r in rows:
         b = before.get(r["security_id"])
@@ -1133,14 +1177,22 @@ def _c9_expected_nulls(con, prev: date, rows: list[dict]) -> set[tuple[str, str]
     return out
 
 
-def _g4_compared_rows(con, prev: date, rows: list[dict]) -> list[dict]:
+def _g4_compared_rows(con, prev: date | DaySummary, rows: list[dict]) -> list[dict]:
     """Rule G4_NEW_ENTRANT: the null-rate gate compares like with like, the securities that also had a row on `prev`.
     A security first trading today (an IPO, or 156 Permitted BSE-listed securities on 2026-04-20) brings its own NULLs
     (no fundamentals yet); that is new coverage, not lost coverage. With no overlap at all, every row counts."""
-    before = {r[0] for r in con.execute(
-        "SELECT security_id FROM screener_features_history WHERE as_of_date = ?", [prev]
-    ).fetchall()}  # fmt: skip
+    before = _summary(con, prev).fundamentals
     return [r for r in rows if r["security_id"] in before] or rows
+
+
+def _g4_spikes(con, prev: date | DaySummary, rows: list[dict]) -> dict[str, tuple[float, float]]:
+    """Gate G4 of `rows` (a whole day) against the previous published day: the critical columns whose null rate rose
+    by more than G4_MAX_NULL_RISE."""
+    before = _summary(con, prev)
+    same = _g4_compared_rows(con, before, rows)
+    now = _null_rates(same, _c9_expected_nulls(con, before, same))
+    was = before.null_rates
+    return {c: (was[c], now[c]) for c in CRITICAL_COLUMNS if now[c] - was[c] > G4_MAX_NULL_RISE}
 
 
 def materialize(
@@ -1184,13 +1236,7 @@ def materialize(
 
     prev = con.execute("SELECT max(as_of_date) FROM features_daily WHERE as_of_date < ?", [as_of]).fetchone()[0]
     if prev is not None:
-        cols = ", ".join(f"avg(CASE WHEN {c} IS NULL THEN 1 ELSE 0 END)" for c in CRITICAL_COLUMNS)
-        before = dict(zip(CRITICAL_COLUMNS, con.execute(
-            f"SELECT {cols} FROM screener_features_history WHERE as_of_date = ?", [prev]
-        ).fetchone(), strict=True))  # fmt: skip
-        same = _g4_compared_rows(con, prev, merged)
-        now = _null_rates(same, _c9_expected_nulls(con, prev, same))
-        spikes = {c: (before[c], now[c]) for c in CRITICAL_COLUMNS if now[c] - before[c] > G4_MAX_NULL_RISE}
+        spikes = _g4_spikes(con, prev, merged)
         if spikes:
             return MaterializeResult("ABORTED", as_of, len(merged), "G4", f"null-rate spike vs {prev}: {spikes}")
 
@@ -1243,6 +1289,7 @@ def materialize_days(
     prices: PriceHistory | None = None,
     entities_for=None,
     report=None,
+    batch_days: int | None = None,
 ) -> list[MaterializeResult]:
     """`materialize` each of `days` in order (one run: `materialize --from/--to`, `--incremental`, `rebuild-market`),
     stopping at the first day that does not publish. The live `screener_features` table is rewritten once, in the
@@ -1250,8 +1297,14 @@ def materialize_days(
     latest day again and left the deleted copies as dead blocks in the file. When the run stops early (a failed
     gate, an error) after a day that deferred it, it is rewritten on its own, so the tables end exactly as the
     day-by-day publish left them. `entities_for(day)`: the entities to recompute on that day (None = all);
-    `report(result)`: called after each day."""
+    `report(result)`: called after each day (after its batch's commit on the batched path).
+
+    A full run (no `entities_for`) on the run-level path (`prices`) publishes up to `batch_days` days per
+    transaction (default FULL_RUN_BATCH_DAYS; 1 = the day-by-day path): `_materialize_batched`."""
     days = list(days)
+    batch = FULL_RUN_BATCH_DAYS if batch_days is None else batch_days
+    if entities_for is None and prices is not None and batch > 1 and len(days) > 1:
+        return _materialize_batched(con, days, exchange, prices, report, batch)
     results: list[MaterializeResult] = []
     due = False
     try:
@@ -1269,6 +1322,170 @@ def materialize_days(
         if due:  # the last day did not publish (or raised): the days before it did, as day-by-day would have shown
             publish_snapshot(con)
     return results
+
+
+# Days a full run publishes per transaction (`_materialize_batched`). A batch holds its days' rows in memory
+# (~2,400 rows x ~660 values a day on the live database: ~30 MB of Python objects a day).
+FULL_RUN_BATCH_DAYS = 20
+
+
+# The days whose changing entities one set of the full run's slices holds (`_FullRunSlices.prepare`), longest
+# first, and the most entities worth copying. On the live database a copy costs ~1.7 s per 100 entities (fact,
+# disclosure and shareholding line rows) and saves ~2.5 s of full-table reads a day: in a results or shareholding
+# season (~650 entities in 6 days of August 2025) the copy costs more than it saves, so such days read the database.
+SLICE_WINDOWS = (5,)
+SLICE_MAX_ENTITIES = 400
+
+
+def _quarter(d: date) -> tuple[int, int]:
+    return d.year, (d.month - 1) // 3
+
+
+def _reads_stored_days(d: date) -> bool:
+    """compute_rows(d) reads stored days of the current quarter: the 5-year PE median of features_gems
+    (`pe_medians`, every stored day of its window up to the day before d) once its window is in scope (C9)."""
+    return features_gems.pe_history_gate(d) is not None
+
+
+def _materialize_batched(con, days: list[date], exchange: str, prices: PriceHistory, report,
+                         batch_days: int) -> list[MaterializeResult]:  # fmt: skip
+    """A full run (every entity, every one of `days`, ascending) with the day-by-day result, published in batches of
+    up to `batch_days` days per transaction (architecture §11.11).
+
+    Day by day, as `materialize`: compute_rows (with the run's PriceHistory and FundamentalsCache), G5 (the rows are
+    the day's universe) and G4 against the previous materialised day; the first day that fails a gate stops the
+    run, and the days before it are published. Only the publish is batched: one transaction writes the batch's days
+    in order (features_store.write_day, each day replacing its rows and EVENT intervals exactly as before), then the
+    breadth and the three cross-sections of all its days (each day's from that day's stored rows, which the later
+    days' writes do not touch), the live table when the batch holds the run's last day, and the days' meta rows.
+
+    What a day reads of the stored days is what the day-by-day run had stored by then:
+    - G4's previous day: a day of this run is gated against the summary of the rows it published (DaySummary,
+      equal to what the stored day returns); a stored day outside the run is read from the database;
+    - the valuation histories (`FundamentalsCache.per_quarter`) read stored days before the day's quarter: a batch
+      never spans two quarters, so every earlier quarter is committed when a quarter's first day reads it;
+    - `features_gems.pe_medians` reads every stored day of its window up to the previous day: from the first day its
+      window is in scope (C9: 5 years after MIN_TRADE_DATE) such days are published one by one.
+    An error stops the run after publishing the batch's days computed before it (as day by day); an error in a
+    batch's transaction rolls back the whole batch (each day stays atomic: all of its rows or none)."""
+    results: list[MaterializeResult] = []
+    stored = sorted(d for (d,) in con.execute("SELECT DISTINCT as_of_date FROM features_daily").fetchall())
+    pending: list[tuple[date, list[dict]]] = []
+    published = False
+    last_summary: DaySummary | None = None
+
+    def flush() -> None:
+        nonlocal published
+        if not pending:
+            return
+        batch = pending[:]
+        pending.clear()  # never published twice: a batch whose transaction failed is rolled back, not retried
+        _publish_days(con, batch, snapshot=batch[-1][0] == days[-1])
+        published = True
+        for d, rows in batch:
+            r = MaterializeResult("PROMOTED", d, len(rows))
+            results.append(r)
+            if report is not None:
+                report(r)
+
+    batches: list[list[date]] = []
+    for d in days:  # a new batch at the size limit, at a quarter's first day and on days that read stored days
+        joins = batches and len(batches[-1]) < batch_days and _quarter(d) == _quarter(batches[-1][0])
+        if joins and not _reads_stored_days(d):
+            batches[-1].append(d)
+        else:
+            batches.append([d])
+
+    def day_ts(d: date) -> datetime:
+        return ist_to_utc(d + timedelta(days=1), time(0, 0))
+
+    try:
+        with full_run_memo(con) as slices:
+            prev_ts: datetime | None = None  # the as-of of the run's last computed day
+            slice_end = 0
+            for batch in batches:
+                failed = None
+                for i, d in enumerate(batch):
+                    if prev_ts is not None and (i == 0 or i >= slice_end):
+                        # slices of the entities whose inputs become visible in the next SLICE_WINDOWS days, or fewer
+                        # days, when they are few enough to be worth copying (the run's first day reads every entity
+                        # from the database, and so does a day too busy to slice)
+                        slice_end, chosen = i + 1, frozenset()
+                        for n in SLICE_WINDOWS:
+                            end = min(i + n, len(batch))
+                            moving = slices.moving(prev_ts, day_ts(batch[end - 1]))
+                            if len(moving) <= SLICE_MAX_ENTITIES:
+                                slice_end, chosen = end, moving
+                                break
+                        slices.prepare(chosen)
+                    rows = compute_rows(con, d, exchange, prices=prices, cross=False)  # the publish refreshes it
+                    prev_ts = day_ts(d)
+                    prices.settle()
+                    failed = _gate_day(con, exchange, d, rows, stored, last_summary)
+                    if failed is not None:
+                        break
+                    rows = [{c: r.get(c) for c in features_store.COLUMNS} for r in rows]
+                    last_summary = DaySummary.of_rows(d, rows)
+                    pending.append((d, rows))
+                flush()
+                if failed is not None:
+                    results.append(failed)
+                    if report is not None:
+                        report(failed)
+                    break
+    except BaseException:
+        flush()  # the days computed before the error publish, as day by day
+        raise
+    finally:
+        if published and not (results and results[-1].as_of_date == days[-1] and results[-1].status == "PROMOTED"):
+            publish_snapshot(con)  # the run stopped before its last day: the live table of the days it published
+    return results
+
+
+def _gate_day(con, exchange: str, d: date, rows: list[dict], stored: list[date],
+              last: DaySummary | None) -> MaterializeResult | None:  # fmt: skip
+    """G5 and G4 of a full day's rows as `materialize` gates them (None = passed). `stored`: the materialised days
+    before the run; `last`: the run's previous day as published (the previous materialised day unless a stored day
+    outside the run lies between)."""
+    universe = _universe(con, exchange, d)
+    if len(rows) != len(universe) or {r["security_id"] for r in rows} != {u[0] for u in universe} or not rows:
+        return MaterializeResult("ABORTED", d, len(rows), "G5", f"{len(rows)} rows vs universe {len(universe)}")
+    i = bisect.bisect_left(stored, d)
+    prev: date | DaySummary | None = stored[i - 1] if i else None
+    if last is not None and (prev is None or last.day >= prev):
+        prev = last
+    if prev is None:
+        return None
+    spikes = _g4_spikes(con, prev, rows)
+    if not spikes:
+        return None
+    day = prev.day if isinstance(prev, DaySummary) else prev
+    return MaterializeResult("ABORTED", d, len(rows), "G4", f"null-rate spike vs {day}: {spikes}")
+
+
+def _publish_days(con, batch: list[tuple[date, list[dict]]], snapshot: bool) -> None:
+    """Publish whole days (rows of every entity) in one transaction: `materialize`'s publish of each day, with the
+    breadth and cross-section refreshes done once for all the days."""
+    ds = [d for d, _ in batch]
+    con.execute("BEGIN TRANSACTION")
+    try:
+        for d, rows in batch:
+            features_store.write_day(con, d, rows)  # event-sparse (architecture §4.1), day by day in order
+        refresh_breadth_days(con, ds)  # batch B: market-level breadth from each day's stored rows
+        features_gems.refresh_cross_sections(con, ds)  # batch D: ranks / scores / hats over each stored day
+        features_peers.refresh_cross_sections(con, ds)  # batch H: industry medians / peer ranks
+        features_more.refresh_cross_sections(con, ds)  # batch I: RS rank / industry earnings breadth
+        if snapshot:
+            _write_snapshot(con)
+        for d, rows in batch:
+            con.execute(
+                "INSERT OR REPLACE INTO features_meta VALUES (?, ?, ?, ?, ?)",
+                [d, FEATURES_VERSION, "FULL", len(rows), utc_now()],
+            )
+    except BaseException:
+        con.execute("ROLLBACK")
+        raise
+    con.execute("COMMIT")
 
 
 class FundamentalsCache:
@@ -1344,16 +1561,38 @@ RUN_CHECKPOINT_THRESHOLD = "512MB"
 
 
 @contextmanager
+def _no_failed_imports() -> Iterator[None]:
+    """DuckDB's Python client tries `import pandas` whenever it binds a statement's parameters (~700 times a
+    materialised day); without pandas installed each failed import searches sys.path again (~0.15 s a day). For the
+    run, an absent pandas is recorded as absent (`sys.modules[name] = None`: the import fails at once, as it would
+    anyway); an installed one is untouched. Restored when the run ends."""
+    import importlib.util
+    import sys
+
+    stubbed = [m for m in ("pandas",) if m not in sys.modules and importlib.util.find_spec(m) is None]
+    for m in stubbed:
+        sys.modules[m] = None
+    try:
+        yield
+    finally:
+        for m in stubbed:
+            if sys.modules.get(m, 0) is None:
+                del sys.modules[m]
+
+
+@contextmanager
 def materialize_run(con, days, exchange: str = "NSE", entities=None) -> Iterator[PriceHistory | None]:
     """The state shared by the days of one run (`materialize --from/--to`, `--incremental`, `rebuild-market`;
     architecture §11.11): yields a PriceHistory read through the last day (restricted to the securities of `entities`
     when given) carrying the run's FundamentalsCache, its heap frozen for the run (`PriceHistory.frozen_heap`); None
     on the legacy per-day path (FINANCIALS_MATERIALIZE_LEGACY=1) or without days. Raises DuckDB's checkpoint
-    threshold for the run (RUN_CHECKPOINT_THRESHOLD) and checkpoints at the end."""
+    threshold for the run (RUN_CHECKPOINT_THRESHOLD) and checkpoints at the end, and holds `_no_failed_imports`."""
     old = con.execute("SELECT current_setting('checkpoint_threshold')").fetchone()[0]
     con.execute(f"SET checkpoint_threshold = '{RUN_CHECKPOINT_THRESHOLD}'")
     done = False
+    stack = ExitStack()
     try:
+        stack.enter_context(_no_failed_imports())
         if legacy_materialize() or not days:
             yield None
         else:
@@ -1368,6 +1607,7 @@ def materialize_run(con, days, exchange: str = "NSE", entities=None) -> Iterator
                 yield prices
         done = True
     finally:
+        stack.close()
         con.execute(f"SET checkpoint_threshold = '{old}'")
         if done and len(days) > 1:  # a run ends checkpointed (one day: DuckDB's usual threshold decides)
             con.execute("CHECKPOINT")
@@ -1520,6 +1760,110 @@ def entity_slices(con, entities) -> Iterator[None]:
     finally:
         for t in reversed(created):
             con.execute(f"DROP TABLE IF EXISTS temp.main.{t}")
+
+
+class _FullRunSlices:
+    """The visibility memo of a full run (`_materialize_batched`, architecture §11.11) and its run-scoped slices.
+
+    The memo's readers (`run_memo.by_visibility`) take `entities=None` in a full run; under this memo that means
+    every entity (`everyone`: every entity of `securities` or with a row in SLICED_TABLES), and each entity's part
+    is re-read only on a day its visibility interval moves, as in an incremental run (§11.10). Those re-reads are
+    few entities a day, but each scanned the full tables (~2.5 s a day on the live database). So before a batch's
+    days are computed, `prepare` copies, on a second connection of the same database (`con.cursor()`, whose TEMP
+    tables only it sees), the SLICED_TABLES rows of the entities whose interval moves within the batch (and every
+    row of their filings, as `entity_slices` does), and `reader(stale)` reads the stale entities there when they
+    are all in the slices (else from the database). The FundamentalsCache's prefetch of the entities whose block is
+    recomputed goes the same way (`compute_rows`). The entity-restricted reads return the same rows from a slice as
+    from the full tables (tests/test_incremental_materialize.py, test_materialize_batched.py). The first batch reads
+    the database (every entity is new to the memo). Nothing in the run writes these tables."""
+
+    def __init__(self, con) -> None:
+        self.con = con
+        self.cur = con.cursor()
+        self._db = con.execute("SELECT current_database()").fetchone()[0].replace('"', '""')
+        self.sliced: frozenset[str] = frozenset()
+        self._tables: list[str] = []
+        stamps: dict[str, list[datetime]] = defaultdict(list)
+        for ent, ts in con.execute(self._stamps_sql()).fetchall():
+            stamps[ent].append(ts)
+        self.stamps = {e: sorted(v) for e, v in stamps.items()}
+        listed = con.execute("SELECT DISTINCT entity_id FROM securities WHERE entity_id IS NOT NULL").fetchall()
+        self.everyone = frozenset(self.stamps) | {e for (e,) in listed}
+
+    @staticmethod
+    def _stamps_sql() -> str:
+        """Per entity, every visibility timestamp of its rows and of the rows of its filings, as `entity_slices`
+        reads them from its slices, for every entity at once: a filing with rows of more than one entity (or of
+        none) gives each of them the timestamps of all its rows."""
+        own = " UNION ".join(f"SELECT entity_id, filing_id FROM {t}" for t in SLICED_TABLES)
+        parts = []
+        for t in SLICED_TABLES:
+            if t in _VISIBLE:
+                parts.append(f"SELECT entity_id, visible_from_ts FROM {t} WHERE entity_id IS NOT NULL")
+                parts.append(
+                    f"SELECT o.entity_id, x.visible_from_ts FROM {t} x JOIN own o USING (filing_id) "
+                    "WHERE o.entity_id IS NOT NULL AND x.filing_id IN (SELECT filing_id FROM multi)"
+                )
+        parts.append("SELECT entity_id, visible_from_ts FROM supplemental_kpis WHERE entity_id IS NOT NULL")
+        return (
+            f"WITH own AS (SELECT DISTINCT entity_id, filing_id FROM ({own})), "
+            "multi AS (SELECT filing_id FROM own GROUP BY filing_id "
+            "HAVING count(DISTINCT coalesce(entity_id, '')) > 1) " + " UNION ".join(parts)
+        )
+
+    def reader(self, stale) -> object:
+        return self.cur if self.sliced and stale <= self.sliced else self.con
+
+    def moving(self, lo: datetime, hi: datetime) -> frozenset[str]:
+        """The entities with a visibility timestamp in (lo, hi]."""
+        return frozenset(e for e, ts in self.stamps.items()
+                         if bisect.bisect_right(ts, hi) > bisect.bisect_right(ts, lo))  # fmt: skip
+
+    def prepare(self, moving: frozenset[str]) -> None:
+        """Slices of `moving` (the entities whose visibility interval moves in the next days); none when empty."""
+        self._drop()
+        if not moving:
+            return
+        sql, params = in_list("entity_id", moving)
+        db, cur = self._db, self.cur
+        cur.execute(
+            "CREATE TEMP TABLE _slice_filings AS SELECT DISTINCT filing_id FROM ("
+            + " UNION ALL ".join(f'SELECT filing_id FROM "{db}".main.{t} WHERE {sql}' for t in SLICED_TABLES)
+            + ")",
+            params * len(SLICED_TABLES),
+        )
+        self._tables.append("_slice_filings")
+        for t in SLICED_TABLES:
+            cur.execute(
+                f'CREATE TEMP TABLE {t} AS SELECT * FROM "{db}".main.{t} '
+                f"WHERE {sql} OR filing_id IN (SELECT filing_id FROM temp.main._slice_filings)",
+                params,
+            )
+            self._tables.append(t)
+        self.sliced = moving
+
+    def _drop(self) -> None:
+        self.sliced = frozenset()
+        for t in reversed(self._tables):
+            self.cur.execute(f"DROP TABLE IF EXISTS temp.main.{t}")
+        self._tables.clear()
+
+    def close(self) -> None:
+        try:
+            self._drop()
+        finally:
+            self.cur.close()
+
+
+@contextmanager
+def full_run_memo(con) -> Iterator[_FullRunSlices]:
+    """The full-run visibility memo (`_FullRunSlices`), active for the block."""
+    slices = _FullRunSlices(con)
+    try:
+        with visibility_memo(con, slices.stamps, slices.everyone, slices.reader):
+            yield slices
+    finally:
+        slices.close()
 
 
 PUBLISHED = ("PROMOTED", "UNCHANGED")  # day statuses of a successful incremental run

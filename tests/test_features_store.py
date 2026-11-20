@@ -238,13 +238,13 @@ def _shadow(monkeypatch, con) -> None:
     monkeypatch.setattr(features_store, "write_day", write_day)
     monkeypatch.setattr(features_store, "delete_from", delete_from)
     for mod in (features_gems, features_peers, features_more):
-        real = mod.refresh_cross_section
+        real = mod.refresh_cross_sections  # refresh_cross_section (one day) calls it too
 
-        def refresh(con_, as_of, _real=real):
-            _real(con_, as_of)
-            _real(_Rewrite(con_), as_of)
+        def refresh(con_, days, _real=real):
+            _real(con_, days)
+            _real(_Rewrite(con_), days)
 
-        monkeypatch.setattr(mod, "refresh_cross_section", refresh)
+        monkeypatch.setattr(mod, "refresh_cross_sections", refresh)
 
 
 def assert_view_equals_wide(con) -> int:

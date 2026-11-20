@@ -61,12 +61,14 @@ def classifications(con, as_of: date, as_of_ts: datetime, entities=None) -> dict
     return {r[0]: tuple(r[1:]) for r in rows}
 
 
-def add_columns(con, rows: list[dict], as_of: date, as_of_ts: datetime, entities=None) -> None:
-    """The features.compute_rows hook: classification columns, then the day's cross-section, in place."""
+def add_columns(con, rows: list[dict], as_of: date, as_of_ts: datetime, entities=None, cross: bool = True) -> None:
+    """The features.compute_rows hook: classification columns, then the day's cross-section, in place (`cross=False`:
+    none, as features_gems.add_columns)."""
     cls = classifications(con, as_of, as_of_ts, entities)
     for row in rows:
         row.update(dict(zip(CLASS_COLUMNS, cls.get(row["entity_id"], (None,) * 4), strict=True)))
-    cross_section(rows)
+    if cross:
+        cross_section(rows)
 
 
 def _f(v) -> float | None:
@@ -134,31 +136,37 @@ _ARROW_TYPES = {"peer_count": "int32", **dict.fromkeys(RANKS, "int32")}
 
 def refresh_cross_section(con, as_of: date) -> None:
     """Recompute CROSS_COLUMNS for every stored row of `as_of` (inside the materialize transaction, after the day's
-    rows are written): one read of the history view, one UPDATE of features_daily (CROSS_COLUMNS are DAILY columns,
-    tests/test_features_store.py) through Arrow."""
+    rows are written)."""
+    refresh_cross_sections(con, [as_of])
+
+
+def refresh_cross_sections(con, days) -> None:
+    """Recompute CROSS_COLUMNS for every stored row of each of `days`, each day's cross-section from that day's rows
+    alone, in security order (inside the materialize transaction, after the days' rows are written): one read of the
+    history view, one UPDATE of features_daily (CROSS_COLUMNS are DAILY columns, tests/test_features_store.py)
+    through Arrow, for all the days (a full run publishes many days per transaction, features.materialize_days)."""
     import pyarrow as pa
 
-    from financials.db import fetch_dicts
+    from financials.features_store import stored_days
 
-    rows = fetch_dicts(con, f"SELECT {', '.join(CROSS_INPUTS)} FROM screener_features_history WHERE as_of_date = ? "
-                       "ORDER BY security_id",
-                       [as_of])  # fmt: skip
+    rows = []
+    for day, day_rows in stored_days(con, CROSS_INPUTS, days):
+        cross_section(day_rows)
+        rows += [{**r, "as_of_date": day} for r in day_rows]
     if not rows:
         return
-    cross_section(rows)
     types = {"int32": pa.int32()}
-    fields = [pa.field("security_id", pa.string())] + [
+    fields = [pa.field("as_of_date", pa.date32()), pa.field("security_id", pa.string())] + [
         pa.field(c, types[_ARROW_TYPES[c]] if c in _ARROW_TYPES else pa.float64()) for c in CROSS_COLUMNS
     ]
-    table = pa.Table.from_pylist([{c: r[c] for c in ("security_id", *CROSS_COLUMNS)} for r in rows],
+    table = pa.Table.from_pylist([{c: r[c] for c in ("as_of_date", "security_id", *CROSS_COLUMNS)} for r in rows],
                                  schema=pa.schema(fields))  # fmt: skip
     con.register("_peers_cross", table)
     try:
         sets = ", ".join(f"{c} = s.{c}" for c in CROSS_COLUMNS)
         con.execute(
             f"UPDATE features_daily h SET {sets} FROM _peers_cross s "  # DAILY columns (features_store)
-            "WHERE h.as_of_date = ? AND h.security_id = s.security_id",
-            [as_of],
+            "WHERE h.as_of_date = s.as_of_date AND h.security_id = s.security_id"
         )
     finally:
         con.unregister("_peers_cross")

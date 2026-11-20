@@ -31,6 +31,7 @@ Everything here runs inside the caller's transaction (the single writer, feature
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Iterator
 from datetime import date, timedelta
 
 from financials.db import declared_columns
@@ -289,6 +290,29 @@ def _merge_adjacent(con, as_of: date) -> None:
         "AND e.security_id = i.security_id AND e.valid_from_date = i.valid_from_date "
         "AND e.valid_to_date IS DISTINCT FROM i.isl_to"
     )
+
+
+def stored_days(con, columns, days) -> Iterator[tuple[date, list[dict]]]:
+    """(day, rows) for each of `days` that has stored rows, ascending: the history view's `columns` of the day's
+    rows (dicts), in security_id order. One read for all the days (the cross-section refresh of a batch of days)."""
+    days = sorted(set(days))
+    if not days:
+        return
+    cur = con.execute(
+        f"SELECT as_of_date, {', '.join(columns)} FROM screener_features_history WHERE as_of_date >= ? "
+        "AND as_of_date <= ? AND as_of_date IN (SELECT unnest(CAST(? AS DATE[]))) ORDER BY as_of_date, security_id",
+        [days[0], days[-1], days],
+    )
+    names = [d[0] for d in cur.description][1:]
+    day, out = None, []
+    for row in cur.fetchall():
+        if row[0] != day:
+            if out:
+                yield day, out
+            day, out = row[0], []
+        out.append(dict(zip(names, row[1:], strict=True)))
+    if out:
+        yield day, out
 
 
 def write_rows(con, rows) -> int:

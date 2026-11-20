@@ -886,6 +886,33 @@ only because the pinned files changed).
   blocks. Now only the run's last day rewrites it, inside its own publish transaction (`materialize(...,
   snapshot=False)` on the others reports `snapshot_due`); a run that stops early rewrites it from the last
   published day. The tables end identical to the day-by-day publish (`tests/test_storage.py`).
+- **Batched full runs** (SP2, 2026-11-20; `features._materialize_batched`): a run over every entity
+  (`materialize --from/--to`, `rebuild-market`) computes and gates each day as before (compute_rows, G5, G4 against
+  the previous day: a `DaySummary` of the rows the run just published, equal to what the stored day returns) but
+  publishes up to `FULL_RUN_BATCH_DAYS` (20) days per transaction: each day's `write_day` in order, then the
+  breadth and the three cross-sections of all the batch's days in one read and one UPDATE each, the live table
+  when the batch holds the run's last day. A batch never spans a quarter (the per-quarter valuation histories read
+  the committed earlier quarters) and, once `features_gems.pe_medians` reads daily history (C9: from 2029-10-01),
+  such days publish one by one. The first day that fails a gate stops the run with the days before it published;
+  an error publishes the days computed before it; a failed batch transaction rolls back the whole batch (each day
+  stays atomic). The run also holds the **full-run visibility memo** (`features.full_run_memo`): the
+  `run_memo.by_visibility` readers, called with `entities=None`, re-read only the entities whose visibility moved
+  (as in an incremental run), from run-scoped slices of those entities (SLICED_TABLES rows, built on a second
+  connection, `con.cursor()`, for 5 days at a time, when at most 400 entities change in them:
+  busier days read the database) instead of scanning the full tables; the
+  FundamentalsCache prefetch of recomputed entities reads them the same way. The in-compute cross-sections are
+  skipped (`compute_rows(cross=False)`): the publish recomputes them from the stored rows. With `_add_months`
+  memoised, the reverse DCF's bisection stopping at its fixed point and DuckDB's failed `import pandas` per bound
+  statement short-circuited for the run, a live-size day went from ~9.5 s to ~4.5 s on a loaded 4-CPU machine
+  (docs/benchmarks.md section 6). `materialize_days(..., batch_days=1)` keeps the day-by-day path;
+  `tests/test_materialize_batched.py` pins that both leave identical tables (features_daily, features_events,
+  market_breadth, screener_features, features_meta, materialize_dirty). Compaction after a full run: the rewrite
+  leaves about one copy of features_daily as free blocks, which the next run reuses; `maybe_compact` still decides.
+- **Dirty windows** (SP2): a changed identifier or Nifty 500 interval marks its security from the first date whose
+  coverage differs (`dirty._interval_changes`), not from the interval's start (closing an identifier on the last
+  day used to mark from the first listing day, so `--incremental` walked every materialised day); a changed open
+  finding marks from the later of its period end and its filing's visibility (the first as-of it can flag), and a
+  finding without a period end (which flags no row) marks nothing.
 - Not done: parallel day computation. DuckDB lets no other process open the database file while the single writer
   holds it, and the per-day Python work is GIL-bound, so worker processes would need their own copy of every input;
   after the changes above a day of ~3,000 securities is ~1.5-2 s (half per-row Python, half the Arrow insert, the

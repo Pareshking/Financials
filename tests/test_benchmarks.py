@@ -112,3 +112,33 @@ def test_incremental_cost_per_unchanged_day_is_small(full_market):
     elapsed = time.perf_counter() - t
     assert r.status == "DONE" and len(r.days) == n_days >= 5 and {d.status for d in r.days} == {"UNCHANGED"}, r
     assert elapsed / n_days < 0.5, f"incremental (50 entities, {n_days} days) took {elapsed:.2f}s"
+
+
+def test_full_run_is_batched_and_not_slower_than_day_by_day(tmp_path):
+    """`materialize --from/--to` publishes many days per transaction and reads the changing entities through the
+    run's slices (features._materialize_batched): over the fixture market extended with synthetic histories it must
+    not be slower than the same run day by day (one transaction a day). Generous: the live-size gain is ~2x."""
+    import shutil
+
+    from conftest import build_full_market
+
+    from financials import features
+    from financials.bench import extend_synthetic
+    from financials.db import connect
+
+    (tmp_path / "m").mkdir()
+    build_full_market(tmp_path / "m").con.close()
+    src = tmp_path / "m" / "market.duckdb"
+    days = [d for d in extend_synthetic(src, 40, date(2025, 7, 1), date(2025, 10, 31)) if d >= date(2025, 8, 1)]
+    took = {}
+    for name, batch in (("day_by_day", 1), ("batched", None)):
+        path = tmp_path / f"{name}.duckdb"
+        shutil.copy(src, path)
+        con = connect(path)
+        t = time.perf_counter()
+        with features.materialize_run(con, days) as prices:
+            res = features.materialize_days(con, days, prices=prices, batch_days=batch)
+        took[name] = time.perf_counter() - t
+        con.close()
+        assert len(res) == len(days) and {r.status for r in res} == {"PROMOTED"}
+    assert took["batched"] < 1.2 * took["day_by_day"] + 1.0, took

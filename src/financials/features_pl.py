@@ -146,9 +146,10 @@ def _index(rows) -> dict[tuple[str, str], dict]:
     return out
 
 
-def prefetch(con, as_of: datetime, entities=None) -> None:
-    """One pass for every entity of a materialisation day (benchmarks: never a per-entity query on the hot path)."""
-    _PREFETCH[(id(con), as_of)] = _index(_visibility_rows(con, as_of, entities))
+def prefetch(con, as_of: datetime, entities=None, *, key=None) -> None:
+    """One pass for every entity of a materialisation day (benchmarks: never a per-entity query on the hot path).
+    `key`: the connection the readers will look it up with (default `con`)."""
+    _PREFETCH[(id(con if key is None else key), as_of)] = _index(_visibility_rows(con, as_of, entities))
 
 
 def clear(con, as_of: datetime) -> None:

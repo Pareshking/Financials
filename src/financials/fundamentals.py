@@ -7,6 +7,7 @@ Money stays Decimal; ratios are returned as Decimal and stored as DOUBLE by the 
 from __future__ import annotations
 
 import calendar
+import functools
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -103,6 +104,7 @@ FIXED_ASSET_LINES = (
 ZERO = Decimal(0)
 
 
+@functools.cache  # a pure function of (date, months) called millions of times per run (benchmarks)
 def _add_months(d: date, months: int) -> date:
     """Shift a month-end (or month-start) date by whole months, keeping the end/start convention."""
     y, m = divmod(d.month - 1 + months, 12)
@@ -1045,8 +1047,9 @@ def entity_filter(column: str, entities) -> tuple[str, list]:
     return " AND " + sql, params
 
 
-def prefetch_fundamentals(con, as_of: datetime, entities=None) -> None:
-    """`entities`: restrict the pass to these entities (same rows for them as an unrestricted pass)."""
+def prefetch_fundamentals(con, as_of: datetime, entities=None, *, key=None) -> None:
+    """`entities`: restrict the pass to these entities (same rows for them as an unrestricted pass). `key`: the
+    connection the readers will look the pass up with (default `con`; a full run reads it from its slices)."""
     only, only_p = entity_filter("entity_id", entities)
     only_c, only_c_p = entity_filter("c.entity_id", entities)
     facts: dict[tuple[str, str], list] = {}
@@ -1096,8 +1099,9 @@ def prefetch_fundamentals(con, as_of: datetime, entities=None) -> None:
     overrides = {e: (q, a) for e, q, a in con.execute(
         "SELECT entity_id, quarterly_scope, annual_scope FROM entity_scope_override").fetchall()}  # fmt: skip
     structural = _structural_actions(con, as_of, only.replace("entity_id", "e"), only_p)
-    _PREFETCH[(id(con), as_of)] = {"facts": facts, "meta": meta, "anchors": anchors, "overrides": overrides,
-                                   "structural": structural}  # fmt: skip
+    _PREFETCH[(id(con if key is None else key), as_of)] = {
+        "facts": facts, "meta": meta, "anchors": anchors, "overrides": overrides, "structural": structural,
+    }  # fmt: skip
 
 
 def clear_prefetch(con, as_of: datetime) -> None:
@@ -1521,7 +1525,10 @@ def reverse_dcf_implied_growth(
         return None
     for _ in range(200):  # value(g) is increasing in g for F > 0: bisection
         mid = (lo + hi) / 2
-        lo, hi = (mid, hi) if value(mid) < ev else (lo, mid)
+        nxt = (mid, hi) if value(mid) < ev else (lo, mid)
+        if nxt == (lo, hi):  # converged to adjacent floats: every further step returns the same (lo, hi)
+            break
+        lo, hi = nxt
     return round((lo + hi) / 2, 6)
 
 

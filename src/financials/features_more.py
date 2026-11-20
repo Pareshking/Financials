@@ -540,9 +540,10 @@ def row_columns(row: dict, more: dict | None, hist: dict | None, bars, factors, 
 
 
 def add_columns(con, rows: list[dict], as_of: date, as_of_ts: datetime, fundamentals: dict, factors, frozen,
-                entities=None, exchange: str = "NSE", prices=None) -> None:  # fmt: skip
+                entities=None, exchange: str = "NSE", prices=None, cross: bool = True) -> None:  # fmt: skip
     """The features.compute_rows hook: batched reads, each row's columns, then the cross-section, in place. With the
-    run's `price_history.PriceHistory` (`prices`) the price columns are sliced from it (the same values)."""
+    run's `price_history.PriceHistory` (`prices`) the price columns are sliced from it (the same values). `cross=False`:
+    no cross-section (as features_gems.add_columns)."""
     from financials.features_price import index_closes
 
     secs = None if entities is None else {r["security_id"] for r in rows}
@@ -562,7 +563,8 @@ def add_columns(con, rows: list[dict], as_of: date, as_of_ts: datetime, fundamen
         row.update(row_columns(row, fund.get("_more"), hist.get(sec), bars.get(sec, []), factors.get(sec, []),
                                frozen.get(sec), index, events, actions.get(sec),
                                segments.get((ent, row.get("scope_used"))), prices))  # fmt: skip
-    cross_section(rows)
+    if cross:
+        cross_section(rows)
 
 
 def _representatives(rows: list[dict]) -> list[dict]:
@@ -600,33 +602,40 @@ CROSS_INPUTS = ("security_id", "entity_id", "market_cap", "nse_industry", "core_
 
 def refresh_cross_section(con, as_of: date) -> None:
     """Recompute CROSS_COLUMNS for every stored row of `as_of` (inside the materialize transaction, after the day's
-    rows are written): one read of the history view, one UPDATE of features_daily (CROSS_COLUMNS are DAILY columns,
-    tests/test_features_store.py) through Arrow."""
+    rows are written)."""
+    refresh_cross_sections(con, [as_of])
+
+
+def refresh_cross_sections(con, days) -> None:
+    """Recompute CROSS_COLUMNS for every stored row of each of `days`, each day's cross-section from that day's rows
+    alone, in security order (inside the materialize transaction, after the days' rows are written): one read of the
+    history view, one UPDATE of features_daily (CROSS_COLUMNS are DAILY columns, tests/test_features_store.py)
+    through Arrow, for all the days (a full run publishes many days per transaction, features.materialize_days)."""
     import pyarrow as pa
 
-    from financials.db import fetch_dicts
+    from financials.features_store import stored_days
 
-    rows = fetch_dicts(con, f"SELECT {', '.join(CROSS_INPUTS)} FROM screener_features_history WHERE as_of_date = ? "
-                       "ORDER BY security_id",
-                       [as_of])  # fmt: skip
+    rows = []
+    for day, day_rows in stored_days(con, CROSS_INPUTS, days):
+        cross_section(day_rows)
+        rows += [{**r, "as_of_date": day} for r in day_rows]
     if not rows:
         return
-    cross_section(rows)
     fields = [
+        pa.field("as_of_date", pa.date32()),
         pa.field("security_id", pa.string()),
         pa.field("rs_rank_12m_1m", pa.float64()),
         pa.field("industry_earnings_breadth", pa.float64()),
         pa.field("industry_earnings_breadth_n", pa.int32()),
     ]
-    table = pa.Table.from_pylist([{c: r[c] for c in ("security_id", *CROSS_COLUMNS)} for r in rows],
+    table = pa.Table.from_pylist([{c: r[c] for c in ("as_of_date", "security_id", *CROSS_COLUMNS)} for r in rows],
                                  schema=pa.schema(fields))  # fmt: skip
     con.register("_more_cross", table)
     try:
         sets = ", ".join(f"{c} = s.{c}" for c in CROSS_COLUMNS)
         con.execute(
             f"UPDATE features_daily h SET {sets} FROM _more_cross s "  # DAILY columns (features_store)
-            "WHERE h.as_of_date = ? AND h.security_id = s.security_id",
-            [as_of],
+            "WHERE h.as_of_date = s.as_of_date AND h.security_id = s.security_id"
         )
     finally:
         con.unregister("_more_cross")

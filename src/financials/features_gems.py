@@ -448,8 +448,11 @@ def forensic_clean(r: dict) -> bool | None:
     return not any(fails)
 
 
-def add_columns(con, rows: list[dict], as_of: date, as_of_ts: datetime, fundamentals: dict, entities=None) -> None:
-    """The features.compute_rows hook: ownership, signals and the day's cross-section, in place (batched reads)."""
+def add_columns(con, rows: list[dict], as_of: date, as_of_ts: datetime, fundamentals: dict, entities=None,
+                cross: bool = True) -> None:  # fmt: skip
+    """The features.compute_rows hook: ownership, signals and the day's cross-section, in place (batched reads).
+    `cross=False`: no cross-section (the caller publishes whole days, whose refresh recomputes it from the stored
+    rows: features._materialize_batched)."""
     secs = None if entities is None else {r["security_id"] for r in rows}
     own = ownership_inputs(con, as_of_ts, entities)
     ind = industries(con, as_of, secs)
@@ -459,7 +462,8 @@ def add_columns(con, rows: list[dict], as_of: date, as_of_ts: datetime, fundamen
         row.update(ownership_columns(row, own.get(row["entity_id"])))
         g = (fundamentals.get(row["entity_id"]) or {}).get("_gems")
         row.update(signal_columns(row, g, ind.get(row["security_id"]), curated, medians.get(row["security_id"])))
-    cross_section(rows)
+    if cross:
+        cross_section(rows)
 
 
 # ── stage 3: cross-section of one as-of date ──────────────────────────────────────────────────────────────────────
@@ -608,31 +612,37 @@ _ARROW_TYPES = {"magic_formula_rank": "int32", "hats_passed": "int32", "market_c
 
 def refresh_cross_section(con, as_of: date) -> None:
     """Recompute CROSS_COLUMNS for every stored row of `as_of` (inside the materialize transaction, after the day's
-    rows are written): one read of the history view, one UPDATE of features_daily (CROSS_COLUMNS are DAILY columns,
-    tests/test_features_store.py) through Arrow."""
+    rows are written)."""
+    refresh_cross_sections(con, [as_of])
+
+
+def refresh_cross_sections(con, days) -> None:
+    """Recompute CROSS_COLUMNS for every stored row of each of `days`, each day's cross-section from that day's rows
+    alone, in security order (inside the materialize transaction, after the days' rows are written): one read of the
+    history view, one UPDATE of features_daily (CROSS_COLUMNS are DAILY columns, tests/test_features_store.py)
+    through Arrow, for all the days (a full run publishes many days per transaction, features.materialize_days)."""
     import pyarrow as pa
 
-    from financials.db import fetch_dicts
+    from financials.features_store import stored_days
 
-    rows = fetch_dicts(con, f"SELECT {', '.join(CROSS_INPUTS)} FROM screener_features_history WHERE as_of_date = ? "
-                       "ORDER BY security_id",
-                       [as_of])  # fmt: skip
+    rows = []
+    for day, day_rows in stored_days(con, CROSS_INPUTS, days):
+        cross_section(day_rows)
+        rows += [{**r, "as_of_date": day} for r in day_rows]
     if not rows:
         return
-    cross_section(rows)
     types = {"int32": pa.int32(), "float64": pa.float64(), "decimal": pa.decimal128(24, 2)}
-    fields = [pa.field("security_id", pa.string())] + [
+    fields = [pa.field("as_of_date", pa.date32()), pa.field("security_id", pa.string())] + [
         pa.field(c, types[_ARROW_TYPES[c]] if c in _ARROW_TYPES else pa.bool_()) for c in CROSS_COLUMNS
     ]
-    table = pa.Table.from_pylist([{c: r[c] for c in ("security_id", *CROSS_COLUMNS)} for r in rows],
+    table = pa.Table.from_pylist([{c: r[c] for c in ("as_of_date", "security_id", *CROSS_COLUMNS)} for r in rows],
                                  schema=pa.schema(fields))  # fmt: skip
     con.register("_gems_cross", table)
     try:
         sets = ", ".join(f"{c} = s.{c}" for c in CROSS_COLUMNS)
         con.execute(
             f"UPDATE features_daily h SET {sets} FROM _gems_cross s "  # DAILY columns (features_store)
-            "WHERE h.as_of_date = ? AND h.security_id = s.security_id",
-            [as_of],
+            "WHERE h.as_of_date = s.as_of_date AND h.security_id = s.security_id"
         )
     finally:
         con.unregister("_gems_cross")

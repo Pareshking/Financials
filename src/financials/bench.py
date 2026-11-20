@@ -247,8 +247,20 @@ def run_synthetic(db: Path, work: Path, n_secs: int, legacy_days: int = 3, incre
     n_secs = con.execute("SELECT count(DISTINCT security_id) FROM ohlcv WHERE trade_date = ?", [days[0]]).fetchone()[0]
     con.close()
     shutil.copy(path, work / "synthetic_legacy.duckdb")
-    con = connect(path)
+    shutil.copy(path, work / "synthetic_daybyday.duckdb")
     res: dict = {"secs": n_secs, "requested": requested, "days": len(days), "per_day": []}
+    # The full run as `materialize --from/--to` makes it: batched (features._materialize_batched).
+    con = connect(path)
+    t0 = time.perf_counter()
+    with features.materialize_run(con, days) as prices:
+        out = features.materialize_days(con, days, prices=prices)
+    if len(out) != len(days) or any(r.status != "PROMOTED" for r in out):
+        raise RuntimeError(f"batched run: {out[-1]}")
+    res["batched_s"] = time.perf_counter() - t0
+    res["batch_days"] = features.FULL_RUN_BATCH_DAYS
+    con.close()
+    # The same run day by day (one transaction a day, no full-run memo): the per-day timings.
+    con = connect(work / "synthetic_daybyday.duckdb")
     t0 = time.perf_counter()
     with features.materialize_run(con, days) as prices:
         res["load_s"] = time.perf_counter() - t0
@@ -262,6 +274,7 @@ def run_synthetic(db: Path, work: Path, n_secs: int, legacy_days: int = 3, incre
     res["total_s"] = time.perf_counter() - t0
     res["rss_mb"] = _rss_mb()
     con.close()
+    (work / "synthetic_daybyday.duckdb").unlink()
     # The legacy path on a few days, each on a database holding every earlier materialised day (as in a run).
     sample = [days[int(i * (len(days) - 1) / max(1, legacy_days - 1))] for i in range(legacy_days)]
     res["legacy"] = []
@@ -413,11 +426,14 @@ def render(res: dict) -> str:
             f"The fixture market plus random-walk histories for {syn['secs']:,} securities (every security of the "
             f"2025-09-19 fixture day, up to N) on every weekday from 2024-10-01 (accepted splits, holes, Nifty 500 "
             f"closes; `bench.extend_synthetic`): {syn['days']} days, "
-            f"one `materialize --from/--to` run on the run-level path (§11.11). Price history read in "
-            f"{syn['load_s']:.1f} s; **whole run {syn['total_s'] / 60:.1f} min** "
-            f"({syn['total_s'] / syn['days']:.2f} s a day on average), peak RSS {syn['rss_mb']:,.0f} MB.",
+            f"one `materialize --from/--to` run (§11.11). **Batched full run** (`materialize_days`, what the CLI "
+            f"runs: up to {syn.get('batch_days', '?')} days per transaction, the full-run visibility memo and "
+            f"slices): **{syn.get('batched_s', 0) / 60:.1f} min** ({syn.get('batched_s', 0) / syn['days']:.2f} s a "
+            f"day). The same run day by day (`batch_days=1`, one transaction a day): **{syn['total_s'] / 60:.1f} "
+            f"min** ({syn['total_s'] / syn['days']:.2f} s a day; price history read in {syn['load_s']:.1f} s), "
+            f"peak RSS {syn['rss_mb']:,.0f} MB. Both leave identical tables (tests/test_materialize_batched.py).",
             "",
-            "| Day | Rows | Run-level path s (materialize incl. gates and write) |",
+            "| Day | Rows | Day-by-day s (materialize incl. gates and write) |",
             "|---|---|---|",
         ]
         lines += [f"| {d} | {n:,} | {t:.2f} |" for d, t, n in q]

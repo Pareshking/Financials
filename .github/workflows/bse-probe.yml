@@ -1,0 +1,40 @@
+name: bse-probe
+
+# BSE request-gap probe (owner 2026-11-20). Dispatch only; one runner; answers discarded; stops at the first refusal.
+on:
+  workflow_dispatch:
+    inputs:
+      scrips:
+        description: "comma-separated BSE scrip codes (2 x n)"
+        required: true
+      gaps:
+        description: "seconds between requests, one phase each"
+        default: "4,2"
+      n:
+        description: "requests per phase"
+        default: "20"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -e ".[bse]"
+      - run: python scripts/bse_rate_probe.py --scrips "$SCRIPS" --gaps "$GAPS" --n "$N" --out bse_probe.jsonl
+        env:
+          SCRIPS: ${{ inputs.scrips }}
+          GAPS: ${{ inputs.gaps }}
+          N: ${{ inputs.n }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bse-probe
+          path: bse_probe.jsonl
+          retention-days: 3

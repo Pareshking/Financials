@@ -119,7 +119,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="financials", description=__doc__.splitlines()[0])
     p.add_argument("--data-dir", type=Path, default=Path("data"))
     archive_help = "archive host requests/s and connections (owner decision); the API host stays at 1/s"
-    p.add_argument("--archive-rps", type=float, default=1.0, help=archive_help)
+    p.add_argument("--archive-rps", type=float, default=ARCHIVE_RPS, help=archive_help)
 
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("init-db")
@@ -838,10 +838,18 @@ def write_command(args, db_path: Path, stage_root: Path, out) -> int:
     return 2
 
 
-def archive_limits(args) -> dict[str, tuple[float, int]] | None:
-    if args.archive_rps <= 1:
-        return None
-    return {"nsearchives.nseindia.com": (args.archive_rps, max(1, int(args.archive_rps)))}
+# Owner decision 2026-11-20 (rate probe X354: 0 refusals at archive 8/12/16 req/s and API 2 req/s with 3 in flight):
+# archive host 12 req/s with 12 connections, API host 2 req/s with 3 in flight. Backoff on 403/429/5xx unchanged.
+ARCHIVE_RPS = 12.0
+API_LIMIT = ("www.nseindia.in", 2.0, 3)
+
+
+def archive_limits(args) -> dict[str, tuple[float, int]]:
+    host, rps, conns = API_LIMIT
+    limits = {host: (rps, conns)}
+    if args.archive_rps > 1:
+        limits["nsearchives.nseindia.com"] = (args.archive_rps, max(1, int(args.archive_rps)))
+    return limits
 
 
 def universe_symbols(db_path: Path, name: str, as_of: date) -> list[str]:
@@ -1039,7 +1047,7 @@ def run_day(args, transport: Transport | None, out) -> int:
     import time
 
     vault_dir, stage_root, db_path = _paths(args.data_dir)
-    jobs = Jobs(PoliteFetcher(transport, warmup=WARMUP), Vault(vault_dir), stage_root)
+    jobs = Jobs(PoliteFetcher(transport, warmup=WARMUP, host_limits=archive_limits(args)), Vault(vault_dir), stage_root)
     d = args.date or utc_to_ist_date(utc_now())
     errors: list[str] = []
     started = time.monotonic()

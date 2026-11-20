@@ -3,7 +3,7 @@ name: nse-fetch
 # NSE filings discovery fanned out over N GitHub-hosted runners (owner 2026-11-17: "We used to download using 8
 # runners"). Each runner takes one contiguous-by-hash shard of a committed symbols list (tickers only) and runs
 # discover-filings against a fresh, empty data dir (no market database), with the usual per-host limits: the API host
-# at 1 request/s, the archive host at --archive-rps 8. Its vault (blobs + url_index.jsonl + responses.jsonl) is a
+# at 2 requests/s (3 in flight), the archive host at --archive-rps 12 (owner 2026-11-20, rate probe X354). Its vault (blobs + url_index.jsonl + responses.jsonl) is a
 # workflow artifact `nse-fetch-<k>` for 1 day (the repository is public); `import-vault` then verifies, vaults and
 # stages it on the owner's machine and `promote` promotes it. Nothing is committed or pushed back.
 on:
@@ -59,7 +59,7 @@ jobs:
       - run: python -m pip install -e .
       - name: discover-filings (one shard)
         run: |
-          python -m financials --data-dir "$RUNNER_TEMP/nse" --archive-rps 8 discover-filings \
+          python -m financials --data-dir "$RUNNER_TEMP/nse" --archive-rps 12 discover-filings \
             --symbols-file "$LIST" --shard "$SHARD/$N" --shp-from "$SHP_FROM" \
             --kinds $KINDS ${SINCE:+--since "$SINCE"} --no-events --workers 8 --record-responses \
             || echo "::warning::discover-filings reported per-file errors (e.g. an archive 404); see the log"

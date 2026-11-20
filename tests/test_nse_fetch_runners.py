@@ -137,7 +137,7 @@ def test_nse_fetch_workflow_fans_out_shards_and_hands_back_only_the_vault():
     assert fetch["strategy"]["fail-fast"] is False
     assert "needs.plan.outputs" in str(fetch["strategy"]["max-parallel"])
     run_text = "\n".join(s.get("run", "") for s in fetch["steps"])
-    assert "--shard" in run_text and "--record-responses" in run_text and "--archive-rps 8" in run_text
+    assert "--shard" in run_text and "--record-responses" in run_text and "--archive-rps 12" in run_text
     assert '${SINCE:+--since "$SINCE"}' in run_text
     upload = next(s for s in fetch["steps"] if str(s.get("uses", "")).startswith("actions/upload-artifact"))
     assert upload["with"]["path"] == "nse_fetch/" and upload["with"]["retention-days"] == 1

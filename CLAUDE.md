@@ -138,8 +138,9 @@ data/                  local only, gitignored: vault/, staging/, market.duckdb
 
 - `nsearchives.nseindia.com`: archives (bhavcopy, delivery, XBRL files, RSS). `www.nseindia.com`
   needs session cookies and runs only locally.
-- At least 1 s between requests per host by default (also with `--workers`). Owner decision: the static archive host
-  may run at `--archive-rps 8` (8 requests/s, 8 connections); `www.nseindia.com` API calls stay at 1/s. Backoff with
+- At least 1 s between requests per host by default (also with `--workers`). Owner decision 2026-11-20 (measured rate
+  probe, X354): the static archive host runs at `--archive-rps 12` (default; 12 requests/s, 12 connections) and the
+  `www.nseindia.in` API at 2 requests/s with 3 in flight; BSE stays 4-6 s apart until a new owner decision. Backoff with
   jitter on 403/429/5xx, never re-download a vaulted blob (vault `url_index.jsonl` is the fetch checkpoint ledger).
 - Exchange terms prohibit automated access. Keep volume minimal and never redistribute data.
 

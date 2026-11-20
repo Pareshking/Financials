@@ -21,7 +21,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
-from conftest import build_full_market
+from conftest import full_market_db
 from test_materialize_fast_path import identical
 
 from financials import features, features_gems, features_more, features_peers, features_store
@@ -266,10 +266,7 @@ def assert_view_equals_wide(con) -> int:
 
 @pytest.fixture(scope="module")
 def fixture_db(tmp_path_factory):
-    root = tmp_path_factory.mktemp("store_base")
-    m = build_full_market(root)
-    m.con.close()
-    return root / "market.duckdb"
+    return full_market_db(tmp_path_factory, "store_base")
 
 
 def test_fixture_market_view_equals_the_wide_table(fixture_db, tmp_path, monkeypatch):

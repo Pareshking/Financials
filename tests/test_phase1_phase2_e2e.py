@@ -15,7 +15,7 @@ from collections import Counter
 from datetime import date, datetime
 
 import pytest
-from conftest import FETCHED_AT, Market
+from conftest import FETCHED_AT, Market, shared_market
 
 from _fixture_helpers import E2E_EXCLUDED_FIXTURES, FIXTURES, XBRL_DIR
 from financials.cli import promote_pending
@@ -36,9 +36,7 @@ FILED, EVENTS = datetime(2026, 11, 12, 6, 0), datetime(2026, 11, 13, 8, 0)  # UT
 AS_OF = date(2026, 11, 13)
 
 
-@pytest.fixture(scope="module")
-def unified(tmp_path_factory):
-    m = Market(tmp_path_factory.mktemp("unified"))
+def _fill_unified(m: Market) -> dict:
     for d in ("20250919", "20250922", "20250923", "20251013", "20251017", "20251020", "20251021", "20251023"):
         m.stage_day(d)
     m.stage_day("20251014", with_delivery=True)
@@ -79,9 +77,14 @@ def unified(tmp_path_factory):
                 broadcast_ts_source="RSS_PUBDATE",
             )
     out = io.StringIO()
-    m.pending = promote_pending(m.con, m.stage_root, out)
-    m.log = [ln.split()[:2] for ln in out.getvalue().splitlines()]
-    m.materialized = materialize(m.con, AS_OF)
+    pending = promote_pending(m.con, m.stage_root, out)
+    log = [ln.split()[:2] for ln in out.getvalue().splitlines()]
+    return {"pending": pending, "log": log, "materialized": materialize(m.con, AS_OF)}
+
+
+@pytest.fixture(scope="module")
+def unified(tmp_path_factory):
+    m = shared_market(tmp_path_factory, "unified", _fill_unified)  # built once per run, a private copy per worker
     yield m
     m.con.close()
 

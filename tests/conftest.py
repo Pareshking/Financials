@@ -8,6 +8,32 @@ from financials.db import apply_schema, connect
 from financials.staging import stage_market_day
 from financials.vault import Vault
 
+
+def _share_cores_between_xdist_workers() -> None:
+    """Under `pytest -n N`, each DuckDB connection gets cpu_count // N threads instead of one per core.
+
+    DuckDB sizes its pool to every core per connection, so N workers ran N x cores threads on cores CPUs; the
+    oversubscription cost ~30% more CPU and wall time (measured: 382 s -> 265 s CPU on the features-store and
+    fast-path files with -n 4 on 4 cores). Results do not depend on the thread count. A serial run (and the benchmarks,
+    which run alone) keep DuckDB's default; an explicit `threads` in a connect() config is kept."""
+    import os
+
+    workers = int(os.environ.get("PYTEST_XDIST_WORKER_COUNT") or 0)
+    if workers < 2:
+        return
+    import duckdb
+
+    threads = max(1, (os.cpu_count() or 1) // workers)
+    real = duckdb.connect
+
+    def connect(database=":memory:", read_only=False, config=None, **kw):
+        return real(database, read_only=read_only, config={"threads": threads, **(config or {})}, **kw)
+
+    duckdb.connect = connect
+
+
+_share_cores_between_xdist_workers()
+
 FETCHED_AT = datetime(2026, 11, 13, 9, 0, 0)
 ARCHIVE = "https://nsearchives.nseindia.com"
 
@@ -53,6 +79,75 @@ class Market:
         return row[0][0]
 
 
+def _run_shared_dir(tmp_path_factory) -> Path:
+    """A directory all xdist workers of this run share and no other run sees: the controller's base temp (a fresh
+    `pytest-N`, or the --basetemp it wiped at start), whose `popen-gwK` children are the workers' base temps. Without
+    xdist, this process's own base temp."""
+    import os
+
+    base = tmp_path_factory.getbasetemp()
+    return (base.parent if os.environ.get("PYTEST_XDIST_WORKER") else base) / "shared_templates"
+
+
+def shared_template(tmp_path_factory, key: str, build) -> tuple[Path, object]:
+    """Build `build(root) -> extras` once per test run, for every xdist worker, and return (template root, extras).
+
+    The template is a pure function of the code and fixtures of this run: it lives in this run's own temp tree
+    (`_run_shared_dir`), so a later run (with changed src/ or fixtures) can never see it. A file lock makes one worker
+    build while the others wait; a failed build leaves nothing behind, so the next caller builds (and fails) again.
+    Callers must treat the template as read-only and work on a copy (`shared_market`)."""
+    import fcntl
+    import pickle
+    import shutil
+
+    shared = _run_shared_dir(tmp_path_factory)
+    shared.mkdir(parents=True, exist_ok=True)
+    final = shared / key
+    with open(shared / f"{key}.lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            if not (final / "extras.pickle").exists():
+                work = shared / f"{key}.building"
+                shutil.rmtree(work, ignore_errors=True)
+                (work / "root").mkdir(parents=True)
+                extras = build(work / "root")
+                (work / "extras.pickle").write_bytes(pickle.dumps(extras))
+                work.rename(final)
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)
+    return final / "root", pickle.loads((final / "extras.pickle").read_bytes())
+
+
+def market_template(tmp_path_factory, key: str, build) -> tuple[Path, dict]:
+    """shared_template for a Market: `build(m: Market) -> dict | None` fills a fresh Market, whose connection is then
+    closed. Returns (template root holding vault/, staging/ and market.duckdb; extras): the attributes the build set on
+    the Market (e.g. `m.rows = ...`) plus the dict it returned, all picklable."""
+
+    def run(root: Path) -> dict:
+        m = Market(root)
+        try:
+            returned = build(m) or {}
+        finally:
+            m.con.close()
+        return {k: v for k, v in vars(m).items() if k not in ("vault", "stage_root", "con")} | returned
+
+    return shared_template(tmp_path_factory, key, run)
+
+
+def shared_market(tmp_path_factory, key: str, build) -> "Market":
+    """A Market on a private copy of the state market_template builds once per run (the dict's items become
+    attributes of every copy)."""
+    import shutil
+
+    template, extras = market_template(tmp_path_factory, key, build)
+    dest = tmp_path_factory.mktemp(key)
+    shutil.copytree(template, dest, dirs_exist_ok=True)
+    m = Market(dest)
+    for name, value in extras.items():
+        setattr(m, name, value)
+    return m
+
+
 @pytest.fixture
 def market(tmp_path: Path) -> Market:
     m = Market(tmp_path)
@@ -62,6 +157,27 @@ def market(tmp_path: Path) -> Market:
 
 def build_full_market(root: Path) -> "Market":
     """Every real fixture through the real pipeline, in arrival order (shared by e2e/feature tests)."""
+    m = Market(root)
+    fill_full_market(m)
+    return m
+
+
+def full_market_copy(tmp_path_factory) -> "Market":
+    """build_full_market on a private copy of the run's one build (shared_market)."""
+    return shared_market(tmp_path_factory, "full_market", fill_full_market)
+
+
+def full_market_db(tmp_path_factory, name: str) -> Path:
+    """A private, closed copy of the run's one full-market database file (for modules that copy it per test)."""
+    import shutil
+
+    template, _ = market_template(tmp_path_factory, "full_market", fill_full_market)
+    dest = tmp_path_factory.mktemp(name) / "market.duckdb"
+    shutil.copy(template / "market.duckdb", dest)
+    return dest
+
+
+def fill_full_market(m: "Market") -> None:
     from datetime import UTC
 
     from _fixture_helpers import CORP, FIXTURES, XBRL_DIR
@@ -74,8 +190,6 @@ def build_full_market(root: Path) -> "Market":
         stage_results_xbrl,
         stage_shareholding,
     )
-
-    m = Market(root)
 
     def ok(stage):
         r = promote(m.con, stage)
@@ -124,12 +238,11 @@ def build_full_market(root: Path) -> "Market":
             broadcast_ts_source="API_FIELD",
         )
     )
-    return m
 
 
 @pytest.fixture(scope="session")
 def full_market(tmp_path_factory) -> Market:
-    m = build_full_market(tmp_path_factory.mktemp("full_market"))
+    m = full_market_copy(tmp_path_factory)
     yield m
     m.con.close()
 

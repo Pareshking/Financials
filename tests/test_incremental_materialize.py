@@ -16,7 +16,7 @@ import shutil
 from datetime import date, datetime
 
 import pytest
-from conftest import FETCHED_AT, Market
+from conftest import FETCHED_AT, Market, market_template
 
 from _fixture_helpers import CORP, FIXTURES, XBRL_DIR
 from financials import dirty, features, features_store
@@ -39,11 +39,7 @@ SHP_Q1 = "SHP_1489727_21072025081003_WEB.xml"
 CA = FIXTURES / "corp_actions" / "nse_corporateActions_equities_15-09-2025_17-10-2025.json"
 
 
-@pytest.fixture(scope="module")
-def base(tmp_path_factory):
-    """Database file of the fully materialised base state (closed, so tests can copy it)."""
-    root = tmp_path_factory.mktemp("incr_base")
-    m = Market(root)
+def _fill_base(m: Market) -> None:
     for d in DAYS:
         assert promote(m.con, m.stage_day(d)).status == "PROMOTED"
     assert promote(m.con, m.stage_day("20251014", with_delivery=True)).status == "PROMOTED"
@@ -61,8 +57,13 @@ def base(tmp_path_factory):
     assert materialize_dates(m.con, None, date(2024, 10, 1), None, out) == 0, out.getvalue()
     # A full run over every materialised day consumes every marker the promotions wrote.
     assert m.con.execute("SELECT count(*) FROM materialize_dirty").fetchone()[0] == 0
-    m.con.close()
-    return root / "market.duckdb"
+
+
+@pytest.fixture(scope="module")
+def base(tmp_path_factory):
+    """Database file of the fully materialised base state (closed, so tests can copy it; built once per run)."""
+    template, _ = market_template(tmp_path_factory, "incr_base", _fill_base)
+    return template / "market.duckdb"
 
 
 @pytest.fixture

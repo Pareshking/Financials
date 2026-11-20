@@ -135,6 +135,10 @@ class Jobs:
         self.record_responses = False  # runner hand-back: also note listing / API answers (fetch.replay)
         self.since: date | None = None  # X346: discovery fetches only filings broadcast on or after this date
 
+    def _has_listing_page(self, url: str) -> bool:
+        """A later listing page may be asked for (live: always; a runner replay overrides it)."""
+        return True
+
     def _before_since(self, ts) -> bool:
         """X346: a listed filing broadcast before `since` is skipped (no download). Unknown time: never skipped."""
         return self.since is not None and ts is not None and ts.date() < self.since
@@ -382,6 +386,8 @@ class Jobs:
         out, entries, page = [], [], 1
         while True:  # every page until totalCount rows are listed [A7]
             url = results_listing_url(symbol, page)
+            if page > 1 and not self._has_listing_page(url):  # replay: the runner stopped paging here (X346)
+                break
             listing = self._get(url, accept=JSON)
             out.append(stage_results_listing(self.vault, self.stage_root, data=listing, source_url=url,
                                              fetched_at=utc_now()))  # fmt: skip

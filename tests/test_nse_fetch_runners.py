@@ -146,3 +146,18 @@ def test_nse_fetch_workflow_fans_out_shards_and_hands_back_only_the_vault():
         ["discover-filings", "--symbols-file", lst, "--shard", "0/8", "--record-responses"]
     )
     assert args.shard == "0/8" and args.record_responses
+
+
+def test_import_vault_of_a_since_run_stops_where_the_runner_stopped_paging(tmp_path):
+    """X346: a runner with --since that never asked page 2 must not make the replay report page 2 as a 404."""
+    runner = tmp_path / "runner"
+    f = tmp_path / "symbols.txt"
+    f.write_text("TCS\n")
+    rc, text = run(["--data-dir", str(runner), "discover-filings", "--symbols-file", str(f), "--shard", "0/1",
+                    "--kinds", "results", "--since", "2027-01-01", "--no-events", "--record-responses"],
+                   FakeTransport(routes()))  # fmt: skip
+    responses = [json.loads(x) for x in (runner / "vault" / "responses.jsonl").read_text().splitlines()]
+    assert {r["url"] for r in responses} == {results_listing_url("TCS")}  # page 1 wholly before since: no page 2
+    rc, text = run(["--data-dir", str(tmp_path / "local"), "import-vault", str(runner / "vault")])
+    assert rc == 0, text
+    assert "page=2" not in text and "error" not in text

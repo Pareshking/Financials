@@ -61,7 +61,8 @@ jobs:
         run: |
           python -m financials --data-dir "$RUNNER_TEMP/nse" --archive-rps 8 discover-filings \
             --symbols-file "$LIST" --shard "$SHARD/$N" --shp-from "$SHP_FROM" \
-            --kinds $KINDS ${SINCE:+--since "$SINCE"} --no-events --workers 8 --record-responses
+            --kinds $KINDS ${SINCE:+--since "$SINCE"} --no-events --workers 8 --record-responses \
+            || echo "::warning::discover-filings reported per-file errors (e.g. an archive 404); see the log"
         env:
           LIST: ${{ inputs.list || 'reference/fetch_lists/mcap500_new_20261117.txt' }}
           SHP_FROM: ${{ inputs.shp_from || '2025-03-31' }}

@@ -182,6 +182,11 @@ def _stage(vault: Vault, stage_root: Path, answers: dict[str, bytes], stats: dic
     transport = ReplayTransport(answers)
 
     class ReplayJobs(Jobs):
+        def _has_listing_page(self, url: str) -> bool:
+            # a page the runner did not fetch (it stopped paging, e.g. under --since, X346) ends the listing:
+            # no network, no error
+            return url in answers or self.is_vaulted(url)
+
         def _file(self, url: str) -> bytes | None:
             if not self.is_vaulted(url) and url not in answers:  # not fetched on the runner: skip, no network
                 stats["files_not_on_runner"] += 1

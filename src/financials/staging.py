@@ -12,6 +12,7 @@ import json
 import os
 import shutil
 import tempfile
+import threading
 from dataclasses import asdict
 from datetime import datetime, time
 from pathlib import Path
@@ -187,6 +188,32 @@ def _filing_row(f: Filing) -> dict[str, Any]:
     return asdict(f)
 
 
+_LOCAL = threading.local()
+
+
+def _staging_connection():
+    """X347 STAGING_CONNECTION_REUSE: one in-memory DuckDB with the schema per thread and process, reused by every
+    batch. Applying schema.sql to a fresh database took 450-840 ms of each batch (2,649 batches of one import-vault:
+    the bulk of its minutes); a batch now inserts and copies inside a transaction that is rolled back, so every
+    batch still starts from empty tables with the same types, keys and foreign keys."""
+    held = getattr(_LOCAL, "con", None)
+    if held is not None and held[0] == os.getpid():
+        return held[1]
+    con = connect()
+    apply_schema(con)
+    con.execute(STAGING_SCHEMA)
+    _LOCAL.con = (os.getpid(), con)
+    return con
+
+
+def _release(con) -> None:
+    try:
+        con.execute("ROLLBACK")
+    except Exception:  # a connection that cannot roll back is not reused
+        _LOCAL.con = None
+        con.close()
+
+
 def write_stage(
     stage_root: Path,
     job: str,
@@ -206,18 +233,19 @@ def write_stage(
     final.parent.mkdir(parents=True, exist_ok=True)
     tmp = Path(tempfile.mkdtemp(dir=final.parent, prefix=f".{run_id}-"))
     try:
-        con = connect()
-        apply_schema(con)
-        con.execute(STAGING_SCHEMA)
-        counts = {}
-        for name in TABLE_ORDER:
-            rows = tables.get(name) or []
-            if not rows:
-                continue
-            insert_rows(con, name, rows)
-            con.execute(f"COPY {name} TO '{(tmp / (name + '.parquet')).as_posix()}' (FORMAT PARQUET)")
-            counts[name] = len(rows)
-        con.close()
+        con = _staging_connection()
+        con.execute("BEGIN")
+        try:
+            counts = {}
+            for name in TABLE_ORDER:
+                rows = tables.get(name) or []
+                if not rows:
+                    continue
+                insert_rows(con, name, rows)
+                con.execute(f"COPY {name} TO '{(tmp / (name + '.parquet')).as_posix()}' (FORMAT PARQUET)")
+                counts[name] = len(rows)
+        finally:
+            _release(con)  # the batch's rows never outlive it: the next batch starts from empty tables
         manifest = {"job": job, "run_id": run_id, "tables": counts, **(extra or {})}
         (tmp / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
         os.replace(tmp, final)

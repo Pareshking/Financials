@@ -18,6 +18,12 @@ Calls, through the ported client (4-6 s apart, in-page XHR only after a refusal,
   consolidated (`Consol_XMLName`) inline XBRL once, skipping rows whose quarter ends before Q4 FY25
   (`quarter_code`, scope C9); `import-bse` parses them with the NSE results parser.
 `--scrips` comes from `python -m financials --data-dir data bse-members` (the codes of the Permitted members).
+
+X353 (weekly runs): `--window` limits the results XBRL and the shareholding XBRL to files created / broadcast on or
+after --since (`Fld_CreateDate`, `D`; the FlagDur 7 pass is skipped when --since is within the last year), and
+`--shard K/N` takes one shard of the scrips (financials.fetch.replay.shard; the group lists only in shard 0), so N
+runners split a sweep. The 4-6 s pace between calls is unchanged on every runner. A weekly run of 121 scrips without
+them made about 2,170 calls (~3.4 h at 5.6 s): every in-scope results file again each week.
 """
 
 from __future__ import annotations
@@ -27,7 +33,8 @@ import sys
 from datetime import date, timedelta
 from pathlib import Path
 
-from financials.fetch.bse import BadRequest, Blocked, BseClient, Failed, Ledger, Missing, results_files
+from financials.fetch.bse import BadRequest, Blocked, BseClient, Failed, Ledger, Missing, created_since, results_files
+from financials.fetch.replay import parse_shard, shard
 from financials.scope import MIN_PERIOD_END_DATE
 
 GROUPS = ("A", "B", "E", "F", "FC", "G", "GC", "I", "IF", "IT", "M", "MS", "MT", "P", "R", "T", "TS", "W", "X",
@@ -49,11 +56,21 @@ def _window(entry: str, since: date, today: date) -> tuple[str, date, date]:
     return code, d - timedelta(days=WINDOW_DAYS), min(d + timedelta(days=WINDOW_DAYS), today)
 
 
-def results_xbrl(c: BseClient, codes: list[str], log, seen: set[str] | None = None) -> int:
-    """Results XBRL of `codes` [X265]: listing pass FlagDur 6 then FlagDur 7, each file of a row in scope once."""
+def results_xbrl(
+    c: BseClient,
+    codes: list[str],
+    log,
+    seen: set[str] | None = None,
+    since: date | None = None,
+    today: date | None = None,
+) -> int:
+    """Results XBRL of `codes` [X265]: listing pass FlagDur 6 then FlagDur 7, each file of a row in scope once.
+    `since` (X353): only rows created on or after it, and no FlagDur 7 pass when it lies within the last year."""
     skipped = 0
     seen = set() if seen is None else seen
-    for flag in (6, 7):
+    today = today or date.today()
+    flags = (6,) if since is not None and since >= today - timedelta(days=365) else (6, 7)
+    for flag in flags:
         for s in codes:
             try:
                 rows = c.finance_results(s, flag)
@@ -61,9 +78,12 @@ def results_xbrl(c: BseClient, codes: list[str], log, seen: set[str] | None = No
                 skipped += 1
                 log(f"SKIP results listing {s} FlagDur {flag}: {exc}")
                 continue
+            listed = len(rows)
+            rows, before = created_since(rows, since)
             files, early = results_files(rows, MIN_PERIOD_END_DATE)
             new = [(u, cov) for u, cov in files if u not in seen]
-            log(f"{s} FlagDur {flag}: {len(rows)} results rows, {early} before Q4 FY25, {len(new)} new files")
+            window = "" if since is None else f"{before} created before --since, "
+            log(f"{s} FlagDur {flag}: {listed} results rows, {window}{early} before Q4 FY25, {len(new)} new files")
             for url, covers in new:
                 seen.add(url)
                 try:
@@ -74,11 +94,24 @@ def results_xbrl(c: BseClient, codes: list[str], log, seen: set[str] | None = No
     return skipped
 
 
-def run(c: BseClient, scrips: list[str], since: date, today: date, log, only: str = "all") -> int:
+def run(
+    c: BseClient,
+    scrips: list[str],
+    since: date,
+    today: date,
+    log,
+    only: str = "all",
+    *,
+    window: bool = False,
+    groups: bool = True,
+) -> int:
+    """`window` (X353): results and shareholding XBRL only from --since on. `groups`: fetch the group lists."""
+    files_since = since if window else None
+    codes = list(dict.fromkeys(_window(e, since, today)[0] for e in scrips))
     if only == "results":
-        return results_xbrl(c, list(dict.fromkeys(_window(e, since, today)[0] for e in scrips)), log)
+        return results_xbrl(c, codes, log, since=files_since, today=today)
     skipped = 0
-    for g in GROUPS:
+    for g in GROUPS if groups else ():
         try:
             log(f"group {g}: {len(c.list_securities(g))} securities")
         except BadRequest as exc:
@@ -111,7 +144,8 @@ def run(c: BseClient, scrips: list[str], since: date, today: date, log, only: st
         shp = []
         skipped += 1
         log(f"SKIP shareholding filings: {exc}")
-    log(f"shareholding filings of the listed scrips (3 months): {len(shp)}")
+    shp, before = created_since(shp, files_since, "D")
+    log(f"shareholding filings of the listed scrips (3 months): {len(shp)} ({before} broadcast before --since)")
     for r in shp:
         if r.get("IsXBRL") == 1 and r.get("XBRLAttachment"):
             try:
@@ -119,7 +153,7 @@ def run(c: BseClient, scrips: list[str], since: date, today: date, log, only: st
             except (Missing, BadRequest) as exc:
                 skipped += 1
                 log(f"SKIP {r['XBRLAttachment']}: {exc}")
-    return skipped + results_xbrl(c, list(dict.fromkeys(_window(e, since, today)[0] for e in scrips)), log)
+    return skipped + results_xbrl(c, codes, log, since=files_since, today=today)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -134,15 +168,29 @@ def main(argv: list[str] | None = None) -> int:
         default="all",
         help="results: only the results XBRL listing and files (no lists, announcements, shareholding)",
     )
+    ap.add_argument(
+        "--window",
+        action="store_true",
+        help="X353: results and shareholding XBRL only if created / broadcast on or after --since",
+    )
+    ap.add_argument("--shard", help="K/N: only shard K (0-based) of N of the scrips; group lists in shard 0 only")
     a = ap.parse_args(argv)
     scrips = [s.strip() for s in a.scrips.split(",") if s.strip()]
     if not all(s.partition("@")[0].isdigit() for s in scrips):
         ap.error("--scrips: BSE scrip codes are digits (optionally CODE@YYYY-MM-DD)")
+    k = 0
+    if a.shard:
+        try:
+            k, n = parse_shard(a.shard)
+        except ValueError as exc:
+            ap.error(str(exc))
+        scrips = shard(scrips, k, n)
+        print(f"shard {k}/{n}: {len(scrips)} scrips")
     led = Ledger(a.out)
     c = BseClient(ledger=led)
     rc = 0
     try:
-        skipped = run(c, scrips, a.since, a.to, print, a.only)
+        skipped = run(c, scrips, a.since, a.to, print, a.only, window=a.window, groups=k == 0)
         print(f"done: {len(led.records())} answers in the ledger, {skipped} calls skipped")
     except (Blocked, Failed) as exc:
         print(f"STOP  {type(exc).__name__}: {exc} ({len(led.records())} answers kept in the ledger)")

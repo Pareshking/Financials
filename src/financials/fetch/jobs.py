@@ -99,6 +99,8 @@ def results_listing_url(symbol: str, page: int = 1) -> str:
 ANNOUNCEMENTS_RSS = "https://nsearchives.nseindia.com/content/RSS/Online_announcements.xml"
 # XBRL file-name prefixes of the parsed Reg. 30 families [E2]
 EVENT_PREFIXES = ("REG30_PARA_B_", "CIM_", "ALTERATION_OF_CAPITAL_AND_FUND_RAISING_", "ANN_FRAUD_")
+RSS_ATTEMPTS = 3  # X350: a cut-short announcements RSS is asked again (3 answers in all)
+RSS_RETRY_WAIT = 10.0  # seconds before asking again (on top of the host's spacing)
 
 
 def annual_listing_url(symbol: str) -> str:
@@ -196,11 +198,24 @@ class Jobs:
         fid = stable_id("fil", "NSE", url, last["sha256"])
         if (self.stage_root / job / fid).exists():
             return True
-        if getattr(self, "_promoted", None) is None:  # X345: promoted filings whose staging directory is gone
+        return fid in self._promoted_ids()  # X345: promoted filings whose staging directory is gone
+
+    def _promoted_ids(self) -> frozenset[str]:
+        if getattr(self, "_promoted", None) is None:
             from financials import promoted_ledger
 
             self._promoted = promoted_ledger.read(self.stage_root)
-        return fid in self._promoted
+        return self._promoted
+
+    def _promoted_answer(self, url: str, data: bytes) -> bool:
+        """X349 PROMOTED_ANSWER_SKIP: a listing / master / RSS answer byte-identical to one already promoted (same
+        URL and sha256, so the same filing id) is not staged again; it is still read. import-vault re-staged every
+        listing of a runner vault each time (2,143 listings of one 8-runner sweep)."""
+        import hashlib
+
+        from financials.ids import stable_id
+
+        return stable_id("fil", "NSE", url, hashlib.sha256(data).hexdigest()) in self._promoted_ids()
 
     def is_vaulted(self, url: str) -> bool:
         last = self.vault.last_fetch(url)
@@ -336,8 +351,9 @@ class Jobs:
         that date on (2024-12-31 gives the first in-scope quarter, 2025-03-31, its QoQ comparison)."""
         url = shp_master_url(symbol)
         master = self._get(url, accept=JSON)
-        out = [stage_raw_only(self.vault, self.stage_root, data=master, ext="json", media_type=JSON,
-                              category="SHP_MASTER", source_url=url, fetched_at=utc_now())]  # fmt: skip
+        out = [] if self._promoted_answer(url, master) else [
+            stage_raw_only(self.vault, self.stage_root, data=master, ext="json", media_type=JSON,
+                           category="SHP_MASTER", source_url=url, fetched_at=utc_now())]  # fmt: skip
         entries = parse_shp_master(master)
         if min_as_of is not None:
             entries = [e for e in entries if e.as_of_date >= min_as_of]
@@ -362,8 +378,9 @@ class Jobs:
         Only fiscal years ending in or after `min_to_year` are downloaded (C9); one file per request."""
         url = annual_listing_url(symbol)
         listing = self._get(url, accept=JSON)
-        out = [stage_raw_only(self.vault, self.stage_root, data=listing, ext="json", media_type=JSON,
-                              category="ANNUAL_LISTING", source_url=url, fetched_at=utc_now())]  # fmt: skip
+        out = [] if self._promoted_answer(url, listing) else [
+            stage_raw_only(self.vault, self.stage_root, data=listing, ext="json", media_type=JSON,
+                           category="ANNUAL_LISTING", source_url=url, fetched_at=utc_now())]  # fmt: skip
         for e in parse_annual_listing(listing):
             if e.to_year < min_to_year or self._before_since(e.broadcast_ts_ist):
                 continue
@@ -389,8 +406,9 @@ class Jobs:
             if page > 1 and not self._has_listing_page(url):  # replay: the runner stopped paging here (X346)
                 break
             listing = self._get(url, accept=JSON)
-            out.append(stage_results_listing(self.vault, self.stage_root, data=listing, source_url=url,
-                                             fetched_at=utc_now()))  # fmt: skip
+            if not self._promoted_answer(url, listing):
+                out.append(stage_results_listing(self.vault, self.stage_root, data=listing, source_url=url,
+                                                 fetched_at=utc_now()))  # fmt: skip
             rows = parse_integrated_filing_listing(listing)
             entries += rows
             seen, total = listing_progress(listing)
@@ -426,13 +444,13 @@ class Jobs:
     def reg30_events(self, *, limit: int | None = None, rss: bytes | None = None) -> list[Path]:
         """Announcements RSS (vaulted) -> structured event XBRL of the parsed families, one file per request [E1, E2].
         The RSS pubDate (IST) is the broadcast time."""
-        rss = rss if rss is not None else self._get(ANNOUNCEMENTS_RSS)
-        raw = stage_raw_only(
+        rss = rss if rss is not None else self.announcements_rss()
+        parsed = parse_announcements_rss(rss)  # before vaulting: a cut-short answer is never kept as the day's RSS
+        out = [] if self._promoted_answer(ANNOUNCEMENTS_RSS, rss) else [stage_raw_only(
             self.vault, self.stage_root, data=rss, ext="xml", media_type="application/rss+xml",
             category="ANNOUNCEMENTS_RSS", source_url=ANNOUNCEMENTS_RSS, fetched_at=utc_now(),
-        )  # fmt: skip
-        out = [raw]
-        items = [i for i in parse_announcements_rss(rss)
+        )]  # fmt: skip
+        items = [i for i in parsed
                  if i.xbrl_url and i.xbrl_url.rsplit("/", 1)[-1].startswith(EVENT_PREFIXES)
                  and not self.is_vaulted(i.xbrl_url)]  # fmt: skip
         for item in items[:limit]:
@@ -500,4 +518,31 @@ class Jobs:
 
     def symbols_from_rss(self) -> list[str]:
         """Daily hint: symbols whose 'financial results' announcements are in the RSS (attachment file name)."""
-        return symbols_with_results_today(self._get(ANNOUNCEMENTS_RSS))
+        return symbols_with_results_today(self.announcements_rss())
+
+    def announcements_rss(self) -> bytes:
+        """X350 RSS_PARSE_RETRY: the announcements RSS, fetched once per job set (run-day reads it for the symbols
+        hint and for the Reg. 30 events) and accepted only when it parses as XML. NSE served a cut-short file on
+        2026-11-20 ("unclosed token: line 1, column 430594") and the day's discovery failed: an answer that does not
+        parse is asked again after RSS_RETRY_WAIT seconds (the host's own spacing still applies), up to
+        RSS_ATTEMPTS times in all; then the ParseError is raised. A rejected answer is never vaulted or recorded."""
+        if getattr(self, "_rss", None) is not None:
+            return self._rss
+        for attempt in range(1, RSS_ATTEMPTS + 1):
+            data = self.f.get(ANNOUNCEMENTS_RSS)
+            try:
+                parse_announcements_rss(data)
+            except ParseError as exc:
+                if attempt == RSS_ATTEMPTS:
+                    raise ParseError(f"{exc} ({attempt} attempts)") from exc
+                self.warnings.append(f"announcements RSS did not parse ({exc}); asked again ({attempt + 1}/"
+                                     f"{RSS_ATTEMPTS}) [X350]")  # fmt: skip
+                self.f.sleep(RSS_RETRY_WAIT)
+                continue
+            if self.record_responses:
+                from financials.fetch.replay import record_response
+
+                record_response(self.vault, ANNOUNCEMENTS_RSS, data, "xml", utc_now())
+            self._rss = data
+            return data
+        raise AssertionError("unreachable")

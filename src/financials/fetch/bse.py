@@ -482,6 +482,24 @@ def results_files(rows: list[dict], min_period_end: date) -> tuple[list[tuple[st
     return list(out.items()), skipped
 
 
+def created_since(rows: list[dict], since: date | None, field: str = "Fld_CreateDate") -> tuple[list[dict], int]:
+    """X353 BSE_SINCE_WINDOW: the rows whose `field` (IST: a results row's `Fld_CreateDate` [X265], a shareholding
+    row's `D` [A18]) falls on or after `since`, and how many were left out. A row whose time does not read is kept;
+    `since` None keeps every row."""
+    if since is None:
+        return rows, 0
+    kept = []
+    for r in rows:
+        try:
+            ts = datetime.fromisoformat(str(r.get(field) or ""))
+        except ValueError:
+            kept.append(r)
+            continue
+        if ts.date() >= since:
+            kept.append(r)
+    return kept, len(rows) - len(kept)
+
+
 _FILE_STAMP = re.compile(r"_(\d{11,16})_(?:IFIndAs\.html|IFNBFC\.xml)$", re.IGNORECASE)
 
 

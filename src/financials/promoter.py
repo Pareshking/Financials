@@ -1815,6 +1815,11 @@ def treasury_totals(con, shp_filing: str, total: Decimal, employee_trusts) -> li
         "WHERE filing_id = ? AND holder_category = ? AND regexp_matches(holder_name, '(?i)\\btrust\\b'))",
         [shp_filing, TREASURY_TRUST_CATEGORY],
     ).fetchone()[0]
+    return treasury_candidates(total, employee_trusts, trusts)
+
+
+def treasury_candidates(total: Decimal, employee_trusts, trusts) -> list[Decimal]:
+    """`treasury_totals` from the two trust holdings already read (share_capital reads them for many filings)."""
     out = [total]
     both = (employee_trusts or 0) + (trusts or 0) if employee_trusts and trusts else 0
     for less in (employee_trusts, trusts, both):
@@ -1978,7 +1983,7 @@ def audit_annual_checks(con, entity_ids=None) -> dict[str, int]:
     ACCEPTED finding of the filing, are resolved ACCEPTED (`accept_prior_year_findings`); they stay visible."""
     from financials import filing_checks as fc
     from financials.share_capital import REASON as SHARE_REASON
-    from financials.share_capital import annual_share_disagreement
+    from financials.share_capital import annual_share_disagreements
 
     metas = con.execute(
         "SELECT filing_id, parser_version, entity_id, scope, fy_start, fy_end, level_of_rounding, visible_from_ts "
@@ -1989,7 +1994,8 @@ def audit_annual_checks(con, entity_ids=None) -> dict[str, int]:
         wanted = set(entity_ids)
         metas = [m for m in metas if m[2] in wanted]
     rows, prior = [], []
-    for fid, pv, ent, scope, fy_start, fy_end, lor, visible in metas:
+    shares = annual_share_disagreements(con, [(m[0], m[2], m[5]) for m in metas])  # X349: one batch
+    for fid, pv, ent, scope, fy_start, _fy_end, lor, visible in metas:
         diffs, ctx = fc.annual_prior_year_comparison(
             con, filing_id=fid, parser_version=pv, entity_id=ent, scope=scope, fy_start=fy_start,
             level_of_rounding=lor, visible_from_ts=visible,
@@ -1999,7 +2005,7 @@ def audit_annual_checks(con, entity_ids=None) -> dict[str, int]:
             rows.append(_quarantine_row(stage="CONSISTENCY", reason_code=fc.PRIOR_YEAR_REASON, filing_id=fid,
                                         entity_id=ent, details=details))  # fmt: skip
             prior.append((rows[-1]["quarantine_id"], fid, details, ctx))
-        share = annual_share_disagreement(con, fid, ent, fy_end)
+        share = shares[fid]
         if share is not None:
             rows.append(_quarantine_row(stage="SHARES", reason_code=SHARE_REASON, entity_id=ent, filing_id=fid,
                                         details=share))  # fmt: skip
@@ -2056,16 +2062,22 @@ def close_resolved_annual_share_findings(con) -> int:
     those that now agree (typically the FY-end Reg. 31 filing was promoted after the annual). Cheap: open findings
     only; run after every promote batch like close_resolved_share_findings."""
     from financials.share_capital import REASON as SHARE_REASON
-    from financials.share_capital import annual_share_disagreement
+    from financials.share_capital import annual_share_disagreements
 
     rows = con.execute(
         "SELECT quarantine_id, filing_id, entity_id, CAST(json_extract_string(details, '$.as_of') AS DATE) "
         "FROM quarantine_queue WHERE reason_code = ? AND resolved_at IS NULL",
         [SHARE_REASON],
     ).fetchall()
-    fixed = [
-        q for q, fid, ent, as_of in rows if ent and fid and annual_share_disagreement(con, fid, ent, as_of) is None
-    ]
+    rows = [r for r in rows if r[1] and r[2]]
+    # X349: one batch; a filing with findings of two dates is checked at each (keyed by finding, not filing)
+    by_date: dict = {}
+    for q, fid, ent, as_of in rows:
+        by_date.setdefault(as_of, []).append((q, fid, ent))
+    fixed = []
+    for as_of, group in by_date.items():
+        got = annual_share_disagreements(con, [(fid, ent, as_of) for _, fid, ent in group])
+        fixed += [q for q, fid, _ in group if got[fid] is None]
     if fixed:
         con.execute(
             "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ? "

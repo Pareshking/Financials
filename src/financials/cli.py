@@ -30,6 +30,7 @@ from financials.promoter import (
 )
 from financials.scope import MIN_TRADE_DATE
 from financials.staging import read_manifest
+from financials.staging_clean import clean_staging
 from financials.timeutil import utc_now, utc_to_ist_date
 from financials.vault import Vault
 
@@ -99,6 +100,15 @@ def promote_pending(con, stage_root: Path, out=sys.stdout, vault: Vault | None =
 
     promoted_ledger.write(con, stage_root)  # X345: discovery skips promoted filings whose staging dir is gone
     return pending
+
+
+def _print_clean(r: dict, out) -> None:
+    verb = "would remove" if r["dry_run"] else "removed"
+    print(f"clean-staging: {verb} {r['removed']} director(ies), {r['bytes'] / 2**20:.1f} MB; kept "
+          f"{r['kept_open_finding']} with an open finding, {r['kept_not_in_ledger']} not in the ledger [X352]",
+          file=out)  # fmt: skip
+    for job, v in sorted(r["by_job"].items()):
+        print(f"  {job:14s} {v['dirs']:>7} {v['bytes'] / 2**20:10.1f} MB", file=out)
 
 
 def _date(s: str) -> date:
@@ -179,7 +189,7 @@ def build_parser() -> argparse.ArgumentParser:
     ib_ = sub.add_parser(
         "import-bse", help="vault + stage a BSE runner ledger (blobs/ + ledger.jsonl) for promote [A17]"
     )
-    ib_.add_argument("ledger_dir", type=Path)
+    ib_.add_argument("ledger_dir", type=Path, nargs="+", help="one or more ledgers (bse-fetch shards, X353)")
     lk = sub.add_parser("load-kpis", help="stage a supplemental KPI file (CSV/JSON: parsers.kpis) for promote")
     lk.add_argument("path", type=Path)
     eb = sub.add_parser(
@@ -236,7 +246,11 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("audit-ytd", help="raise YTD_QUARTER_MISMATCH findings for every entity and scope [X80]")
     ls = sub.add_parser("rescale-level-slips", help="X201: rescale filings that declared the wrong LevelOfRounding")
     ls.add_argument("--dry-run", action="store_true", help="list the filings and their proof, write nothing")
-    sub.add_parser("promote", help="apply all pending staged batches (single writer)")
+    pr = sub.add_parser("promote", help="apply all pending staged batches (single writer)")
+    clean_help = "then remove the staging directories of promoted filings no reader needs (X352, opt-in)"
+    pr.add_argument("--clean-staging", action="store_true", help=clean_help)
+    cs = sub.add_parser("clean-staging", help="remove staging directories of promoted filings no reader needs (X352)")
+    cs.add_argument("--dry-run", action="store_true", help="count only: read-only database, nothing deleted")
     rb = sub.add_parser("rebuild-market", help="roll market-derived state back to a date and replay it (audited)")
     rb.add_argument("--from", dest="from_date", type=_date, required=True)
     rb.add_argument("--note", default="rebuild-market")
@@ -569,11 +583,14 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
     if args.cmd == "import-bse":
         from financials.fetch.bse import import_ledger
 
-        staged, errors = import_ledger(Vault(vault_dir), stage_root, args.ledger_dir)
-        for e in errors:
-            print(f"error: {e}", file=out)
-        print(f"staged {len(staged)} BSE file(s) from {args.ledger_dir} (run promote)", file=out)
-        return 1 if errors else 0
+        failed = False
+        for ledger_dir in args.ledger_dir:  # X353: one ledger per bse-fetch shard
+            staged, errors = import_ledger(Vault(vault_dir), stage_root, ledger_dir)
+            for e in errors:
+                print(f"error: {e}", file=out)
+            print(f"staged {len(staged)} BSE file(s) from {ledger_dir} (run promote)", file=out)
+            failed = failed or bool(errors)
+        return 1 if failed else 0
     if args.cmd == "load-kpis":
         from financials.staging import stage_kpis
 
@@ -600,6 +617,16 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
         from financials.dsl import load_saved_screens
 
         print(json.dumps([asdict(v) for v in load_saved_screens().values()], indent=1), file=out)
+        return 0
+    if args.cmd == "clean-staging" and args.dry_run:  # read only: counts what a clean-up would remove
+        if not db_path.exists():
+            print(f"error: no market database at {db_path}", file=out)
+            return 2
+        con = connect(db_path, read_only=True)
+        try:
+            _print_clean(clean_staging(con, stage_root, dry_run=True), out)
+        finally:
+            con.close()
         return 0
     if args.cmd in ("screen", "ratios", "check-issue-size") or (
         args.cmd == "quarantine" and args.qcmd in ("list", "inspect")
@@ -659,7 +686,13 @@ def write_command(args, db_path: Path, stage_root: Path, out) -> int:
             print(f"schema applied to {db_path} ({len(upgraded)} column(s) added)", file=out)
             return 0
         if args.cmd == "promote":
-            return 1 if promote_pending(con, stage_root, out) else 0
+            pending = promote_pending(con, stage_root, out)
+            if args.clean_staging:
+                _print_clean(clean_staging(con, stage_root), out)
+            return 1 if pending else 0
+        if args.cmd == "clean-staging":
+            _print_clean(clean_staging(con, stage_root), out)
+            return 0
         if args.cmd == "rebuild-market":
             from financials.admin import rebuild_market
 
@@ -996,23 +1029,39 @@ def materialize_incremental_cli(con, to: date | None, out) -> int:
 def run_day(args, transport: Transport | None, out) -> int:
     """Idempotent daily run for `--date D`: holiday list, market days D-lookback..D (vaulted days are not fetched
     again; each with its PR-zip mcap file), corporate actions D-lookback..D+30 (announced ahead of ex-date),
-    discovery for the symbols with results in today's RSS plus Reg. 30 events, then promote, apply universe rule U1
-    to the week ends in D-lookback..D (financials.universe) and materialise D. Fetch failures are reported; the rest
-    of the run continues, and the next run picks up what failed."""
+    discovery for the symbols with results in today's RSS, the Reg. 30 events of that RSS, then promote, apply
+    universe rule U1 to the week ends in D-lookback..D (financials.universe) and materialise D. Fetch failures are
+    reported; the rest of the run continues, and the next run picks up what failed.
+
+    X351 RUN_DAY_TIMINGS: every step prints its wall time (`time <step>: N.N s`) and the run its total, so a slow
+    day shows where it went. The announcements RSS is fetched once (X350: asked again when it does not parse) and
+    serves both the symbols hint and the events."""
+    import time
+
     vault_dir, stage_root, db_path = _paths(args.data_dir)
     jobs = Jobs(PoliteFetcher(transport, warmup=WARMUP), Vault(vault_dir), stage_root)
     d = args.date or utc_to_ist_date(utc_now())
     errors: list[str] = []
+    started = time.monotonic()
+
+    def timed(name: str, fn):
+        t0 = time.monotonic()
+        try:
+            return fn()
+        finally:
+            print(f"time {name}: {time.monotonic() - t0:.1f} s", file=out)
+
     steps = (
         ("holidays", jobs.holidays),
         ("days", lambda: jobs.market_days(max(d - timedelta(days=args.lookback_days), MIN_TRADE_DATE), d)),
         ("corp-actions", lambda: jobs.corp_actions(max(d - timedelta(days=args.lookback_days), MIN_TRADE_DATE),
                                                    d + timedelta(days=30))),
-        ("discovery", lambda: jobs.discover(jobs.symbols_from_rss(), ["results", "shareholding"])),
+        ("discovery", lambda: jobs.discover(jobs.symbols_from_rss(), ["results", "shareholding"], events=False)),
+        ("events", jobs.reg30_events),  # the RSS that discovery read (one fetch)
     )  # fmt: skip
     for name, step in steps:
         try:
-            r = step()
+            r = timed(name, step)
             staged, errs = r if isinstance(r, tuple) else (r, [])
             errors += [f"{name}: {e}" for e in errs]
             print(f"{name}: {len(staged)} staged", file=out)
@@ -1021,28 +1070,33 @@ def run_day(args, transport: Transport | None, out) -> int:
     for w in jobs.warnings:
         print(f"warning: {w}", file=out)
     args.data_dir.mkdir(parents=True, exist_ok=True)
-    con = connect(db_path)
+    con = timed("open-db", lambda: connect(db_path))
     try:
-        apply_schema(con)
-        waiting = promote_pending(con, stage_root, out)
+        timed("schema", lambda: apply_schema(con))
+        waiting = timed("promote", lambda: promote_pending(con, stage_root, out))
         from financials.universe import update_universe
 
-        con.execute("BEGIN")  # rule U1 for the week ends in the lookback (D itself once its week is known to end)
-        u = update_universe(con, max(d - timedelta(days=args.lookback_days), MIN_TRADE_DATE), d)
-        con.execute("COMMIT")
+        def universe():
+            con.execute("BEGIN")  # rule U1 for the week ends in the lookback (D itself once its week is known to end)
+            u = update_universe(con, max(d - timedelta(days=args.lookback_days), MIN_TRADE_DATE), d)
+            con.execute("COMMIT")
+            return u
+
+        u = timed("universe", universe)
         print(f"universe: {u['joined']} joined, {u['members']} members ({u['week_ends']} week end(s))", file=out)
         # Dirty rows of earlier days first (a late filing, a resolved gap), so D's percentile history is current;
         # then D in full. A version mismatch skips the catch-up (it needs a full run) but still publishes D.
-        caught_up = materialize_incremental_cli(con, d - timedelta(days=1), out)
+        caught_up = timed("materialize-catch-up", lambda: materialize_incremental_cli(con, d - timedelta(days=1), out))
         if is_trading_day(con, "NSE", d) is False:  # holiday / weekend per the promoted calendar: no day to publish
             print(f"{d}: not a trading day; nothing to materialise", file=out)
             rc = caught_up
         else:
-            rc = materialize_dates(con, d, None, None, out) or caught_up
+            rc = timed("materialize", lambda: materialize_dates(con, d, None, None, out)) or caught_up
     finally:
         con.close()
     for e in errors:
         print(f"error: {e}", file=out)
+    print(f"time total: {time.monotonic() - started:.1f} s", file=out)
     return 1 if errors or waiting or rc else 0
 
 

@@ -27,7 +27,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: python -m pip install -e ".[bse]"
-      - run: python scripts/bse_rate_probe.py --scrips "$SCRIPS" --gaps "$GAPS" --n "$N" --out bse_probe.jsonl
+      - run: mkdir -p bse_probe && python scripts/bse_rate_probe.py --scrips "$SCRIPS" --gaps "$GAPS" --n "$N" --out bse_probe/bse_probe.jsonl
         env:
           SCRIPS: ${{ inputs.scrips }}
           GAPS: ${{ inputs.gaps }}
@@ -36,5 +36,5 @@ jobs:
         if: always()
         with:
           name: bse-probe
-          path: bse_probe.jsonl
+          path: bse_probe/
           retention-days: 3

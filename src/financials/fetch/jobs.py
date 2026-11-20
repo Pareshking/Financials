@@ -133,6 +133,11 @@ class Jobs:
         self.shp_min_as_of: date | None = None  # discovery: shareholding quarters from this date (None = latest)
         self.workers = 1  # fetch-days threads (useful only with a host limit above one connection)
         self.record_responses = False  # runner hand-back: also note listing / API answers (fetch.replay)
+        self.since: date | None = None  # X346: discovery fetches only filings broadcast on or after this date
+
+    def _before_since(self, ts) -> bool:
+        """X346: a listed filing broadcast before `since` is skipped (no download). Unknown time: never skipped."""
+        return self.since is not None and ts is not None and ts.date() < self.since
 
     def _file(self, url: str) -> bytes | None:
         try:
@@ -335,6 +340,8 @@ class Jobs:
         elif latest_only:
             entries = entries[:1]
         for e in entries:
+            if self._before_since(e.broadcast_ts_ist):
+                continue
             if self.is_done(e.xbrl_url, "shareholding") or (xbrl := self._file(e.xbrl_url)) is None:
                 continue
             out.append(
@@ -354,7 +361,9 @@ class Jobs:
         out = [stage_raw_only(self.vault, self.stage_root, data=listing, ext="json", media_type=JSON,
                               category="ANNUAL_LISTING", source_url=url, fetched_at=utc_now())]  # fmt: skip
         for e in parse_annual_listing(listing):
-            if e.to_year < min_to_year or self.is_done(e.xbrl_url, "results_xbrl"):
+            if e.to_year < min_to_year or self._before_since(e.broadcast_ts_ist):
+                continue
+            if self.is_done(e.xbrl_url, "results_xbrl"):
                 continue
             if (xbrl := self._file(e.xbrl_url)) is None:
                 continue
@@ -376,13 +385,18 @@ class Jobs:
             listing = self._get(url, accept=JSON)
             out.append(stage_results_listing(self.vault, self.stage_root, data=listing, source_url=url,
                                              fetched_at=utc_now()))  # fmt: skip
-            entries += parse_integrated_filing_listing(listing)
+            rows = parse_integrated_filing_listing(listing)
+            entries += rows
             seen, total = listing_progress(listing)
             if not seen or page * 20 >= total or page >= 10:
                 break
+            if rows and all(self._before_since(e.visible_ts_ist) for e in rows):  # X346: a page wholly before since
+                break
             page += 1
         for e in entries:
-            if e.period_end < MIN_PERIOD_END_DATE or self.is_done(e.xbrl_url, "results_xbrl"):
+            if e.period_end < MIN_PERIOD_END_DATE or self._before_since(e.visible_ts_ist):
+                continue
+            if self.is_done(e.xbrl_url, "results_xbrl"):
                 continue
             if (xbrl := self._file(e.xbrl_url)) is None:
                 continue

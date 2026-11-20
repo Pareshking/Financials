@@ -18,10 +18,12 @@ on:
       shp_from:
         description: "shareholding quarters from (YYYY-MM-DD)"
         default: "2025-03-31"
-  push:
-    paths:
-      - ".github/workflows/nse-fetch.yml"
-      - "reference/fetch_lists/mcap500_new_20261117.txt"
+      since:
+        description: "only filings broadcast on or after (YYYY-MM-DD; X346). Empty: every in-scope filing"
+        default: ""
+      kinds:
+        description: "space-separated: results annual shareholding"
+        default: "results annual shareholding"
 
 permissions:
   contents: read
@@ -59,10 +61,12 @@ jobs:
         run: |
           python -m financials --data-dir "$RUNNER_TEMP/nse" --archive-rps 8 discover-filings \
             --symbols-file "$LIST" --shard "$SHARD/$N" --shp-from "$SHP_FROM" \
-            --no-events --workers 8 --record-responses
+            --kinds $KINDS ${SINCE:+--since "$SINCE"} --no-events --workers 8 --record-responses
         env:
           LIST: ${{ inputs.list || 'reference/fetch_lists/mcap500_new_20261117.txt' }}
           SHP_FROM: ${{ inputs.shp_from || '2025-03-31' }}
+          SINCE: ${{ inputs.since || '' }}
+          KINDS: ${{ inputs.kinds || 'results annual shareholding' }}
           SHARD: ${{ matrix.shard }}
           N: ${{ needs.plan.outputs.n }}
       - if: always()

@@ -164,6 +164,7 @@ def build_parser() -> argparse.ArgumentParser:
     df.add_argument("--no-events", action="store_true")
     df.add_argument("--workers", type=int, default=1, help="threads (per-host limits still apply)")
     df.add_argument("--shp-from", type=_date, help="shareholding quarters from this date (default: latest only)")
+    df.add_argument("--since", type=_date, help="only filings broadcast on or after this date (X346; runner sweeps)")
     df.add_argument("--symbols-file", type=Path, help="one NSE symbol per line (needs no market database)")
     df.add_argument("--shard", help="K/N: only shard K (0-based) of N of the symbols (runner fan-out, fetch.replay)")
     df.add_argument("--record-responses", action="store_true",
@@ -930,6 +931,7 @@ def run_fetch(args, jobs: Jobs, db_path: Path, out) -> tuple[list[Path], list[st
             print(f"discover-filings: shard {args.shard}: {len(syms)} symbol(s)", file=out)
         jobs.record_responses = args.record_responses
         jobs.shp_min_as_of = args.shp_from
+        jobs.since = args.since
         staged, errors = jobs.discover(syms, args.kinds, events=not args.no_events, workers=args.workers)
     return staged, errors
 

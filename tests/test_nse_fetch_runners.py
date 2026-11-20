@@ -130,13 +130,15 @@ def test_nse_fetch_workflow_fans_out_shards_and_hands_back_only_the_vault():
     on = doc.pop(True, doc.get("on"))
     assert on["workflow_dispatch"]["inputs"]["shards"]["default"] == "8"
     lst = on["workflow_dispatch"]["inputs"]["list"]["default"]
-    assert set(on["push"]["paths"]) == {".github/workflows/nse-fetch.yml", lst}
+    assert "push" not in on  # a push never starts a full download (X346: dispatch only, with `since`)
+    assert on["workflow_dispatch"]["inputs"]["since"]["default"] == ""
     assert len(read_symbols_file(ROOT / lst)) > 1000
     fetch = doc["jobs"]["fetch"]
     assert fetch["strategy"]["fail-fast"] is False
     assert "needs.plan.outputs" in str(fetch["strategy"]["max-parallel"])
     run_text = "\n".join(s.get("run", "") for s in fetch["steps"])
     assert "--shard" in run_text and "--record-responses" in run_text and "--archive-rps 8" in run_text
+    assert '${SINCE:+--since "$SINCE"}' in run_text
     upload = next(s for s in fetch["steps"] if str(s.get("uses", "")).startswith("actions/upload-artifact"))
     assert upload["with"]["path"] == "nse_fetch/" and upload["with"]["retention-days"] == 1
     assert upload["with"]["name"] == "nse-fetch-${{ matrix.shard }}"

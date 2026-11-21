@@ -139,7 +139,7 @@ def test_client_headers_pace_and_raw_first(tmp_path):
     assert url == bse.API + "AnnSubCategoryGetData/w" and params["strScrip"] == "500488"
     assert params["strCat"] == "Result" and params["strPrevDate"] == "20261012" and params["strType"] == "C"
     c.shareholding_filings(6, scrip="500488")
-    assert len(sleeps) == 1 and 4.0 <= sleeps[0] <= 6.0  # 4-6 s between calls, none before the first
+    assert len(sleeps) == 1 and 2.0 <= sleeps[0] <= 3.0  # 2-3 s between calls (X354), none before the first
     recs = c.ledger.records()
     assert [r["dataset"] for r in recs] == ["announcements", "shareholding_filings"]
     assert c.ledger.read(recs[0]["sha256"]) == payload and recs[0]["via"] == "requests"

@@ -6,7 +6,7 @@ machine; `promote` (the single writer) promotes it.
     python scripts/bse_fetch.py --scrips 500488,534091 --since 2026-10-01 --out bse_fetch
     python scripts/bse_fetch.py --scrips 500488,534091 --since 2025-04-01 --only results --out bse_fetch
 
-Calls, through the ported client (4-6 s apart, in-page XHR only after a refusal, Blocked stops the job):
+Calls, through the ported client (2-3 s apart, in-page XHR only after a refusal, Blocked stops the job):
 - list of securities for every BSE group (`bse` package groups): ISIN <-> scrip code (rule BSE1) and BSE market cap;
 - per scrip: announcements since --since (every category, `strScrip`; pages until BSE's count) and each attachment of
   a `Result` announcement (the results PDF, vaulted raw);
@@ -22,7 +22,7 @@ Calls, through the ported client (4-6 s apart, in-page XHR only after a refusal,
 X353 (weekly runs): `--window` limits the results XBRL and the shareholding XBRL to files created / broadcast on or
 after --since (`Fld_CreateDate`, `D`; the FlagDur 7 pass is skipped when --since is within the last year), and
 `--shard K/N` takes one shard of the scrips (financials.fetch.replay.shard; the group lists only in shard 0), so N
-runners split a sweep. The 4-6 s pace between calls is unchanged on every runner. A weekly run of 121 scrips without
+runners split a sweep. The 2-3 s pace between calls is unchanged on every runner. A weekly run of 121 scrips without
 them made about 2,170 calls (~3.4 h at 5.6 s): every in-scope results file again each week.
 """
 

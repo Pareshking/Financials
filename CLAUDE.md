@@ -19,7 +19,7 @@ and `docs/tag_registry.yaml` (every XBRL element seen per profile + named label 
 ```bash
 python -m pip install -e ".[dev]"   # Python 3.11+
 python -m pytest                    # must pass before every commit
-python -m pytest -n 4 --deselect tests/test_benchmarks.py && python -m pytest tests/test_benchmarks.py  # same suite, ~17 min instead of ~38 (benchmarks time themselves: run them alone)
+python -m pytest -n 4 --deselect tests/test_benchmarks.py && python -m pytest tests/test_benchmarks.py  # same suite, ~10 min on a quiet machine instead of ~38 (benchmarks time themselves: run them alone)
 ruff check src tests && ruff format --check src tests   # CI runs both
 
 # local operation (network; never in tests or CI)
@@ -140,7 +140,7 @@ data/                  local only, gitignored: vault/, staging/, market.duckdb
   needs session cookies and runs only locally.
 - At least 1 s between requests per host by default (also with `--workers`). Owner decision 2026-11-20 (measured rate
   probe, X354): the static archive host runs at `--archive-rps 12` (default; 12 requests/s, 12 connections) and the
-  `www.nseindia.in` API at 2 requests/s with 3 in flight; BSE stays 4-6 s apart until a new owner decision. Backoff with
+  `www.nseindia.in` API at 2 requests/s with 3 in flight; BSE 2-3 s apart (owner 2026-11-21, X354). Backoff with
   jitter on 403/429/5xx, never re-download a vaulted blob (vault `url_index.jsonl` is the fetch checkpoint ledger).
 - Exchange terms prohibit automated access. Keep volume minimal and never redistribute data.
 

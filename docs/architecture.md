@@ -952,7 +952,7 @@ only because the pinned files changed).
   bhavcopy (UDiFF, FinInstrmId = scrip code [X165]) gives the same map and is reachable from the container; it is
   parsed (`parse_udiff_cm(exchange="BSE")`) but not yet fetched or promoted.
 - **Fetching** [A16, A17]: the container is refused by `api.bseindia.com`; BSE is fetched only on GitHub-hosted runners
-  with the owner's method, ported as-is (`financials/fetch/bse.py`: BSE's headers, plain requests, 4-6 s apart, 3
+  with the owner's method, ported as-is (`financials/fetch/bse.py`: BSE's headers, plain requests, 2-3 s apart (X354; was 4-6 s), 3
   retries on network / 5xx, hard stop on 401/403/429, then in-page XHR in headless Chrome; HTTP 400 ends that call
   only). Workflows: `bse-reach` (probe) and `bse-fetch` (by hand, scrip codes from `bse-members`;
   `scripts/bse_fetch.py`: every group's list of securities, per scrip announcements + `Result` attachments, shareholding

@@ -2,7 +2,7 @@ name: bse-reach
 
 # Probe (owner 2026-11-17: "I need exact same way our BSE working"): the ported BSE client (financials.fetch.bse,
 # from Pareshking/NSE-BSE-Insider-Tracker collectors/bse/client.py) on a GitHub-hosted runner: plain requests with
-# BSE's own headers, 4-6 s apart, in-page XHR in headless Chrome only after a refusal; 5-7 calls (list of securities,
+# BSE's own headers, 2-3 s apart, in-page XHR in headless Chrome only after a refusal; 5-7 calls (list of securities,
 # ABBOTINDIA results announcements + one attachment, its shareholding filings + one inline XBRL). The ledger
 # (bytes as sent + one JSON line per answer) is a workflow artifact for 1 day (the repository is public), which
 # `import-bse` vaults and stages on the owner's machine. No database is read or written.

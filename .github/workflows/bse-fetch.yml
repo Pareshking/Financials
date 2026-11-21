@@ -1,10 +1,10 @@
 name: bse-fetch
 
 # BSE side of the Permitted members of rule U1-P (owner 2026-11-17), on GitHub-hosted runners with the ported BSE
-# client (financials.fetch.bse: plain requests with BSE's headers, 4-6 s apart, in-page XHR only after a refusal).
+# client (financials.fetch.bse: plain requests with BSE's headers, 2-3 s apart, in-page XHR only after a refusal).
 # By hand only: the scrip codes come from `python -m financials --data-dir <dir> bse-members` on the owner's machine.
 # X353: `shards` runners each take one shard of the scrips (`--shard K/N`; the group lists in shard 0 only), each at
-# the same 4-6 s pace; `window` limits results and shareholding XBRL to files created on or after `since` (a weekly
+# the same 2-3 s pace; `window` limits results and shareholding XBRL to files created on or after `since` (a weekly
 # run: `since` 8 days back, window true). Each runner's ledger (bytes as sent + one JSON line per answer) is a workflow
 # artifact `bse-fetch-<k>` for 1 day (the repository is public); `import-bse` then vaults and stages each one on the
 # owner's machine and `promote` promotes them. No database here.

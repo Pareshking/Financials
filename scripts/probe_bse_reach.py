@@ -1,5 +1,5 @@
 """BSE probe through the ported client (financials.fetch.bse: the owner's production method, plain requests with BSE's
-own headers, 4-6 s apart, in-page XHR in headless Chrome only after a refusal). Five to seven calls:
+own headers, 2-3 s apart, in-page XHR in headless Chrome only after a refusal). Five to seven calls:
 
   1. list of securities, group A, scrip 500488 (run 2: group A answered 200, A18)    ListofScripData
   2. announcements of ABBOTINDIA (500488, NSE `Permitted`), 15 Oct - 17 Nov 2026     AnnSubCategoryGetData

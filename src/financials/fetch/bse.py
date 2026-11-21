@@ -4,7 +4,7 @@ answers on 12-13 Oct 2026 [A17]). It runs on GitHub-hosted runners only: this co
 
 Method (unchanged from the source):
 - Plain HTTP first with BSE's own headers (`HEADERS`: the `bse` package's User-Agent, Accept, Origin and Referer
-  https://www.bseindia.com, Sec-Fetch-Site same-site), 4-6 s between calls (`PACE_SECONDS`), 3 retries on network
+  https://www.bseindia.com, Sec-Fetch-Site same-site), 2-3 s between calls (`PACE_SECONDS`, X354), 3 retries on network
   errors and 5xx, a hard stop on 401 / 403 / 429 (`Blocked`).
 - If BSE refuses a plain request, the rest of the run goes through `InPage`: an XMLHttpRequest made from inside a
   bseindia.com page in headless Chrome (selenium), the way BSE's own pages call the API (`fetch` with credentials
@@ -66,7 +66,7 @@ UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like 
 HEADERS = {"User-Agent": UA, "Accept": "application/json, text/plain, */*", "Accept-Language": "en-US,en;q=0.5",
            "Origin": "https://www.bseindia.com", "Referer": HOME, "Connection": "keep-alive",
            "Sec-Fetch-Site": "same-site"}  # fmt: skip
-PACE_SECONDS = (4.0, 6.0)
+PACE_SECONDS = (2.0, 3.0)  # owner decision 2026-11-21 (X354 BSE probe: 2 s held 20 of 20); was 4-6 s
 RETRIES = 3
 STOP_STATUSES = (401, 403, 429)
 

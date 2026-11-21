@@ -8,16 +8,16 @@ Every concrete item in the chat is mapped to the repository as of 2026-11-14. Th
 
 ## Status summary
 
-Recounted from the rows on 2026-11-16; G93 moved to DONE on 2026-11-17.
+Recounted from the rows on 2026-11-21 (G93 DONE 2026-11-17; G214 DONE, G275 / G336 out of scope 2026-11-21).
 
 | Status | Meaning | Count |
 |---|---|---|
-| DONE | implemented and tested (file and test cited) | 224 |
-| DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 55 |
+| DONE | implemented and tested (file and test cited) | 225 |
+| DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 52 |
 | IN_PROGRESS | being built now | 2 |
 | MISSING | not anywhere in docs or code | 12 |
 | CONFLICTS_WITH_EVIDENCE | contradicted by our verified fixtures or tests | 19 |
-| OUT_OF_SCOPE_BY_DECISION | excluded by a recorded decision (C2, C7, C9, invariants, CLAUDE.md Don'ts, owner decisions A-H) | 31 |
+| OUT_OF_SCOPE_BY_DECISION | excluded by a recorded decision (C2, C7, C9, invariants, CLAUDE.md Don'ts, owner decisions A-V) | 33 |
 | NEEDS_OWNER_DECISION | the docs do not settle it | 0 |
 | **Total** | | **343** |
 
@@ -60,7 +60,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G296 | Review: price table needs exchange and series columns *(owner)* | DONE | ohlcv PK (security_id, exchange, series, trade_date) |
 | G306 | Review: DVR shares get INE ISINs; only partly-paid get IN9 *(owner)* | CONFLICTS_WITH_EVIDENCE | P17, R10: partly-paid are IN9 + series E1 (true); DVRs carry IN9 (JISLDVREQS, FELDVR) or INE (GATECHDVR) ISINs; tests/test_share_class_fixture_facts.py |
 | G313 | Review: insurer and new-gen KPIs (VNB, EV, APE, platform KPIs) are not in XBRL *(owner)* | DONE | X62; supplemental_kpis; tests/test_supplemental_kpis.py |
-| G336 | Share classes COMMON / DVR / PARTLY_PAID with voting-rights ratio and face value | DOCUMENTED_PLANNED | arch 8; securities.share_class. BLOCKED (2026-11-15): P17 shows the classes exist, but partly-paid trade only in series E1 (outside the v1 universe: owner decision), DVR voting ratio and face value are in no fixture, and no DVR issuer's Reg. 31 pattern is committed |
+| G336 | Share classes COMMON / DVR / PARTLY_PAID with voting-rights ratio and face value | OUT_OF_SCOPE_BY_DECISION | owner 2026-11-19 "Ignore DVR"; partly-paid series E1 stays outside the universe (P17) |
 
 ## Taxonomy/profile (17)
 
@@ -165,7 +165,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G205 | Sector earnings breadth during results season | DONE | `industry_earnings_breadth` (+ `_n`): share of the NSE industry's companies reporting its latest quarter with core profit YoY > 0, >= 3 companies, refresh step over the stored day (batch I, features_more.py); tests/test_features_more.py |
 | G207 | Liquidity: 20D median traded value; bid-ask / circuit-lock days | MISSING | 20D median traded value built (turnover_median_20d; tests/test_features_price.py); bid-ask is in no ingested EOD file; circuit-lock days wait for an F20 price-band fixture |
 | G208 | Market regime / breadth: % of Nifty 500 above 50/200 DMA, 52W high/low ratio, advance-decline | DONE | market_breadth table, one row per materialised day from the in_nifty500 rows (arch 10.7); tests/test_features_price.py |
-| G214 | 20-30 distinctive ratios for all companies *(owner)* | DOCUMENTED_PLANNED | arch 10 catalogue. Most built; rest Phase 2 |
+| G214 | 20-30 distinctive ratios for all companies *(owner)* | DONE | arch 10 catalogue built (batches B-J, gems, forensic scores; Piotroski / Beneish filled where two annuals exist). Not built by evidence rule: Screener "Price to Quarterly Earning" (definition UNVERIFIED), filed ISCR / DSCR (implausible filed values) |
 | G215 | Incremental ROIC (3Y/5Y) | DONE | incremental_roic_1y (on now, FY26 vs FY25), incremental_roic_3y / _5y (history-gated: FY28 ~May 2028 / FY30); ΔNOPAT / Δ invested capital, NULL when ΔIC <= 0; features_bs; tests/test_balance_sheet_cash_flow_family.py |
 | G216 | Reinvestment rate | DONE | reinvestment_rate = FY (capex - D&A + Δ non-cash working capital) / NOPAT; features_bs; tests/test_balance_sheet_cash_flow_family.py |
 | G217 | Cash ROIC (CROIC) | DONE | croic; tests/test_fundamentals.py |
@@ -218,7 +218,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G266 | ARPU and MTU growth | DONE | batch G: KPI names arpu (INR), mtu (COUNT) in parsers/kpis.py; arpu, mtu, arpu_ / mtu_ / gov_growth_yoy_pct; tests/test_features_extra.py |
 | G269 | Insurance archetype metrics: P/EV, VNB margin, combined ratio | DONE | combined_ratio (X66), vnb_margin, embedded_value (supplemental); tests/test_batch6_insurers.py. P/EV itself not built |
 | G270 | P/EV for life insurers | DONE | batch G: price_to_embedded_value; tests/test_features_extra.py |
-| G275 | Dual-ISIN securities (partly paid, DVR): sum market cap over all linked ISINs | DOCUMENTED_PLANNED | arch 8 (market_cap over active share classes). BLOCKED (2026-11-15): P17 links DVR / partly-paid ISINs to the ordinary share by issuer code, but the share count per class is unknown (whether Reg. 31 counts DVRs is unverified; no DVR issuer pattern committed or vaulted; none is in the Nifty 500), and partly-paid E1 is outside the universe |
+| G275 | Dual-ISIN securities (partly paid, DVR): sum market cap over all linked ISINs | OUT_OF_SCOPE_BY_DECISION | owner 2026-11-19 "Ignore DVR": each listed security keeps its own market cap |
 | G276 | Organic vs inorganic perimeter flag (business-combination outflows, acquisition filings) | DONE | C26; `inorganic_growth_flag` from the business-combination cash outflow (features_extra.py, batch G); tests/test_features_extra.py (test_business_combination_outflows_and_the_inorganic_flag, test_inorganic_flag_is_three_valued). Reg. 30 acquisition events are not an input (no event type parsed) |
 | G278 | Standalone-to-consolidated profit leakage | DONE | `profit_leakage_pct`, `profit_leakage_latest_quarter_pct`, `standalone_pat_ttm` (features_extra.py, batch G); tests/test_features_extra.py (test_reliance_profit_leakage_latest_quarter, test_ttm_profit_leakage) |
 | G314 | Review: forensic scores have different scales; never sum; Altman not for financials *(owner)* | DONE | arch 10.2 |
@@ -660,3 +660,4 @@ My 19:31 (2026-11-17) recommendations, unanswered, applied:
 - **DVR:** ignored (to-do 11b dropped).
 - **Decision V (show everything, flag the suspect):** "Ensure we show everything for all companies, if required flag suspected one, using the correct way." Supersedes "Withheld numbers are NULL in screens" above. Every number a filing states is shown in the feature rows; where a check failed, the row shows the validated value if there is one, else the figure as filed, and names the reason in `dq_flags` / `dq_suspect` (rule SHOW_AND_FLAG, X325; architecture §7.7). Open non-blocking findings flag the rows they concern (`OPEN_FINDING:<reason>`). Screens include flagged rows; `Data Suspect = 0` excludes them. Genuine absence stays NULL (fewer than 4 quarters, pre-cutoff windows, no filing, undefined ratios), and a failed identity, unknown taxonomy or undetermined period still parses nothing.
 - **Exchange request rates (X354):** after a measured probe with no refusals, the NSE archive host runs at 12 req/s and the NSE API at 2 req/s with 3 in flight (was 8 and 1). BSE 2-3 s apart (owner 2026-11-21 "Yes"; probe: 2 s held for 20 of 20; was 4-6 s).
+- **Phase 3 reference (owner 2026-11-21):** many Phase 3 feeds (F&O, AMFI MF portfolios, PIT / SAST insider trading, bulk / block deals, BRSR, governance, RBI macro, backtester) are already built in the owner's repo `Pareshking/NSE-BSE-Insider-Tracker`. Reuse it (import, not copy) before building any Phase 3 feed here.

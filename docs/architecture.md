@@ -1175,7 +1175,8 @@ CFF = borrowings in/out, interest, dividends, leases, shares, other; Net Cash Fl
 **Phase 1: thin slice, screenable end-to-end (Nifty 500)**
 
 Status (2026-11-13): **built and tested end to end** on real fixtures, all listed items below, plus index backfill (§11.6), quarantine resolution (D-6) and benchmarks (`docs/benchmarks.md`). Known gaps inside Phase 1:
-- `piotroski_f` / `beneish_m` columns exist but stay NULL: both need year-over-year annual data (Reg. 34, Phase 2).
+- `piotroski_f` / `beneish_m` need two consecutive annual reports (Reg. 34): filled for 1,645 / 1,625 of 3,005 rows on
+  2026-11-20 (55%); NULL until a company's second in-scope annual exists (genuine absence, C9).
 - Altman Z'' uses OtherEquity as the retained-earnings proxy; ROCE and ROE use the latest balance sheet (ROE by decision, C16); ROIC, CROIC, RoA, NIM proxy and credit cost use opening + closing averages.
 - EV adds minority interest (`NonControllingInterest`, VERIFIED [X34, X42]); preference capital is still excluded (no tag seen). PE and ROE use the owners' share of profit and equity [X42].
 - Results-XBRL discovery API is UNVERIFIED [A7]; `fetch-results` takes URLs.

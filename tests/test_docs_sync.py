@@ -112,7 +112,10 @@ def test_every_seen_numeric_element_is_mapped():
     assert "UNKNOWN" not in REGISTRY["profiles"]
 
 
-ALL_RESULTS = sorted([*INTEGRATED, *XBRL_DIR.glob("AR_XBRL_*.xml")])
+# A committed negative-case fixture that stays quarantined (X152: its only period is a stub), so it has no
+# validated periods; tests/test_x150_x155_quarantine_rules.py pins that it does not parse.
+QUARANTINED_ANNUAL = {"AR_XBRL_ABLBL_01122025184209.xml"}
+ALL_RESULTS = sorted([*INTEGRATED, *(p for p in XBRL_DIR.glob("AR_XBRL_*.xml") if p.name not in QUARANTINED_ANNUAL)])
 
 
 @pytest.mark.parametrize("path", ALL_RESULTS, ids=lambda p: p.name[:40])

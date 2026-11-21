@@ -1,5 +1,22 @@
 """Indian equity research, screening and point-in-time backtesting engine."""
 
+# 0.10.12: X335 owners / NCI of an X86 withheld period kept as filed (asfiled_) when the element also serves another
+#          period; X337 FIRST_PERIOD_LONG (a 13..18-month first financial period starting mid-month, stored as a
+#          one-off); X338 pre-cutoff irregular / conflicting comparative ignored; re-parses filings with open findings;
+# 0.10.11: X330-X333 IGAAP_CORP profile: SME-listed companies' results on SEBI's non-Ind AS template (Division I);
+#          AMOUNTS_AND_EPS_SCALED blocks a filing whose amounts and EPS are a power of ten too large; re-parses the
+#          results with open UNKNOWN_TAXONOMY findings;
+# 0.10.10: X317 OCI-shaped owners with NCI 0 chosen by EPS (X214 amended), X318 owners 0 with NCI within rounding
+#          (OWNERS_ZERO_NCI_WITHIN_ROUNDING); re-parses results with open ATTRIBUTION_WITHHELD findings;
+# 0.10.9: X285-X287 BSE results inline XBRL repairs (bare '<' in text blocks, omitted </tr>, unclosed empty audit-
+#         qualification table); NSE XML output unchanged; re-parses BSE results with open parse findings;
+# 0.10.8: X280-X283 BSE results inline XBRL (boolean "true" / "false" text, void <BR>, <thead> closed by </tbody>,
+#         untagged displayed reporting period); NSE XML output unchanged; re-parses BSE results with open findings;
+# 0.10.7: X214 attribution by EPS (ATTRIBUTION_BY_EPS); X213 Reg. 31 named holders of the non-institutions "Others"
+#         axis (OTHER_NON_INSTITUTIONS rows: trusts holding treasury shares); re-parses results and Reg. 31 files;
+# 0.10.6: X189 owners before the JV share (OWNERS_BEFORE_JV_SHARE; re-parses filings with open findings);
+# 0.10.5: X150-X156 quarantine rules (annual "Actual" rounding, undeclared pre-cutoff contexts, comparative stub
+#         periods, E&P face line, exchange-specific SHP taxonomy, insurer service-expense adjustments);
 # 0.10.4: SHP20 2022-09-30 SHP taxonomy mutual-fund member / holder axis (re-parses Q3-Q4 FY25 Reg. 31 files);
 # 0.10.3: X105 missing / zero NCI in the attribution rules;
 # 0.10.2: X104 declared dates with day and month swapped (re-parses 4 life-insurer filings);
@@ -10,4 +27,4 @@
 # 0.8.0: X83 visibility from listing creation / file-name time (re-promotes backdated re-filings);
 # 0.7.0: SHP16-SHP18 (old SHP taxonomy, event dates, percent scale); 0.6.0: zero-drop line items (C24);
 # 0.5.0: REG34_ANNUAL; audit mappings
-PARSER_VERSION = "0.10.4"
+PARSER_VERSION = "0.10.12"

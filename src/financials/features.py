@@ -16,15 +16,17 @@ Fundamentals are read point-in-time at the end of `as_of_date` (IST).
 
 from __future__ import annotations
 
+import bisect
 import statistics
 from collections import defaultdict
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
 from financials import (
+    dirty,
     features_audit,
     features_bs,
     features_disclosures,
@@ -35,17 +37,25 @@ from financials import (
     features_pl,
     features_rpt,
     features_store,
+    run_memo,
 )
 from financials.corp_actions import ACCEPTED_STATUSES
 from financials.db import version_key
-from financials.features_price import add_price_columns, refresh_breadth
+from financials.features_price import add_price_columns, refresh_breadth, refresh_breadth_days
 from financials.fundamentals import (
     ANNUAL_COLUMNS,
     BANK_COLUMNS,
     CASH_CONVERSION_COLUMNS,
     CURRENT_VERSION,
+    DQ_ATTRIBUTION,
+    DQ_ATTRIBUTION_NCI,
+    DQ_TAX_COPY,
+    DQ_TTM_MISFILED,
+    DQ_TTM_MIXED,
+    DQ_YTD,
     INSURER_COLUMNS,
     NBFC_COLUMNS,
+    RESTATEMENT_QUARTERS,
     REVERSE_DCF_TERMINAL_G,
     REVERSE_DCF_WACC,
     SCREENER_CONVENTION_COLUMNS,
@@ -63,6 +73,7 @@ from financials.fundamentals import (
     interest_coverage,
     load_factbook,
     nbfc_blocks,
+    nbfc_gearing,
     newgen_inputs,
     percentile_rank,
     prefetch_fundamentals,
@@ -71,19 +82,36 @@ from financials.fundamentals import (
     quarter_rev_ops,
     resolve_scope,
     reverse_dcf_implied_growth,
+    roe_screener,
     safe_div,
     screener_convention_ratios,
     yoy_growth,
 )
+from financials.identity import UNIVERSE_SERIES
 from financials.price_history import PriceHistory
 from financials.price_history import legacy as legacy_materialize
+from financials.run_memo import by_visibility, visibility_memo
 from financials.scope import MIN_PERIOD_END_DATE, MIN_TRADE_DATE
 from financials.timeutil import ist_to_utc, utc_now
 
 # Reader version of materialised rows. Bump it whenever features.py, fundamentals.py (or another file pinned by
 # tests/test_incremental_materialize.py) changes any output: `materialize --incremental` refuses days built by another
 # version, because only a full run then reproduces the history.
-FEATURES_VERSION = "2026.11.17-20A"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
+FEATURES_VERSION = "2026.11.21-21N"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
+# -21A: core profit (fundamentals._core) quantized to the paisa (Arrow decimal256 on the expanded universe)
+# -21B: gate G4 compares only securities present on the previous day (rule G4_NEW_ENTRANT; output unchanged)
+# -21C: X173 YTD copies of a quarter withheld (TTM sums the quarters); X194 roce_screener needs positive capital
+# -21D: X221 SHARES_REG31_OUTLIER (market cap uses NSE Issue Size when Reg. 31 alone disagrees; owner decision S)
+# -21E: X226 no YTD bridge on a proven mis-filed YTD; X227 roe_screener; X228 NBFC debt/equity
+# -21F: X250 segment features skip unallocated / elimination / total members; X260 rounding-only YTD bound
+# -21G: X273 fixed-asset lines of a year end from one filing (decision T)
+# -21H: X293 owners profit of a quarter derived from the owners YTD before falling back to total PAT
+# -21I: X300 operating lines bridge through the YTD; X301 no mixed-basis bridge (4-quarter sum), owners TTM guarded
+# -21J: X314 NBFC net fair-value line side (revenue break closed, quarters summed); X315 YTD copies prior year
+# -21K: QS2 incremental speed-up (run-scoped slices, visibility memo, unchanged days skipped); same rows
+# -21L: X334 IGAAP_CORP is its own accounting basis (QG Indian GAAP SME-era results)
+# -21M: X325 show and flag (owner decision V): stated values shown with dq_flags / dq_suspect instead of NULL
+# -21N: SP2 batched full materialize (20-day publish), dirty markers from the change date; same rows
 # -3: QoQ sales / profit growth, NPM, interest coverage, OPM same quarter last year, dividend yield / payout,
 #     promoter holding QoQ change (owner_requirements items 1, 3, 4)
 # -4A: period P&L family (features_pl: quarter / fiscal-year lines, quarter YoY growth, result dates, history-gated
@@ -168,22 +196,82 @@ def _universe(con, exchange: str, as_of: date, entities=None) -> list[tuple[str,
     ).fetchall()
 
 
+# Rule SHARES_REG31_OUTLIER [X221] (owner decision S, 2026-11-18): when the results filing and NSE agree and Reg. 31
+# does not, use NSE's count. Same 0.5% tolerance as the share cross-check (promoter.SHARE_CROSS_CHECK_TOLERANCE, X18,
+# X133): on the snapshot of 2026-11-17, where paid-up / face value agrees with Issue Size, |Reg. 31 / Issue Size - 1|
+# is <= 0.5% on 578,285 of 590,011 rows and the remainder spreads evenly to > 5% (no second mode to put a wider bar
+# at); paid-up stated in rounded lakhs or crores (TCS) stays inside 0.5%.
+SHARES_REG31_OUTLIER_TOLERANCE = Decimal("0.005")
+ISSUE_SIZE_MAX_AGE_DAYS = 14  # PR-zip mcap files are weekly (gaps of 5 to 9 days between files) plus quarter ends
+
+
+def reg31_outlier(
+    reg31: tuple[Decimal, date] | None,
+    paid_up: tuple[Decimal, date] | None,
+    issue: tuple[Decimal, date] | None,
+    factors: list[tuple[date, Decimal, Decimal]],
+    *,
+    partly_paid: bool = False,
+    entity_listings: int = 1,
+    trust_shares: Decimal | None = None,
+) -> str | None:
+    """Rule SHARES_REG31_OUTLIER [X221]: compare the three share counts visible at as-of, the Reg. 31 total (pattern
+    date R), the results filing's paid-up / face value (period end P) and NSE's Issue Size (latest PR-zip mcap file,
+    trade date I). "REG31_OUTLIER" when Reg. 31 differs from Issue Size by more than the tolerance while paid-up /
+    face value agrees with it; "ALL_DIFFER" when no two of the three agree (keep Reg. 31: HMT, and the share cross-
+    check keeps its CROSS_CHECK_FAILED finding open, Reg. 31 vs paid-up of the same date); None otherwise. Compared
+    only like with like: P == R (the results speak to the pattern's own date; a later allotment explains a Reg. 31
+    pattern newer than the results, an earlier one a stale pattern), no accepted share-count action with ex-date in
+    (R, I] (Issue Size moves on the ex-date), no partly-paid shares (Reg. 31 counts them, NSE lists them as a
+    separate security, paid-up / face value is not a share count [X18]) and one listed EQ / BE / BZ security of the
+    entity in the file (a Reg. 31 total of two listed classes is not one Issue Size). A Reg. 31 total that agrees
+    with paid-up / face value once employee-trust shares are deducted (X103: treasury shares, out of share capital,
+    in the total and listed) is explained, never an outlier."""
+    if reg31 is None or paid_up is None or issue is None or partly_paid or entity_listings != 1:
+        return None
+    (r, r_date), (p, p_date), (i, i_date) = reg31, paid_up, issue
+    if p_date != r_date or not r or not i or any(r_date < ex <= i_date for ex, _, _ in factors):
+        return None
+    tol = SHARES_REG31_OUTLIER_TOLERANCE
+    if abs(r - i) <= tol * i or any(abs(t - p) <= tol * p for t in (r, r - (trust_shares or 0))):
+        return None  # agrees with NSE, or with the results (Issue Size lags an allotment or a buy-back, X133)
+    return "REG31_OUTLIER" if abs(p - i) <= tol * i else "ALL_DIFFER"
+
+
+def _trust_shares(shp: dict) -> Decimal | None:
+    t = shp.get("EMPLOYEE_TRUSTS", (None, None))[1]
+    return None if t is None else Decimal(t)
+
+
 def market_cap_shares(
     reg31: tuple[Decimal, date] | None,
     paid_up: tuple[Decimal, date] | None,
     factors: list[tuple[date, Decimal, Decimal]],
     as_of: date,
+    issue: tuple[Decimal, date] | None = None,
+    *,
+    partly_paid: bool = False,
+    entity_listings: int = 1,
+    trust_shares: Decimal | None = None,
 ) -> tuple[Decimal | None, date | None, str | None]:
-    """Share count for market cap, in order [X18, X53, X61]:
-    1. the Reg. 31 total of the latest visible shareholding pattern (REG31);
+    """Share count for market cap, in order [X18, X53, X61, X221]:
+    1. the Reg. 31 total of the latest visible shareholding pattern (REG31), unless rule SHARES_REG31_OUTLIER
+       (`reg31_outlier`) finds it the outlier against NSE's Issue Size and the results' paid-up / face value of the
+       same date: then the Issue Size (ISSUE_SIZE);
     2. else the results filing's paid-up capital / face value (PAID_UP). The parser withholds it when no filed EPS
        implies a share count within 10x (Kotak Q2 FY27 tags FaceValue = 994.79: SHARES_FROM_PAID_UP_WITHHELD), so a
        withheld count never reaches here; promotion cross-checks it against Reg. 31 (> 0.5% -> quarantine);
     3. then divided by the EPS factor of every accepted share-count action with ex-date in (count date, as_of]
        (a 1:5 split after the count multiplies shares by 5).
+    `issue` is (Issue Size, file trade date), already limited to ISSUE_SIZE_MAX_AGE_DAYS before as_of.
     Returns (shares, count date, source), all None when neither count exists."""
     if reg31 is not None:
-        (shares, counted), source = reg31, "REG31"
+        verdict = reg31_outlier(reg31, paid_up, issue, factors, partly_paid=partly_paid,
+                                entity_listings=entity_listings, trust_shares=trust_shares)  # fmt: skip
+        if verdict == "REG31_OUTLIER":
+            (shares, counted), source = issue, "ISSUE_SIZE"
+        else:
+            (shares, counted), source = reg31, "REG31"
     elif paid_up is not None:
         (shares, counted), source = paid_up, "PAID_UP"
     else:
@@ -194,11 +282,40 @@ def market_cap_shares(
     return shares, counted, source
 
 
+def issue_sizes(con, as_of: date, exchange: str = "NSE", entities=None) -> dict[str, tuple[Decimal, date, int]]:
+    """Per security: (Issue Size, trade date, listed EQ / BE / BZ securities of its entity in that file) of the latest
+    PR-zip mcap file [X130-X133] with trade date in (as_of - ISSUE_SIZE_MAX_AGE_DAYS, as_of]. The file of a trade
+    date is published after the close of that day (EOD_RULE), as the day's bars. One query (no per-security read);
+    of several fetches of one trade date the latest fetched file is read, as in `universe.issue_size_check`."""
+    only, only_p = entity_filter("s.entity_id", entities)
+    rows = con.execute(
+        """WITH f AS (
+             SELECT m.trade_date, arg_max(m.filing_id, (fi.fetched_at, m.filing_id)) AS filing_id
+             FROM (SELECT DISTINCT trade_date, filing_id FROM raw_nse_mcap
+                   WHERE exchange = ? AND trade_date <= ? AND trade_date > ?) m
+             JOIN filings fi USING (filing_id) GROUP BY 1),
+           r AS (
+             SELECT h.security_id, s.entity_id, m.trade_date, m.issue_size
+             FROM raw_nse_mcap m JOIN f USING (trade_date, filing_id)
+             JOIN security_identifier_history h ON h.exchange = m.exchange AND h.symbol = m.symbol
+                  AND h.series = m.series AND h.valid_from <= m.trade_date
+                  AND (h.valid_to IS NULL OR h.valid_to > m.trade_date)
+             JOIN securities s ON s.security_id = h.security_id
+             WHERE m.series IN (SELECT unnest(?))"""
+        + only
+        + """ QUALIFY row_number() OVER (PARTITION BY h.security_id ORDER BY m.trade_date DESC) = 1)
+           SELECT security_id, trade_date, issue_size, count(*) OVER (PARTITION BY entity_id, trade_date) FROM r""",
+        [exchange, as_of, as_of - timedelta(days=ISSUE_SIZE_MAX_AGE_DAYS), sorted(UNIVERSE_SERIES), *only_p],
+    ).fetchall()
+    return {sec: (Decimal(n), d, listings) for sec, d, n, listings in rows}
+
+
 KPI_COLUMNS = ("vnb_margin", "embedded_value", "ape_growth", "gov", "take_rate", "contribution_margin", "nrr",
                "cac_payback")  # fmt: skip
 _KPI_RUPEES = ("embedded_value", "gov")
 
 
+@by_visibility  # read once per visibility interval of an incremental run (run_memo)
 def supplemental_kpi_columns(con, as_of_ts: datetime, entities=None) -> dict[str, dict]:
     """Per entity: each KPI for its latest period visible at `as_of_ts`, latest visible version (one query)."""
     only, only_p = entity_filter("entity_id", entities)
@@ -438,6 +555,7 @@ def _event_counts(con, as_of: date, as_of_ts: datetime, entities=None) -> dict[s
     }  # fmt: skip
 
 
+@by_visibility  # read once per visibility interval of an incremental run (run_memo)
 def _preload(con, as_of_ts: datetime, entities=None):
     """Bulk point-in-time lookups keyed by entity (avoids per-security queries)."""
     only, only_p = entity_filter("entity_id", entities)
@@ -456,18 +574,19 @@ def _preload(con, as_of_ts: datetime, entities=None):
         + """) WHERE rn = 1),
            r AS (SELECT *, row_number() OVER (PARTITION BY entity_id ORDER BY as_of_date DESC) AS r FROM f)
            SELECT r.entity_id, r.as_of_date, r.r, o.category, o.pct, o.shares,
-                  m.promoter_pledged_shares, m.promoter_encumbered_shares
+                  m.promoter_pledged_shares, m.promoter_encumbered_shares, m.has_partly_paid
            FROM r JOIN shareholding_observations o USING (filing_id, parser_version)
            JOIN shareholding_meta m USING (filing_id, parser_version)
            WHERE r.r <= 2""",
         [as_of_ts, *only_p],
     ).fetchall()
     shp: dict[str, dict] = defaultdict(dict)
-    for ent, d, rank, cat, pct, shares, pledged, encumbered in shp_rows:
+    for ent, d, rank, cat, pct, shares, pledged, encumbered, partly_paid in shp_rows:
         if rank == 1:
             shp[ent][cat] = (pct, shares)
             shp[ent]["_as_of"] = d
             shp[ent]["_pledged"], shp[ent]["_encumbered"] = pledged, encumbered
+            shp[ent]["_partly_paid"] = bool(partly_paid)
         else:
             shp[ent].setdefault("_prev", {})[cat] = (pct, shares)
             shp[ent]["_prev_as_of"] = d
@@ -561,6 +680,7 @@ def compute_rows(
     knowledge: str = "valid",
     entities: frozenset[str] | None = None,
     prices: PriceHistory | None = None,
+    cross: bool = True,
 ) -> list[dict]:
     """Feature rows for `as_of`. `knowledge` selects how price adjustments and gap freezes are read (see
     `_price_inputs`); materialised history always uses the default "valid" knowledge. `entities` computes only the
@@ -569,7 +689,10 @@ def compute_rows(
 
     Price columns ("valid" knowledge) come from a `PriceHistory` (read once per run, sliced per day; `prices`, or one
     read here for this day); FINANCIALS_MATERIALIZE_LEGACY=1 (and knowledge="system") re-read and recompute the
-    whole history per day instead. Both give identical rows (tests/test_materialize_fast_path.py)."""
+    whole history per day instead. Both give identical rows (tests/test_materialize_fast_path.py).
+
+    `cross=False` leaves out the day's cross-section columns (features_gems / _peers / _more CROSS_COLUMNS): for a
+    caller that publishes the whole day, whose refresh recomputes them from the stored rows (`_materialize_batched`)."""
     as_of_ts = ist_to_utc(as_of + timedelta(days=1), time(0, 0))  # end of as_of day, IST
     universe = _universe(con, exchange, as_of, entities)
     if entities is not None and not universe:
@@ -591,27 +714,36 @@ def compute_rows(
         ).fetchall()
     }
     shp_all, paid_up, quarter_end = _preload(con, as_of_ts, entities)
+    issues = issue_sizes(con, as_of, exchange, entities)  # rule SHARES_REG31_OUTLIER [X221]
     dividends = _dividends(con, as_of, knowledge, as_of_ts, secs)
     events = _event_counts(con, as_of, as_of_ts, entities)
+    findings = open_findings(con, as_of_ts, entities)  # X325 OPEN_FINDING flags
     kpis = supplemental_kpi_columns(con, as_of_ts, entities)
-    history = _valuation_history(con, as_of, secs)
+    run_cache = prices.fundamentals if prices is not None else None
+    if run_cache is not None:  # one read per quarter of the run (it reads only days before the quarter)
+        history = run_cache.per_quarter("valuation", as_of, secs, lambda: _valuation_history(con, as_of, secs))
+    else:
+        history = _valuation_history(con, as_of, secs)
     curated = _curated_archetypes()
     arch_override = dict(con.execute("SELECT entity_id, valuation_archetype FROM entity_archetype_override").fetchall())
     fundamentals_cache: dict[str, dict] = {}
     rows = []
-    run_cache = prices.fundamentals if prices is not None else None
     keys: dict[str, tuple] = {}
     stale = entities
     if run_cache is not None:  # reuse the entities' blocks of an earlier day of the run when no input changed
         keys = {e: run_cache.key(e, as_of, as_of_ts, quarter_end[e]) for (_, e, _, _) in universe if e in quarter_end}
         fundamentals_cache.update(run_cache.hits(keys))
         stale = frozenset(keys.keys() - fundamentals_cache.keys())
-    prefetch_fundamentals(con, as_of_ts, stale)  # one pass instead of a per-entity scan [benchmarks]
-    features_pl.prefetch(con, as_of_ts, stale)
+    if stale is None or stale:  # nothing to prefetch when every entity's block is reused
+        memo = run_memo.active()  # a full run reads the recomputed entities from its slices (_FullRunSlices)
+        src = memo.source(stale) if memo is not None and memo.con is con and stale is not None else con
+        prefetch_fundamentals(src, as_of_ts, stale, key=con)  # one pass instead of a per-entity scan [benchmarks]
+        features_pl.prefetch(src, as_of_ts, stale, key=con)
     features_bs.prefetch(con, as_of_ts, entities)
     try:
         rows = _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all, paid_up, quarter_end,
-                     events, kpis, history, curated, arch_override, fundamentals_cache, dividends, prices)  # fmt: skip
+                     events, kpis, history, curated, arch_override, fundamentals_cache, dividends, prices,
+                     issues, findings)  # fmt: skip
         if run_cache is not None:
             run_cache.store({e: (k, fundamentals_cache[e]) for e, k in keys.items() if e in stale})
     finally:
@@ -620,11 +752,11 @@ def compute_rows(
         features_bs.clear(con, as_of_ts)
     add_price_columns(con, rows, as_of, exchange, factors, frozen, secs, prices)  # batch B (price/technicals)
     features_audit.add_columns(con, rows, as_of_ts, entities)  # 20A (audit opinions, X121; before forensic_clean)
-    features_gems.add_columns(con, rows, as_of, as_of_ts, fundamentals_cache, entities)  # batch D (hidden gems)
-    features_peers.add_columns(con, rows, as_of, as_of_ts, entities)  # batch H (industry / peers)
+    features_gems.add_columns(con, rows, as_of, as_of_ts, fundamentals_cache, entities, cross)  # batch D
+    features_peers.add_columns(con, rows, as_of, as_of_ts, entities, cross)  # batch H (industry / peers)
     features_extra.add_columns(con, rows, as_of, as_of_ts, fundamentals_cache, factors, entities)  # batch G
     features_more.add_columns(
-        con, rows, as_of, as_of_ts, fundamentals_cache, factors, frozen, entities, prices=prices
+        con, rows, as_of, as_of_ts, fundamentals_cache, factors, frozen, entities, prices=prices, cross=cross
     )  # batch I
     features_rpt.add_columns(con, rows, as_of_ts, entities)  # batch J (related-party leak, X113)
     features_disclosures.add_columns(con, rows, as_of_ts, entities)  # 18D (disclosure_facts, X116-X119)
@@ -632,7 +764,8 @@ def compute_rows(
 
 
 def _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all, paid_up, quarter_end, events, kpis,
-          history, curated, arch_override, fundamentals_cache, dividends=None, prices=None) -> list[dict]:  # fmt: skip
+          history, curated, arch_override, fundamentals_cache, dividends=None, prices=None,
+          issues=None, findings=None) -> list[dict]:  # fmt: skip
     rows = []
     for sec, ent, symbol, series in universe:
         b = bars.get(sec, [])
@@ -662,7 +795,12 @@ def _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all,
 
         shp = shp_all.get(ent, {})
         reg31 = (Decimal(shp["TOTAL"][1]), shp["_as_of"]) if "TOTAL" in shp else None
-        shares, _counted, source = market_cap_shares(reg31, paid_up.get(ent), factors.get(sec, []), as_of)
+        iss = (issues or {}).get(sec)
+        shares, _counted, source = market_cap_shares(
+            reg31, paid_up.get(ent), factors.get(sec, []), as_of, None if iss is None else iss[:2],
+            partly_paid=shp.get("_partly_paid", False), entity_listings=1 if iss is None else iss[2],
+            trust_shares=_trust_shares(shp),
+        )  # fmt: skip
         mcap = close * shares if close is not None and shares is not None else None
         ev = (
             mcap + fund["_net_debt"] + (fund["_minority"] or 0)
@@ -715,8 +853,65 @@ def _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all,
         public = shp.get("PUBLIC", (None, None))[1]
         a5 = row["deliv_avg_5d"]
         row["float_turnover_pct"] = a5 / public * 100 if a5 is not None and public else None
+        row.update(dq_columns(fund, (findings or {}).get(ent, ()), frozen.get(sec), as_of))
         rows.append(row)
     return rows
+
+
+# X325 (rule SHOW_AND_FLAG, owner decision V): an open finding flags the rows whose fundamentals window it concerns.
+# The window is the restatement window (fundamentals.RESTATEMENT_QUARTERS: the 4 TTM quarters and the year-ago
+# quarter they are compared with), on the row's scope when the finding names one.
+DQ_FINDING_MONTHS = 3 * RESTATEMENT_QUARTERS
+DQ_PRICE_GAP = "PRICE_GAP_UNRESOLVED"  # an open GAP finding freezes the back-adjusted series (returns stay NULL)
+DQ_CODES = (DQ_ATTRIBUTION, DQ_ATTRIBUTION_NCI, DQ_YTD, DQ_TAX_COPY, DQ_TTM_MISFILED, DQ_TTM_MIXED, DQ_PRICE_GAP)
+# Reasons of the non-blocking findings that carry an entity (the DSL names one alias per reason; a flag is written
+# for any open entity finding, named or not).
+DQ_FINDING_REASONS = (
+    "YTD_QUARTER_MISMATCH", "ANNUAL_PRIOR_YEAR_DIFFERS", "ATTRIBUTION_WITHHELD", "CROSS_CHECK_FAILED",
+    "ANNUAL_SHARE_COUNT_DIFFERS", "TAX_COPIED_FROM_PRIOR_YEAR",
+)  # fmt: skip
+
+
+def open_findings(con, as_of_ts: datetime, entities=None) -> dict[str, list[tuple[str, str | None, date | None]]]:
+    """X325: open (unresolved) findings attributed to an entity, as (reason_code, scope or None, period end), whose
+    filing (if any) is visible at `as_of_ts`. The period end is the finding's own period (YTD period, period,
+    share-count date) or its filing's period end. Read with today's resolution state ("valid" knowledge, as the GAP
+    freeze and PDF corrections): a finding resolved later flags no as-of date, an open one flags every as-of date
+    from its filing's visibility, so a rebuilt history shows what is known now about each date's filings."""
+    only, params = entity_filter("q.entity_id", entities)
+    out: dict[str, list] = defaultdict(list)
+    for ent, reason, scope, end in con.execute(
+        "SELECT q.entity_id, q.reason_code, coalesce(json_extract_string(q.details, '$.scope'), fm.scope), "
+        + dirty.FINDING_PERIOD_END_SQL
+        + " FROM quarantine_queue q "
+        + dirty.FINDING_FILING_JOIN
+        + " WHERE "
+        + dirty.OPEN_ENTITY_FINDING
+        + " AND (q.filing_id IS NULL OR fm.vis <= ?)"
+        + only
+        + " ORDER BY 1, 2, 3, 4",
+        [as_of_ts, *params],
+    ).fetchall():
+        out[ent].append((reason, scope, end))
+    return out
+
+
+def dq_columns(fund: dict, findings, frozen_from: date | None, as_of: date) -> dict:
+    """X325: `dq_flags` = sorted, comma-separated codes of the row (NULL when none); `dq_suspect` = any flag.
+    Codes: the as-filed values the fundamentals block used (fundamentals.DQ_*), OPEN_FINDING:<reason> for each open
+    finding of the entity whose period end lies in the row's window (on the row's scope when the finding names
+    one), PRICE_GAP_UNRESOLVED while an open GAP finding freezes the price series."""
+    codes = set(fund.get("_dq", ()))
+    end, scope = fund.get("fundamentals_end"), fund.get("scope_used")
+    for reason, f_scope, f_end in findings:
+        if f_end is None or end is None or not (_add_months(end, -DQ_FINDING_MONTHS) < f_end <= end):
+            continue
+        if f_scope is not None and scope is not None and f_scope != scope:
+            continue
+        codes.add(f"OPEN_FINDING:{reason}")
+    if frozen_from is not None and frozen_from <= as_of:
+        codes.add(DQ_PRICE_GAP)
+    return {"dq_suspect": bool(codes), "dq_flags": ",".join(sorted(codes)) or None}
 
 
 _EMPTY_FUNDAMENTALS: dict = {
@@ -729,7 +924,7 @@ _EMPTY_FUNDAMENTALS: dict = {
     "_net_debt": None, "_fcff": None, "_pat_owners": None, "_pe_earnings": None, "_equity_owners": None,
     "_minority": None, "roe_continuing": None, "core_profit_ttm": None, "_pat_owners_total": None,
     "sales_growth_qoq_pct": None, "profit_growth_qoq_pct": None, "npm_pct": None, "interest_coverage": None,
-    "opm_preceding_year_quarter_pct": None,
+    "opm_preceding_year_quarter_pct": None, "roe_screener": None,
     **dict.fromkeys(NBFC_COLUMNS + BANK_COLUMNS + INSURER_COLUMNS + CASH_CONVERSION_COLUMNS + ANNUAL_COLUMNS
                   + SCREENER_CONVENTION_COLUMNS),
 }  # fmt: skip
@@ -798,6 +993,7 @@ def _fundamentals(con, entity_id: str, as_of_ts: datetime, end: date) -> dict:
     if decision is None:
         return {**empty, "fundamentals_end": end}
     scope, book = decision.scope, decision.book
+    book.fill_as_filed = True  # X325 SHOW_AND_FLAG: validated values first, else as filed (flagged in book.dq)
     scope_cols = {
         "scope_reason": decision.reason,
         "restatement_suspected": decision.book.restatement_suspected(end),
@@ -839,11 +1035,14 @@ def _fundamentals(con, entity_id: str, as_of_ts: datetime, end: date) -> dict:
         "_net_debt": b["net_debt"], "_fcff": b["fcff"], "_pat_owners": b["pat_owners"],
         "_pe_earnings": b["pat_owners_continuing"], "_pat_owners_total": b["pat_owners"],
         "roe_continuing": _f(safe_div(b["pat_owners_continuing"], b["equity_owners"])),
+        "roe_screener": _f(roe_screener(book, end)),  # X227: Screener's FY ROE on average equity, beside `roe`
         "core_profit_ttm": b["core_continuing_profit"],
         "_equity_owners": b["equity_owners"], "_minority": b["minority_interest"],
         **_quarterly_columns(book, end),
         "interest_coverage": _f(interest_coverage(b["pbt"], b["finance_costs"])),
     } | _lender_overrides(book, end)  # fmt: skip
+    if out.get("is_lending_nbfc") is True and "interest_expended" not in book.durations:
+        out["debt_to_equity"] = _f(nbfc_gearing(book, end))  # X228: NBFC gearing; banks and insurers stay NULL
     # NPM on the row's own sales (interest earned for banks, premium for insurers) and owners' TTM profit [X42]
     out["npm_pct"] = _f(safe_div(b["pat_owners"], out["sales_ttm"]))
     out["_pl"] = features_pl.period_values(con, book, end, as_of_ts)  # period P&L family (ratio catalogue Batch 1)
@@ -851,6 +1050,7 @@ def _fundamentals(con, entity_id: str, as_of_ts: datetime, end: date) -> dict:
     out["_gems"] = features_gems.period_values(book, end, b)  # batch D: core profit, TTM core earnings, stability
     out["_extra"] = features_extra.period_values(con, book, end, b, as_of_ts)  # batch G (remaining Phase 2 ratios)
     out["_more"] = features_more.period_values(book, end, b, industrial)  # batch I (last catalogue rows)
+    out["_dq"] = tuple(sorted(book.dq))  # X325: as-filed values this block used
     return out
 
 
@@ -923,13 +1123,49 @@ def _window_reaches_before_cutoff(end: date | None) -> bool:
     return end is not None and _add_months(end, -9) < MIN_PERIOD_END_DATE
 
 
-def _c9_expected_nulls(con, prev: date, rows: list[dict]) -> set[tuple[str, str]]:
+@dataclass
+class DaySummary:
+    """What gate G4 reads of a published day (the previous day of the day it gates): per security, its
+    fundamentals_end and whether each TTM column (sorted TTM_COLUMNS) is NULL; the day's CRITICAL_COLUMNS null rates
+    over all its rows. From the stored day (`stored`), or from the rows a run just published (`of_rows`: the same
+    values, which a run keeps instead of reading them back)."""
+
+    day: date
+    null_rates: dict[str, float]
+    fundamentals: dict[str, tuple]
+
+    @classmethod
+    def stored(cls, con, day: date) -> DaySummary:
+        ttm = ", ".join(f"{c} IS NULL" for c in sorted(TTM_COLUMNS))
+        crit = ", ".join(f"{c} IS NULL" for c in CRITICAL_COLUMNS)
+        rows = con.execute(
+            f"SELECT security_id, fundamentals_end, {ttm}, {crit} FROM screener_features_history WHERE as_of_date = ?",
+            [day],
+        ).fetchall()
+        k = 2 + len(TTM_COLUMNS)
+        return cls._of(day, [(r[0], r[1:k], r[k:]) for r in rows])
+
+    @classmethod
+    def of_rows(cls, day: date, rows: list[dict]) -> DaySummary:
+        ttm = sorted(TTM_COLUMNS)
+        return cls._of(day, [(r["security_id"], (r.get("fundamentals_end"), *(r.get(c) is None for c in ttm)),
+                              tuple(r.get(c) is None for c in CRITICAL_COLUMNS)) for r in rows])  # fmt: skip
+
+    @classmethod
+    def _of(cls, day: date, rows: list[tuple]) -> DaySummary:
+        # avg(CASE WHEN c IS NULL THEN 1 ELSE 0 END) as DuckDB computes it: the exact count over the exact row count
+        rates = {c: sum(r[2][i] for r in rows) / len(rows) if rows else None for i, c in enumerate(CRITICAL_COLUMNS)}
+        return cls(day, rates, {r[0]: r[1] for r in rows})
+
+
+def _summary(con, prev: date | DaySummary) -> DaySummary:
+    return prev if isinstance(prev, DaySummary) else DaySummary.stored(con, prev)
+
+
+def _c9_expected_nulls(con, prev: date | DaySummary, rows: list[dict]) -> set[tuple[str, str]]:
     """Rule G4_C9_WINDOW: (security, TTM column) pairs that were non-NULL on `prev` and are NULL now only because
     `fundamentals_end` moved to a newer quarter whose window needs pre-cutoff quarters. One query for all rows."""
-    cols = ", ".join(f"{c} IS NULL" for c in sorted(TTM_COLUMNS))
-    before = {r[0]: r[1:] for r in con.execute(
-        f"SELECT security_id, fundamentals_end, {cols} FROM screener_features_history WHERE as_of_date = ?", [prev]
-    ).fetchall()}  # fmt: skip
+    before = _summary(con, prev).fundamentals
     out = set()
     for r in rows:
         b = before.get(r["security_id"])
@@ -942,6 +1178,24 @@ def _c9_expected_nulls(con, prev: date, rows: list[dict]) -> set[tuple[str, str]
     return out
 
 
+def _g4_compared_rows(con, prev: date | DaySummary, rows: list[dict]) -> list[dict]:
+    """Rule G4_NEW_ENTRANT: the null-rate gate compares like with like, the securities that also had a row on `prev`.
+    A security first trading today (an IPO, or 156 Permitted BSE-listed securities on 2026-04-20) brings its own NULLs
+    (no fundamentals yet); that is new coverage, not lost coverage. With no overlap at all, every row counts."""
+    before = _summary(con, prev).fundamentals
+    return [r for r in rows if r["security_id"] in before] or rows
+
+
+def _g4_spikes(con, prev: date | DaySummary, rows: list[dict]) -> dict[str, tuple[float, float]]:
+    """Gate G4 of `rows` (a whole day) against the previous published day: the critical columns whose null rate rose
+    by more than G4_MAX_NULL_RISE."""
+    before = _summary(con, prev)
+    same = _g4_compared_rows(con, before, rows)
+    now = _null_rates(same, _c9_expected_nulls(con, before, same))
+    was = before.null_rates
+    return {c: (was[c], now[c]) for c in CRITICAL_COLUMNS if now[c] - was[c] > G4_MAX_NULL_RISE}
+
+
 def materialize(
     con,
     as_of: date,
@@ -951,6 +1205,7 @@ def materialize(
     prices: PriceHistory | None = None,
     snapshot: bool = True,
     snapshot_due: bool = False,
+    rows: list[dict] | None = None,
 ) -> MaterializeResult:
     """Compute, gate and atomically publish features for `as_of`. Caller must be the single writer.
 
@@ -959,10 +1214,12 @@ def materialize(
     `prices`: the run's PriceHistory (`materialize_run`), so a multi-day run reads the bars once.
     `snapshot=False` (every day of a run but the last, `materialize_days`): the live `screener_features` table is not
     rewritten; the result's `snapshot_due` says whether it would have been. `snapshot_due=True` (the run's last day):
-    an earlier day of the run deferred it, so this day's transaction rewrites it in any case (architecture §11.11)."""
-    rows = compute_rows(con, as_of, exchange, entities=entities, prices=prices)
-    if prices is not None:
-        prices.settle()
+    an earlier day of the run deferred it, so this day's transaction rewrites it in any case (architecture §11.11).
+    `rows`: the day's rows already computed by `compute_rows` with the same `entities` (`materialize_incremental`)."""
+    if rows is None:
+        rows = compute_rows(con, as_of, exchange, entities=entities, prices=prices)
+        if prices is not None:
+            prices.settle()
     universe = _universe(con, exchange, as_of)
     merged = rows
     if entities is not None:
@@ -980,12 +1237,7 @@ def materialize(
 
     prev = con.execute("SELECT max(as_of_date) FROM features_daily WHERE as_of_date < ?", [as_of]).fetchone()[0]
     if prev is not None:
-        cols = ", ".join(f"avg(CASE WHEN {c} IS NULL THEN 1 ELSE 0 END)" for c in CRITICAL_COLUMNS)
-        before = dict(zip(CRITICAL_COLUMNS, con.execute(
-            f"SELECT {cols} FROM screener_features_history WHERE as_of_date = ?", [prev]
-        ).fetchone(), strict=True))  # fmt: skip
-        now = _null_rates(merged, _c9_expected_nulls(con, prev, merged))
-        spikes = {c: (before[c], now[c]) for c in CRITICAL_COLUMNS if now[c] - before[c] > G4_MAX_NULL_RISE}
+        spikes = _g4_spikes(con, prev, merged)
         if spikes:
             return MaterializeResult("ABORTED", as_of, len(merged), "G4", f"null-rate spike vs {prev}: {spikes}")
 
@@ -1038,6 +1290,7 @@ def materialize_days(
     prices: PriceHistory | None = None,
     entities_for=None,
     report=None,
+    batch_days: int | None = None,
 ) -> list[MaterializeResult]:
     """`materialize` each of `days` in order (one run: `materialize --from/--to`, `--incremental`, `rebuild-market`),
     stopping at the first day that does not publish. The live `screener_features` table is rewritten once, in the
@@ -1045,8 +1298,14 @@ def materialize_days(
     latest day again and left the deleted copies as dead blocks in the file. When the run stops early (a failed
     gate, an error) after a day that deferred it, it is rewritten on its own, so the tables end exactly as the
     day-by-day publish left them. `entities_for(day)`: the entities to recompute on that day (None = all);
-    `report(result)`: called after each day."""
+    `report(result)`: called after each day (after its batch's commit on the batched path).
+
+    A full run (no `entities_for`) on the run-level path (`prices`) publishes up to `batch_days` days per
+    transaction (default FULL_RUN_BATCH_DAYS; 1 = the day-by-day path): `_materialize_batched`."""
     days = list(days)
+    batch = FULL_RUN_BATCH_DAYS if batch_days is None else batch_days
+    if entities_for is None and prices is not None and batch > 1 and len(days) > 1:
+        return _materialize_batched(con, days, exchange, prices, report, batch)
     results: list[MaterializeResult] = []
     due = False
     try:
@@ -1064,6 +1323,170 @@ def materialize_days(
         if due:  # the last day did not publish (or raised): the days before it did, as day-by-day would have shown
             publish_snapshot(con)
     return results
+
+
+# Days a full run publishes per transaction (`_materialize_batched`). A batch holds its days' rows in memory
+# (~2,400 rows x ~660 values a day on the live database: ~30 MB of Python objects a day).
+FULL_RUN_BATCH_DAYS = 20
+
+
+# The days whose changing entities one set of the full run's slices holds (`_FullRunSlices.prepare`), longest
+# first, and the most entities worth copying. On the live database a copy costs ~1.7 s per 100 entities (fact,
+# disclosure and shareholding line rows) and saves ~2.5 s of full-table reads a day: in a results or shareholding
+# season (~650 entities in 6 days of August 2025) the copy costs more than it saves, so such days read the database.
+SLICE_WINDOWS = (5,)
+SLICE_MAX_ENTITIES = 400
+
+
+def _quarter(d: date) -> tuple[int, int]:
+    return d.year, (d.month - 1) // 3
+
+
+def _reads_stored_days(d: date) -> bool:
+    """compute_rows(d) reads stored days of the current quarter: the 5-year PE median of features_gems
+    (`pe_medians`, every stored day of its window up to the day before d) once its window is in scope (C9)."""
+    return features_gems.pe_history_gate(d) is not None
+
+
+def _materialize_batched(con, days: list[date], exchange: str, prices: PriceHistory, report,
+                         batch_days: int) -> list[MaterializeResult]:  # fmt: skip
+    """A full run (every entity, every one of `days`, ascending) with the day-by-day result, published in batches of
+    up to `batch_days` days per transaction (architecture §11.11).
+
+    Day by day, as `materialize`: compute_rows (with the run's PriceHistory and FundamentalsCache), G5 (the rows are
+    the day's universe) and G4 against the previous materialised day; the first day that fails a gate stops the
+    run, and the days before it are published. Only the publish is batched: one transaction writes the batch's days
+    in order (features_store.write_day, each day replacing its rows and EVENT intervals exactly as before), then the
+    breadth and the three cross-sections of all its days (each day's from that day's stored rows, which the later
+    days' writes do not touch), the live table when the batch holds the run's last day, and the days' meta rows.
+
+    What a day reads of the stored days is what the day-by-day run had stored by then:
+    - G4's previous day: a day of this run is gated against the summary of the rows it published (DaySummary,
+      equal to what the stored day returns); a stored day outside the run is read from the database;
+    - the valuation histories (`FundamentalsCache.per_quarter`) read stored days before the day's quarter: a batch
+      never spans two quarters, so every earlier quarter is committed when a quarter's first day reads it;
+    - `features_gems.pe_medians` reads every stored day of its window up to the previous day: from the first day its
+      window is in scope (C9: 5 years after MIN_TRADE_DATE) such days are published one by one.
+    An error stops the run after publishing the batch's days computed before it (as day by day); an error in a
+    batch's transaction rolls back the whole batch (each day stays atomic: all of its rows or none)."""
+    results: list[MaterializeResult] = []
+    stored = sorted(d for (d,) in con.execute("SELECT DISTINCT as_of_date FROM features_daily").fetchall())
+    pending: list[tuple[date, list[dict]]] = []
+    published = False
+    last_summary: DaySummary | None = None
+
+    def flush() -> None:
+        nonlocal published
+        if not pending:
+            return
+        batch = pending[:]
+        pending.clear()  # never published twice: a batch whose transaction failed is rolled back, not retried
+        _publish_days(con, batch, snapshot=batch[-1][0] == days[-1])
+        published = True
+        for d, rows in batch:
+            r = MaterializeResult("PROMOTED", d, len(rows))
+            results.append(r)
+            if report is not None:
+                report(r)
+
+    batches: list[list[date]] = []
+    for d in days:  # a new batch at the size limit, at a quarter's first day and on days that read stored days
+        joins = batches and len(batches[-1]) < batch_days and _quarter(d) == _quarter(batches[-1][0])
+        if joins and not _reads_stored_days(d):
+            batches[-1].append(d)
+        else:
+            batches.append([d])
+
+    def day_ts(d: date) -> datetime:
+        return ist_to_utc(d + timedelta(days=1), time(0, 0))
+
+    try:
+        with full_run_memo(con) as slices:
+            prev_ts: datetime | None = None  # the as-of of the run's last computed day
+            slice_end = 0
+            for batch in batches:
+                failed = None
+                for i, d in enumerate(batch):
+                    if prev_ts is not None and (i == 0 or i >= slice_end):
+                        # slices of the entities whose inputs become visible in the next SLICE_WINDOWS days, or fewer
+                        # days, when they are few enough to be worth copying (the run's first day reads every entity
+                        # from the database, and so does a day too busy to slice)
+                        slice_end, chosen = i + 1, frozenset()
+                        for n in SLICE_WINDOWS:
+                            end = min(i + n, len(batch))
+                            moving = slices.moving(prev_ts, day_ts(batch[end - 1]))
+                            if len(moving) <= SLICE_MAX_ENTITIES:
+                                slice_end, chosen = end, moving
+                                break
+                        slices.prepare(chosen)
+                    rows = compute_rows(con, d, exchange, prices=prices, cross=False)  # the publish refreshes it
+                    prev_ts = day_ts(d)
+                    prices.settle()
+                    failed = _gate_day(con, exchange, d, rows, stored, last_summary)
+                    if failed is not None:
+                        break
+                    rows = [{c: r.get(c) for c in features_store.COLUMNS} for r in rows]
+                    last_summary = DaySummary.of_rows(d, rows)
+                    pending.append((d, rows))
+                flush()
+                if failed is not None:
+                    results.append(failed)
+                    if report is not None:
+                        report(failed)
+                    break
+    except BaseException:
+        flush()  # the days computed before the error publish, as day by day
+        raise
+    finally:
+        if published and not (results and results[-1].as_of_date == days[-1] and results[-1].status == "PROMOTED"):
+            publish_snapshot(con)  # the run stopped before its last day: the live table of the days it published
+    return results
+
+
+def _gate_day(con, exchange: str, d: date, rows: list[dict], stored: list[date],
+              last: DaySummary | None) -> MaterializeResult | None:  # fmt: skip
+    """G5 and G4 of a full day's rows as `materialize` gates them (None = passed). `stored`: the materialised days
+    before the run; `last`: the run's previous day as published (the previous materialised day unless a stored day
+    outside the run lies between)."""
+    universe = _universe(con, exchange, d)
+    if len(rows) != len(universe) or {r["security_id"] for r in rows} != {u[0] for u in universe} or not rows:
+        return MaterializeResult("ABORTED", d, len(rows), "G5", f"{len(rows)} rows vs universe {len(universe)}")
+    i = bisect.bisect_left(stored, d)
+    prev: date | DaySummary | None = stored[i - 1] if i else None
+    if last is not None and (prev is None or last.day >= prev):
+        prev = last
+    if prev is None:
+        return None
+    spikes = _g4_spikes(con, prev, rows)
+    if not spikes:
+        return None
+    day = prev.day if isinstance(prev, DaySummary) else prev
+    return MaterializeResult("ABORTED", d, len(rows), "G4", f"null-rate spike vs {day}: {spikes}")
+
+
+def _publish_days(con, batch: list[tuple[date, list[dict]]], snapshot: bool) -> None:
+    """Publish whole days (rows of every entity) in one transaction: `materialize`'s publish of each day, with the
+    breadth and cross-section refreshes done once for all the days."""
+    ds = [d for d, _ in batch]
+    con.execute("BEGIN TRANSACTION")
+    try:
+        for d, rows in batch:
+            features_store.write_day(con, d, rows)  # event-sparse (architecture §4.1), day by day in order
+        refresh_breadth_days(con, ds)  # batch B: market-level breadth from each day's stored rows
+        features_gems.refresh_cross_sections(con, ds)  # batch D: ranks / scores / hats over each stored day
+        features_peers.refresh_cross_sections(con, ds)  # batch H: industry medians / peer ranks
+        features_more.refresh_cross_sections(con, ds)  # batch I: RS rank / industry earnings breadth
+        if snapshot:
+            _write_snapshot(con)
+        for d, rows in batch:
+            con.execute(
+                "INSERT OR REPLACE INTO features_meta VALUES (?, ?, ?, ?, ?)",
+                [d, FEATURES_VERSION, "FULL", len(rows), utc_now()],
+            )
+    except BaseException:
+        con.execute("ROLLBACK")
+        raise
+    con.execute("COMMIT")
 
 
 class FundamentalsCache:
@@ -1103,6 +1526,7 @@ class FundamentalsCache:
         structural = _structural_actions(con, through_ts, only.replace("entity_id", "e"), only_p)
         self._structural = {e: [d for d, _ in v] for e, v in structural.items()}
         self._blocks: dict[str, tuple[tuple, dict]] = {}
+        self._quarterly: dict[tuple, object] = {}
 
     def key(self, entity_id: str, as_of: date, as_of_ts: datetime, end: date) -> tuple:
         return (end, self._bisect(self._vis.get(entity_id, ()), as_of_ts),
@@ -1119,6 +1543,17 @@ class FundamentalsCache:
     def store(self, blocks: dict[str, tuple[tuple, dict]]) -> None:
         self._blocks.update(blocks)
 
+    def per_quarter(self, name: str, as_of: date, securities, read):
+        """`read()` once per (name, calendar quarter of as_of, securities) in the run, for the valuation-history
+        reads (`_valuation_history`, `features_more.valuation_history`): they read only stored days before the
+        quarter of as_of. A run materialises its days ascending and writes only the day it publishes, so those
+        days are final before the run's first day of the quarter reads them. The result is shared: read only."""
+        key = (name, date(as_of.year, 3 * ((as_of.month - 1) // 3) + 1, 1),
+               None if securities is None else frozenset(securities))  # fmt: skip
+        if key not in self._quarterly:
+            self._quarterly[key] = read()
+        return self._quarterly[key]
+
 
 # Checkpoint threshold for the length of a materialize run. Each day commits ~30 MB of WAL (the day's rows and the
 # cross-section updates); at DuckDB's default 16 MB every commit checkpointed, rewriting the history table's open
@@ -1127,16 +1562,38 @@ RUN_CHECKPOINT_THRESHOLD = "512MB"
 
 
 @contextmanager
+def _no_failed_imports() -> Iterator[None]:
+    """DuckDB's Python client tries `import pandas` whenever it binds a statement's parameters (~700 times a
+    materialised day); without pandas installed each failed import searches sys.path again (~0.15 s a day). For the
+    run, an absent pandas is recorded as absent (`sys.modules[name] = None`: the import fails at once, as it would
+    anyway); an installed one is untouched. Restored when the run ends."""
+    import importlib.util
+    import sys
+
+    stubbed = [m for m in ("pandas",) if m not in sys.modules and importlib.util.find_spec(m) is None]
+    for m in stubbed:
+        sys.modules[m] = None
+    try:
+        yield
+    finally:
+        for m in stubbed:
+            if sys.modules.get(m, 0) is None:
+                del sys.modules[m]
+
+
+@contextmanager
 def materialize_run(con, days, exchange: str = "NSE", entities=None) -> Iterator[PriceHistory | None]:
     """The state shared by the days of one run (`materialize --from/--to`, `--incremental`, `rebuild-market`;
     architecture §11.11): yields a PriceHistory read through the last day (restricted to the securities of `entities`
     when given) carrying the run's FundamentalsCache, its heap frozen for the run (`PriceHistory.frozen_heap`); None
     on the legacy per-day path (FINANCIALS_MATERIALIZE_LEGACY=1) or without days. Raises DuckDB's checkpoint
-    threshold for the run (RUN_CHECKPOINT_THRESHOLD) and checkpoints at the end."""
+    threshold for the run (RUN_CHECKPOINT_THRESHOLD) and checkpoints at the end, and holds `_no_failed_imports`."""
     old = con.execute("SELECT current_setting('checkpoint_threshold')").fetchone()[0]
     con.execute(f"SET checkpoint_threshold = '{RUN_CHECKPOINT_THRESHOLD}'")
     done = False
+    stack = ExitStack()
     try:
+        stack.enter_context(_no_failed_imports())
         if legacy_materialize() or not days:
             yield None
         else:
@@ -1151,6 +1608,7 @@ def materialize_run(con, days, exchange: str = "NSE", entities=None) -> Iterator
                 yield prices
         done = True
     finally:
+        stack.close()
         con.execute(f"SET checkpoint_threshold = '{old}'")
         if done and len(days) > 1:  # a run ends checkpointed (one day: DuckDB's usual threshold decides)
             con.execute("CHECKPOINT")
@@ -1231,7 +1689,309 @@ def settle_full_run(con, days: list[date]) -> int:
     if not stored <= set(days):
         return 0
     prev = con.execute("SELECT max(as_of_date) FROM features_daily WHERE as_of_date < ?", [lo]).fetchone()[0]
+    last = con.execute("SELECT max(as_of_date) FROM features_daily").fetchone()[0]
+    if prev is None and last is not None and last <= hi:  # X325: every stored row now reflects today's findings
+        dirty.store_finding_state(con)
     return settle_dirty(con, _dirty_rows(con), None if prev is None else prev + timedelta(days=1), hi)
+
+
+# Tables that compute_rows (and the run's FundamentalsCache) reads only for the requested entities: every read is
+# restricted by an entity_id filter, or reaches rows through the filing_id of such rows (current parser version,
+# the filing's basis, its REG34_ANNUAL profile, the disclosure / RPT denominators of the same filing). An
+# incremental run reads them through run-scoped slices (`entity_slices`).
+SLICED_TABLES = (
+    "filing_meta", "fact_observations", "fact_corrections", "disclosure_facts", "segment_observations",
+    "related_party_transactions", "audit_opinions", "shareholding_meta", "shareholding_observations",
+    "shareholding_line_items", "shareholding_major_holders",
+)  # fmt: skip
+_VISIBLE = frozenset(SLICED_TABLES) - {"fact_corrections"}  # with a visible_from_ts (corrections: their filing's)
+
+
+@contextmanager
+def entity_slices(con, entities) -> Iterator[None]:
+    """Run-scoped slices of SLICED_TABLES for an incremental run over `entities` (architecture §11.10): a TEMP table
+    of the same name holding every row of those entities plus every row of a filing any of them has a row in (so a
+    filing whose versions moved between entities, X83, keeps all its versions). DuckDB resolves an unqualified name
+    to the temp table first, so compute_rows reads the slice; its reads are restricted to the same entities, so they
+    return exactly the rows they return from the full tables, from a few thousand rows instead of millions (each of
+    a day's ~60 reads used to scan the full table: a fixed ~0.6 s a day whatever the number of entities). Nothing
+    in the run writes these tables (the run writes only the feature tables). The slices are dropped when the run
+    ends, by their catalog-qualified name. While they are held fixed, the run's visibility memo (`run_memo`) is
+    active: a reader that depends on the as-of only through visibility is read once per visibility interval.
+    `entities=None` (a FULL marker): no slices, no memo."""
+    if entities is None:
+        yield
+        return
+    db = con.execute("SELECT current_database()").fetchone()[0].replace('"', '""')
+    sql, params = in_list("entity_id", entities)
+    created: list[str] = []
+    try:
+        con.execute(
+            "CREATE TEMP TABLE _slice_filings AS SELECT DISTINCT filing_id FROM ("
+            + " UNION ALL ".join(f'SELECT filing_id FROM "{db}".main.{t} WHERE {sql}' for t in SLICED_TABLES)
+            + ")",
+            params * len(SLICED_TABLES),
+        )
+        created.append("_slice_filings")
+        for t in SLICED_TABLES:
+            con.execute(
+                f'CREATE TEMP TABLE {t} AS SELECT * FROM "{db}".main.{t} '
+                f"WHERE {sql} OR filing_id IN (SELECT filing_id FROM temp.main._slice_filings)",
+                params,
+            )
+            created.append(t)
+        # Per entity, every visibility timestamp the run's readers filter on (run_memo): of its rows in the slices,
+        # of the other rows of its filings, of its KPIs.
+        own = " UNION ".join(f"SELECT entity_id, filing_id FROM temp.main.{t}" for t in SLICED_TABLES)
+        stamps: dict[str, list[datetime]] = defaultdict(list)
+        for ent, ts in con.execute(
+            f"WITH fe AS (SELECT DISTINCT entity_id, filing_id FROM ({own}) WHERE {sql}) "
+            + " UNION ".join(
+                f"SELECT entity_id, visible_from_ts FROM temp.main.{t} WHERE {sql} UNION "
+                f"SELECT fe.entity_id, x.visible_from_ts FROM temp.main.{t} x JOIN fe USING (filing_id)"
+                for t in SLICED_TABLES
+                if t in _VISIBLE
+            )
+            + f' UNION SELECT entity_id, visible_from_ts FROM "{db}".main.supplemental_kpis WHERE {sql}',
+            params * (2 + len(_VISIBLE)),
+        ).fetchall():
+            stamps[ent].append(ts)
+        with visibility_memo(con, stamps):
+            yield
+    finally:
+        for t in reversed(created):
+            con.execute(f"DROP TABLE IF EXISTS temp.main.{t}")
+
+
+class _FullRunSlices:
+    """The visibility memo of a full run (`_materialize_batched`, architecture §11.11) and its run-scoped slices.
+
+    The memo's readers (`run_memo.by_visibility`) take `entities=None` in a full run; under this memo that means
+    every entity (`everyone`: every entity of `securities` or with a row in SLICED_TABLES), and each entity's part
+    is re-read only on a day its visibility interval moves, as in an incremental run (§11.10). Those re-reads are
+    few entities a day, but each scanned the full tables (~2.5 s a day on the live database). So before a batch's
+    days are computed, `prepare` copies, on a second connection of the same database (`con.cursor()`, whose TEMP
+    tables only it sees), the SLICED_TABLES rows of the entities whose interval moves within the batch (and every
+    row of their filings, as `entity_slices` does), and `reader(stale)` reads the stale entities there when they
+    are all in the slices (else from the database). The FundamentalsCache's prefetch of the entities whose block is
+    recomputed goes the same way (`compute_rows`). The entity-restricted reads return the same rows from a slice as
+    from the full tables (tests/test_incremental_materialize.py, test_materialize_batched.py). The first batch reads
+    the database (every entity is new to the memo). Nothing in the run writes these tables."""
+
+    def __init__(self, con) -> None:
+        self.con = con
+        self.cur = con.cursor()
+        self._db = con.execute("SELECT current_database()").fetchone()[0].replace('"', '""')
+        self.sliced: frozenset[str] = frozenset()
+        self._tables: list[str] = []
+        stamps: dict[str, list[datetime]] = defaultdict(list)
+        for ent, ts in con.execute(self._stamps_sql()).fetchall():
+            stamps[ent].append(ts)
+        self.stamps = {e: sorted(v) for e, v in stamps.items()}
+        listed = con.execute("SELECT DISTINCT entity_id FROM securities WHERE entity_id IS NOT NULL").fetchall()
+        self.everyone = frozenset(self.stamps) | {e for (e,) in listed}
+
+    @staticmethod
+    def _stamps_sql() -> str:
+        """Per entity, every visibility timestamp of its rows and of the rows of its filings, as `entity_slices`
+        reads them from its slices, for every entity at once: a filing with rows of more than one entity (or of
+        none) gives each of them the timestamps of all its rows."""
+        own = " UNION ".join(f"SELECT entity_id, filing_id FROM {t}" for t in SLICED_TABLES)
+        parts = []
+        for t in SLICED_TABLES:
+            if t in _VISIBLE:
+                parts.append(f"SELECT entity_id, visible_from_ts FROM {t} WHERE entity_id IS NOT NULL")
+                parts.append(
+                    f"SELECT o.entity_id, x.visible_from_ts FROM {t} x JOIN own o USING (filing_id) "
+                    "WHERE o.entity_id IS NOT NULL AND x.filing_id IN (SELECT filing_id FROM multi)"
+                )
+        parts.append("SELECT entity_id, visible_from_ts FROM supplemental_kpis WHERE entity_id IS NOT NULL")
+        return (
+            f"WITH own AS (SELECT DISTINCT entity_id, filing_id FROM ({own})), "
+            "multi AS (SELECT filing_id FROM own GROUP BY filing_id "
+            "HAVING count(DISTINCT coalesce(entity_id, '')) > 1) " + " UNION ".join(parts)
+        )
+
+    def reader(self, stale) -> object:
+        return self.cur if self.sliced and stale <= self.sliced else self.con
+
+    def moving(self, lo: datetime, hi: datetime) -> frozenset[str]:
+        """The entities with a visibility timestamp in (lo, hi]."""
+        return frozenset(e for e, ts in self.stamps.items()
+                         if bisect.bisect_right(ts, hi) > bisect.bisect_right(ts, lo))  # fmt: skip
+
+    def prepare(self, moving: frozenset[str]) -> None:
+        """Slices of `moving` (the entities whose visibility interval moves in the next days); none when empty."""
+        self._drop()
+        if not moving:
+            return
+        sql, params = in_list("entity_id", moving)
+        db, cur = self._db, self.cur
+        cur.execute(
+            "CREATE TEMP TABLE _slice_filings AS SELECT DISTINCT filing_id FROM ("
+            + " UNION ALL ".join(f'SELECT filing_id FROM "{db}".main.{t} WHERE {sql}' for t in SLICED_TABLES)
+            + ")",
+            params * len(SLICED_TABLES),
+        )
+        self._tables.append("_slice_filings")
+        for t in SLICED_TABLES:
+            cur.execute(
+                f'CREATE TEMP TABLE {t} AS SELECT * FROM "{db}".main.{t} '
+                f"WHERE {sql} OR filing_id IN (SELECT filing_id FROM temp.main._slice_filings)",
+                params,
+            )
+            self._tables.append(t)
+        self.sliced = moving
+
+    def _drop(self) -> None:
+        self.sliced = frozenset()
+        for t in reversed(self._tables):
+            self.cur.execute(f"DROP TABLE IF EXISTS temp.main.{t}")
+        self._tables.clear()
+
+    def close(self) -> None:
+        try:
+            self._drop()
+        finally:
+            self.cur.close()
+
+
+@contextmanager
+def full_run_memo(con) -> Iterator[_FullRunSlices]:
+    """The full-run visibility memo (`_FullRunSlices`), active for the block."""
+    slices = _FullRunSlices(con)
+    try:
+        with visibility_memo(con, slices.stamps, slices.everyone, slices.reader):
+            yield slices
+    finally:
+        slices.close()
+
+
+PUBLISHED = ("PROMOTED", "UNCHANGED")  # day statuses of a successful incremental run
+# Columns set by the cross-section refresh after a day's rows are written (from the day's stored rows): never
+# computed by compute_rows, so not compared.
+_CROSS = (
+    frozenset(features_gems.CROSS_COLUMNS)
+    | frozenset(features_peers.CROSS_COLUMNS)
+    | frozenset(features_more.CROSS_COLUMNS)
+)
+
+
+class _StoredRows:
+    """The stored rows an incremental run may replace, for `equal`: the daily rows of the run's entities and their
+    securities, read in chunks of STORED_CHUNK_DAYS days, and those securities' EVENT intervals, read once (one
+    query per chunk instead of a read per day). Read ahead of the writes, they stay valid: the run handles its days
+    ascending and publishing day D' replaces only D''s daily rows and the EVENT values on [D', the security's next
+    materialised day), so the rows of a later day are untouched until that day itself is published."""
+
+    def __init__(self, con, days: list[date], entities: frozenset[str]) -> None:
+        self._con, self._days = con, days
+        self._daily = [c for c in features_store.DAILY_COLUMNS if c not in _CROSS and c != "security_id"]
+        self._ent_pos = self._daily.index("entity_id")
+        by_ent = in_list("entity_id", entities)
+        self._secs = {s for (s,) in con.execute(
+            "SELECT security_id FROM securities WHERE " + by_ent[0] + " UNION "
+            "SELECT DISTINCT security_id FROM features_daily WHERE as_of_date >= ? AND " + by_ent[0],
+            [*by_ent[1], days[0], *by_ent[1]],
+        ).fetchall()}  # fmt: skip
+        self._filter = in_list("security_id", self._secs)
+        self._chunk: dict[date, dict[str, tuple]] = {}
+        self._events: dict[str, list[tuple]] = defaultdict(list)
+        for sec, start, end, *vals in con.execute(
+            "SELECT security_id, valid_from_date, coalesce(valid_to_date, DATE '9999-12-31'), "
+            + ", ".join(features_store.EVENT_COLUMNS)
+            + " FROM features_events WHERE "
+            + self._filter[0]
+            + " AND coalesce(valid_to_date, DATE '9999-12-31') > ? ORDER BY 1, 2",
+            [*self._filter[1], days[0]],
+        ).fetchall():
+            self._events[sec].append((start, end, tuple(vals)))
+
+    def _day(self, d: date) -> dict[str, tuple]:
+        if d not in self._chunk:
+            i = self._days.index(d)
+            chunk = self._days[i : i + STORED_CHUNK_DAYS]
+            self._chunk = {x: {} for x in chunk}
+            for sec, day, *vals in self._con.execute(
+                "SELECT security_id, as_of_date, " + ", ".join(self._daily) + " FROM features_daily "
+                "WHERE as_of_date >= ? AND as_of_date <= ? AND " + self._filter[0],
+                [chunk[0], chunk[-1], *self._filter[1]],
+            ).fetchall():
+                if day in self._chunk:
+                    self._chunk[day][sec] = tuple(vals)
+        return self._chunk[d]
+
+    def _event_values(self, sec: str, d: date) -> tuple | None:
+        for start, end, vals in self._events.get(sec, ()):
+            if start <= d < end:
+                return vals
+        return None
+
+    def equal(self, d: date, entities: frozenset[str], rows: list[dict]) -> bool:
+        """True when publishing `rows` for `entities` on `d` would store exactly the rows already stored: the rows
+        `features_store.write_day` would replace (the day's rows of those entities and of the rows' securities)
+        are the same securities with equal values in every column compute_rows sets (not the cross-section
+        columns, which the publish recomputes from those values). Equal is value equality (NaN equals NaN); a value
+        that would be cast on storage (a Decimal with more places than its column) compares unequal, so the day is
+        published: a False only costs the publish."""
+        secs = {r["security_id"] for r in rows}
+        if len(rows) != len(secs) or not secs <= self._secs:
+            return False
+        day = self._day(d)
+        replaced = {s for s, v in day.items() if v[self._ent_pos] in entities or s in secs}
+        if replaced != secs:
+            return False
+        none = (None,) * len(features_store.EVENT_COLUMNS)
+        for r in rows:
+            sec = r["security_id"]
+            events = self._event_values(sec, d)
+            for cols, vals in ((self._daily, day[sec]), (features_store.EVENT_COLUMNS, events or none)):
+                for c, v in zip(cols, vals, strict=True):
+                    w = r.get(c)
+                    if w is v:
+                        continue
+                    if w is None or v is None or not (w == v or (w != w and v != v)):
+                        return False
+        return True
+
+
+STORED_CHUNK_DAYS = 32
+
+
+def _incremental_days(con, days, exchange, prices, entities_for) -> list[MaterializeResult]:
+    """The days of an incremental run, ascending. Each day computes its dirty rows (one batched compute_rows). A day
+    whose rows equal the stored ones (a re-parse, a mirror or re-send of a filing, a revision that changed nothing
+    these entities' rows read) is left as stored: publishing it would rewrite the same rows, recompute the same
+    cross-section from the same inputs and pass the same gates as when it was published. Every other day is gated
+    (G5, G4 on the merged day) and published as before, and so is the day after a published day, whose G4 compares
+    with the changed previous day. The first day that fails a gate stops the run (the days before it stay
+    published). The live table is rewritten as `materialize_days` does: once, by the run's last day."""
+    results: list[MaterializeResult] = []
+    changed_prev = due = False
+    every = entities_for(days[-1]) if days else None  # the run's entities (the markers due by its last day)
+    stored = _StoredRows(con, days, every) if every is not None else None
+    try:
+        for i, d in enumerate(days):
+            last = i == len(days) - 1
+            ents = entities_for(d)
+            rows = compute_rows(con, d, exchange, entities=ents, prices=prices)
+            if prices is not None:
+                prices.settle()
+            same = stored is not None and ents is not None and stored.equal(d, ents, rows)
+            if same and not changed_prev:
+                results.append(MaterializeResult("UNCHANGED", d, len(rows), message="dirty rows equal stored rows"))
+                continue
+            r = materialize(con, d, exchange, entities=ents, prices=prices, snapshot=last, snapshot_due=due,
+                            rows=rows)  # fmt: skip
+            results.append(r)
+            if r.status != "PROMOTED":
+                break
+            changed_prev = not same
+            due = (due or r.snapshot_due) and not last
+    finally:
+        if due:  # a deferred live-table rewrite the run's last day did not make
+            publish_snapshot(con)
+    return results
 
 
 def materialize_incremental(con, to: date | None = None, exchange: str = "NSE") -> IncrementalResult:
@@ -1246,8 +2006,10 @@ def materialize_incremental(con, to: date | None = None, exchange: str = "NSE") 
     msg = version_mismatch(con)
     if msg is not None:
         return IncrementalResult("REFUSED", [], msg)
+    dirty.mark_finding_changes(con)  # X325: findings opened / resolved since the rows were flagged
     rows = _dirty_rows(con)
     if not rows:
+        dirty.store_finding_state(con)
         return IncrementalResult("NOTHING", [], "no dirty entities")
     if to is not None:
         rows = [r for r in rows if r[2] <= to]
@@ -1263,10 +2025,11 @@ def materialize_incremental(con, to: date | None = None, exchange: str = "NSE") 
         due = [r for r in rows if r[2] <= d]
         return None if any(r[1] == FULL for r in due) else frozenset(r[1] for r in due)
 
-    with materialize_run(con, days, exchange, every) as prices:
-        results = materialize_days(con, days, exchange, prices=prices, entities_for=entities_for)
-    if results and results[-1].status != "PROMOTED":
+    with entity_slices(con, every), materialize_run(con, days, exchange, every) as prices:
+        results = _incremental_days(con, days, exchange, prices, entities_for)
+    if results and results[-1].status not in PUBLISHED:
         r = results[-1]
         return IncrementalResult("ABORTED", results, f"{r.as_of_date}: {r.gate} {r.message}; dirty markers kept")
     settle_dirty(con, rows, None, to)
+    dirty.store_finding_state(con)  # markers left after `to` keep those rows stale until a later run
     return IncrementalResult("DONE", results, f"{len(days)} day(s)", len({r[1] for r in rows}))

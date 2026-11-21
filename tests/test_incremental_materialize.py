@@ -16,7 +16,7 @@ import shutil
 from datetime import date, datetime
 
 import pytest
-from conftest import FETCHED_AT, Market
+from conftest import FETCHED_AT, Market, market_template
 
 from _fixture_helpers import CORP, FIXTURES, XBRL_DIR
 from financials import dirty, features, features_store
@@ -39,11 +39,7 @@ SHP_Q1 = "SHP_1489727_21072025081003_WEB.xml"
 CA = FIXTURES / "corp_actions" / "nse_corporateActions_equities_15-09-2025_17-10-2025.json"
 
 
-@pytest.fixture(scope="module")
-def base(tmp_path_factory):
-    """Database file of the fully materialised base state (closed, so tests can copy it)."""
-    root = tmp_path_factory.mktemp("incr_base")
-    m = Market(root)
+def _fill_base(m: Market) -> None:
     for d in DAYS:
         assert promote(m.con, m.stage_day(d)).status == "PROMOTED"
     assert promote(m.con, m.stage_day("20251014", with_delivery=True)).status == "PROMOTED"
@@ -61,8 +57,13 @@ def base(tmp_path_factory):
     assert materialize_dates(m.con, None, date(2024, 10, 1), None, out) == 0, out.getvalue()
     # A full run over every materialised day consumes every marker the promotions wrote.
     assert m.con.execute("SELECT count(*) FROM materialize_dirty").fetchone()[0] == 0
-    m.con.close()
-    return root / "market.duckdb"
+
+
+@pytest.fixture(scope="module")
+def base(tmp_path_factory):
+    """Database file of the fully materialised base state (closed, so tests can copy it; built once per run)."""
+    template, _ = market_template(tmp_path_factory, "incr_base", _fill_base)
+    return template / "market.duckdb"
 
 
 @pytest.fixture
@@ -311,12 +312,136 @@ def test_full_range_run_consumes_markers_it_covers(db):
     assert history(con) == full_rebuild(con)
 
 
+# ── batched incremental run (QS2): slices, visibility memo, unchanged days ───────────────────────────────────────
+
+
+def assert_rows_equal(got: list[tuple], want: list[tuple]) -> None:
+    """Row by row, column by column; NULL equals only NULL (the first difference is named)."""
+    cols = features_store.COLUMNS
+    assert len(got) == len(want), (len(got), len(want))
+    for g, w in zip(got, want, strict=True):
+        for c, a, b in zip(cols, g, w, strict=True):
+            assert (a is None) == (b is None) and (a is None or a == b), (g[0], g[1], c, a, b)
+
+
+def some_entities(con, n: int) -> list[str]:
+    return [e for (e,) in con.execute(
+        "SELECT DISTINCT entity_id FROM screener_features_history ORDER BY entity_id LIMIT ?", [n]
+    ).fetchall()]  # fmt: skip
+
+
+def probe(con) -> None:
+    for t in ("features_daily", "features_events", "screener_features"):  # a rewritten row has probe NULL
+        con.execute(f"ALTER TABLE {t} ADD COLUMN probe INTEGER")
+        con.execute(f"UPDATE {t} SET probe = 1")
+
+
+def test_dirty_entities_without_changed_inputs_rewrite_nothing(db):
+    """A marker whose inputs changed nothing (a re-parse, a BSE mirror or re-send of a filing): every day's
+    recomputed rows equal the stored rows, so no day is published, no row is rewritten, the markers are consumed
+    and the history still equals a full rebuild row for row."""
+    con = db.con
+    before = history(con)
+    ents = some_entities(con, 40)
+    dirty.mark_entities(con, ents, date(2024, 10, 1), "TEST")
+    probe(con)
+    r = materialize_incremental(con)
+    assert r.status == "DONE", r
+    assert {d.status for d in r.days} == {"UNCHANGED"} and len(r.days) == len(days(con))
+    assert con.execute("SELECT count(*) FROM features_daily WHERE probe IS NULL").fetchone()[0] == 0
+    assert con.execute("SELECT count(*) FROM features_events WHERE probe IS NULL").fetchone()[0] == 0
+    assert con.execute("SELECT count(*) FROM materialize_dirty").fetchone()[0] == 0
+    for t in ("features_daily", "features_events", "screener_features"):
+        con.execute(f"ALTER TABLE {t} DROP COLUMN probe")
+    assert_rows_equal(history(con), before)
+    assert_rows_equal(history(con), full_rebuild(con))
+
+
+def test_changed_and_unchanged_entities_equal_a_full_rebuild(db):
+    """A results filing (its entity's rows change from its first visible day) plus 30 entities marked from the first
+    day without any input change: the days before the filing is visible are left as stored, the days from it are
+    published, and the whole history equals a full rebuild row by row, NULLs included."""
+    con = db.con
+    (ent,) = _results(db)
+    others = [e for e in some_entities(con, 31) if e != ent][:30]
+    dirty.mark_entities(con, others, date(2024, 10, 1), "TEST")
+    r = materialize_incremental(con)
+    assert r.status == "DONE", r
+    status = {d.as_of_date: d.status for d in r.days}
+    assert {s for d, s in status.items() if d < date(2025, 9, 20)} == {"UNCHANGED"}
+    assert status[date(2025, 9, 22)] == "PROMOTED"
+    assert_rows_equal(history(con), full_rebuild(con))
+
+
+def test_entity_slices_and_visibility_memo_read_the_same_rows(db):
+    """compute_rows for a set of entities through the run's slices and visibility memo equals compute_rows on the
+    full tables, on every materialised day; the slices are dropped when the run ends."""
+    from financials import run_memo
+
+    con = db.con
+    (ent,) = _results(db)
+    ents = frozenset({ent, *some_entities(con, 25)})
+    plain = {d: features.compute_rows(con, d, entities=ents) for d in days(con)}
+    with features.entity_slices(con, ents):
+        assert run_memo.active() is not None
+        n = con.execute("SELECT count(*) FROM fact_observations").fetchone()[0]
+        assert n < con.execute("SELECT count(*) FROM market.main.fact_observations").fetchone()[0] or n == 0
+        sliced = {d: features.compute_rows(con, d, entities=ents) for d in days(con)}
+    assert run_memo.active() is None
+    assert con.execute("SELECT count(*) FROM duckdb_tables() WHERE temporary").fetchone()[0] == 0
+    for d in plain:
+        assert len(plain[d]) == len(sliced[d]) > 0
+        for a, b in zip(plain[d], sliced[d], strict=True):
+            assert a.keys() == b.keys()
+            for k in a:
+                assert (a[k] is None) == (b[k] is None) and (a[k] is None or a[k] == b[k]), (d, a["security_id"], k)
+
+
+def test_visibility_memo_rereads_only_entities_whose_visibility_moved(db, monkeypatch):
+    """Two as-ofs between the same visibility timestamps of every entity share one read (the same result); a
+    timestamp of one entity in between re-reads that entity only, and the merged result equals a plain read. The
+    check mode used by every test of this file fails a run whose consumer changed a shared result."""
+    from financials import run_memo
+
+    con = db.con
+    (filed,) = [e for (e,) in con.execute("SELECT DISTINCT entity_id FROM filing_meta").fetchall()]
+    ents = frozenset({filed, *some_entities(con, 5)})
+    ts = datetime(2026, 11, 13)
+    want = features._preload(con, ts, ents)
+    assert want[2]  # the filed entity's latest quarter
+    asked: list[frozenset] = []
+    real = features._preload.__wrapped__
+    with run_memo.visibility_memo(con, {filed: [datetime(2026, 11, 13, 12)]}) as memo:
+        a = features._preload(con, ts, ents)
+        assert features._preload(con, datetime(2026, 11, 13, 6), ents) is a and a == want
+        spy = lambda c, t, e: asked.append(e) or real(c, t, e)  # noqa: E731
+        b = memo.read("spy", spy, datetime(2026, 11, 14), ents)
+        c = memo.read("spy", spy, datetime(2026, 11, 15), ents)
+    assert asked == [ents] and b is c
+    with run_memo.visibility_memo(con, {filed: [datetime(2026, 11, 14, 12)]}) as memo:
+        memo.read("spy", spy, datetime(2026, 11, 14), ents)
+        merged = memo.read("spy", spy, datetime(2026, 11, 15), ents)  # only `filed` passed a timestamp
+    assert asked[1:] == [ents, frozenset({filed})] and merged == want
+    monkeypatch.setattr(run_memo, "CHECK_MUTATIONS", True)
+    with pytest.raises(AssertionError, match="changed a shared reader result"), run_memo.visibility_memo(con, {}):
+        features._preload(con, ts, ents)[2].clear()
+
+
+@pytest.fixture(autouse=True)
+def _check_shared_results(monkeypatch):
+    """Every incremental run of this file fails if a consumer changes a shared visibility-memo result."""
+    from financials import run_memo
+
+    monkeypatch.setattr(run_memo, "CHECK_MUTATIONS", True)
+
+
 # ── reader version pin ───────────────────────────────────────────────────────
 
 # Files whose text decides feature values. Changing any of them changes this hash: bump features.FEATURES_VERSION
 # (so `materialize --incremental` refuses days built by the old rules) and update both values here together.
 PINNED_SOURCES = (
     "src/financials/features.py",
+    "src/financials/run_memo.py",
     "src/financials/features_bs.py",
     "src/financials/features_price.py",
     "src/financials/features_pl.py",
@@ -333,10 +458,11 @@ PINNED_SOURCES = (
     "src/financials/money.py",
     "src/financials/price_history.py",
     "src/financials/features_store.py",
+    "src/financials/dirty.py",  # X325: the open-finding period end of dq_flags
     "reference/valuation_archetypes.csv",
     "reference/cyclical_symbols.csv",
 )
-PINNED = ("2026.11.17-20A", "223fe8143826de8e3de15978f9b9e81b58be7a805d36c31bea2b893b2a87e277")
+PINNED = ("2026.11.21-21N", "c8543fd5f18155063d4bbdbe022ed3eba03d3d6fc42339fc7e9c6809239d1e3f")
 
 
 def sources_sha256() -> str:

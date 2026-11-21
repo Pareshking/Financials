@@ -197,6 +197,7 @@ SCOPES = {"standalone": "STANDALONE", "consolidated": "CONSOLIDATED"}
 
 IMPLEMENTED_PROFILES = (
     "INDAS_CORP", "INDAS_NBFC", "IGAAP_BANK", "IRDAI_LIFE", "IRDAI_GENERAL", "INDAS_INSURANCE", "REG34_ANNUAL",
+    "IGAAP_CORP",
 )  # fmt: skip
 
 # Named label rules [references X39, X40]: some lines exist only as a free-text label on a dimensional
@@ -285,11 +286,54 @@ def detect_profile(entity_ns: str | None) -> str | None:
     return None
 
 
+# X330: SEBI's non-Ind AS results template (`IntegratedFinance_OtherThanBank`, Schedule III Division I, Accounting
+# Standards) is the IGAAP_CORP profile only when the filing itself says the company is SME-listed (TypeOfCompany =
+# "SME"; SME-listed companies are exempt from Ind AS). A Main Board company on this template is an Ind AS company on
+# the wrong template (X89: MRPL, L&T, Rajesh Exports, Ruchira): it stays UNKNOWN_TAXONOMY until its Ind AS re-filing
+# closes the finding.
+IGAAP_CORP_NS = "/IntegratedFinance_OtherThanBank/"
+IGAAP_CORP_COMPANY_TYPE = "SME"
+
+
+def company_types(inst: Instance) -> list[str]:
+    return sorted({f.value_text.strip() for f in inst.facts if f.name == "TypeOfCompany"})
+
+
+def detect_instance_profile(inst: Instance) -> str | None:
+    """The profile of a parsed instance: its namespace's [X1], or IGAAP_CORP for an SME-listed company's filing on
+    the non-Ind AS template [X330] (None for any other filing on that template)."""
+    ns = inst.entity_namespace
+    if ns and IGAAP_CORP_NS in ns:
+        return "IGAAP_CORP" if company_types(inst) == [IGAAP_CORP_COMPANY_TYPE] else None
+    return detect_profile(ns)
+
+
 def period_months(start: date, end: date) -> int | None:
     """Whole calendar months for a period starting on the 1st and ending on a month end."""
     if start.day != 1 or end.day != calendar.monthrange(end.year, end.month)[1] or end < start:
         return None
     return (end.year - start.year) * 12 + end.month - start.month + 1
+
+
+FIRST_PERIOD_MONTHS = range(13, 19)  # invariant 6 allows 1..18; 13..18 only for a company's first financial period
+
+
+def first_period_months(start: date, end: date) -> int | None:
+    """FIRST_PERIOD_LONG [X337]: a newly incorporated company's first financial period runs from its incorporation
+    date (any day) to a financial year end (a month end), so it can exceed 12 months (Companies Act 2013 s. 2(41):
+    a company incorporated on or after 1 January may end its first financial year on 31 March of the following
+    year; invariant 6 caps any period at 18 months). Demerged companies file it as their first annual report:
+    BLUSPRING 2024-02-11..2025-03-31, DIGITIDE
+    2024-02-10..2025-03-31. Months are the calendar months the period touches (Feb 2024..Mar 2025 = 14). Only a
+    period starting after the 1st of a month with 13..18 such months qualifies; one starting on the 1st already has
+    whole-month `period_months`, and a shorter mid-month period stays irregular (or an X152 comparative stub).
+    The period is stored as a one-off: every TTM, YoY and annual-on-annual reader takes 3- or 12-month periods only
+    (and `period_months` recomputed from the dates is None), so it is never combined with any other period
+    (invariant 6); its balance sheet is an ordinary year-end balance sheet."""
+    if start.day == 1 or end < start or end.day != calendar.monthrange(end.year, end.month)[1]:
+        return None
+    months = (end.year - start.year) * 12 + end.month - start.month + 1
+    return months if months in FIRST_PERIOD_MONTHS else None
 
 
 def _parse_date(text: str | None) -> date | None:
@@ -366,9 +410,11 @@ def parse_indas_corp_results(data: bytes) -> ParsedResults:
 def parse_with_spec(data: bytes, spec: ProfileSpec) -> ParsedResults:
     inst = parse_instance(data)
     ns = inst.entity_namespace
-    profile = detect_profile(ns)
+    profile = detect_instance_profile(inst)
     result = ParsedResults(profile=profile, taxonomy_ns=ns)
     if profile is None:
+        # Details unchanged since X1 (the finding id derives from them): a Main Board filing on the non-Ind AS
+        # template [X330] re-parsed by a later parser hits its existing finding instead of opening a second one.
         result.issues.append(Issue("PARSE", "UNKNOWN_TAXONOMY", {"entity_namespace": ns}))
         return result
     if profile != spec.profile:
@@ -379,6 +425,8 @@ def parse_with_spec(data: bytes, spec: ProfileSpec) -> ParsedResults:
     if result.issues:
         return result
     _map_facts(inst, result, spec)
+    if not result.issues and spec.derive is not None:
+        spec.derive(result)
     if not result.issues:
         _check_critical(result, spec)
         if spec.identities is not None:
@@ -571,6 +619,7 @@ def _map_facts(inst: Instance, result: ParsedResults, spec: ProfileSpec | None =
         )
     _apply_zero_attribution_rule(result)
     _apply_owners_tci_rule(result)
+    _apply_owners_before_jv_rule(result)
     if spec is None or spec.identities is None:
         # Only where owners + NCI = PAT is the profile's identity (corporate, NBFC, annual). Not banks: their
         # PAT precedes the share of associates (PNB Q2 FY27: owners 5,898 Cr = PAT 5,561 - NCI + associates).
@@ -709,14 +758,27 @@ def enrich_line_items(result: ParsedResults) -> None:
 def preserve_withheld(inst: Instance, result: ParsedResults, *, durations: set, instants: set) -> None:
     """Zero-drop (C24): a value a named rule withheld or replaced (placeholder owners/NCI [X48], owners tagged as
     TCI, contingent-liability placeholders [X73]) is kept as filed under `asfiled_<element>`; the canonical tag
-    keeps the corrected value."""
+    keeps the corrected value.
+
+    ATTRIBUTION_WITHHELD_AS_FILED [X335]: an element still mapped for another period would be skipped, so the owners
+    / NCI elements of an X86 withheld period are kept as filed even when the filing uses them for a period that
+    reconciles (FCL 9M FY26: NCI 4.08 Cr as filed for the withheld 9M, Q3 NCI 3.77 Cr canonical); X325 then shows
+    owners = PAT - NCI as filed, flagged."""
     from financials.line_items import snake
 
     have = {f.source_element for f in result.facts}
-    seen = set()
+    withheld = {(f.period_start, f.period_end) for f in result.facts if f.canonical_tag == ATTRIBUTION_WITHHELD_TAG}
+    # kept by an earlier call (results profiles with a post_process call this twice): never twice
+    seen = {
+        (f.canonical_tag, f.period_start, f.period_end) for f in result.facts if f.canonical_tag.startswith("asfiled_")
+    }
     for f in inst.facts:
         c = inst.contexts[f.context_id]
-        if not f.is_numeric or c.dimensions or f.name in have:
+        if not f.is_numeric or c.dimensions:
+            continue
+        if f.name in have and not (
+            f.name in ATTRIBUTION_ELEMENTS and c.instant is None and (c.start, c.end) in withheld
+        ):
             continue
         inside = c.instant in instants if c.instant is not None else (c.start, c.end) in durations
         if not inside:
@@ -785,6 +847,36 @@ def _apply_owners_tci_rule(result: ParsedResults) -> None:
     )
 
 
+def _apply_owners_before_jv_rule(result: ParsedResults) -> None:
+    """Named rule OWNERS_BEFORE_JV_SHARE [X189]: the owners' profit element carries the profit before the share of
+    associates / joint ventures (the Integrated Filing puts that share after continuing profit), so owners = PAT - JV
+    share. Applied only when the NCI share is exactly 0 or not filed (then owners' profit must equal PAT, as in
+    X56) and the JV share is non-zero: owners := PAT. India Power (DPSCLTD) Q4 FY25: owners -17.748 Mn, PAT -18.661 Mn,
+    JV share -0.913 Mn; the PDF has no NCI line and reads PAT (186.61) lakhs. Gokul Agro FY26: owners 3,700.655 Mn
+    = 37,006.55 lakhs before associates, PDF minority interest 0.00. Only for a period that fails the attribution
+    identity (X93 tolerance) and a non-zero owners figure (owners 0 is a placeholder: CEAT Q1 FY27, crore rounding).
+    Raw facts stay as filed (asfiled_)."""
+    tol = identity_tolerance(result.meta["level_of_rounding"], 3)
+    identity_tol = identity_tolerance(result.meta["level_of_rounding"], ATTRIBUTION_TERMS)
+    fixed = []
+    for f in [f for f in result.facts if f.canonical_tag == "pat_owners"]:
+        p = (f.period_start, f.period_end)
+        pat, nci, jv = (result.value(t, *p) for t in ("pat", "pat_nci", "share_of_associates_jv"))
+        if pat is None or jv is None or abs(jv) <= tol or (nci is not None and nci != 0) or f.value == 0:
+            continue
+        if abs(f.value - pat) <= identity_tol:
+            continue
+        if abs(f.value - (pat - jv)) <= tol and abs(f.value - pat) > tol:
+            fixed.append((f, pat))
+    for f, pat in fixed:
+        result.facts.remove(f)
+        result.facts.append(dataclasses.replace(f, value=pat, source_element="RULE:OWNERS_BEFORE_JV_SHARE"))
+    if fixed:
+        result.meta.setdefault("rules_applied", []).append(
+            {"rule": "OWNERS_BEFORE_JV_SHARE", "periods": [[str(f.period_start), str(f.period_end)] for f, _ in fixed]}
+        )
+
+
 # X93: owners + NCI = PAT holds to 3 rounding units, not the 1.5 of a three-term sum: companies round each line from
 # unrounded books and file a 2-3 unit gap that their own PDF shows too (SPARC Q1 FY27 -20.76 vs PAT -20.78 Lakhs ->
 # 2 lakh; RPower Q4 FY25 125.60 vs 125.57 Cr in Lakhs -> 3 lakh).
@@ -792,6 +884,7 @@ ATTRIBUTION_TERMS = 6
 TCI_OWNERS_KEY = "li_comprehensive_income_for_the_period_attributable_to_owners_of_parent"
 TCI_NCI_KEY = "li_comprehensive_income_for_the_period_attributable_to_owners_of_parent_non_controlling_interests"
 ATTRIBUTION_WITHHELD_TAG = "attribution_withheld"  # marker (PURE 1): owners/NCI for the period are not usable [X86]
+ATTRIBUTION_ELEMENTS = ("ProfitOrLossAttributableToOwnersOfParent", "ProfitOrLossAttributableToNonControllingInterests")
 
 
 def _replace_attribution(result: ParsedResults, p: tuple, owners: Decimal, nci: Decimal, rule: str) -> None:
@@ -861,6 +954,22 @@ def _apply_attribution_recovery_rules(result: ParsedResults) -> None:
             # X105: no NCI element and no exact recovery: owners stay as filed and NCI stays absent, as before X96
             # (Oberoi Realty FY26 owners 2,224.05 vs PAT 2,225.51 Cr; the untagged NCI is the difference).
             continue
+        by_eps = _attribution_by_eps(result, p, owners, nci, pat)
+        if by_eps is not None:
+            new_owners, new_nci = by_eps
+            _replace_attribution(result, p, new_owners, new_nci if new_nci is not None else nci, "ATTRIBUTION_BY_EPS")
+            if new_nci is None:  # owners as filed: the NCI is unverified, so it is dropped (raw facts stay)
+                result.facts = [f for f in result.facts if not (f.canonical_tag == "pat_nci"
+                                                                and (f.period_start, f.period_end) == p)]  # fmt: skip
+            applied.setdefault("ATTRIBUTION_BY_EPS", []).append([str(p[0]), str(p[1])])
+            continue
+        if owners == 0 and nci != 0 and abs(nci) <= tol:
+            # X318 OWNERS_ZERO_NCI_WITHIN_ROUNDING: owners filed 0 (a placeholder, as in X48 / X214) with an NCI
+            # share within the identity tolerance: owners := PAT - NCI as filed is within that tolerance of PAT
+            # whatever the NCI's sign (Prime Securities FY25: owners 0, NCI 3 lakh, PAT 3,830 lakh).
+            _replace_attribution(result, p, pat - nci, nci, "OWNERS_ZERO_NCI_WITHIN_ROUNDING")
+            applied.setdefault("OWNERS_ZERO_NCI_WITHIN_ROUNDING", []).append([str(p[0]), str(p[1])])
+            continue
         withheld.append((p, owners, nci, pat))
     for p, owners, nci, pat in withheld:
         kept = [
@@ -884,6 +993,56 @@ def _apply_attribution_recovery_rules(result: ParsedResults) -> None:
         result.meta.setdefault("rules_applied", []).append({"rule": rule, "periods": ps})
 
 
+ATTRIBUTION_EPS_AGREE = Decimal("0.005")  # EPS x period-end shares within 0.5% of the chosen owners' profit
+EPS_HALF_PAISA = Decimal("0.005")  # basic EPS is printed to the paisa: owners' profit is known to 0.005 x shares
+
+
+def _attribution_by_eps(result: ParsedResults, p: tuple, owners: Decimal, nci: Decimal, pat: Decimal):
+    """ATTRIBUTION_BY_EPS [X214]: owners + NCI != PAT and no exact rule applies. Exactly one of the filed lines is
+    wrong, and the filing's own basic EPS (Ind AS 33: owners' profit / weighted shares) tells which. Candidates
+    (owners, NCI): owners as filed (NCI then unverified: None, dropped); owners := PAT - NCI as filed (owners filed
+    0 as a placeholder, or another line); owners := PAT + NCI with the NCI sign flipped. Chosen when EPS x period-end
+    shares (paid-up / face value) is within 0.5% of the candidate's owners (or within half a paisa of EPS) and every
+    other candidate is more than one paisa of EPS further away; when the only rivals are the two NCI signs and NCI is
+    itself below half a paisa of EPS, owners := PAT - NCI as filed (the error, at most 2 x NCI, is below what EPS can
+    show). Current periods only (period end = the filing's quarter end; prior-period shares differ). Ajmera Q2 FY26
+    consolidated: owners 0, NCI 87 lakh, PAT 3,124 lakh; EPS 7.72 x 39,360,000 = 3,038.6 lakh; PDF 'Profit/(Loss)
+    after Tax and Non Controlling Interests' 3,037 lakh. Bajaj Indef H1 FY26 filings with NCI +3.5 lakh: EPS picks
+    PAT + 3.5 lakh, as the other filing of the period (NCI -3.5 lakh) states. Otherwise None (withheld, X86)."""
+    q = result.meta.get("quarter_period")
+    if not q or p[1] != q[1]:
+        return None
+    shares = result.value("shares_from_paid_up", q[1], q[1])
+    eps = result.value("eps_basic", *p)
+    if not shares or shares <= 0 or not eps:
+        return None
+    oci, tol = result.value("oci_net", *p), identity_tolerance(result.meta["level_of_rounding"], ATTRIBUTION_TERMS)
+    # Both lines carry the OCI attribution (X84 shape, TCI split untagged): neither is usable (TECHM Q4 FY25), except
+    # with the NCI filed 0 and no NCI share of TCI [X317]: owners alone carry OCI, and the only other candidate is
+    # owners := PAT, which EPS must confirm (Indo Borax Q1 FY26: owners = OCI 107.44 lakh, PAT 1,020.41 lakh, EPS
+    # 3.18 x 32,090,000 = 1,020.46 lakh).
+    oci_shaped = owners and oci is not None and abs(oci) > tol and abs(owners + nci - oci) <= tol
+    if oci_shaped and (nci != 0 or result.value(TCI_NCI_KEY, *p) not in (None, 0)):
+        return None
+    implied, r = eps * shares, EPS_HALF_PAISA * shares
+    # Owners as filed: EPS vouches for owners only, so NCI is not derived (PAT itself may be the wrong line: Nilkamal
+    # FY25 PAT 1,832 Cr with tax filed as a credit, Supreme Infrastructure H1 FY27 owners repeated as the JV share).
+    cands = ([(owners, None, "OWNERS")] if owners else []) + [(pat - nci, nci, "NCI")]
+    if nci:
+        cands.append((pat + nci, -nci, "NCI_FLIPPED"))
+    ranked = sorted(cands, key=lambda c: abs(implied - c[0]))
+    best = ranked[0]
+    d0 = abs(implied - best[0])
+    if d0 > max(ATTRIBUTION_EPS_AGREE * abs(best[0]), r):
+        return None
+    rivals = [c for c in ranked[1:] if abs(implied - c[0]) - d0 <= 2 * r]
+    if not rivals:
+        return best[0], best[1]
+    if abs(nci) <= r and {c[2] for c in [best, *rivals]} <= {"NCI", "NCI_FLIPPED"}:
+        return pat - nci, nci
+    return None
+
+
 def _classify(result: ParsedResults, op_tag: str, other_tag: str, other_label: str) -> str | None:
     ytd = result.meta["ytd_period"]
     op = result.value(op_tag, *ytd)
@@ -905,6 +1064,19 @@ def _check_critical(result: ParsedResults, spec: ProfileSpec | None = None) -> N
     missing = [t for t in (spec or CORP_SPEC).critical if result.value(t, *q) is None]
     if missing:
         result.issues.append(Issue("PARSE", "MISSING_CRITICAL", {"tags": missing}))
+
+
+EP_FACE_LINE_RULE = "EP_EXPENDITURE_FACE_LINE"
+
+
+def _record_rule(result: ParsedResults, rule: str, detail: dict) -> None:
+    """EP_EXPENDITURE_FACE_LINE [X153]: the annual taxonomy's `ExpenditureOnProductionTransportationAndOther
+    ExpenditurePertainingToExplorationAndProductionActivities` is a separate face-of-P&L expense line for some
+    filers (ONGC, IOC, Premier Energies FY25-FY26: the EXPENSE_COMPONENTS gap equals it to the rupee) and a note
+    inside other expenses for others (Coal India, Hindustan Zinc: the identity holds without it). The identity
+    therefore holds when either the seven components alone, or the seven plus the filed element, tie to Expenses;
+    nothing is added to any stored value."""
+    result.meta.setdefault("rules_applied", []).append({"rule": rule, **detail})
 
 
 def _check(result: ParsedResults, name: str, lhs: Decimal, rhs: Decimal, n_terms: int, period: Any) -> None:
@@ -959,7 +1131,13 @@ def _check_identities(result: ParsedResults, spec: ProfileSpec | None = None) ->
         if spec.missing_component_is_zero:  # Division III: every component is filed, absent = not applicable
             comps = [c or Decimal(0) for c in comps]
         if exp is not None and None not in comps:
-            _check(result, "EXPENSE_COMPONENTS", sum(comps, Decimal(0)), exp, len(comps) + 1, p)
+            total = sum(comps, Decimal(0))
+            ep = v("ep_expenditure")  # annual taxonomy only [X153]
+            tol = identity_tolerance(result.meta["level_of_rounding"], len(comps) + 1)
+            if ep is not None and abs(total - exp) > tol and abs(total + ep - exp) <= tol:
+                _record_rule(result, EP_FACE_LINE_RULE, {"period": [str(x) for x in p], "ep_expenditure": str(ep)})
+            else:
+                _check(result, "EXPENSE_COMPONENTS", total, exp, len(comps) + 1, p)
         if spec.revenue_components:
             rev = v("revenue_from_operations")
             parts = [v(t) or Decimal(0) for t in spec.revenue_components]
@@ -1040,6 +1218,7 @@ class ProfileSpec:
     missing_component_is_zero: bool = False
     post_process: Any = None
     identities: Any = None  # replaces the Ind AS identity set (banks: RBI format)
+    derive: Any = None  # profile-specific derived facts, before the critical-tag check (IGAAP_CORP: PAT, NCI)
 
 
 CORP_SPEC = ProfileSpec(

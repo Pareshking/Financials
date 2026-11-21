@@ -10,12 +10,20 @@ Transaction` (a closed list of 14 values, TYPE_MAP), `ValueOfTheRelatedPartyTran
 `AmountOfRelatedPartyTransactionDuringTheReportingPeriod`; the balances as `AmountOfRelatedPartyTransaction` on two
 instants: the day before the context start (opening) and the context end (closing).
 
-Only standalone Q2 (September) and Q4 (March) filings carry the section (27 of 27 such fixtures; none of the other 74
+Only standalone Q2 (September) and Q4 (March) filings carry the section (June / December for a calendar financial
+year; 27 of 27 such fixtures; none of the other 74
 parsed Integrated Filings: consolidated, Q1 or Q3). In all 27 the rows add up exactly to the undimensioned total
-(`rpt_total_amount`). The context dates are the filing's reporting-period context, not a
-period of the disclosure: NETWEB filed the same rows with the same amounts in an Oct-Mar and, re-filed, in a Jan-Mar
-context (X82). Whether the amounts cover the quarter or the Reg. 23(9) half-year is therefore UNVERIFIED (R13); the
-period is stored exactly as tagged and these rows never feed a ratio or a feature column.
+(`rpt_total_amount`). The context dates are the filing's reporting-period context, not a period of the disclosure:
+NETWEB filed the same rows with the same amounts in an Oct-Mar and, re-filed, in a Jan-Mar context (X82).
+
+The amounts cover the Reg. 23(9) half-year ending on the filing's period end (X160, R13 resolved): SEBI's format D
+(circular 2024/185, note 4) asks for the six months ended September 30 and March 31 (or the six months of another
+financial year), and the filings agree (POLYMED, CASTROLIND fixtures; 116 of 134 companies in the vault): the Q2 and
+the Q4 amounts add up to the Reg. 34 Ind AS 24 year, and the Q4 opening balance is the Q2 closing balance, under a
+three-month context. `disclosure_start` / `disclosure_months` record that half-year (HALF_YEAR_RULE). A few
+filers put financial-year-to-date amounts and the year's opening balance in the Q4 filing instead (X161: EIDPARRY;
+8 of 378 companies by balance roll-forward): nothing inside the filing says so, so the rule stays the prescribed
+half-year and these rows still feed no ratio or feature column.
 
 Rules:
 - a row needs a counterparty name and a numeric amount during the period; the duration context must end on the
@@ -26,6 +34,7 @@ Rules:
 from __future__ import annotations
 
 import json
+from calendar import monthrange
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -34,7 +43,8 @@ from decimal import Decimal, InvalidOperation
 from financials.parsers.indas_corp import period_months
 from financials.parsers.xbrl import Instance
 
-REG23_PARSER_VERSION = "reg23-1"
+REG23_PARSER_VERSION = "reg23-2"  # reg23-2: disclosure_start / disclosure_months (X160)
+HALF_YEAR_MONTHS = 6
 AXIS = "RelatedPartyTransactionAxis"
 
 # TypeOfRelatedPartyTransaction as filed -> canonical type: every value seen in the 27 fixtures. Another value is
@@ -92,6 +102,8 @@ class Reg23Row:
     period_start: date  # the duration context as tagged (the filing's reporting-period context; see module doc)
     period_end: date
     period_months: int | None
+    disclosure_start: date  # HALF_YEAR_RULE: first day of the six months ending on period_end (X160)
+    disclosure_months: int  # HALF_YEAR_MONTHS
     listed_party_name: str | None  # the listed entity or the subsidiary entering into the transaction
     counterparty_name: str
     counterparty_pan: str | None
@@ -122,6 +134,15 @@ def _num(text: str) -> Decimal | None:
         return Decimal(text.strip())
     except InvalidOperation:
         return None
+
+
+def half_year_start(period_end: date) -> date:
+    """HALF_YEAR_RULE (X160): the first day of the six months that end on `period_end` (SEBI format D note 4)."""
+    nxt = period_end + timedelta(days=1)
+    months = nxt.year * 12 + nxt.month - 1 - HALF_YEAR_MONTHS
+    year, month = divmod(months, 12)
+    month += 1
+    return date(year, month, min(nxt.day, monthrange(year, month)[1]))
 
 
 def parse_reg23_rpt(inst: Instance, period_end: date | None) -> list[Reg23Row]:
@@ -166,6 +187,8 @@ def parse_reg23_rpt(inst: Instance, period_end: date | None) -> list[Reg23Row]:
                 period_start=start,
                 period_end=end,
                 period_months=period_months(start, end),
+                disclosure_start=half_year_start(end),
+                disclosure_months=HALF_YEAR_MONTHS,
                 listed_party_name=_clean(d.get("listed_party_name")),
                 counterparty_name=name,
                 counterparty_pan=None if pan is None or set(pan) <= {"*"} else pan,

@@ -2,7 +2,7 @@
 
 <!-- GENERATED from config/data_sources.yaml by `python -m financials.sources --write`. Do not edit. -->
 
-30 feeds: 13 VERIFIED, 9 OBSERVED, 6 UNVERIFIED, 2 PLANNED. Status meanings and runtime labels are defined in `config/data_sources.yaml`; evidence IDs point to `docs/references.md`.
+34 feeds: 17 VERIFIED, 9 OBSERVED, 6 UNVERIFIED, 2 PLANNED. Status meanings and runtime labels are defined in `config/data_sources.yaml`; evidence IDs point to `docs/references.md`.
 
 | ID | Feed | Phase | Status | Runtime | Evidence |
 |---|---|---|---|---|---|
@@ -36,6 +36,10 @@
 | F28 | NSE equity master (EQUITY_L.csv) | 1 | VERIFIED | CONTAINER_DIRECT | IDX10 |
 | F29 | Nifty 500 total-return index (TRI) | 1 | UNVERIFIED | UNKNOWN | — |
 | F30 | NSE 4-level industry classification (quote API) | 1 | VERIFIED | CONTAINER_DIRECT | IC1, IC2, IC3, A14 |
+| F31 | NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv) | 1 | VERIFIED | CONTAINER_DIRECT | X130, X131, X132, X133, X134, P18 |
+| F34 | BSE equity UDiFF bhavcopy | 1 | VERIFIED | CONTAINER_DIRECT | X165, A16 |
+| F35 | BSE list of securities (ListofScripData, per BSE group) | 1 | VERIFIED | GITHUB_RUNNER | X169, A17, A18 |
+| F36 | BSE announcements (+ AttachLive attachments), shareholding filings (+ inline XBRL) and results XBRL | 1 | VERIFIED | GITHUB_RUNNER | A17, A18, X166, X167, X168, X170, X247, X265 |
 
 ## F01 — UDiFF cash-market bhavcopy
 
@@ -76,7 +80,7 @@
 | Field | Value |
 |---|---|
 | exchange_or_agency | NSE |
-| url_or_endpoint_pattern | https://www.nseindia.com/api/corporates-corporateActions?index=equities&from_date=<DD-MM-YYYY>&to_date=<DD-MM-YYYY>; RSS https://nsearchives.nseindia.com/content/RSS/Corporate_action.xml |
+| url_or_endpoint_pattern | https://www.nseindia.in/api/corporates-corporateActions?index=equities&from_date=<DD-MM-YYYY>&to_date=<DD-MM-YYYY>; RSS https://nsearchives.nseindia.com/content/RSS/Corporate_action.xml |
 | format | JSON; RSS XML |
 | cadence | Daily (rolling window) |
 | fetch_runtime | CONTAINER_DIRECT |
@@ -93,7 +97,7 @@
 | Field | Value |
 |---|---|
 | exchange_or_agency | NSE |
-| url_or_endpoint_pattern | https://www.nseindia.com/api/holiday-master?type=trading |
+| url_or_endpoint_pattern | https://www.nseindia.in/api/holiday-master?type=trading |
 | format | JSON keyed by segment |
 | cadence | Yearly (current year only) and on change |
 | fetch_runtime | CONTAINER_DIRECT |
@@ -127,7 +131,7 @@
 | Field | Value |
 |---|---|
 | exchange_or_agency | NSE (SEBI taxonomy) |
-| url_or_endpoint_pattern | discovery https://www.nseindia.com/api/integrated-filing-results?index=equities&symbol=<SYM>; files https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_<PROFILE>_<id>_<ts>_WEB.xml |
+| url_or_endpoint_pattern | discovery https://www.nseindia.in/api/integrated-filing-results?index=equities&symbol=<SYM>; files https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_<PROFILE>_<id>_<ts>_WEB.xml |
 | format | XBRL instance |
 | cadence | Quarterly per company (standalone and consolidated filings) |
 | fetch_runtime | CONTAINER_DIRECT |
@@ -144,7 +148,7 @@
 | Field | Value |
 |---|---|
 | exchange_or_agency | NSE (ICAI/MCA taxonomy) |
-| url_or_endpoint_pattern | discovery https://www.nseindia.com/api/annual-reports-xbrl?index=equities&symbol=<SYM>; files https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_<SYM>_<ts>.xml |
+| url_or_endpoint_pattern | discovery https://www.nseindia.in/api/annual-reports-xbrl?index=equities&symbol=<SYM>; files https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_<SYM>_<ts>.xml |
 | format | XBRL instance (ICAI ind-as 2017-03-31) |
 | cadence | Annual (post-AGM) |
 | fetch_runtime | CONTAINER_DIRECT |
@@ -161,7 +165,7 @@
 | Field | Value |
 |---|---|
 | exchange_or_agency | NSE (BSE shp taxonomy) |
-| url_or_endpoint_pattern | listing https://www.nseindia.com/api/corporate-share-holdings-master?index=equities&symbol=<SYM>; files https://nsearchives.nseindia.com/corporate/xbrl/SHP_<id>_<ts>_WEB.xml; RSS https://nsearchives.nseindia.com/content/RSS/Shareholding_Pattern.xml |
+| url_or_endpoint_pattern | listing https://www.nseindia.in/api/corporate-share-holdings-master?index=equities&symbol=<SYM>; files https://nsearchives.nseindia.com/corporate/xbrl/SHP_<id>_<ts>_WEB.xml; RSS https://nsearchives.nseindia.com/content/RSS/Shareholding_Pattern.xml |
 | format | JSON + XBRL instance |
 | cadence | Quarterly per company |
 | fetch_runtime | CONTAINER_DIRECT |
@@ -188,7 +192,7 @@
 | phase | 2 |
 | verification_status | UNVERIFIED |
 | evidence | — |
-| notes | BLOCKED 2026-11-15 (references A15): no Reg. 76 file in the vault ledger, the announcements RSS or TCS's announcements API for Jul-Nov 2026; BSE answers 403. The Reg. 31 total x paid-up capital cross-check (X103) and the Reg. 34 year-end share counts cross-check (X114, annual stand-in; issued / subscribed / paid-up, not listed or demat) stand in. |
+| notes | BLOCKED 2026-11-15 (references A15): no Reg. 76 file in the vault ledger, the announcements RSS or TCS's announcements API for Jul-Nov 2026; BSE answers 403. The Reg. 31 total x paid-up capital cross-check (X103) and the Reg. 34 year-end share counts cross-check (X114, annual stand-in; issued / subscribed / paid-up) stand in. Since 2026-11-17 the listed side is daily: NSE Issue Size from the PR zip (F31, X133), cross-checked against Reg. 31 by check-issue-size; the audit report itself (demat vs physical, Reg. 76) is still unsourced. |
 
 ## F10 — Reg. 23(9) related party transactions
 
@@ -229,7 +233,7 @@
 | Field | Value |
 |---|---|
 | exchange_or_agency | NSE |
-| url_or_endpoint_pattern | pledge summary https://www.nseindia.com/api/corporate-pledgedata?index=equities; per-event filings endpoint TBD |
+| url_or_endpoint_pattern | pledge summary https://www.nseindia.in/api/corporate-pledgedata?index=equities; per-event filings endpoint TBD |
 | format | JSON (pledge summary); XBRL expected for events |
 | cadence | Event |
 | fetch_runtime | CONTAINER_DIRECT |
@@ -365,7 +369,7 @@
 | Field | Value |
 |---|---|
 | exchange_or_agency | NSE / NSE Clearing |
-| url_or_endpoint_pattern | bands https://nsearchives.nseindia.com/content/equities/sec_list_<DDMMYYYY>.csv; ASM https://www.nseindia.com/api/reportASM; VaR https://nsearchives.nseindia.com/archives/nsccl/var/C_VAR1_<DDMMYYYY>_1.DAT; GSM endpoint TBD |
+| url_or_endpoint_pattern | bands https://nsearchives.nseindia.com/content/equities/sec_list_<DDMMYYYY>.csv; ASM https://www.nseindia.in/api/reportASM; VaR https://nsearchives.nseindia.com/archives/nsccl/var/C_VAR1_<DDMMYYYY>_1.DAT; GSM endpoint TBD |
 | format | CSV; JSON; DAT |
 | cadence | Daily |
 | fetch_runtime | CONTAINER_DIRECT |
@@ -416,7 +420,7 @@
 | Field | Value |
 |---|---|
 | exchange_or_agency | NSE |
-| url_or_endpoint_pattern | Integrated Filing - Governance rows in https://www.nseindia.com/api/integrated-filing-results (INTEGRATED_FILING_GOVERNANCE_<id>_<ts>_WEB.xml); others TBD |
+| url_or_endpoint_pattern | Integrated Filing - Governance rows in https://www.nseindia.in/api/integrated-filing-results (INTEGRATED_FILING_GOVERNANCE_<id>_<ts>_WEB.xml); others TBD |
 | format | XBRL |
 | cadence | Quarterly / event |
 | fetch_runtime | CONTAINER_DIRECT |
@@ -535,7 +539,7 @@
 | Field | Value |
 |---|---|
 | exchange_or_agency | NSE |
-| url_or_endpoint_pattern | https://www.nseindia.com/api/NextApi/apiClient/GetQuoteApi?functionName=getSymbolData&marketType=N&series=<SERIES>&symbol=<SYM> |
+| url_or_endpoint_pattern | https://www.nseindia.in/api/NextApi/apiClient/GetQuoteApi?functionName=getSymbolData&marketType=N&series=<SERIES>&symbol=<SYM> |
 | format | JSON (equityResponse[0].secInfo macro / sector / industryInfo / basicIndustry) |
 | cadence | Snapshot (as shown on the fetch day; no effective dates) |
 | fetch_runtime | CONTAINER_DIRECT |
@@ -546,3 +550,71 @@
 | verification_status | VERIFIED |
 | evidence | IC1, IC2, IC3, A14 |
 | notes | fetch-classification [SYMBOLS] --universe nifty500 (API host, 1 request/s). /api/quote-equity answers 403 from the container (A14). Point in time from the first fetch (C25): never backdated. |
+
+## F31 — NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv)
+
+| Field | Value |
+|---|---|
+| exchange_or_agency | NSE |
+| url_or_endpoint_pattern | https://nsearchives.nseindia.com/archives/equities/bhavcopy/pr/PR<DDMMYY>.zip |
+| format | ZIP of 14 files (15 in Oct 2024); only mcapddmmyyyy.csv is parsed (fixed-width values between commas, summary rows Listed / Permitted / Total) |
+| cadence | Daily (trading days) |
+| fetch_runtime | CONTAINER_DIRECT |
+| join_keys | Trade Date, Symbol, Series |
+| target_tables | raw_nse_mcap, universe_membership |
+| unlocked_metrics | NSE market cap per security, NSE Issue Size (shares listed on NSE), Rs 500 Cr universe (rule U1), Issue Size vs Reg. 31 cross-check |
+| phase | 1 |
+| verification_status | VERIFIED |
+| evidence | X130, X131, X132, X133, X134, P18 |
+| notes | Fetched by fetch-days / run-day with each trading day's bhavcopy; fetch-mcap START END --weekly backfills the week ends for the universe. No ISIN: rows resolve by symbol and series on the file date. Issue Size is not the market-cap share count (X133: 98.4% within 0.5% of Reg. 31, below the 99% bar); it is stored and used as a cross-check (check-issue-size). The zip's other files (corporate actions, price bands, SME, ...) are not parsed. |
+
+## F34 — BSE equity UDiFF bhavcopy
+
+| Field | Value |
+|---|---|
+| exchange_or_agency | BSE |
+| url_or_endpoint_pattern | https://www.bseindia.com/download/BhavCopy/Equity/BhavCopy_BSE_CM_0_0_0_<YYYYMMDD>_F_0000.CSV |
+| format | CSV (UDiFF, NSE's column set; Src BSE, FinInstrmId = BSE scrip code, SctySrs = BSE group) |
+| cadence | Daily, trading days |
+| fetch_runtime | CONTAINER_DIRECT |
+| join_keys | TradDt, FinInstrmId (scrip code), ISIN, TckrSymb |
+| target_tables | — |
+| unlocked_metrics | ISIN to BSE scrip code map, BSE prices for BSE-only companies (owner to-do 31) |
+| phase | 1 |
+| verification_status | VERIFIED |
+| evidence | X165, A16 |
+| notes | Plain HTTP answered 200 from the container and a GitHub runner (byte-identical, 2026-11-17). parse_udiff_cm(data, exchange='BSE') reads it; nothing fetches or promotes it yet (rule BSE1 uses F35). |
+
+## F35 — BSE list of securities (ListofScripData, per BSE group)
+
+| Field | Value |
+|---|---|
+| exchange_or_agency | BSE |
+| url_or_endpoint_pattern | https://api.bseindia.com/BseIndiaAPI/api/ListofScripData/w?scripcode=&Group=<G>&industry=&segment=Equity&status=Active |
+| format | JSON list (SCRIP_CD, ISIN_NUMBER, scrip_id, GROUP, FACE_VALUE, Status, Segment, Scrip_Name, Issuer_Name, Mktcap Rs crore) |
+| cadence | Snapshot (fetch day) |
+| fetch_runtime | GITHUB_RUNNER |
+| join_keys | ISIN_NUMBER, SCRIP_CD |
+| target_tables | raw_bse_securities, security_identifier_history.bse_scrip_code |
+| unlocked_metrics | BSE scrip code per ISIN (rule BSE1), BSE market cap (BSE-only universe, owner to-do 31) |
+| phase | 1 |
+| verification_status | VERIFIED |
+| evidence | X169, A17, A18 |
+| notes | Ported owner client (financials.fetch.bse) on a runner: group A answered 200 by plain requests with BSE's headers (probe run 2, 705 rows). Runner ledger -> import-bse -> promote (rule BSE1). The container gets 403/404 (A16). |
+
+## F36 — BSE announcements (+ AttachLive attachments), shareholding filings (+ inline XBRL) and results XBRL
+
+| Field | Value |
+|---|---|
+| exchange_or_agency | BSE |
+| url_or_endpoint_pattern | https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=<N>&strCat=-1&strPrevDate=<YYYYMMDD>&strScrip=<code>&strSearch=P&strToDate=<YYYYMMDD>&strType=C&subcategory=-1; https://www.bseindia.com/xml-data/corpfiling/AttachLive/<ATTACHMENTNAME>; https://api.bseindia.com/BseIndiaAPI/api/Corp_Shareholding_ng/w?scripcode=<code>&flag=<1-6>&indtype=; https://www.bseindia.com/XBRLFILES/SHPXBRLDataXML/<code>_<ts>_SP.html; https://api.bseindia.com/BseIndiaAPI/api/Corp_FinanceResult_ng_new/w?SCRIP_CD=<code>&FlagDur=<1-7>&HFQ=&ISUBGROUP_CODE=&segment=C; https://www.bseindia.com/XBRLFILES/<XMLName \| Consol_XMLName> (IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_<code>_<D><M><YYYY><H><MM><SS>_IFIndAs.html) |
+| format | JSON (Table / Table1 ROWCNT); attachments PDF; shareholding inline XBRL (in-bse-shp taxonomy); results inline XBRL (SEBI in-capmkt taxonomy, scale 7 = crores) |
+| cadence | Per filing |
+| fetch_runtime | GITHUB_RUNNER |
+| join_keys | SCRIP_CD / FLD_ScripCode, NEWSID, ISIN inside the shareholding file |
+| target_tables | filings (exchange BSE), shareholding_meta, shareholding_observations (inline XBRL, X170), filing_meta, fact_observations, segment_observations, disclosure_facts (results inline XBRL, X265) |
+| unlocked_metrics | Reg. 31 shareholding of the Permitted members of rule U1-P; their Integrated Filing results (inline XBRL, X265; no NSE XBRL, X176) and results PDFs |
+| phase | 1 |
+| verification_status | VERIFIED |
+| evidence | A17, A18, X166, X167, X168, X170, X247, X265 |
+| notes | bse-fetch workflow (scripts/bse_fetch.py) -> import-bse -> promote. Shareholding inline XBRL is parsed into the shareholding tables (X170); announcements and PDFs are vaulted raw. strCat=Result with strScrip answered 400 (A18): ask strCat=-1 and pick Result rows by CATEGORYNAME. Results XBRL (bse_fetch.py --only results): the Corp_FinanceResult_ng_new rows' XMLName / Consol_XMLName inline files are read by the NSE results parser (parse_instance reads inline XBRL as its instance); identity by ISIN through the NSE identifier rows, else the filed ScripCode (BSE1 codes); visible from the latest of Fld_CreateDate and the file name's same-day readings. FlagDur 7 (beyond last 1 year) not answered yet. Weekly runs: --since 8 days back with --window (results and shareholding XBRL created on or after --since only, no FlagDur 7 pass) and --shard K/N over several runners, 2-3 s apart on each (X353, X354). |

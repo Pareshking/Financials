@@ -1,0 +1,52 @@
+name: bse-reach
+
+# Probe (owner 2026-11-17: "I need exact same way our BSE working"): the ported BSE client (financials.fetch.bse,
+# from Pareshking/NSE-BSE-Insider-Tracker collectors/bse/client.py) on a GitHub-hosted runner: plain requests with
+# BSE's own headers, 2-3 s apart, in-page XHR in headless Chrome only after a refusal; 5-7 calls (list of securities,
+# ABBOTINDIA results announcements + one attachment, its shareholding filings + one inline XBRL). The ledger
+# (bytes as sent + one JSON line per answer) is a workflow artifact for 1 day (the repository is public), which
+# `import-bse` vaults and stages on the owner's machine. No database is read or written.
+# Dispatch with mode=xbrl (X240) for the results / annual XBRL probe (results RSS feed, stock pages and their scripts,
+# at most 4 candidate listing endpoints per scrip, one results and one annual file); see scripts/probe_bse_reach.py.
+# A push of the paths below runs mode xbrl6 (X247-X248, the comp_resultsnew component's real parameters and the beta
+# WebForms grid; no inputs on push), so merging this change is itself the one probe.
+on:
+  push:
+    paths:
+      - .github/workflows/bse-reach.yml
+      - scripts/probe_bse_reach.py
+      - src/financials/fetch/bse.py
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "reach (the A18 calls), xbrl (X240), xbrl2 (X242), xbrl3 (X243), xbrl4 (X244), xbrl5 (X245: CorpXbrlGen with Scripcode, Corp_* listings, legacy postbacks) or xbrl6 (X247-X248: Corp_FinanceResult_ng_new / Corp_Archive_Wthxml_ng_new with the component values, XBRLFILES Std / Con, beta Comp_Resultsnew.aspx grid postbacks)"
+        default: "reach"
+      scrips:
+        description: "xbrl mode: CODE:GROUP list (list of securities group)"
+        default: "500488:A,505036:B,530745:T"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -e ".[bse]"
+      - run: curl -s https://api.ipify.org; echo " (runner public IP)"
+      - run: python scripts/probe_bse_reach.py --out bse_probe --mode "$MODE" --scrips "$SCRIPS"
+        env:
+          MODE: ${{ inputs.mode || 'xbrl6' }}  # a push (no inputs) runs the X247-X248 xbrl6 probe
+          SCRIPS: ${{ inputs.scrips || '500488:A,505036:B,530745:T' }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bse-probe
+          path: bse_probe/
+          retention-days: 1
+          if-no-files-found: warn

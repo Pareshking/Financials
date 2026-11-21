@@ -7,6 +7,7 @@ container the API answered without one [A1], so warm-up is optional).
 
 from __future__ import annotations
 
+import http.client
 import http.cookiejar
 import random
 import threading
@@ -133,7 +134,8 @@ class PoliteFetcher:
         for attempt in range(1, self.max_attempts + 1):
             try:
                 r = self._raw(url, accept)
-            except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+            except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException) as exc:
+                # HTTPException: a body cut short (IncompleteRead) or a dropped connection; seen from NSE on a runner
                 last_status, message = None, str(exc)
             else:
                 if r.status == 200:

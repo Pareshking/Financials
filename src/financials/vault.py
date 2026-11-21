@@ -144,7 +144,10 @@ class Vault:
         with self._index_lock:
             with self.index_path.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps(entry, sort_keys=True) + "\n")
-            self._index = None
+            # X348: the loaded index takes the new line (the last line of a URL wins, as on a re-read); dropping it
+            # re-parsed the whole ledger (46,000 lines, ~0.3 s) at the next lookup after every downloaded file
+            if getattr(self, "_index", None) is not None:
+                self._index[url] = dict(entry)
 
     def last_fetch(self, url: str) -> dict | None:
         with self._index_lock:

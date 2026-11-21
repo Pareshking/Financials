@@ -179,7 +179,7 @@ def test_columns_without_a_schedule_or_with_a_non_positive_denominator():
 def test_every_column_is_appended_in_both_tables_and_has_an_alias():
     for t in ("screener_features",):  # the history view has its columns (test_features_store)
         names = [c for c, _ in declared_columns()[t]]
-        tail = len(DISCLOSURE_COLUMNS) + len(AUDIT_COLUMNS)  # batch J, then the 18D and 20A blocks
+        tail = len(DISCLOSURE_COLUMNS) + len(AUDIT_COLUMNS) + 3  # J, 18D, 20A, X227, X325
         assert names[-len(R.RPT_COLUMNS) - tail : -tail] == list(R.RPT_COLUMNS), t
     used = " ".join(sql for sql, _ in ALIASES.values())
     assert [c for c in R.RPT_COLUMNS if c not in used] == ["rpt_fy_end"]  # a date, shown with `screen --columns`

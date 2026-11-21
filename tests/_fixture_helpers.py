@@ -50,6 +50,22 @@ AUDIT_OPINION_FIXTURES = frozenset({
     "INTEGRATED_FILING_INDAS_1758732_14112026091104_WEB.xml",
 })  # fmt: skip
 
+# Quarantine-rule evidence (MANIFEST.md "Quarantine rules X150-X155" and X156): read by
+# tests/test_x150_x155_quarantine_rules.py; left out of the end-to-end fixture market for the same reason.
+QUARANTINE_RULE_FIXTURES = frozenset({
+    "AR_XBRL_ABLBL_01122025184209.xml",
+    "AR_XBRL_ALOKINDS_14082026191942.xml",
+    "AR_XBRL_CHOICEIN_28102025170241.xml",
+    "AR_XBRL_ENRIN_13032026115920.xml",
+    "AR_XBRL_PREMIERENE_28012026112034.xml",
+    "IF_INS_COM_IND_AS_19757_WebXMLFile_20261104_181240292.xml",
+    "INTEGRATED_FILING_INDAS_1502813_05082025045022_WEB.xml",
+    "SHP_13769_15072025060551_WEB.xml",
+    "SHP_1652898_17042026122104_WEB.xml",
+    "SHP_1697747_21072026110424_WEB.xml",
+})  # fmt: skip
+E2E_EXCLUDED_FIXTURES = AUDIT_OPINION_FIXTURES | QUARANTINE_RULE_FIXTURES
+
 
 @dataclass(frozen=True)
 class Context:

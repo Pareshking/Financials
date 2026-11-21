@@ -97,7 +97,12 @@ def _date(el: ET.Element | None) -> date | None:
 def parse_instance(data: bytes, *, undeclared_entity_contexts: frozenset[str] = frozenset()) -> Instance:
     """Parse an XBRL instance. A fact whose context is not declared raises ParseError, except for ids in
     `undeclared_entity_contexts` (named rule SHP16, granted only by the shareholding parser): those become
-    dimensionless contexts with no period, so they can never pass a period check."""
+    dimensionless contexts with no period, so they can never pass a period check. A BSE inline XBRL file [X170,
+    X265] is read as the instance it denotes (parsers.ixbrl); the vault keeps the HTML as sent."""
+    from financials.parsers.ixbrl import inline_to_instance, is_inline
+
+    if is_inline(data):
+        data = inline_to_instance(data)
     try:
         namespaces: dict[str, str] = {}
         for _, (prefix, uri) in ET.iterparse(io.BytesIO(data), events=("start-ns",)):

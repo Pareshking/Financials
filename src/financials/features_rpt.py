@@ -30,6 +30,7 @@ from decimal import Decimal
 
 from financials.db import version_key
 from financials.fundamentals import CURRENT_VERSION, entity_filter, safe_div
+from financials.run_memo import by_visibility
 
 RPT_COLUMNS = ("rpt_fy_end", "rpt_counterparties", "rpt_leak_pct", "rpt_purchases_to_sales", "rpt_royalty_to_sales",
                "rpt_loans_given_to_net_worth")  # fmt: skip
@@ -37,6 +38,7 @@ LEAK_TYPES = ("purchases", "loans_given", "royalty")
 ZERO = Decimal(0)
 
 
+@by_visibility  # read once per visibility interval of an incremental run (run_memo)
 def rpt_inputs(con, as_of_ts: datetime, entities=None) -> dict[tuple[str, str], dict]:
     """(entity, scope) -> inputs of the latest visible fiscal year with a related-party schedule."""
     only, only_p = entity_filter("entity_id", entities)

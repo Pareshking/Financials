@@ -547,7 +547,8 @@ def test_columns_are_appended_and_split_event_daily():
     from financials.features_store import DAILY_COLUMNS, EVENT_COLUMNS
 
     names = [c for c, _ in declared_columns()["screener_features"]]
-    assert names[-len(F.COLUMNS) - len(AUDIT_COLUMNS) : -len(AUDIT_COLUMNS)] == list(F.COLUMNS)  # then 20A
+    tail = len(AUDIT_COLUMNS) + 3  # then 20A, roe_screener (X227), dq_suspect + dq_flags (X325)
+    assert names[-len(F.COLUMNS) - tail : -tail] == list(F.COLUMNS)
     assert {*F.INSIDER_COLUMNS, *F.SUBSIDIARY_COLUMNS} <= set(EVENT_COLUMNS)  # annual filings: in the cache key
     assert set(F.SHP_DECLARATION_COLUMNS) <= set(DAILY_COLUMNS)  # shareholding is outside the key
 

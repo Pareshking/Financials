@@ -73,6 +73,7 @@ from financials.fundamentals import (
     safe_div,
 )
 from financials.parsers.indas_corp import period_months
+from financials.run_memo import by_visibility
 
 # ── columns (schema order: `-- batch G (remaining Phase 2 ratios)` in db/schema.sql) ──────────────────────────────
 
@@ -175,6 +176,10 @@ def _cost_tags(book) -> dict[str, str]:
         mats = book.durations.get("cost_of_materials_consumed", {})
         pur, inv = (book.durations.get(t, {}) for t in ("purchases_of_stock_in_trade", "changes_in_inventories"))
         book.durations[key] = {p: v + pur.get(p, ZERO) + inv.get(p, ZERO) for p, v in mats.items()}
+        lines = ("cost_of_materials_consumed", "purchases_of_stock_in_trade", "changes_in_inventories")
+        book.withhold_combined(
+            key, lines, lambda v: v[lines[0]] + (v[lines[1]] or ZERO) + (v[lines[2]] or ZERO), require=lines[:1]
+        )  # X325: as-filed inputs, flagged
     return {"material_cost": key, "employee_cost": "employee_benefit_expense", "other_expenses": "other_expenses",
             "power_fuel": "power_and_fuel", "freight": "freight", "ad_promo": "advertising_promotion"}  # fmt: skip
 
@@ -214,10 +219,10 @@ def _fy_cash(book, tag: str, fy: tuple[date, date] | None) -> Decimal | None:
     """A cash-flow line of fiscal year `fy`: as filed; nil when the year's cash flow is filed without it; else NULL."""
     if fy is None:
         return None
-    v = book.durations.get(tag, {}).get(fy)
+    v = book.stated(tag, fy)  # X325: as filed (flagged) where a rule withheld it
     if v is not None:
         return v
-    return ZERO if fy in book.durations.get("cfo", {}) else None
+    return ZERO if book.stated("cfo", fy) is not None else None
 
 
 def inorganic_flag(shares: list[Decimal | None]) -> bool | None:
@@ -267,6 +272,8 @@ def _same_period_sales(book, sales_tag: str, p: tuple[date, date]) -> Decimal | 
     if v is not None:
         return v
     m = period_months(*p)
+    if m != 3:
+        return book.stated(sales_tag, p)  # X325: as filed (flagged) where a rule withheld it
     return book.quarter(sales_tag, p[1]) if m == 3 else None
 
 
@@ -360,12 +367,12 @@ def period_values(con, book, end: date, b: dict, as_of: datetime | None = None, 
 
     if fy is not None:  # Reg. 34 annual notes at the last fiscal year end [X73]
         at = lambda t: book.instants.get(t, {}).get(fy[1])  # noqa: E731
-        fees = book.durations.get("audit_fees", {}).get(fy)  # 0 = rounded to nil at the filing's unit (TCS, Eternal)
+        fees = book.stated("audit_fees", fy)  # 0 = rounded to nil at the filing's unit (TCS, Eternal)
         out["audit_fees_to_sales"] = safe_div(fees, fy_sales) if fees else None
-        fy_pat = book.durations.get("pat", {}).get(fy)
+        fy_pat = book.stated("pat", fy)  # X325: as filed (flagged) where a rule withheld it
         if fy_pat is not None and fy_pat > 0:
             out["managerial_remuneration_to_pat"] = safe_div(
-                book.durations.get(ANNUAL_TAGS["managerial_remuneration"], {}).get(fy), fy_pat)  # fmt: skip
+                book.stated(ANNUAL_TAGS["managerial_remuneration"], fy), fy_pat)  # fmt: skip
         equity = at("equity_attributable_to_owners") or at("total_equity")
         out["capital_commitments_to_net_worth"] = safe_div(at(ANNUAL_TAGS["capital_commitments"]), equity)
         for col, key in (("unquoted_investments", "unquoted"), ("quoted_investments_market_value", "quoted_mv")):
@@ -387,6 +394,7 @@ _RANKED_SHP = """WITH f AS (
     r AS (SELECT *, row_number() OVER (PARTITION BY entity_id ORDER BY as_of_date DESC) AS r FROM f)"""
 
 
+@by_visibility  # read once per visibility interval of an incremental run (run_memo)
 def shareholding_flow_inputs(con, as_of_ts: datetime, entities=None) -> dict[str, dict]:
     """Per entity, for the two latest visible Reg. 31 patterns (rank 1 = latest): as-of date, FII + DII shares,
     promoter shares, pledged shares; and the count of named public holders above 1% in the latest. Two queries."""
@@ -457,6 +465,7 @@ def event_inputs(con, as_of: date, as_of_ts: datetime, entities=None) -> dict[st
     return out
 
 
+@by_visibility  # read once per visibility interval of an incremental run (run_memo)
 def kpi_inputs(con, as_of_ts: datetime, entities=None) -> dict[str, dict[str, dict]]:
     """{entity: {kpi: {(start, end): value}}} for KPI_NAMES, latest visible version per period (one query)."""
     only, only_p = entity_filter("entity_id", entities)

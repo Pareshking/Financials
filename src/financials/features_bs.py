@@ -245,7 +245,7 @@ def noncash_working_capital(book: FactBook, d: date) -> Decimal | None:
 
 
 def _fy(book: FactBook, tag: str, p: tuple[date, date] | None) -> Decimal | None:
-    return None if p is None else book.durations.get(tag, {}).get(p)
+    return None if p is None else book.stated(tag, p)  # X325: as filed (flagged) where a rule withheld it
 
 
 def nopat(book: FactBook, p: tuple[date, date] | None) -> Decimal | None:
@@ -312,8 +312,7 @@ def cf_window(book: FactBook, cf_end: date | None) -> list[tuple[tuple[date, dat
 def _window_sum(book: FactBook, tag: str, window) -> Decimal | None:
     if window is None:
         return None
-    vals = book.durations.get(tag, {})
-    return sum((sign * vals.get(p, ZERO) for p, sign in window), ZERO)
+    return sum((sign * (book.stated(tag, p) or ZERO) for p, sign in window), ZERO)  # X325: as filed, flagged
 
 
 def _days(book: FactBook, fy_end: date) -> dict:

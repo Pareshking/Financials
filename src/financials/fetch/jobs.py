@@ -1,6 +1,6 @@
 """Fetch jobs: download → vault → staging. Each returns the stage directories it wrote.
 
-URLs below are the ones verified in docs/references.md (P1, P10, A6, A7, P12, CAL1, SHP6).
+URLs below are the ones verified in docs/references.md (P1, P10, A6, A7, P12, CAL1, SHP6, X130).
 
 Never re-download a vaulted blob (CLAUDE.md): every fetch is recorded in the vault's URL index; an archive file
 (bhavcopy, delivery, filing XBRL) that is already vaulted is read back from the vault, and a 404 that was observed
@@ -31,6 +31,7 @@ from financials.staging import (
     stage_index_closes,
     stage_index_snapshot,
     stage_market_day,
+    stage_mcap_day,
     stage_raw_only,
     stage_reg30_event,
     stage_results_listing,
@@ -41,12 +42,15 @@ from financials.timeutil import ist_to_utc, utc_now
 from financials.vault import Vault
 
 ARCHIVE = "https://nsearchives.nseindia.com"
-API = "https://www.nseindia.com/api"
+# NSE moved its site to nseindia.in (A19, nse-reach run 44357423381, 2026-11-18): www.nseindia.com answers 301 to the
+# same path on www.nseindia.in, API included; calling .in directly avoids the redirect and keeps cookies on one host.
+API = "https://www.nseindia.in/api"
 JSON = "application/json"
-WARMUP = {"www.nseindia.com": "https://www.nseindia.com/"}  # session cookies for the API host [A1]
+WARMUP = {"www.nseindia.in": "https://www.nseindia.in/"}  # session cookies for the API host [A1]
 CORP_ACTION_CHUNK_DAYS = 30  # the API answer was verified on a one-month window [P12]
 IMMUTABLE_PREFIXES = (f"{ARCHIVE}/content/cm/BhavCopy_", f"{ARCHIVE}/products/content/sec_bhavdata_full_",
-                      f"{ARCHIVE}/corporate/xbrl/", f"{ARCHIVE}/content/indices/ind_close_all_")  # fmt: skip
+                      f"{ARCHIVE}/corporate/xbrl/", f"{ARCHIVE}/content/indices/ind_close_all_",
+                      f"{ARCHIVE}/archives/equities/bhavcopy/pr/")  # fmt: skip
 EQUITY_MASTER_URL = f"{ARCHIVE}/content/equities/EQUITY_L.csv"  # [IDX10]
 NOT_FOUND_SETTLE_DAYS = 2  # a 404 counts as final only when observed this long after the requested date [P11]
 
@@ -61,6 +65,11 @@ def delivery_url(d: date) -> str:
 
 def index_close_url(d: date) -> str:
     return f"{ARCHIVE}/content/indices/ind_close_all_{d:%d%m%Y}.csv"  # [IDX9]
+
+
+def pr_zip_url(d: date) -> str:
+    """NSE's daily PRddmmyy.zip; its mcapddmmyyyy.csv is the market-cap file [X130]."""
+    return f"{ARCHIVE}/archives/equities/bhavcopy/pr/PR{d:%d%m%y}.zip"
 
 
 def corp_actions_url(start: date, end: date) -> str:
@@ -90,6 +99,8 @@ def results_listing_url(symbol: str, page: int = 1) -> str:
 ANNOUNCEMENTS_RSS = "https://nsearchives.nseindia.com/content/RSS/Online_announcements.xml"
 # XBRL file-name prefixes of the parsed Reg. 30 families [E2]
 EVENT_PREFIXES = ("REG30_PARA_B_", "CIM_", "ALTERATION_OF_CAPITAL_AND_FUND_RAISING_", "ANN_FRAUD_")
+RSS_ATTEMPTS = 3  # X350: a cut-short announcements RSS is asked again (3 answers in all)
+RSS_RETRY_WAIT = 10.0  # seconds before asking again (on top of the host's spacing)
 
 
 def annual_listing_url(symbol: str) -> str:
@@ -123,6 +134,16 @@ class Jobs:
         self.errors: list[str] = []  # per-file failures inside a listing (the rest of the listing goes on)
         self.shp_min_as_of: date | None = None  # discovery: shareholding quarters from this date (None = latest)
         self.workers = 1  # fetch-days threads (useful only with a host limit above one connection)
+        self.record_responses = False  # runner hand-back: also note listing / API answers (fetch.replay)
+        self.since: date | None = None  # X346: discovery fetches only filings broadcast on or after this date
+
+    def _has_listing_page(self, url: str) -> bool:
+        """A later listing page may be asked for (live: always; a runner replay overrides it)."""
+        return True
+
+    def _before_since(self, ts) -> bool:
+        """X346: a listed filing broadcast before `since` is skipped (no download). Unknown time: never skipped."""
+        return self.since is not None and ts is not None and ts.date() < self.since
 
     def _file(self, url: str) -> bytes | None:
         try:
@@ -137,10 +158,18 @@ class Jobs:
         name = url.rsplit("/", 1)[-1]
         return "csv.zip" if name.endswith(".csv.zip") else name.rsplit(".", 1)[-1] if "." in name else "bin"
 
-    def _get(self, url: str, *, accept: str = "*/*", allow_404: bool = False, asked_for: date | None = None):
-        """Bytes, or None for an allowed 404. Archive files already vaulted are not downloaded again."""
+    def _get(
+        self, url: str, *, accept: str = "*/*", allow_404: bool = False, asked_for: date | None = None,
+        refetch: bool = False,
+    ):  # fmt: skip
+        """Bytes, or None for an allowed 404. Archive files already vaulted are not downloaded again, except on an
+        explicit `refetch` (rule X322, `fetch-results URL --refetch`): the archive served a file that was empty or cut
+        short when it was first fetched. The old blob and its ledger line stay; the new answer is ledgered after it,
+        and different bytes are a new blob and so a new filing (invariant 2)."""
         immutable = url.startswith(IMMUTABLE_PREFIXES)
-        last = self.vault.last_fetch(url) if immutable else None
+        last = self.vault.last_fetch(url) if immutable and not refetch else None
+        if refetch and immutable and self.vault.last_fetch(url):
+            self.warnings.append(f"refetch (X322): {url} downloaded again on request; the vaulted blob is kept")
         if last and last["status"] == 200 and self.vault.exists(last["storage_path"]):
             return self.vault.read_path(last["storage_path"], last["sha256"])
         if last and last["status"] == 404 and allow_404 and asked_for is not None:
@@ -152,6 +181,10 @@ class Jobs:
             if data is not None:  # the blob is in the vault before the ledger says so (a killed run leaves no lie)
                 self.vault.put(data, ext=self._ext(url), media_type="application/octet-stream", fetched_at=utc_now())
             self.vault.record_fetch(url, 404 if data is None else 200, utc_now(), data, self._ext(url))
+        elif self.record_responses and data is not None:
+            from financials.fetch.replay import record_response
+
+            record_response(self.vault, url, data, "json" if accept == JSON else self._ext(url), utc_now())
         return data
 
     def is_done(self, url: str, job: str) -> bool:
@@ -162,7 +195,27 @@ class Jobs:
             return False
         from financials.ids import stable_id
 
-        return (self.stage_root / job / stable_id("fil", "NSE", url, last["sha256"])).exists()
+        fid = stable_id("fil", "NSE", url, last["sha256"])
+        if (self.stage_root / job / fid).exists():
+            return True
+        return fid in self._promoted_ids()  # X345: promoted filings whose staging directory is gone
+
+    def _promoted_ids(self) -> frozenset[str]:
+        if getattr(self, "_promoted", None) is None:
+            from financials import promoted_ledger
+
+            self._promoted = promoted_ledger.read(self.stage_root)
+        return self._promoted
+
+    def _promoted_answer(self, url: str, data: bytes) -> bool:
+        """X349 PROMOTED_ANSWER_SKIP: a listing / master / RSS answer byte-identical to one already promoted (same
+        URL and sha256, so the same filing id) is not staged again; it is still read. import-vault re-staged every
+        listing of a runner vault each time (2,143 listings of one 8-runner sweep)."""
+        import hashlib
+
+        from financials.ids import stable_id
+
+        return stable_id("fil", "NSE", url, hashlib.sha256(data).hexdigest()) in self._promoted_ids()
 
     def is_vaulted(self, url: str) -> bool:
         last = self.vault.last_fetch(url)
@@ -174,14 +227,14 @@ class Jobs:
         """None when no bhavcopy exists (holiday/weekend): nothing is staged. A bhavcopy staged without delivery
         is staged again once the delivery file appears [P0-2]; a fully fetched day is not fetched again."""
         b_url, d_url = bhavcopy_url(d), delivery_url(d)
-        closes = self._index_closes(d) if self.is_vaulted(b_url) else []
+        closes = self._index_closes(d) + self.mcap_day(d) if self.is_vaulted(b_url) else []
         if self.is_vaulted(b_url) and self.is_vaulted(d_url):
             return closes
         bhav = self._get(b_url, allow_404=True, asked_for=d)
         if bhav is None:
             return None
         if not closes:
-            closes = self._index_closes(d)
+            closes = self._index_closes(d) + self.mcap_day(d)
         deliv = self._get(d_url, allow_404=True, asked_for=d)
         stage = stage_market_day(
             self.vault, self.stage_root, bhavcopy=bhav, bhavcopy_url=b_url, delivery=deliv,
@@ -202,6 +255,30 @@ class Jobs:
         if data is None:
             return []
         return [stage_index_closes(self.vault, self.stage_root, data=data, source_url=url, fetched_at=utc_now())]
+
+    def mcap_day(self, d: date) -> list[Path]:
+        """The day's PRddmmyy.zip mcap file [X130], for a date with a bhavcopy. A vaulted zip is not downloaded again;
+        one vaulted but not staged (a parse failure since fixed) is staged again from the vault."""
+        url = pr_zip_url(d)
+        last = self.vault.last_fetch(url)
+        vaulted = bool(last and last["status"] == 200 and self.vault.exists(last["storage_path"]))
+        if vaulted and any((self.stage_root / "mcap_day").glob(f"*-{last['sha256'][:12]}")):
+            return []
+        data = self._get(url, allow_404=True, asked_for=d)
+        if data is None:
+            return []
+        return [stage_mcap_day(self.vault, self.stage_root, data=data, source_url=url, fetched_at=utc_now())]
+
+    def mcap_days(self, days: Iterable[date]) -> tuple[list[Path], list[str]]:
+        """fetch-mcap: the PR zips of the given trading days (e.g. the week ends of a backfill); a failure on one
+        day is reported and the rest continues."""
+        staged, errors = [], []
+        for d in days:
+            try:
+                staged += self.mcap_day(d)
+            except (FetchError, ParseError) as exc:
+                errors.append(f"{d} mcap: {exc}")
+        return staged, errors
 
     def equity_master(self) -> list[Path]:
         data = self._get(EQUITY_MASTER_URL)
@@ -274,14 +351,17 @@ class Jobs:
         that date on (2024-12-31 gives the first in-scope quarter, 2025-03-31, its QoQ comparison)."""
         url = shp_master_url(symbol)
         master = self._get(url, accept=JSON)
-        out = [stage_raw_only(self.vault, self.stage_root, data=master, ext="json", media_type=JSON,
-                              category="SHP_MASTER", source_url=url, fetched_at=utc_now())]  # fmt: skip
+        out = [] if self._promoted_answer(url, master) else [
+            stage_raw_only(self.vault, self.stage_root, data=master, ext="json", media_type=JSON,
+                           category="SHP_MASTER", source_url=url, fetched_at=utc_now())]  # fmt: skip
         entries = parse_shp_master(master)
         if min_as_of is not None:
             entries = [e for e in entries if e.as_of_date >= min_as_of]
         elif latest_only:
             entries = entries[:1]
         for e in entries:
+            if self._before_since(e.broadcast_ts_ist):
+                continue
             if self.is_done(e.xbrl_url, "shareholding") or (xbrl := self._file(e.xbrl_url)) is None:
                 continue
             out.append(
@@ -298,10 +378,13 @@ class Jobs:
         Only fiscal years ending in or after `min_to_year` are downloaded (C9); one file per request."""
         url = annual_listing_url(symbol)
         listing = self._get(url, accept=JSON)
-        out = [stage_raw_only(self.vault, self.stage_root, data=listing, ext="json", media_type=JSON,
-                              category="ANNUAL_LISTING", source_url=url, fetched_at=utc_now())]  # fmt: skip
+        out = [] if self._promoted_answer(url, listing) else [
+            stage_raw_only(self.vault, self.stage_root, data=listing, ext="json", media_type=JSON,
+                           category="ANNUAL_LISTING", source_url=url, fetched_at=utc_now())]  # fmt: skip
         for e in parse_annual_listing(listing):
-            if e.to_year < min_to_year or self.is_done(e.xbrl_url, "results_xbrl"):
+            if e.to_year < min_to_year or self._before_since(e.broadcast_ts_ist):
+                continue
+            if self.is_done(e.xbrl_url, "results_xbrl"):
                 continue
             if (xbrl := self._file(e.xbrl_url)) is None:
                 continue
@@ -320,16 +403,24 @@ class Jobs:
         out, entries, page = [], [], 1
         while True:  # every page until totalCount rows are listed [A7]
             url = results_listing_url(symbol, page)
+            if page > 1 and not self._has_listing_page(url):  # replay: the runner stopped paging here (X346)
+                break
             listing = self._get(url, accept=JSON)
-            out.append(stage_results_listing(self.vault, self.stage_root, data=listing, source_url=url,
-                                             fetched_at=utc_now()))  # fmt: skip
-            entries += parse_integrated_filing_listing(listing)
+            if not self._promoted_answer(url, listing):
+                out.append(stage_results_listing(self.vault, self.stage_root, data=listing, source_url=url,
+                                                 fetched_at=utc_now()))  # fmt: skip
+            rows = parse_integrated_filing_listing(listing)
+            entries += rows
             seen, total = listing_progress(listing)
             if not seen or page * 20 >= total or page >= 10:
                 break
+            if rows and all(self._before_since(e.visible_ts_ist) for e in rows):  # X346: a page wholly before since
+                break
             page += 1
         for e in entries:
-            if e.period_end < MIN_PERIOD_END_DATE or self.is_done(e.xbrl_url, "results_xbrl"):
+            if e.period_end < MIN_PERIOD_END_DATE or self._before_since(e.visible_ts_ist):
+                continue
+            if self.is_done(e.xbrl_url, "results_xbrl"):
                 continue
             if (xbrl := self._file(e.xbrl_url)) is None:
                 continue
@@ -353,13 +444,13 @@ class Jobs:
     def reg30_events(self, *, limit: int | None = None, rss: bytes | None = None) -> list[Path]:
         """Announcements RSS (vaulted) -> structured event XBRL of the parsed families, one file per request [E1, E2].
         The RSS pubDate (IST) is the broadcast time."""
-        rss = rss if rss is not None else self._get(ANNOUNCEMENTS_RSS)
-        raw = stage_raw_only(
+        rss = rss if rss is not None else self.announcements_rss()
+        parsed = parse_announcements_rss(rss)  # before vaulting: a cut-short answer is never kept as the day's RSS
+        out = [] if self._promoted_answer(ANNOUNCEMENTS_RSS, rss) else [stage_raw_only(
             self.vault, self.stage_root, data=rss, ext="xml", media_type="application/rss+xml",
             category="ANNOUNCEMENTS_RSS", source_url=ANNOUNCEMENTS_RSS, fetched_at=utc_now(),
-        )  # fmt: skip
-        out = [raw]
-        items = [i for i in parse_announcements_rss(rss)
+        )]  # fmt: skip
+        items = [i for i in parsed
                  if i.xbrl_url and i.xbrl_url.rsplit("/", 1)[-1].startswith(EVENT_PREFIXES)
                  and not self.is_vaulted(i.xbrl_url)]  # fmt: skip
         for item in items[:limit]:
@@ -372,9 +463,11 @@ class Jobs:
             )  # fmt: skip
         return out
 
-    def results_xbrl(self, url: str, broadcast_ts: datetime | None = None, source: str = "UNKNOWN") -> list[Path]:
-        """A results XBRL by URL (when the URL is known from elsewhere)."""
-        data = self._get(url)
+    def results_xbrl(
+        self, url: str, broadcast_ts: datetime | None = None, source: str = "UNKNOWN", *, refetch: bool = False
+    ) -> list[Path]:
+        """A results XBRL by URL (when the URL is known from elsewhere); `refetch`: see `_get` (X322)."""
+        data = self._get(url, refetch=refetch)
         return [
             stage_results_xbrl(self.vault, self.stage_root, data=data, source_url=url, fetched_at=utc_now(),
                                broadcast_ts=broadcast_ts, broadcast_ts_source=source)
@@ -425,4 +518,31 @@ class Jobs:
 
     def symbols_from_rss(self) -> list[str]:
         """Daily hint: symbols whose 'financial results' announcements are in the RSS (attachment file name)."""
-        return symbols_with_results_today(self._get(ANNOUNCEMENTS_RSS))
+        return symbols_with_results_today(self.announcements_rss())
+
+    def announcements_rss(self) -> bytes:
+        """X350 RSS_PARSE_RETRY: the announcements RSS, fetched once per job set (run-day reads it for the symbols
+        hint and for the Reg. 30 events) and accepted only when it parses as XML. NSE served a cut-short file on
+        2026-11-20 ("unclosed token: line 1, column 430594") and the day's discovery failed: an answer that does not
+        parse is asked again after RSS_RETRY_WAIT seconds (the host's own spacing still applies), up to
+        RSS_ATTEMPTS times in all; then the ParseError is raised. A rejected answer is never vaulted or recorded."""
+        if getattr(self, "_rss", None) is not None:
+            return self._rss
+        for attempt in range(1, RSS_ATTEMPTS + 1):
+            data = self.f.get(ANNOUNCEMENTS_RSS)
+            try:
+                parse_announcements_rss(data)
+            except ParseError as exc:
+                if attempt == RSS_ATTEMPTS:
+                    raise ParseError(f"{exc} ({attempt} attempts)") from exc
+                self.warnings.append(f"announcements RSS did not parse ({exc}); asked again ({attempt + 1}/"
+                                     f"{RSS_ATTEMPTS}) [X350]")  # fmt: skip
+                self.f.sleep(RSS_RETRY_WAIT)
+                continue
+            if self.record_responses:
+                from financials.fetch.replay import record_response
+
+                record_response(self.vault, ANNOUNCEMENTS_RSS, data, "xml", utc_now())
+            self._rss = data
+            return data
+        raise AssertionError("unreachable")

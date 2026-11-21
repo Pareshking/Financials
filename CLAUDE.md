@@ -1,7 +1,8 @@
 # CLAUDE.md
 
 Personal, single-user Indian equity research, screening and point-in-time backtesting engine.
-Universe v1: NSE Mainboard `EQ`/`BE`/`BZ`, starting with the Nifty 500. SME excluded.
+Universe v1: NSE Mainboard `EQ`/`BE`/`BZ` listed companies: the Nifty 500 seed plus every company whose weekly NSE
+market cap reaches Rs 500 Cr (rule U1, sticky: members never leave). SME excluded.
 **Data starts** (CHOICE C9, `financials/scope.py`): market data, corporate actions and index snapshots
 `>= 2024-10-01` (`MIN_TRADE_DATE`, UDiFF era); financials and shareholding `period_end >= 2025-03-31`
 (`MIN_PERIOD_END_DATE`, Q4 FY25: first Integrated Filing quarter). No parsers or fallbacks for older formats.
@@ -18,6 +19,7 @@ and `docs/tag_registry.yaml` (every XBRL element seen per profile + named label 
 ```bash
 python -m pip install -e ".[dev]"   # Python 3.11+
 python -m pytest                    # must pass before every commit
+python -m pytest -n 4 --deselect tests/test_benchmarks.py && python -m pytest tests/test_benchmarks.py  # same suite, ~10 min on a quiet machine instead of ~38 (benchmarks time themselves: run them alone)
 ruff check src tests && ruff format --check src tests   # CI runs both
 
 # local operation (network; never in tests or CI)
@@ -28,12 +30,20 @@ python -m financials --data-dir data materialize 2026-11-12
 python -m financials --data-dir data screen "Market Cap > 500 AND ROE > 15"
 python -m financials --data-dir data quarantine list --reason ISIN_COLLISION    # then: quarantine inspect <id> / resolve --id … --action … --note … / reprocess
 python -m financials --data-dir data discover-filings --universe nifty500      # results, annual, shareholding listings + Reg. 30 RSS (new files only)
+python -m financials --data-dir data fetch-mcap 2024-10-01 2026-11-17 --weekly   # PR-zip mcap files (fetch-days fetches each day's too)
+python -m financials --data-dir data update-universe [--from D --to D]           # sticky Rs 500 Cr Listed universe, rule U1 (run-day does it weekly)
+python -m financials --data-dir data discover-filings --universe mcap500-new     # filings of members without financials yet (mcap500 = all)
+python -m financials --data-dir data check-issue-size --as-of 2026-09-30         # NSE Issue Size vs Reg. 31 cross-check (read-only)
+python -m financials --data-dir data backfill-audit-opinions --workers 4         # audit_opinions from the vault (then full materialize on a version bump)
+python -m financials --data-dir data import-vault nse-fetch-0/ nse-fetch-1/ …        # runner vaults of the nse-fetch workflow (verified, staged; then promote)
 python -m financials --data-dir data run-day --date 2026-11-13                  # daily: fetch, discover (RSS hint), promote, materialize
 python -m financials --data-dir data rebuild-market --from 2025-09-23           # roll market state back to a date and replay (audited)
 python -m financials --data-dir data materialize --from 2024-10-01 --to 2026-11-13
 python -m financials --data-dir data materialize --incremental                 # only rows marked dirty (architecture §11.10)
 # Changing features.py / fundamentals.py (or another file pinned in tests/test_incremental_materialize.py) means bumping
 # features.FEATURES_VERSION and the pinned hash together; --incremental then refuses until a full --from/--to run.
+python -m financials --data-dir data bse-members                                # Permitted members (filings on BSE): scrip codes for the bse-fetch workflow
+python -m financials --data-dir data import-bse bse_fetch                       # vault + stage the runner's BSE ledger (then promote)
 python -m financials --data-dir data load-kpis kpis.csv                        # supplemental KPIs (then promote)
 python -m financials --data-dir data backfill-disclosures [--workers N]        # disclosure_facts (resumable; re-parses on a disc-N bump, then prune-versions)
 python scripts/disclosure_coverage.py data/market.duckdb                       # per-profile check: 0 uncaptured elements
@@ -96,9 +106,15 @@ data/                  local only, gitignored: vault/, staging/, market.duckdb
 8. **Prices** are adjusted only for splits, bonuses, rights bonus element and demergers. EPS only
    for share-count events. Dividends never adjust prices; they feed the total-return series.
    Absolute financials are never multiplied by any factor.
-9. **Quarantine over auto-heal.** Unknown taxonomy, missing critical tag, failed identity, period
-   conflict, unexplained >10% open gap or ISIN change → `quarantine_queue`; keep raw data (the vault blob and
-   its `filings` row; raw market tables), freeze derived data. A recurring defect may only be fixed by a named deterministic rule with its own fixture and test.
+   (Exception, owner decision R: a filing's wrong declared unit, proven by rule X201, is corrected in
+   `fact_corrections`; that fixes a label, it is not an adjustment.)
+9. **Quarantine over auto-heal** for raw data and identity. Unknown taxonomy, missing critical tag, failed identity,
+   period conflict, unexplained >10% open gap or ISIN change → `quarantine_queue`; keep raw data (the vault blob and
+   its `filings` row; raw market tables); a failed identity, unknown taxonomy or undetermined period parses nothing.
+   **Show and flag** (owner decision V, X325): a derived value the filings state is shown and flagged
+   (`dq_flags` / `dq_suspect`), never blanked; an unresolved gap keeps adjusted price returns frozen and flags the row.
+   Genuine absence stays NULL (no filing, fewer than 4 quarters, pre-cutoff windows, undefined ratios).
+   A recurring defect may only be fixed by a named deterministic rule with its own fixture and test.
 10. **Single writer.** Fetchers and parsers write vault files and staging Parquet only. Only the
     promoter opens `data/market.duckdb` for writing, and promotes atomically after gates G1–G5.
 11. Timestamps are `TIMESTAMP` columns holding UTC; convert to/from IST only at parse and display boundaries.
@@ -122,8 +138,9 @@ data/                  local only, gitignored: vault/, staging/, market.duckdb
 
 - `nsearchives.nseindia.com`: archives (bhavcopy, delivery, XBRL files, RSS). `www.nseindia.com`
   needs session cookies and runs only locally.
-- At least 1 s between requests per host by default (also with `--workers`). Owner decision: the static archive host
-  may run at `--archive-rps 8` (8 requests/s, 8 connections); `www.nseindia.com` API calls stay at 1/s. Backoff with
+- At least 1 s between requests per host by default (also with `--workers`). Owner decision 2026-11-20 (measured rate
+  probe, X354): the static archive host runs at `--archive-rps 12` (default; 12 requests/s, 12 connections) and the
+  `www.nseindia.in` API at 2 requests/s with 3 in flight; BSE 2-3 s apart (owner 2026-11-21, X354). Backoff with
   jitter on 403/429/5xx, never re-download a vaulted blob (vault `url_index.jsonl` is the fetch checkpoint ledger).
 - Exchange terms prohibit automated access. Keep volume minimal and never redistribute data.
 

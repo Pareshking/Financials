@@ -21,7 +21,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
-from conftest import build_full_market
+from conftest import full_market_db
 from test_materialize_fast_path import identical
 
 from financials import features, features_gems, features_more, features_peers, features_store
@@ -238,13 +238,13 @@ def _shadow(monkeypatch, con) -> None:
     monkeypatch.setattr(features_store, "write_day", write_day)
     monkeypatch.setattr(features_store, "delete_from", delete_from)
     for mod in (features_gems, features_peers, features_more):
-        real = mod.refresh_cross_section
+        real = mod.refresh_cross_sections  # refresh_cross_section (one day) calls it too
 
-        def refresh(con_, as_of, _real=real):
-            _real(con_, as_of)
-            _real(_Rewrite(con_), as_of)
+        def refresh(con_, days, _real=real):
+            _real(con_, days)
+            _real(_Rewrite(con_), days)
 
-        monkeypatch.setattr(mod, "refresh_cross_section", refresh)
+        monkeypatch.setattr(mod, "refresh_cross_sections", refresh)
 
 
 def assert_view_equals_wide(con) -> int:
@@ -266,10 +266,7 @@ def assert_view_equals_wide(con) -> int:
 
 @pytest.fixture(scope="module")
 def fixture_db(tmp_path_factory):
-    root = tmp_path_factory.mktemp("store_base")
-    m = build_full_market(root)
-    m.con.close()
-    return root / "market.duckdb"
+    return full_market_db(tmp_path_factory, "store_base")
 
 
 def test_fixture_market_view_equals_the_wide_table(fixture_db, tmp_path, monkeypatch):

@@ -195,3 +195,33 @@ def test_a_different_stored_scrip_code_is_kept_and_quarantined(market):
         "FROM quarantine_queue WHERE reason_code = 'BSE_SCRIP_CODE_CONFLICT'"
     ).fetchall()
     assert q == [("IDENTIFIER", "532540", "999999")]
+
+
+# ── SC0: an all-zero scrip code is a placeholder (X171) ──────────────────────────────────────────────────────────
+UNITEDPOLY_ZERO = "INTEGRATED_FILING_INDAS_1502813_05082025045022_WEB.xml"
+
+
+def test_a_real_filing_states_an_all_zero_scrip_code_and_sc0_reads_it_as_none():
+    from financials.filing_checks import scrip_code
+    from financials.parsers.xbrl import parse_instance
+
+    inst = parse_instance((XBRL_DIR / UNITEDPOLY_ZERO).read_bytes())
+    stated = {f.name: f.value_text.strip() for f in inst.facts if f.name in ("ScripCode", "Symbol")}
+    assert stated == {"ScripCode": "000000", "Symbol": "UNITEDPOLY"}
+    assert scrip_code("000000") is None and scrip_code(" 0 ") is None and scrip_code("") is None
+    assert scrip_code(None) is None and scrip_code("53254O") is None
+    assert scrip_code(" 532540 ") == "532540" and scrip_code("500180") == "500180"
+
+
+def test_a_stored_all_zero_scrip_code_is_filled_by_the_real_one_without_a_conflict(market):
+    promote(market.con, market.stage_day("20261112"))
+    market.con.execute("UPDATE security_identifier_history SET bse_scrip_code = '000000' WHERE symbol = 'TCS'")
+    r = promote(market.con, _stage(market, TCS_Q2FY27, datetime(2026, 10, 8, 4, 38)))
+    assert r.status == "PROMOTED", r
+    assert _codes(market, "TCS") == {"532540"}
+    assert (
+        market.con.execute(
+            "SELECT count(*) FROM quarantine_queue WHERE reason_code = 'BSE_SCRIP_CODE_CONFLICT'"
+        ).fetchone()[0]
+        == 0
+    )

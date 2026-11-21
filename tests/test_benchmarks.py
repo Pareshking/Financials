@@ -4,6 +4,7 @@ These catch order-of-magnitude regressions such as per-row/per-security query lo
 2026-11-12 promotion that took 11.2 s before gap quarantines were bulk-inserted (now < 1 s locally).
 """
 
+import io
 import statistics
 import time
 from datetime import date
@@ -87,3 +88,57 @@ def test_incremental_materialization_recomputes_a_subset_fast(full_market):
     elapsed = time.perf_counter() - t
     assert r.status == "DONE" and [d.as_of_date for d in r.days] == [day], r
     assert elapsed < 1.5, f"incremental (300 entities, 1 day) took {elapsed:.2f}s (full day {full:.2f}s)"
+
+
+def test_incremental_cost_per_unchanged_day_is_small(full_market):
+    """50 dirty entities over every materialised day, none of whose inputs changed (a re-parse, a BSE mirror): each
+    day computes their rows through the run's slices and visibility memo, finds them equal to the stored rows and
+    publishes nothing (architecture §11.10). Guards the per-day overhead that made a 2-entity, 363-day run take
+    6 minutes (~1.1 s a day before the slices; ~0.12 s now on the live-size database)."""
+    from financials import dirty
+    from financials.cli import materialize_dates
+    from financials.features import materialize_incremental
+
+    con = full_market.con
+    out = io.StringIO()
+    assert materialize_dates(con, None, date(2025, 9, 19), None, out) == 0, out.getvalue()
+    n_days = con.execute("SELECT count(DISTINCT as_of_date) FROM features_daily").fetchone()[0]
+    ents = [e for (e,) in con.execute(
+        "SELECT DISTINCT entity_id FROM features_daily ORDER BY 1 LIMIT 50").fetchall()]  # fmt: skip
+    con.execute("DELETE FROM materialize_dirty")
+    dirty.mark_entities(con, ents, date(2025, 9, 19), "BENCH")
+    t = time.perf_counter()
+    r = materialize_incremental(con)
+    elapsed = time.perf_counter() - t
+    assert r.status == "DONE" and len(r.days) == n_days >= 5 and {d.status for d in r.days} == {"UNCHANGED"}, r
+    assert elapsed / n_days < 0.5, f"incremental (50 entities, {n_days} days) took {elapsed:.2f}s"
+
+
+def test_full_run_is_batched_and_not_slower_than_day_by_day(tmp_path):
+    """`materialize --from/--to` publishes many days per transaction and reads the changing entities through the
+    run's slices (features._materialize_batched): over the fixture market extended with synthetic histories it must
+    not be slower than the same run day by day (one transaction a day). Generous: the live-size gain is ~2x."""
+    import shutil
+
+    from conftest import build_full_market
+
+    from financials import features
+    from financials.bench import extend_synthetic
+    from financials.db import connect
+
+    (tmp_path / "m").mkdir()
+    build_full_market(tmp_path / "m").con.close()
+    src = tmp_path / "m" / "market.duckdb"
+    days = [d for d in extend_synthetic(src, 40, date(2025, 7, 1), date(2025, 10, 31)) if d >= date(2025, 8, 1)]
+    took = {}
+    for name, batch in (("day_by_day", 1), ("batched", None)):
+        path = tmp_path / f"{name}.duckdb"
+        shutil.copy(src, path)
+        con = connect(path)
+        t = time.perf_counter()
+        with features.materialize_run(con, days) as prices:
+            res = features.materialize_days(con, days, prices=prices, batch_days=batch)
+        took[name] = time.perf_counter() - t
+        con.close()
+        assert len(res) == len(days) and {r.status for r in res} == {"PROMOTED"}
+    assert took["batched"] < 1.2 * took["day_by_day"] + 1.0, took

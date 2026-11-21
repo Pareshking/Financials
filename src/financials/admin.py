@@ -17,10 +17,12 @@ from typing import Any
 
 from financials import dirty
 from financials.corp_actions import CorpAction, audit_day
-from financials.db import fetch_dicts, insert_rows
+from financials.db import fetch_dicts, insert_rows, version_key
 from financials.ids import stable_id
 from financials.index_changes import IndexEvent, reconstruct_backward
+from financials.level_slip import level_slip, rescaled, usual_level
 from financials.promoter import (
+    RESULTS_CATEGORY_SQL,
     _actions,
     _prev_closes,
     _quarantine,
@@ -179,9 +181,11 @@ RETRYABLE = ("UNKNOWN_ISIN", "UNKNOWN_SYMBOL", "AMBIGUOUS_ISIN", "AMBIGUOUS_SYMB
 
 def reprocess(con, stage_root) -> dict[str, Any]:
     """Promote again every batch with an open, retryable finding (identity not yet known, visibility not yet
-    derivable, a filing override recorded since). Each open finding is marked REPROCESSING first; promoting
-    the batch again reopens it if the problem is still there (same deterministic id), otherwise it is closed as
-    REPROCESSED. MISSING_FIN_INSTRM_ID bars are loaded when their ISIN belongs to exactly one security that day
+    derivable, a filing override recorded since). Each open finding whose batch is still staged is marked
+    REPROCESSING first; promoting the batch again reopens it if the problem is still there (same deterministic id),
+    otherwise it is closed as REPROCESSED. A finding whose batch is no longer staged is left open and listed under
+    `batch_not_staged` (restage it first) [X141]. The named market rules (CA12, CA13, X140) then re-run over every
+    open GAP finding. MISSING_FIN_INSTRM_ID bars are loaded when their ISIN belongs to exactly one security that day
     with the same symbol and series."""
     from pathlib import Path
 
@@ -200,6 +204,7 @@ def reprocess(con, stage_root) -> dict[str, Any]:
     )
     filing_ids = sorted({q["filing_id"] for q in open_q})
     stages: list[str] = []
+    staged: set[str] = set()
     if filing_ids:
         logged = [r[0] for r in con.execute("SELECT stage_path FROM promotion_log").fetchall()]
         files = [
@@ -209,11 +214,16 @@ def reprocess(con, stage_root) -> dict[str, Any]:
         ]
         if files:
             rows = con.execute(
-                "SELECT DISTINCT filename FROM read_parquet(?, filename = true) WHERE filing_id IN (SELECT unnest(?))",
+                "SELECT DISTINCT filename, filing_id FROM read_parquet(?, filename = true) "
+                "WHERE filing_id IN (SELECT unnest(?))",
                 [files, filing_ids],
             ).fetchall()
-            stages = sorted({Path(f).parent.relative_to(stage_root).as_posix() for (f,) in rows})
-    ids = [q["quarantine_id"] for q in open_q]
+            stages = sorted({Path(f).parent.relative_to(stage_root).as_posix() for f, _ in rows})
+            staged = {fid for _, fid in rows}
+    # Only a finding whose batch is promoted again can be re-checked. A finding whose staged batch is gone (staging
+    # pruned after promotion) stays open: closing it as REPROCESSED would claim a re-check that never ran [X141].
+    not_found = sorted(q["quarantine_id"] for q in open_q if q["filing_id"] not in staged)
+    ids = [q["quarantine_id"] for q in open_q if q["filing_id"] in staged]
     if ids:
         con.execute(
             "UPDATE quarantine_queue SET resolved_at = ?, resolution = ? WHERE quarantine_id IN (SELECT unnest(?))",
@@ -233,10 +243,21 @@ def reprocess(con, stage_root) -> dict[str, Any]:
         [REPROCESSING],
     ).fetchall()
     loaded = _load_missing_fin_instrm_id_bars(con)
-    out = {"batches": results, "cleared": [r[0] for r in fixed], "bars_loaded": loaded}
+    rules = _transaction(con, _market_rules)
+    out = {"batches": results, "cleared": [r[0] for r in fixed], "bars_loaded": loaded,
+           "batch_not_staged": not_found, "market_rules": rules}  # fmt: skip
     con.execute("INSERT INTO admin_log VALUES (?, 'REPROCESS', '{}', ?, NULL, ?)",
                 [stable_id("adm", "reprocess", now), json.dumps(out, default=str), now])  # fmt: skip
     return out
+
+
+def _market_rules(con) -> dict[str, int]:
+    """The named market-side rules that close open GAP findings (CA12, CA13, X140), re-run over every open finding:
+    the same statements market-day promotion runs, so a rule added later also reaches older findings."""
+    from financials.promoter import resolve_isin_changes, resolve_market_moves, resolve_rights_entitlement_gaps
+
+    return {"CA12": resolve_market_moves(con), "CA13": resolve_isin_changes(con, "NSE"),
+            "X140": resolve_rights_entitlement_gaps(con)}  # fmt: skip
 
 
 def _load_missing_fin_instrm_id_bars(con) -> int:
@@ -358,18 +379,25 @@ def inspect_quarantine(con, quarantine_id: str) -> dict[str, Any]:
                                        "'{\"action_type\": \"SPLIT\", \"ratio_num\": 2, \"ratio_den\": 10}'"],
         "ISIN_COLLISION": [f"{base} --action MERGE_SECURITIES --note '<evidence>'"],
         "UNPARSED_PURPOSE": [f"{base} --action REJECT --note '<not a price action>'",
+                             f"{base} --action ACCEPT --note '<source>' --payload-json "
+                             "'{\"action_type\": \"DIVIDEND\", \"cash_per_share\": \"0.50\"}'",
                              "resolve the day's GAP finding with --action CORP_ACTION (supersedes this record)"],
         "VERIFY_FAILED": [f"{base} --action REJECT --note '<wrong record>'",
+                          f"{base} --action ACCEPT --note '<evidence for the ratio>' --payload-json "
+                          "'{\"accept_recorded_factor\": true}'",
                           "resolve the day's GAP finding with --action CORP_ACTION (supersedes this record)"],
         "NO_VISIBILITY": [f"{base} --action OVERRIDE --note '<source>' --payload-json "
                           "'{\"field\": \"broadcast_ts\", \"value\": \"YYYY-MM-DDTHH:MM:SS (UTC)\"}'",
                           "python -m financials quarantine reprocess  (after the calendar covers the date)"],
         "MISSING_SESSION": ["fetch the missing day(s), then python -m financials rebuild-market --from <date>"],
     }  # fmt: skip
-    for r in ("UNKNOWN_ISIN", "UNKNOWN_SYMBOL", "AMBIGUOUS_ISIN", "AMBIGUOUS_SYMBOL", "CIN_MISMATCH"):
+    for r in FILING_OVERRIDE_FIELDS["security_id"]:
         suggest[r] = [f"{base} --action OVERRIDE --note '<evidence>' --payload-json "
                       "'{\"field\": \"security_id\", \"value\": \"<sec_...>\"}'",
                       "python -m financials quarantine reprocess  (once the security is known)"]  # fmt: skip
+    for r in CA_IDENTITY_REASONS if q["stage"] == "CORP_ACTION" else ():
+        suggest[r] = [f"{base} --action ACCEPT --note '<evidence>' --payload-json '{{\"security_id\": \"<sec_...>\"}}'",
+                      f"{base} --action ACCEPT --note '<no action to record>'"]  # fmt: skip
     suggest.setdefault("MISSING_FIN_INSTRM_ID", ["python -m financials quarantine reprocess"])
     fallback = [f"{base} --action ACCEPT|REJECT --note '<why>'"]
     return {"quarantine": {**q, "details": d}, "context": ctx, "resolve_with": suggest.get(q["reason_code"], fallback)}
@@ -449,6 +477,9 @@ def _resolve(con, qid: str, action: str, note: str, payload: dict) -> dict:
             raise AdminError("CORP_ACTION resolves GAP quarantines")
         effects.update(_add_corp_action(con, q, details, payload, entity, note))
 
+    elif action == "ACCEPT" and q["stage"] == "CORP_ACTION" and payload:
+        effects.update(_accept_corp_action(con, q, details, payload, entity, note))
+
     elif action == "REJECT" and q["stage"] == "CORP_ACTION" and details.get("action_id"):
         n = con.execute(
             "UPDATE corp_actions SET status = 'REJECTED', decided_at = ? WHERE action_id = ? "
@@ -472,7 +503,16 @@ def _resolve(con, qid: str, action: str, note: str, payload: dict) -> dict:
 # OVERRIDE writes only fields the promoter reads, per quarantine reason [P2-13].
 FILING_OVERRIDE_FIELDS = {
     "broadcast_ts": ("NO_VISIBILITY",),
-    "security_id": ("UNKNOWN_ISIN", "UNKNOWN_SYMBOL", "AMBIGUOUS_ISIN", "AMBIGUOUS_SYMBOL", "CIN_MISMATCH"),
+    # ISIN_SYMBOL_CONFLICT [X288]: identifiers that disagree and no named rule settles (X101) are decided by hand,
+    # on evidence the filing carries (e.g. a BSE filing's ScripCode and company name).
+    "security_id": (
+        "UNKNOWN_ISIN",
+        "UNKNOWN_SYMBOL",
+        "AMBIGUOUS_ISIN",
+        "AMBIGUOUS_SYMBOL",
+        "CIN_MISMATCH",
+        "ISIN_SYMBOL_CONFLICT",
+    ),
 }
 
 
@@ -553,6 +593,126 @@ def _add_corp_action(con, q: dict, details: dict, payload: dict, entity: str, no
     ).fetchone()[0]
     return {"corp_action": action.action_id, "status": "VERIFIED_MANUAL", "superseded": superseded,
             "other_gaps_open_same_day": still_open}  # fmt: skip
+
+
+CA_IDENTITY_REASONS = ("STALE_ISIN_OTHER_ISSUER", "UNKNOWN_ISIN", "AMBIGUOUS_SECURITY")
+
+
+def _accept_corp_action(con, q: dict, details: dict, payload: dict, entity: str | None, note: str) -> dict:
+    """ACCEPT with a payload on a CORP_ACTION finding: the admin decides what the feed record means [X142].
+
+    - VERIFY_FAILED + {"accept_recorded_factor": true}: the recorded action (ratio proven by other evidence, e.g. the
+      Issue Size in NSE's PR mcap file) is accepted with its theoretical factor although the ex-date open is outside
+      the verification tolerance; the day is re-audited: a gap the accepted factors explain closes, a residual above
+      the threshold is (re)raised as UNEXPLAINED_GAP for its own decision.
+    - STALE_ISIN_OTHER_ISSUER / UNKNOWN_ISIN / AMBIGUOUS_SECURITY + {"security_id": ..., "face_value": optional}: the
+      record's purpose is parsed by the same rules and recorded for that security (same action id the promoter would
+      give it), then verified like any action. The security must have held the record's symbol.
+    - UNPARSED_PURPOSE + {"action_type": ..., ratio_num / ratio_den / issue_price / cash_per_share}: the UNKNOWN
+      record takes the stated parse (same action id) and is verified like any action.
+    """
+    from financials.corp_actions import ACTION_TYPES
+    from financials.parsers.nse_corp_actions import parse_purpose
+
+    reason, now = q["reason_code"], utc_now()
+    if reason == "VERIFY_FAILED":
+        if payload.get("accept_recorded_factor") is not True:
+            raise AdminError('VERIFY_FAILED: ACCEPT payload must be {"accept_recorded_factor": true}')
+        row = con.execute(
+            "SELECT security_id, ex_date, price_factor, status FROM corp_actions WHERE action_id = ?",
+            [details["action_id"]],
+        ).fetchone()
+        if row is None or row[3] != "QUARANTINED" or row[2] is None:
+            raise AdminError(f"{details['action_id']} is not a factorable QUARANTINED action")
+        sec, ex = row[0], row[1]
+        con.execute("UPDATE corp_actions SET status = 'VERIFIED_MANUAL', decided_at = ? WHERE action_id = ?",
+                    [now, details["action_id"]])  # fmt: skip
+        _override(con, entity, "accepted_corp_action", {"action_id": details["action_id"]}, ex, note)
+        return {"accepted_action": details["action_id"], **_reaudit_day(con, sec, ex, q["quarantine_id"])}
+    if reason == "UNPARSED_PURPOSE":
+        if "action_type" not in payload or not details.get("action_id"):
+            raise AdminError("UNPARSED_PURPOSE: ACCEPT payload needs action_type (and its ratios / amounts)")
+        dec = lambda k: None if payload.get(k) is None else Decimal(str(payload[k]))  # noqa: E731
+        if payload["action_type"] not in ACTION_TYPES or payload["action_type"] == "UNKNOWN":
+            raise AdminError(f"action_type must be one of {sorted(ACTION_TYPES - {'UNKNOWN'})}")
+        n = con.execute(
+            "UPDATE corp_actions SET action_type = ?, ratio_num = ?, ratio_den = ?, issue_price = ?, "
+            "cash_per_share = ?, status = 'PENDING', decided_at = NULL WHERE action_id = ? AND action_type = 'UNKNOWN' "
+            "AND status = 'QUARANTINED' RETURNING security_id, ex_date",
+            [payload["action_type"], dec("ratio_num"), dec("ratio_den"), dec("issue_price"), dec("cash_per_share"),
+             details["action_id"]],
+        ).fetchall()  # fmt: skip
+        if not n:
+            raise AdminError(f"{details['action_id']} is not a QUARANTINED UNKNOWN record")
+        verify_pending_actions(con, "NSE")
+        status = con.execute("SELECT status FROM corp_actions WHERE action_id = ?", [details["action_id"]]).fetchone()
+        _override(con, entity, "parsed_corp_action", {"action_id": details["action_id"], **payload}, n[0][1], note)
+        return {"parsed_action": details["action_id"], "status": status[0]}
+    if reason not in CA_IDENTITY_REASONS or "security_id" not in payload:
+        raise AdminError(f"ACCEPT with a payload resolves VERIFY_FAILED, UNPARSED_PURPOSE or {CA_IDENTITY_REASONS}")
+    sec, ex = payload["security_id"], date.fromisoformat(str(details["ex_date"])[:10])
+    held = con.execute(
+        "SELECT count(*) FROM security_identifier_history WHERE security_id = ? AND symbol = ?",
+        [sec, details["symbol"]],
+    ).fetchone()[0]
+    if not held:
+        raise AdminError(f"{sec} has never held the record's symbol {details['symbol']}")
+    fv = None if payload.get("face_value") is None else Decimal(str(payload["face_value"]))
+    status, why, comps = parse_purpose(details["subject"], fv)
+    if status != "PARSED" or not comps:
+        raise AdminError(f"purpose {details['subject']!r} is {status} ({why}): nothing to record; ACCEPT without "
+                         "a payload to close the finding")  # fmt: skip
+    entity = con.execute("SELECT entity_id FROM securities WHERE security_id = ?", [sec]).fetchone()[0]
+    ids = []
+    for i, c in enumerate(comps):
+        action = CorpAction(
+            action_id=stable_id("ca", "NSE", details["isin"], ex, details["subject"], i), security_id=sec,
+            action_type=c.action_type, ex_date=ex, ratio_num=c.ratio_num, ratio_den=c.ratio_den,
+            issue_price=c.issue_price, cash_per_share=c.cash_per_share,
+        )  # fmt: skip
+        record_corp_action(con, action, source_filing_id=q["filing_id"], entity_id=entity)
+        ids.append(action.action_id)
+    verify_pending_actions(con, "NSE")
+    statuses = dict(con.execute("SELECT action_id, status FROM corp_actions WHERE action_id IN (SELECT unnest(?))",
+                                [ids]).fetchall())  # fmt: skip
+    _override(con, entity, "corp_action_security", {"actions": ids, "security_id": sec, "isin": details["isin"]}, ex,
+              note)  # fmt: skip
+    return {"recorded_actions": statuses}
+
+
+def _reaudit_day(con, sec: str, ex: date, qid: str) -> dict:
+    """Gap audit of one security-day with its currently accepted actions (as verify_pending_actions does)."""
+    from financials.corp_actions import ACCEPTED_STATUSES
+
+    bar = con.execute("SELECT open, exchange FROM ohlcv WHERE security_id = ? AND trade_date = ?", [sec, ex]).fetchone()
+    if bar is None:
+        return {"reaudit": "no bar on the ex-date"}
+    prev = _prev_closes(con, bar[1], ex).get(sec)
+    accepted = [a for a in _actions(con, "security_id = ? AND ex_date = ?", [sec, ex]) if a.status in ACCEPTED_STATUSES]
+    gaps = [f for f in audit_day(sec, ex, bar[0], prev, accepted, False) if f.reason_code == "UNEXPLAINED_GAP"]
+    now = utc_now()
+    if any(a.action_type in ("SPLIT", "CONSOLIDATION") for a in accepted):
+        con.execute(
+            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ? "
+            "WHERE stage = 'GAP' AND reason_code = 'ISIN_CHANGE_WITHOUT_ACTION' AND security_id = ? "
+            "AND resolved_at IS NULL AND CAST(json_extract_string(details, '$.trade_date') AS DATE) = ?",
+            [now, "explained by recorded split/consolidation", sec, ex],
+        )
+    if not gaps:
+        con.execute(
+            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ? "
+            "WHERE stage = 'GAP' AND reason_code = 'UNEXPLAINED_GAP' AND security_id = ? AND resolved_at IS NULL "
+            "AND CAST(json_extract_string(details, '$.trade_date') AS DATE) = ?",
+            [now, "explained by " + ", ".join(f"{a.action_type} {a.action_id}" for a in accepted), sec, ex],
+        )
+        return {"residual_gap": None}
+    f = gaps[0]
+    gid = _quarantine(con, stage="GAP", reason_code=f.reason_code, security_id=sec,
+                      details={"trade_date": ex, "gap": f.gap, "prev_close": prev, "open": bar[0]})  # fmt: skip
+    combined = Decimal(1)
+    for a in accepted:
+        combined *= a.price_factor
+    return {"residual_gap": str(bar[0] / (prev * combined) - 1), "gap_finding": gid}
 
 
 def _merge_securities(con, q: dict, details: dict, note: str) -> dict:
@@ -644,6 +804,114 @@ def _merge_securities(con, q: dict, details: dict, note: str) -> dict:
                 details={"trade_date": trade_date, "gap": f.gap, "prev_close": prev, "open": r["open"]},
             )
     return {"kept": keep, "merged": drop, "bars_loaded": loaded}
+
+
+# ── duplicate entity repair (X321) ─────────────────────────────────────────
+
+# Derived tables: rows of the merged security are deleted and both entities marked dirty, so materialisation
+# recomputes them under the kept security. Everything else that names the merged security or entity is rebound.
+_DERIVED_TABLES = ("features_daily", "features_events", "screener_features")
+_NOT_REBOUND = ("securities", "entity_master", "materialize_dirty", "entity_lineage", *_DERIVED_TABLES)
+
+
+def duplicate_entity_isins(con, exchange: str = "NSE") -> list[dict]:
+    """X321 candidates: ISINs whose identifier history names more than one security (read-only)."""
+    return fetch_dicts(
+        con,
+        "SELECT h.isin, list(DISTINCT h.security_id ORDER BY h.security_id) AS securities, "
+        "list(DISTINCT e.legal_name) AS names FROM security_identifier_history h JOIN securities s USING (security_id) "
+        "JOIN entity_master e USING (entity_id) WHERE h.exchange = ? GROUP BY 1 "
+        "HAVING count(DISTINCT h.security_id) > 1 ORDER BY 1",
+        [exchange],
+    )
+
+
+def merge_duplicate_entity(con, isin: str, *, note: str, exchange: str = "NSE") -> dict:
+    """Rule X321: merge the second security (and entity) that the pre-X320 resolver created for an ISIN that came
+    back after inactivity in another series into the original one (audited). See `_merge_duplicate`."""
+    if not note.strip():
+        raise AdminError("a note is required")
+    return _transaction(con, _merge_duplicate, isin, note.strip(), exchange)
+
+
+def _merge_duplicate(con, isin: str, note: str, exchange: str) -> dict:
+    """The kept security is the one whose identifier history starts first: the id a replay under X320 assigns
+    (stable_id of the first row seen), so the repair and a rebuild agree. Refused unless the ISIN has exactly two
+    securities with the same legal name, the kept one's intervals all end on or before the duplicate's first day,
+    no trading day has bars for both, and neither entity is in entity_lineage. Raw tables are not touched (they hold
+    source identifiers, not ours); every other row naming the duplicate security or entity is rebound, derived
+    feature rows of the duplicate are deleted, and both entities are marked dirty from the first trade date. The
+    duplicate's first bar is gap-audited against the kept security's last close, as promotion under X320 does."""
+    secs = [r[0] for r in con.execute(
+        "SELECT security_id FROM security_identifier_history WHERE exchange = ? AND isin = ? GROUP BY 1 "
+        "ORDER BY min(valid_from), 1", [exchange, isin]).fetchall()]  # fmt: skip
+    if len(secs) != 2:
+        raise AdminError(f"{isin}: {len(secs)} securities, X321 merges exactly two")
+    keep, drop = secs
+    ent = dict(con.execute("SELECT security_id, entity_id FROM securities WHERE security_id IN (?, ?)",
+                           secs).fetchall())  # fmt: skip
+    keep_ent, drop_ent = ent[keep], ent[drop]
+    names = {r[0] for r in con.execute("SELECT upper(trim(legal_name)) FROM entity_master WHERE entity_id IN (?, ?)",
+                                       [keep_ent, drop_ent]).fetchall()}  # fmt: skip
+    if keep_ent == drop_ent or len(names) != 1:
+        raise AdminError(f"{isin}: entities {keep_ent}, {drop_ent} are not same-name duplicates")
+    if con.execute("SELECT count(*) FROM securities WHERE entity_id = ? AND security_id <> ?",
+                   [drop_ent, drop]).fetchone()[0]:  # fmt: skip
+        raise AdminError(f"{drop_ent} has other securities: manual surgery needed")
+    drop_start = con.execute("SELECT min(valid_from) FROM security_identifier_history WHERE security_id = ?",
+                             [drop]).fetchone()[0]  # fmt: skip
+    if con.execute("SELECT count(*) FROM security_identifier_history WHERE security_id = ? "
+                   "AND (valid_to IS NULL OR valid_to > ?)", [keep, drop_start]).fetchone()[0]:  # fmt: skip
+        raise AdminError(f"{keep} has identifier history after {drop} starts on {drop_start}: not a duplicate")
+    if con.execute("SELECT count(*) FROM ohlcv a JOIN ohlcv b USING (exchange, trade_date) WHERE a.security_id = ? "
+                   "AND b.security_id = ?", [keep, drop]).fetchone()[0]:  # fmt: skip
+        raise AdminError("some trading days have bars for both securities: not a duplicate")
+    if con.execute("SELECT count(*) FROM entity_lineage WHERE ? IN (parent_entity_id, child_entity_id) "
+                   "OR ? IN (parent_entity_id, child_entity_id)", [keep_ent, drop_ent]).fetchone()[0]:  # fmt: skip
+        raise AdminError("an entity_lineage edge names one of the entities: decide by hand")
+
+    cols = con.execute(
+        "SELECT c.table_name, c.column_name FROM information_schema.columns c JOIN information_schema.tables t "
+        "USING (table_schema, table_name) WHERE c.table_schema = 'main' AND t.table_type = 'BASE TABLE' "
+        "AND c.column_name IN ('security_id', 'entity_id') ORDER BY 1, 2"
+    ).fetchall()
+    moved: dict[str, int] = {}
+    for table, col in cols:
+        old, new = (drop, keep) if col == "security_id" else (drop_ent, keep_ent)
+        if table in _DERIVED_TABLES:
+            n = len(con.execute(f"DELETE FROM {table} WHERE {col} = ? RETURNING 1", [old]).fetchall())
+            key = f"{table}.deleted"
+        elif table in _NOT_REBOUND:
+            continue
+        else:
+            n = len(con.execute(f"UPDATE {table} SET {col} = ? WHERE {col} = ? RETURNING 1", [new, old]).fetchall())
+            key = f"{table}.{col}"
+        if n:
+            moved[key] = moved.get(key, 0) + n
+    # Tombstone, never delete (as _merge_securities): the duplicate security stays unreferenced, its entity MERGED.
+    con.execute(
+        "UPDATE entity_master SET status = 'MERGED', inactive_date = ?, exit_reason = ? WHERE entity_id = ?",
+        [drop_start, f"duplicate of {keep_ent} (X321 duplicate entity repair)", drop_ent],
+    )
+    _override(con, keep_ent, "merged_security", {"merged": drop, "into": keep, "rule": "X321"}, drop_start, note)
+    dirty.mark_entities(con, {keep_ent, drop_ent}, MIN_TRADE_DATE, "MERGE_DUPLICATE_ENTITY", isin)
+
+    gap = None
+    first = con.execute("SELECT trade_date, open FROM ohlcv WHERE security_id = ? AND trade_date >= ? "
+                        "ORDER BY 1 LIMIT 1", [keep, drop_start]).fetchone()  # fmt: skip
+    if first is not None:
+        prev = _prev_closes(con, exchange, first[0]).get(keep)
+        acts = _actions(con, "security_id = ? AND ex_date = ?", [keep, first[0]])
+        for f in audit_day(keep, first[0], first[1], prev, acts, False):
+            gap = _quarantine(con, stage="GAP", reason_code=f.reason_code, security_id=keep,
+                              details={"trade_date": first[0], "gap": f.gap, "prev_close": prev,
+                                       "open": first[1]})  # fmt: skip
+    out = {"isin": isin, "kept": keep, "merged": drop, "kept_entity": keep_ent, "merged_entity": drop_ent,
+           "rebound": moved, "gap_finding": gap}  # fmt: skip
+    con.execute("INSERT INTO admin_log VALUES (?, 'MERGE_DUPLICATE_ENTITY', ?, ?, ?, ?)",
+                [stable_id("adm", "X321", isin, keep, drop), json.dumps({"isin": isin, "exchange": exchange}),
+                 json.dumps(out, default=str), note, utc_now()])  # fmt: skip
+    return out
 
 
 # ── scope override (Mandate 3) ─────────────────────────────────────────────
@@ -775,6 +1043,15 @@ def _correct(con, filing_id, corrections, url, page, text, reads, note, qid) -> 
             "evidence_page": page, "evidence_text": text, "reads": reads, "quarantine_id": qid, "note": note,
             "created_at": now, "revoked_at": None, "value_other": value_other,
         })  # fmt: skip
+    # X201: a value read from the PDF replaces the rule's rescaled value of the same filing, tag and period
+    for r in rows:
+        con.execute(
+            "UPDATE fact_corrections SET revoked_at = ?, note = note || ' | revoked: replaced by a PDF correction' "
+            "WHERE filing_id = ? AND canonical_tag = ? AND period_start = ? AND period_end = ? AND revoked_at IS NULL "
+            "AND reads LIKE ? AND correction_id <> ?",
+            [now, filing_id, r["canonical_tag"], r["period_start"], r["period_end"], SLIP_READS_PREFIX + "%",
+             r["correction_id"]],
+        )  # fmt: skip
     existing = {r[0] for r in con.execute("SELECT correction_id FROM fact_corrections").fetchall()}
     new = [r for r in rows if r["correction_id"] not in existing]
     if new:
@@ -791,6 +1068,187 @@ def _correct(con, filing_id, corrections, url, page, text, reads, note, qid) -> 
                 [now, f"{note} [PDF {url} p.{page}; reads {reads}]", qid],
             )
     return [r["correction_id"] for r in rows]
+
+
+# ── X201 rule LEVEL_OF_ROUNDING_SLIP (level_slip.py) ──
+# A results filing that declares the wrong LevelOfRounding has every rupee amount off by the unit ratio. The rule's
+# corrections sit in fact_corrections like a PDF correction (same ranking, revocable, raw facts untouched), with the
+# XBRL as evidence_url and `reads` naming the agreeing checks; a later PDF correction of the same value replaces it.
+SLIP_READS_PREFIX = "RULE_X201"
+SLIP_SHARE_COUNT_TAGS = ("shares_from_paid_up",)  # value_other derived from paid-up / face value: off by the ratio
+VK = version_key()
+
+
+def find_level_slips(con) -> list[dict]:
+    """Every quarterly results filing (current parser version) the X201 rule rescales, with its proof, and every
+    Reg. 34 annual filing it rescales (X235, `_annual_level_slips`)."""
+    meta = con.execute(
+        "SELECT m.filing_id, m.entity_id, m.scope, m.level_of_rounding, m.period_end, f.source_url FROM filing_meta m "
+        "JOIN filings f USING (filing_id) WHERE "
+        + RESULTS_CATEGORY_SQL
+        + " AND m.accounting_profile <> 'REG34_ANNUAL' "
+        "QUALIFY row_number() OVER (PARTITION BY m.filing_id ORDER BY " + version_key("m.parser_version") + " DESC) = 1"
+    ).fetchall()
+    quarter = {}
+    for fid, tag, v in con.execute(
+        "SELECT o.filing_id, o.canonical_tag, any_value(coalesce(o.value_inr, o.value_other)) FROM fact_observations o "
+        f"JOIN (SELECT filing_id, arg_max(parser_version, {VK}) AS pv, arg_max(period_end, {VK}) AS pe "
+        "FROM filing_meta GROUP BY filing_id) m ON m.filing_id = o.filing_id "
+        "AND m.pv = o.parser_version AND m.pe = o.period_end "
+        "WHERE o.period_type = 'DURATION' AND o.period_months = 3 AND o.canonical_tag IN "
+        "('paid_up_equity_capital', 'face_value_per_share', 'eps_basic', 'pat', 'pat_owners') GROUP BY ALL"
+    ).fetchall():
+        quarter.setdefault(fid, {})[tag] = v
+    shp: dict[str, list] = {}
+    for ent, as_of, shares in con.execute(
+        "SELECT entity_id, as_of_date, max(shares) FROM shareholding_observations WHERE category = 'TOTAL' "
+        "AND shares > 0 GROUP BY ALL"
+    ).fetchall():
+        shp.setdefault(ent, []).append((as_of, shares))
+    by_pair: dict[tuple[str, str], list] = {}
+    for row in meta:
+        by_pair.setdefault((row[1], row[2]), []).append(row)
+    out = []
+    for (ent, scope), rows in by_pair.items():
+        if len({r[3] for r in rows}) < 2:
+            continue
+        for fid, _, _, level, end, url in rows:
+            others = [r for r in rows if r[0] != fid]
+            near = [s for s in shp.get(ent, []) if abs((s[0] - end).days) <= 92]
+            shares = min(near, key=lambda s: (abs((s[0] - end).days), s[0]))[1] if near else None
+            q = quarter.get(fid, {})
+            usual = usual_level([r[3] for r in others])
+            v = level_slip(
+                level, [r[3] for r in others], paid_up=q.get("paid_up_equity_capital"),
+                neighbour_paid_ups=[quarter.get(r[0], {}).get("paid_up_equity_capital") for r in others
+                                    if r[3] == usual],
+                face_value=q.get("face_value_per_share"), shp_shares=shares, eps_basic=q.get("eps_basic"),
+                profit=q.get("pat_owners") or q.get("pat"),
+            )  # fmt: skip
+            if v is not None:
+                out.append({"filing_id": fid, "entity_id": ent, "scope": scope, "period_end": end,
+                            "source_url": url, "verdict": v})  # fmt: skip
+    out += _annual_level_slips(con, by_pair, quarter, shp)
+    return sorted(out, key=lambda x: (x["entity_id"], x["scope"], x["period_end"], x["filing_id"]))
+
+
+def _annual_level_slips(con, by_pair: dict, quarter: dict, shp: dict) -> list[dict]:
+    """X235: the X201 proof for a Reg. 34 annual filing, against the entity-scope's quarterly results filings (the
+    neighbours; another annual never votes, so two slipped annuals cannot outvote the results). The annual files
+    no face value and no quarter, so: (A) its FY-end `equity_share_capital` against the neighbours' paid-up capital
+    at the usual level; (B) the shareholding pattern's total shares nearest the FY end x the face value of the
+    entity's results filing nearest the FY end (either scope; per share, independent of the declared unit) against
+    that capital; (C) its full-year basic EPS (`eps_basic`, else `eps_basic_continuing`) x those shares against its
+    full-year profit (owners' where filed). Same thresholds as X201: two checks at the unit ratio, none at 1.
+    TD Power Systems consolidated FY25 and FY26 (`Rupees`, results `Lakhs`): FY26 revenue 185,623.38 rupees = Rs
+    1,856.23 Cr typed in lakhs; equity capital 3,124.30 vs 156,214,830 shares x Rs 2."""
+    metas = con.execute(
+        "SELECT m.filing_id, m.entity_id, m.scope, m.level_of_rounding, m.fy_end, f.source_url FROM filing_meta m "
+        "JOIN filings f USING (filing_id) WHERE m.accounting_profile = 'REG34_ANNUAL' "
+        "QUALIFY row_number() OVER (PARTITION BY m.filing_id ORDER BY " + version_key("m.parser_version") + " DESC) = 1"
+    ).fetchall()
+    if not metas:
+        return []
+    facts: dict[str, dict] = {}
+    for fid, tag, v in con.execute(
+        "SELECT o.filing_id, o.canonical_tag, any_value(coalesce(o.value_inr, o.value_other)) FROM fact_observations o "
+        f"JOIN (SELECT filing_id, arg_max(parser_version, {VK}) AS pv, arg_max(fy_end, {VK}) AS fe FROM filing_meta "
+        "WHERE accounting_profile = 'REG34_ANNUAL' GROUP BY filing_id) m ON m.filing_id = o.filing_id "
+        "AND m.pv = o.parser_version AND m.fe = o.period_end "
+        "WHERE ((o.period_type = 'INSTANT' AND o.canonical_tag = 'equity_share_capital') OR (o.period_type = "
+        "'DURATION' AND o.period_months = 12 AND o.canonical_tag IN ('eps_basic', 'eps_basic_continuing', 'pat', "
+        "'pat_owners'))) GROUP BY ALL"
+    ).fetchall():
+        facts.setdefault(fid, {})[tag] = v
+    face: dict[str, list] = {}
+    for (ent, _scope), rows in by_pair.items():
+        for fid, _, _, _, end, _ in rows:
+            fv = quarter.get(fid, {}).get("face_value_per_share")
+            if fv:
+                face.setdefault(ent, []).append((end, fv))
+    out = []
+    for fid, ent, scope, level, fy_end, url in metas:
+        results = by_pair.get((ent, scope), [])
+        usual = usual_level([r[3] for r in results])
+        if usual is None or usual == level:
+            continue
+        near = [s for s in shp.get(ent, []) if abs((s[0] - fy_end).days) <= 92]
+        shares = min(near, key=lambda s: (abs((s[0] - fy_end).days), s[0]))[1] if near else None
+        fvs = [x for x in face.get(ent, []) if abs((x[0] - fy_end).days) <= 92]
+        fv = min(fvs, key=lambda x: (abs((x[0] - fy_end).days), x[0]))[1] if fvs else None
+        a = facts.get(fid, {})
+        v = level_slip(
+            level, [r[3] for r in results], paid_up=a.get("equity_share_capital"),
+            neighbour_paid_ups=[quarter.get(r[0], {}).get("paid_up_equity_capital") for r in results
+                                if r[3] == usual],
+            face_value=fv, shp_shares=shares, eps_basic=a.get("eps_basic") or a.get("eps_basic_continuing"),
+            profit=a.get("pat_owners") or a.get("pat"),
+        )  # fmt: skip
+        if v is not None:
+            out.append({"filing_id": fid, "entity_id": ent, "scope": scope, "period_end": fy_end, "source_url": url,
+                        "verdict": v, "annual": True})  # fmt: skip
+    return out
+
+
+def rescale_level_slips(con, *, dry_run: bool = False) -> list[dict]:
+    """X201: record, for every filing `find_level_slips` proves, each rupee amount (and the share count derived from
+    paid-up capital) times the unit ratio as a correction; (tag, period)s already corrected are left alone. Then the
+    YTD audit of the affected entity-scopes closes the findings the slip caused. Idempotent (stable ids)."""
+    slips = find_level_slips(con)
+    if dry_run or not slips:
+        return slips
+    return _transaction(con, _rescale, slips)
+
+
+def _rescale(con, slips: list[dict]) -> list[dict]:
+    from financials.promoter import audit_ytd_identity
+
+    now = utc_now()
+    existing = {r[0] for r in con.execute("SELECT correction_id FROM fact_corrections").fetchall()}
+    for s in slips:
+        v = s["verdict"]
+        taken = {tuple(r) for r in con.execute(
+            "SELECT canonical_tag, period_start, period_end FROM fact_corrections WHERE filing_id = ? "
+            "AND revoked_at IS NULL", [s["filing_id"]]).fetchall()}  # fmt: skip
+        facts = con.execute(
+            "SELECT canonical_tag, period_type, period_start, period_end, value_inr, value_other "
+            f"FROM fact_observations o WHERE filing_id = ? AND parser_version = (SELECT arg_max(parser_version, {VK}) "
+            "FROM filing_meta m WHERE m.filing_id = o.filing_id) "
+            "AND (value_inr IS NOT NULL OR canonical_tag IN (SELECT unnest(?))) "
+            "ORDER BY ALL",
+            [s["filing_id"], list(SLIP_SHARE_COUNT_TAGS)],
+        ).fetchall()
+        rows, seen = [], set()
+        for tag, ptype, start, end, inr, other in facts:
+            if (tag, start, end) in taken or (tag, start, end) in seen:
+                continue
+            seen.add((tag, start, end))
+            value_inr = rescaled(inr, v.factor) if inr is not None else None
+            value_other = (Decimal(other) * v.factor).quantize(Decimal("0.0001")) if inr is None else None
+            cid = stable_id("corr", s["filing_id"], tag, start, end, value_inr if inr is not None else value_other)
+            if cid in existing:
+                continue
+            existing.add(cid)
+            rows.append({
+                "correction_id": cid, "filing_id": s["filing_id"], "entity_id": s["entity_id"], "scope": s["scope"],
+                "canonical_tag": tag, "period_type": ptype, "period_start": start, "period_end": end,
+                "value_inr": value_inr, "evidence_url": s["source_url"], "evidence_page": 0,
+                "evidence_text": v.evidence(), "reads": SLIP_READS_PREFIX + "+" + "+".join(
+                    c.name for c in v.checks if c.verdict == "SLIP"),
+                "quarantine_id": None, "created_at": now, "revoked_at": None, "value_other": value_other,
+                "note": f"X201 {v.declared} declared, filed in {v.usual}: as filed x {v.factor:f}",
+            })  # fmt: skip
+        if rows:
+            insert_rows(con, "fact_corrections", rows)
+            _mark_correction_dirty(con, s["filing_id"], s["entity_id"], "level_of_rounding_slip")
+        s["corrections"] = len(rows)
+    audit_ytd_identity(con, sorted({(s["entity_id"], s["scope"]) for s in slips}))
+    annual = sorted({s["entity_id"] for s in slips if s.get("annual")})
+    if annual:  # X235: the prior-year check of these entities' annuals compares at the corrected scale
+        from financials.promoter import audit_annual_checks
+
+        audit_annual_checks(con, entity_ids=annual)
+    return slips
 
 
 def _correction_values(c: dict) -> tuple[Decimal | None, Decimal | None]:

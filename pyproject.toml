@@ -10,7 +10,8 @@ requires-python = ">=3.11"
 dependencies = ["duckdb==1.5.6", "pyarrow>=17", "pyyaml>=6"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.12"]
+dev = ["pytest>=8", "pytest-xdist>=3.6", "ruff>=0.12"]
+bse = ["requests>=2.32,<3", "selenium>=4.35,<5"]  # financials.fetch.bse, GitHub runners only
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -22,6 +23,8 @@ where = ["src"]
 testpaths = ["tests"]
 pythonpath = ["tests"]
 addopts = "-ra --strict-markers"
+tmp_path_retention_policy = "failed"  # passing tests delete their temp DuckDB files (the suite used to keep ~5.6 GB)
+tmp_path_retention_count = 1
 
 [tool.ruff]
 line-length = 120

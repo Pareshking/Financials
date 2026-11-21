@@ -423,7 +423,7 @@ def test_columns_are_event_columns_with_dsl_aliases():
     from financials.features_store import EVENT_COLUMNS
 
     names = [c for c, _ in declared_columns()["screener_features"]]
-    assert names[-len(FA.COLUMNS) :] == list(FA.COLUMNS)
+    assert names[-len(FA.COLUMNS) - 3 : -3] == list(FA.COLUMNS)  # then roe_screener, dq_* (X227, X325)
     assert set(FA.COLUMNS) <= set(EVENT_COLUMNS)
     for name in ("audit opinion modified", "quarterly audit opinion modified", "audit opinion conflict",
                  "going concern uncertainty", "emphasis of matter"):  # fmt: skip

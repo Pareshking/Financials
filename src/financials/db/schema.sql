@@ -143,6 +143,24 @@ CREATE TABLE IF NOT EXISTS raw_equity_master (
     PRIMARY KEY (filing_id, symbol, series)
 );
 
+-- BSE list of securities (ListofScripData, one BSE group per filing) [A17, X169]: identifiers as sent; observed on the
+-- IST date of the fetch. Source of rule BSE1 (ISIN -> security_identifier_history.bse_scrip_code). L1, append-only.
+CREATE TABLE IF NOT EXISTS raw_bse_securities (
+    filing_id      VARCHAR NOT NULL REFERENCES filings(filing_id),
+    observed_date  DATE    NOT NULL,
+    scrip_code     VARCHAR NOT NULL,
+    isin           VARCHAR NOT NULL,
+    ticker         VARCHAR NOT NULL,
+    bse_group      VARCHAR NOT NULL,
+    status         VARCHAR NOT NULL,
+    segment        VARCHAR NOT NULL,
+    name           VARCHAR NOT NULL,
+    issuer_name    VARCHAR,
+    face_value     DECIMAL(18,4),
+    market_cap_inr DECIMAL(20,2),            -- Mktcap (Rs crore, as filed) x 1e7, exact
+    PRIMARY KEY (filing_id, scrip_code)
+);
+
 -- One row per Integrated Filing listing row (api/integrated-filing-results, vaulted as RESULTS_LISTING) [A7, X83].
 -- `creation_Date` is on every row; `broadcast_Date` is null on revised rows. Times are UTC (listing is IST).
 CREATE TABLE IF NOT EXISTS raw_results_listing (
@@ -487,7 +505,7 @@ CREATE TABLE IF NOT EXISTS features_daily (
     price_date          DATE,                -- last bar on/before as_of_date
     close               DECIMAL(18,4),
     shares              BIGINT,
-    shares_source       VARCHAR,             -- REG31 | PAID_UP
+    shares_source       VARCHAR,             -- REG31 | ISSUE_SIZE (rule SHARES_REG31_OUTLIER, X221) | PAID_UP
     market_cap          DECIMAL(24,2),
     enterprise_value    DECIMAL(24,2),
     pe                  DOUBLE,
@@ -740,6 +758,12 @@ CREATE TABLE IF NOT EXISTS features_daily (
     has_dvr_shares                           BOOLEAN,         -- equity shares with differential voting rights
     has_sbo                                  BOOLEAN,         -- any significant beneficial owner
     is_psu                                   BOOLEAN,         -- public sector undertaking
+    -- X325 (rule SHOW_AND_FLAG, owner decision V): data-quality flags of the row (DAILY: open findings are read
+    -- with today's resolution state, outside the fundamentals-cache key). dq_flags = sorted comma-separated codes
+    -- (ATTRIBUTION_AS_FILED, ATTRIBUTION_PAT_LESS_NCI, YTD_AS_FILED, TAX_COPY_AS_FILED, TTM_MISFILED_YTD, TTM_MIXED_BASIS,
+    -- OPEN_FINDING:<reason>, PRICE_GAP_UNRESOLVED), NULL when none; dq_suspect = any flag.
+    dq_suspect                               BOOLEAN,
+    dq_flags                                 VARCHAR,
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -1172,6 +1196,7 @@ CREATE TABLE IF NOT EXISTS features_events (
     emphasis_of_matter                       BOOLEAN,         -- informational
     audit_opinion_quarterly                  VARCHAR,         -- latest results filing stating an opinion
     audit_opinion_quarter_end                DATE,
+    roe_screener                             DOUBLE,          -- Screener ROE: last FY owners' PAT / avg owners' equity [X227]
     PRIMARY KEY (security_id, valid_from_date)
 );
 
@@ -1184,7 +1209,7 @@ CREATE TABLE IF NOT EXISTS screener_features (
     price_date          DATE,                -- last bar on/before as_of_date
     close               DECIMAL(18,4),
     shares              BIGINT,
-    shares_source       VARCHAR,             -- REG31 | PAID_UP
+    shares_source       VARCHAR,             -- REG31 | ISSUE_SIZE (rule SHARES_REG31_OUTLIER, X221) | PAID_UP
     market_cap          DECIMAL(24,2),
     enterprise_value    DECIMAL(24,2),
     sales_ttm           DECIMAL(24,2),
@@ -1862,6 +1887,13 @@ CREATE TABLE IF NOT EXISTS screener_features (
     emphasis_of_matter                       BOOLEAN,         -- informational
     audit_opinion_quarterly                  VARCHAR,         -- latest results filing stating an opinion
     audit_opinion_quarter_end                DATE,
+    roe_screener                             DOUBLE,          -- Screener ROE: last FY owners' PAT / avg owners' equity [X227]
+    -- X325 (rule SHOW_AND_FLAG, owner decision V): data-quality flags of the row (DAILY: open findings are read
+    -- with today's resolution state, outside the fundamentals-cache key). dq_flags = sorted comma-separated codes
+    -- (ATTRIBUTION_AS_FILED, ATTRIBUTION_PAT_LESS_NCI, YTD_AS_FILED, TAX_COPY_AS_FILED, TTM_MISFILED_YTD, TTM_MIXED_BASIS,
+    -- OPEN_FINDING:<reason>, PRICE_GAP_UNRESOLVED), NULL when none; dq_suspect = any flag.
+    dq_suspect                               BOOLEAN,
+    dq_flags                                 VARCHAR,
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -1969,6 +2001,16 @@ CREATE TABLE IF NOT EXISTS materialize_dirty (
     created_at  TIMESTAMP NOT NULL
 );
 
+-- X325 (rule SHOW_AND_FLAG): the open entity findings the materialised OPEN_FINDING flags reflect (dirty.py). A
+-- finding opened or resolved by any writer differs from this set; `materialize --incremental` marks its entity
+-- from the finding's period end and stores the current set once the run has succeeded (a full run from the first
+-- materialised day to the last stores it too).
+CREATE TABLE IF NOT EXISTS features_dq_findings (
+    quarantine_id VARCHAR PRIMARY KEY,
+    entity_id     VARCHAR NOT NULL,
+    period_end    DATE                       -- the finding's period end (window anchor); NULL when it names none
+);
+
 -- Reader version of each materialised day (features.FEATURES_VERSION); `materialize --incremental` refuses when
 -- any materialised day was built by another version (or by code that predates this table).
 CREATE TABLE IF NOT EXISTS features_meta (
@@ -2069,18 +2111,22 @@ CREATE TABLE IF NOT EXISTS related_party_transactions (
 );
 -- Reg. 23(9) related-party transactions per counterparty from the Integrated Filing (Governance) section [X19, X115]:
 -- one row per typed RelatedPartyTransactionAxis member of a standalone Q2 / Q4 results filing, promoted with it and
--- by `backfill-rpt`. A separate table from the annual schedule on purpose: the period is the filing's reporting-period
--- context as tagged, and whether the amounts cover that quarter or the Reg. 23(9) half-year is UNVERIFIED (R13), so
--- these rows never feed a ratio or a feature column (features_rpt reads related_party_transactions only).
+-- by `backfill-rpt`. A separate table from the annual schedule on purpose: the tagged context is the filing's quarter,
+-- the amounts cover the Reg. 23(9) half-year (disclosure_start / disclosure_months, X160), and a few filers put
+-- financial-year-to-date amounts in the Q4 filing without saying so (X161), so these rows never feed a ratio or a
+-- feature column (features_rpt reads related_party_transactions only). prune-versions keeps the latest version.
 CREATE TABLE IF NOT EXISTS reg23_related_party_transactions (
     filing_id           VARCHAR NOT NULL REFERENCES filings(filing_id),
     parser_version      VARCHAR NOT NULL,        -- parsers.reg23_rpt.REG23_PARSER_VERSION
     entity_id           VARCHAR NOT NULL REFERENCES entity_master(entity_id),   -- the filer
     scope               VARCHAR NOT NULL,
     row_member          VARCHAR NOT NULL,        -- typed RelatedPartyTransactionAxis member as filed
-    period_start        DATE NOT NULL,           -- the duration context as tagged (see R13)
+    period_start        DATE NOT NULL,           -- the duration context as tagged: the filing's quarter, not the disclosure
     period_end          DATE NOT NULL,           -- = the filing's declared period end
-    period_months       INTEGER,
+    period_months       INTEGER,                 -- of the tagged context
+    disclosure_start    DATE,                    -- the period the amounts cover: the Reg. 23(9) half-year ending on
+    disclosure_months   INTEGER,                 -- period_end (HALF_YEAR_RULE, X160; NULL only on reg23-1 rows). A few
+                                                 -- filers put FY-to-date in Q4 (X161), undetectable inside the filing
     listed_party_name   VARCHAR,                 -- the listed entity or subsidiary entering into the transaction
     counterparty_name   VARCHAR NOT NULL,
     counterparty_pan    VARCHAR,                 -- NULL when masked ("******")
@@ -2178,6 +2224,47 @@ CREATE TABLE IF NOT EXISTS disclosure_facts (
     CHECK (value_bool IS NULL OR unit_ref IS NULL),
     CHECK ((value_text IS NULL) = (text_sha256 IS NOT NULL)),
     CHECK ((text_sha256 IS NULL) = (text_len IS NULL) AND (text_sha256 IS NULL) = (text_snippet IS NULL))
+);
+
+-- ── market-cap universe (owner 2026-11-17): NSE PRddmmyy.zip mcap file and the sticky Rs 500 Cr membership ──────
+-- L1, append-only: one row per security row of mcapddmmyyyy.csv inside PRddmmyy.zip [X130-X133], exactly as sent
+-- (symbol / series as printed, no ISIN in the file). issue_size is NSE's share count for the row (exact integer);
+-- market_cap_inr is as filed (issue_size x a price within 2 paise of `close`, X132). The summary rows are checked
+-- by the parser and not stored.
+CREATE TABLE IF NOT EXISTS raw_nse_mcap (
+    filing_id        VARCHAR NOT NULL REFERENCES filings(filing_id),
+    exchange         VARCHAR NOT NULL,
+    trade_date       DATE    NOT NULL,
+    symbol           VARCHAR NOT NULL,
+    series           VARCHAR NOT NULL,
+    security_name    VARCHAR NOT NULL,
+    category         VARCHAR NOT NULL,          -- Listed | Permitted
+    last_trade_date  DATE,                      -- NULL = "Not Traded"
+    face_value       DECIMAL(18,4) NOT NULL,
+    issue_size       BIGINT  NOT NULL,
+    close            DECIMAL(18,4) NOT NULL,    -- "Close Price/Paid up value(Rs.)"
+    market_cap_inr   DECIMAL(20,2) NOT NULL,
+    PRIMARY KEY (filing_id, symbol, series)
+);
+
+-- L2: point-in-time, sticky universe membership (financials.universe, rule U1 [X134]). One row per security and
+-- universe; members never leave. PIT read: joined_date <= as_of (and visible_from_ts <= as_of_ts).
+CREATE TABLE IF NOT EXISTS universe_membership (
+    universe            VARCHAR NOT NULL,       -- MCAP500
+    security_id         VARCHAR NOT NULL REFERENCES securities(security_id),
+    entity_id           VARCHAR NOT NULL REFERENCES entity_master(entity_id),
+    joined_date         DATE    NOT NULL,
+    reason              VARCHAR NOT NULL,       -- SEED_EXISTING | MCAP_GE_500CR
+    rule_version        VARCHAR NOT NULL,
+    symbol              VARCHAR NOT NULL,       -- as on joined_date
+    series              VARCHAR NOT NULL,
+    market_cap_inr      DECIMAL(20,2),          -- the qualifying mcap-file value; NULL for SEED_EXISTING
+    evidence_filing_id  VARCHAR REFERENCES filings(filing_id),  -- the mcap file; NULL for SEED_EXISTING
+    visible_from_ts     TIMESTAMP NOT NULL,
+    recorded_at         TIMESTAMP NOT NULL,
+    listing_category    VARCHAR,                -- the qualifying row's Category (Listed | Permitted); NULL for SEED_EXISTING
+    PRIMARY KEY (universe, security_id),
+    CHECK (reason IN ('SEED_EXISTING', 'MCAP_GE_500CR'))
 );
 -- ── Views ──────────────────────────────────────────────────────────────
 -- Everything below VIEWS_MARKER runs after the column upgrade (db.apply_schema), so a view may name columns that an
@@ -2299,7 +2386,7 @@ SELECT d.as_of_date, d.security_id, d.entity_id, d.symbol, d.series, d.price_dat
        d.has_partly_paid, d.has_locked_in, d.has_dvr_shares, d.has_sbo, d.is_psu, e.subsidiary_fy_end,
        e.parent_profit_share, e.largest_subsidiary_profit_share, e.largest_subsidiary_name, e.consolidated_entities_count,
        e.audit_opinion, e.audit_opinion_fy_end, e.audit_opinion_conflict, e.going_concern_uncertainty, e.emphasis_of_matter,
-       e.audit_opinion_quarterly, e.audit_opinion_quarter_end
+       e.audit_opinion_quarterly, e.audit_opinion_quarter_end, e.roe_screener, d.dq_suspect, d.dq_flags
 FROM features_daily d
 LEFT JOIN features_events e ON e.security_id = d.security_id AND e.valid_from_date <= d.as_of_date
      AND d.as_of_date < coalesce(e.valid_to_date, DATE '9999-12-31');  -- open interval; an OR here is ~400x slower

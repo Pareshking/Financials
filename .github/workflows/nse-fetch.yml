@@ -1,0 +1,81 @@
+name: nse-fetch
+
+# NSE filings discovery fanned out over N GitHub-hosted runners (owner 2026-11-17: "We used to download using 8
+# runners"). Each runner takes one contiguous-by-hash shard of a committed symbols list (tickers only) and runs
+# discover-filings against a fresh, empty data dir (no market database), with the usual per-host limits: the API host
+# at 2 requests/s (3 in flight), the archive host at --archive-rps 12 (owner 2026-11-20, rate probe X354). Its vault (blobs + url_index.jsonl + responses.jsonl) is a
+# workflow artifact `nse-fetch-<k>` for 1 day (the repository is public); `import-vault` then verifies, vaults and
+# stages it on the owner's machine and `promote` promotes it. Nothing is committed or pushed back.
+on:
+  workflow_dispatch:
+    inputs:
+      shards:
+        description: "number of runners"
+        default: "8"
+      list:
+        description: "symbols file (one NSE symbol per line)"
+        default: "reference/fetch_lists/mcap500_new_20261117.txt"
+      shp_from:
+        description: "shareholding quarters from (YYYY-MM-DD)"
+        default: "2025-03-31"
+      since:
+        description: "only filings broadcast on or after (YYYY-MM-DD; X346). Empty: every in-scope filing"
+        default: ""
+      kinds:
+        description: "space-separated: results annual shareholding"
+        default: "results annual shareholding"
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      n: ${{ steps.plan.outputs.n }}
+      shards: ${{ steps.plan.outputs.shards }}
+    steps:
+      - id: plan
+        run: |
+          python3 -c "import json, sys; n = int(sys.argv[1]); assert 1 <= n <= 20, n; print(f'n={n}'); print('shards=' + json.dumps(list(range(n))))" "$SHARDS" >> "$GITHUB_OUTPUT"
+        env:
+          SHARDS: ${{ inputs.shards || '8' }}
+
+  fetch:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ fromJSON(needs.plan.outputs.n) }}
+      matrix:
+        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -e .
+      - name: discover-filings (one shard)
+        run: |
+          python -m financials --data-dir "$RUNNER_TEMP/nse" --archive-rps 12 discover-filings \
+            --symbols-file "$LIST" --shard "$SHARD/$N" --shp-from "$SHP_FROM" \
+            --kinds $KINDS ${SINCE:+--since "$SINCE"} --no-events --workers 8 --record-responses \
+            || echo "::warning::discover-filings reported per-file errors (e.g. an archive 404); see the log"
+        env:
+          LIST: ${{ inputs.list || 'reference/fetch_lists/mcap500_new_20261117.txt' }}
+          SHP_FROM: ${{ inputs.shp_from || '2025-03-31' }}
+          SINCE: ${{ inputs.since || '' }}
+          KINDS: ${{ inputs.kinds || 'results annual shareholding' }}
+          SHARD: ${{ matrix.shard }}
+          N: ${{ needs.plan.outputs.n }}
+      - if: always()
+        run: mv "$RUNNER_TEMP/nse/vault" nse_fetch || mkdir -p nse_fetch
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nse-fetch-${{ matrix.shard }}
+          path: nse_fetch/
+          retention-days: 1
+          if-no-files-found: warn

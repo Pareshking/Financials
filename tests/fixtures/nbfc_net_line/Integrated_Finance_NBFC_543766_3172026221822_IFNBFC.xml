@@ -1,0 +1,573 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<!--IFNBFC V2.1 (26-06-2026)-->
+<xbrli:xbrl xmlns:in-capmkt="http://www.sebi.gov.in/xbrl/2026-01-31/in-capmkt" xmlns:in-capmkt-roles="http://www.sebi.gov.in/xbrl/IntegratedFinance_NBFC/2026-01-31/in-capmkt-roles" xmlns:in-capmkt-ent="http://www.sebi.gov.in/xbrl/IntegratedFinance_NBFC/2026-01-31/in-capmkt/in-capmkt-ent" xmlns:xbrldt="http://xbrl.org/2005/xbrldt" xmlns:nonnum="http://www.xbrl.org/dtr/type/non-numeric" xmlns:in-capmkt-types="http://www.sebi.gov.in/xbrl/2026-01-31/in-capmkt-types" xmlns:link="http://www.xbrl.org/2003/linkbase" xmlns:net="http://www.xbrl.org/2009/role/net" xmlns:num="http://www.xbrl.org/dtr/type/numeric" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:iso4217="http://www.xbrl.org/2003/iso4217" xmlns:negated="http://www.xbrl.org/2009/role/negated" xmlns:xbrldi="http://xbrl.org/2006/xbrldi" xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:xl="http://www.xbrl.org/2003/XLink">
+  <link:schemaRef xlink:type="simple" xlink:href="in-capmkt-ent-2026-01-31.xsd" />
+  <xbrli:context id="OneD">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2026-04-01</xbrli:startDate>
+      <xbrli:endDate>2026-06-30</xbrli:endDate>
+    </xbrli:period>
+  </xbrli:context>
+  <xbrli:context id="OneI">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:instant>2026-06-30</xbrli:instant>
+    </xbrli:period>
+  </xbrli:context>
+  <xbrli:context id="OneExpenses1D">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2026-04-01</xbrli:startDate>
+      <xbrli:endDate>2026-06-30</xbrli:endDate>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:DetailsOfOtherExpensesAxis">in-capmkt:OtherExpenses1Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="OneReportable1D">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2026-04-01</xbrli:startDate>
+      <xbrli:endDate>2026-06-30</xbrli:endDate>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:ReportableSegmentsAxis">in-capmkt:ReportableSegments1Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="OneReportable2D">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2026-04-01</xbrli:startDate>
+      <xbrli:endDate>2026-06-30</xbrli:endDate>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:ReportableSegmentsAxis">in-capmkt:ReportableSegments2Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="OneReportable3D">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2026-04-01</xbrli:startDate>
+      <xbrli:endDate>2026-06-30</xbrli:endDate>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:ReportableSegmentsAxis">in-capmkt:ReportableSegments3Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="OneReportable4D">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2026-04-01</xbrli:startDate>
+      <xbrli:endDate>2026-06-30</xbrli:endDate>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:ReportableSegmentsAxis">in-capmkt:ReportableSegments4Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="OneReportableFinance1D">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2026-04-01</xbrli:startDate>
+      <xbrli:endDate>2026-06-30</xbrli:endDate>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:ReportableSegmentsFinanceCostsAxis">in-capmkt:ReportableSegments1Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="OneReportableFinance2D">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2026-04-01</xbrli:startDate>
+      <xbrli:endDate>2026-06-30</xbrli:endDate>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:ReportableSegmentsFinanceCostsAxis">in-capmkt:ReportableSegments2Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="OneReportableFinance3D">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2026-04-01</xbrli:startDate>
+      <xbrli:endDate>2026-06-30</xbrli:endDate>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:ReportableSegmentsFinanceCostsAxis">in-capmkt:ReportableSegments3Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="OneReportableFinance4D">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2026-04-01</xbrli:startDate>
+      <xbrli:endDate>2026-06-30</xbrli:endDate>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:ReportableSegmentsFinanceCostsAxis">in-capmkt:ReportableSegments4Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="OneReportable31D">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2026-04-01</xbrli:startDate>
+      <xbrli:endDate>2026-06-30</xbrli:endDate>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:ReportableSegmentAssetsAxis">in-capmkt:ReportableSegments1Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="OneReportable31I">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:instant>2026-06-30</xbrli:instant>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:ReportableSegmentAssetsAxis">in-capmkt:ReportableSegments1Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="OneReportable32D">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2026-04-01</xbrli:startDate>
+      <xbrli:endDate>2026-06-30</xbrli:endDate>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:ReportableSegmentAssetsAxis">in-capmkt:ReportableSegments2Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="OneReportable32I">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:instant>2026-06-30</xbrli:instant>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:ReportableSegmentAssetsAxis">in-capmkt:ReportableSegments2Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="OneReportable33D">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2026-04-01</xbrli:startDate>
+      <xbrli:endDate>2026-06-30</xbrli:endDate>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:ReportableSegmentAssetsAxis">in-capmkt:ReportableSegments3Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="OneReportable33I">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:instant>2026-06-30</xbrli:instant>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:ReportableSegmentAssetsAxis">in-capmkt:ReportableSegments3Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="OneReportable34D">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2026-04-01</xbrli:startDate>
+      <xbrli:endDate>2026-06-30</xbrli:endDate>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:ReportableSegmentAssetsAxis">in-capmkt:ReportableSegments4Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="OneReportable34I">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:instant>2026-06-30</xbrli:instant>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:ReportableSegmentAssetsAxis">in-capmkt:ReportableSegments4Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="OneReportable41D">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2026-04-01</xbrli:startDate>
+      <xbrli:endDate>2026-06-30</xbrli:endDate>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:ReportableSegmentLiabilitiesAxis">in-capmkt:ReportableSegments1Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="OneReportable41I">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:instant>2026-06-30</xbrli:instant>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:ReportableSegmentLiabilitiesAxis">in-capmkt:ReportableSegments1Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="OneReportable42D">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2026-04-01</xbrli:startDate>
+      <xbrli:endDate>2026-06-30</xbrli:endDate>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:ReportableSegmentLiabilitiesAxis">in-capmkt:ReportableSegments2Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="OneReportable42I">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:instant>2026-06-30</xbrli:instant>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:ReportableSegmentLiabilitiesAxis">in-capmkt:ReportableSegments2Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="OneReportable43D">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2026-04-01</xbrli:startDate>
+      <xbrli:endDate>2026-06-30</xbrli:endDate>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:ReportableSegmentLiabilitiesAxis">in-capmkt:ReportableSegments3Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="OneReportable43I">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:instant>2026-06-30</xbrli:instant>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:ReportableSegmentLiabilitiesAxis">in-capmkt:ReportableSegments3Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="OneReportable44D">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2026-04-01</xbrli:startDate>
+      <xbrli:endDate>2026-06-30</xbrli:endDate>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:ReportableSegmentLiabilitiesAxis">in-capmkt:ReportableSegments4Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="OneReportable44I">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:instant>2026-06-30</xbrli:instant>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:explicitMember dimension="in-capmkt:ReportableSegmentLiabilitiesAxis">in-capmkt:ReportableSegments4Member</xbrldi:explicitMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="D_ItemsThatWillNotBeReclassifiedToProfitAndLoss11">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2026-04-01</xbrli:startDate>
+      <xbrli:endDate>2026-06-30</xbrli:endDate>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:typedMember dimension="in-capmkt:ItemsThatWillNotBeReclassifiedToProfitAndLossAxis">
+        <in-capmkt:ItemsThatWillNotBeReclassifiedToProfitAndLossDomain>ItemsThatWillNotBeReclassifiedToProfitAndLoss1</in-capmkt:ItemsThatWillNotBeReclassifiedToProfitAndLossDomain>
+      </xbrldi:typedMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="D_ItemsThatWillNotBeReclassifiedToProfitAndLoss12">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2026-04-01</xbrli:startDate>
+      <xbrli:endDate>2026-06-30</xbrli:endDate>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:typedMember dimension="in-capmkt:ItemsThatWillNotBeReclassifiedToProfitAndLossAxis">
+        <in-capmkt:ItemsThatWillNotBeReclassifiedToProfitAndLossDomain>ItemsThatWillNotBeReclassifiedToProfitAndLoss2</in-capmkt:ItemsThatWillNotBeReclassifiedToProfitAndLossDomain>
+      </xbrldi:typedMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="D_ItemsThatWillNotBeReclassifiedToProfitAndLoss13">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2026-04-01</xbrli:startDate>
+      <xbrli:endDate>2026-06-30</xbrli:endDate>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:typedMember dimension="in-capmkt:ItemsThatWillNotBeReclassifiedToProfitAndLossAxis">
+        <in-capmkt:ItemsThatWillNotBeReclassifiedToProfitAndLossDomain>ItemsThatWillNotBeReclassifiedToProfitAndLoss3</in-capmkt:ItemsThatWillNotBeReclassifiedToProfitAndLossDomain>
+      </xbrldi:typedMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:context id="D_Auditor1">
+    <xbrli:entity>
+      <xbrli:identifier scheme="http://www.sebi.gov.in/in-capmkt/ScripCode">543766</xbrli:identifier>
+    </xbrli:entity>
+    <xbrli:period>
+      <xbrli:startDate>2026-04-01</xbrli:startDate>
+      <xbrli:endDate>2026-06-30</xbrli:endDate>
+    </xbrli:period>
+    <xbrli:scenario>
+      <xbrldi:typedMember dimension="in-capmkt:AuditorAxis">
+        <in-capmkt:AuditorDomain>AuditorDomain1</in-capmkt:AuditorDomain>
+      </xbrldi:typedMember>
+    </xbrli:scenario>
+  </xbrli:context>
+  <xbrli:unit id="INR">
+    <xbrli:measure>iso4217:INR</xbrli:measure>
+  </xbrli:unit>
+  <xbrli:unit id="INRPerShare">
+    <xbrli:divide>
+      <xbrli:unitNumerator>
+        <xbrli:measure>iso4217:INR</xbrli:measure>
+      </xbrli:unitNumerator>
+      <xbrli:unitDenominator>
+        <xbrli:measure>xbrli:shares</xbrli:measure>
+      </xbrli:unitDenominator>
+    </xbrli:divide>
+  </xbrli:unit>
+  <in-capmkt:ScripCode contextRef="OneD">543766</in-capmkt:ScripCode>
+  <in-capmkt:Symbol contextRef="OneD">NOTLISTED</in-capmkt:Symbol>
+  <in-capmkt:MSEISymbol contextRef="OneD">NOTLISTED</in-capmkt:MSEISymbol>
+  <in-capmkt:ISIN contextRef="OneD">INE094B01013</in-capmkt:ISIN>
+  <in-capmkt:NameOfTheCompany contextRef="OneD">ASHIKA GLOBAL SECURITIES LIMITED</in-capmkt:NameOfTheCompany>
+  <in-capmkt:TypeOfCompany contextRef="OneD">Main Board</in-capmkt:TypeOfCompany>
+  <in-capmkt:ClassOfSecurity contextRef="OneD">Equity</in-capmkt:ClassOfSecurity>
+  <in-capmkt:DateOfStartOfFinancialYear contextRef="OneD">2026-04-01</in-capmkt:DateOfStartOfFinancialYear>
+  <in-capmkt:DateOfEndOfFinancialYear contextRef="OneD">2027-03-31</in-capmkt:DateOfEndOfFinancialYear>
+  <in-capmkt:DateOfBoardMeetingWhenFinancialResultsWereApproved contextRef="OneD">2026-07-31</in-capmkt:DateOfBoardMeetingWhenFinancialResultsWereApproved>
+  <in-capmkt:DateOnWhichPriorIntimationOfTheMeetingForConsideringFinancialResultsWasInformedToTheExchange contextRef="OneD">2026-07-24</in-capmkt:DateOnWhichPriorIntimationOfTheMeetingForConsideringFinancialResultsWasInformedToTheExchange>
+  <in-capmkt:DescriptionOfPresentationCurrency contextRef="OneD">INR</in-capmkt:DescriptionOfPresentationCurrency>
+  <in-capmkt:LevelOfRounding contextRef="OneD">Lakhs</in-capmkt:LevelOfRounding>
+  <in-capmkt:TypeOfReportingPeriod contextRef="OneD">Quarterly</in-capmkt:TypeOfReportingPeriod>
+  <in-capmkt:ReportingQuarter contextRef="OneD">First quarter</in-capmkt:ReportingQuarter>
+  <in-capmkt:IsCompanyReportingMultisegmentOrSingleSegment contextRef="OneD">Multi segment</in-capmkt:IsCompanyReportingMultisegmentOrSingleSegment>
+  <in-capmkt:DateOfStartOfBoardMeeting contextRef="OneD">2026-07-31</in-capmkt:DateOfStartOfBoardMeeting>
+  <in-capmkt:StartTimeOfBoardMeeting contextRef="OneD">18:00:00</in-capmkt:StartTimeOfBoardMeeting>
+  <in-capmkt:DateOfEndOfBoardMeeting contextRef="OneD">2026-07-31</in-capmkt:DateOfEndOfBoardMeeting>
+  <in-capmkt:EndTimeOfBoardMeeting contextRef="OneD">20:30:00</in-capmkt:EndTimeOfBoardMeeting>
+  <in-capmkt:DeclarationOfUnmodifiedOpinionOrStatementOnImpactOfAuditQualification contextRef="OneD">Declaration of unmodified opinion</in-capmkt:DeclarationOfUnmodifiedOpinionOrStatementOnImpactOfAuditQualification>
+  <in-capmkt:DateOfStartOfReportingPeriod contextRef="OneD">2026-04-01</in-capmkt:DateOfStartOfReportingPeriod>
+  <in-capmkt:DateOfEndOfReportingPeriod contextRef="OneD">2026-06-30</in-capmkt:DateOfEndOfReportingPeriod>
+  <in-capmkt:WhetherResultsAreAuditedOrUnaudited contextRef="OneD">Unaudited</in-capmkt:WhetherResultsAreAuditedOrUnaudited>
+  <in-capmkt:NatureOfReportStandaloneConsolidated contextRef="OneD">Consolidated</in-capmkt:NatureOfReportStandaloneConsolidated>
+  <in-capmkt:InterestEarned contextRef="OneD" unitRef="INR" decimals="-4">233640000</in-capmkt:InterestEarned>
+  <in-capmkt:DividendIncome contextRef="OneD" unitRef="INR" decimals="-3">4809000</in-capmkt:DividendIncome>
+  <in-capmkt:RentalIncome contextRef="OneD" unitRef="INR" decimals="-5">0</in-capmkt:RentalIncome>
+  <in-capmkt:FeesAndCommissionIncome contextRef="OneD" unitRef="INR" decimals="-3">155665000</in-capmkt:FeesAndCommissionIncome>
+  <in-capmkt:NetGainOnFairValueChanges contextRef="OneD" unitRef="INR" decimals="-3">1292771000</in-capmkt:NetGainOnFairValueChanges>
+  <in-capmkt:NetGainOnDerecognitionOfFinancialInstrumentsUnderAmortisedCostCategory contextRef="OneD" unitRef="INR" decimals="-5">0</in-capmkt:NetGainOnDerecognitionOfFinancialInstrumentsUnderAmortisedCostCategory>
+  <in-capmkt:RevenueFromSaleOfProduct contextRef="OneD" unitRef="INR" decimals="-5">0</in-capmkt:RevenueFromSaleOfProduct>
+  <in-capmkt:RevenueFromSaleOfServices contextRef="OneD" unitRef="INR" decimals="-5">0</in-capmkt:RevenueFromSaleOfServices>
+  <in-capmkt:RevenueFromOperations contextRef="OneD" unitRef="INR" decimals="-3">1686885000</in-capmkt:RevenueFromOperations>
+  <in-capmkt:OtherIncome contextRef="OneD" unitRef="INR" decimals="-3">34593000</in-capmkt:OtherIncome>
+  <in-capmkt:Income contextRef="OneD" unitRef="INR" decimals="-3">1721478000</in-capmkt:Income>
+  <in-capmkt:CostOfMaterialsConsumed contextRef="OneD" unitRef="INR" decimals="-5">0</in-capmkt:CostOfMaterialsConsumed>
+  <in-capmkt:PurchasesOfStockInTrade contextRef="OneD" unitRef="INR" decimals="-5">0</in-capmkt:PurchasesOfStockInTrade>
+  <in-capmkt:ChangesInInventoriesOfFinishedGoodsWorkInProgressAndStockInTrade contextRef="OneD" unitRef="INR" decimals="-5">0</in-capmkt:ChangesInInventoriesOfFinishedGoodsWorkInProgressAndStockInTrade>
+  <in-capmkt:EmployeeBenefitExpense contextRef="OneD" unitRef="INR" decimals="-3">149627000</in-capmkt:EmployeeBenefitExpense>
+  <in-capmkt:FinanceCosts contextRef="OneD" unitRef="INR" decimals="-3">73523000</in-capmkt:FinanceCosts>
+  <in-capmkt:DepreciationDepletionAndAmortisationExpense contextRef="OneD" unitRef="INR" decimals="-3">44478000</in-capmkt:DepreciationDepletionAndAmortisationExpense>
+  <in-capmkt:FeesAndCommissionExpense contextRef="OneD" unitRef="INR" decimals="-3">59161000</in-capmkt:FeesAndCommissionExpense>
+  <in-capmkt:NetLossOnFairValueChanges contextRef="OneD" unitRef="INR" decimals="-3">406000</in-capmkt:NetLossOnFairValueChanges>
+  <in-capmkt:NetLossOnDerecognitionOfFinancialInstrumentsUnderAmortisedCostCategory contextRef="OneD" unitRef="INR" decimals="-5">0</in-capmkt:NetLossOnDerecognitionOfFinancialInstrumentsUnderAmortisedCostCategory>
+  <in-capmkt:ImpairmentOnFinancialInstruments contextRef="OneD" unitRef="INR" decimals="-3">11599000</in-capmkt:ImpairmentOnFinancialInstruments>
+  <in-capmkt:OtherExpenses contextRef="OneD" unitRef="INR" decimals="-3">85389000</in-capmkt:OtherExpenses>
+  <in-capmkt:Expenses contextRef="OneD" unitRef="INR" decimals="-3">424183000</in-capmkt:Expenses>
+  <in-capmkt:ProfitBeforeExceptionalItemsAndTax contextRef="OneD" unitRef="INR" decimals="-3">1297295000</in-capmkt:ProfitBeforeExceptionalItemsAndTax>
+  <in-capmkt:ExceptionalItemsBeforeTax contextRef="OneD" unitRef="INR" decimals="-5">0</in-capmkt:ExceptionalItemsBeforeTax>
+  <in-capmkt:ProfitBeforeTax contextRef="OneD" unitRef="INR" decimals="-3">1297295000</in-capmkt:ProfitBeforeTax>
+  <in-capmkt:CurrentTax contextRef="OneD" unitRef="INR" decimals="-3">74545000</in-capmkt:CurrentTax>
+  <in-capmkt:DeferredTax contextRef="OneD" unitRef="INR" decimals="-3">213092000</in-capmkt:DeferredTax>
+  <in-capmkt:TaxExpense contextRef="OneD" unitRef="INR" decimals="-3">287637000</in-capmkt:TaxExpense>
+  <in-capmkt:ProfitLossForPeriodFromContinuingOperations contextRef="OneD" unitRef="INR" decimals="-3">1009658000</in-capmkt:ProfitLossForPeriodFromContinuingOperations>
+  <in-capmkt:ProfitLossFromDiscontinuedOperationsBeforeTax contextRef="OneD" unitRef="INR" decimals="-5">0</in-capmkt:ProfitLossFromDiscontinuedOperationsBeforeTax>
+  <in-capmkt:TaxExpenseOfDiscontinuedOperations contextRef="OneD" unitRef="INR" decimals="-5">0</in-capmkt:TaxExpenseOfDiscontinuedOperations>
+  <in-capmkt:ProfitLossFromDiscontinuedOperationsAfterTax contextRef="OneD" unitRef="INR" decimals="-5">0</in-capmkt:ProfitLossFromDiscontinuedOperationsAfterTax>
+  <in-capmkt:ShareOfProfitLossOfAssociatesAndJointVenturesAccountedForUsingEquityMethod contextRef="OneD" unitRef="INR" decimals="-5">0</in-capmkt:ShareOfProfitLossOfAssociatesAndJointVenturesAccountedForUsingEquityMethod>
+  <in-capmkt:ProfitLossForPeriod contextRef="OneD" unitRef="INR" decimals="-3">1009658000</in-capmkt:ProfitLossForPeriod>
+  <in-capmkt:OtherComprehensiveIncomeNetOfTaxes contextRef="OneD" unitRef="INR" decimals="-3">46339000</in-capmkt:OtherComprehensiveIncomeNetOfTaxes>
+  <in-capmkt:ComprehensiveIncomeForThePeriod contextRef="OneD" unitRef="INR" decimals="-3">1055997000</in-capmkt:ComprehensiveIncomeForThePeriod>
+  <in-capmkt:ProfitOrLossAttributableToOwnersOfParent contextRef="OneD" unitRef="INR" decimals="-3">1012963000</in-capmkt:ProfitOrLossAttributableToOwnersOfParent>
+  <in-capmkt:ProfitOrLossAttributableToNonControllingInterests contextRef="OneD" unitRef="INR" decimals="-3">-3306000</in-capmkt:ProfitOrLossAttributableToNonControllingInterests>
+  <in-capmkt:ComprehensiveIncomeForThePeriodAttributableToOwnersOfParent contextRef="OneD" unitRef="INR" decimals="-3">1059302000</in-capmkt:ComprehensiveIncomeForThePeriodAttributableToOwnersOfParent>
+  <in-capmkt:ComprehensiveIncomeForThePeriodAttributableToOwnersOfParentNonControllingInterests contextRef="OneD" unitRef="INR" decimals="-3">-3306000</in-capmkt:ComprehensiveIncomeForThePeriodAttributableToOwnersOfParentNonControllingInterests>
+  <in-capmkt:PaidUpValueOfEquityShareCapital contextRef="OneD" unitRef="INR" decimals="-3">739272000</in-capmkt:PaidUpValueOfEquityShareCapital>
+  <in-capmkt:FaceValueOfEquityShareCapital contextRef="OneD" unitRef="INRPerShare" decimals="INF">10</in-capmkt:FaceValueOfEquityShareCapital>
+  <in-capmkt:BasicEarningsLossPerShareFromContinuingOperations contextRef="OneD" unitRef="INRPerShare" decimals="INF">13.69</in-capmkt:BasicEarningsLossPerShareFromContinuingOperations>
+  <in-capmkt:DilutedEarningsLossPerShareFromContinuingOperations contextRef="OneD" unitRef="INRPerShare" decimals="INF">13.69</in-capmkt:DilutedEarningsLossPerShareFromContinuingOperations>
+  <in-capmkt:BasicEarningsLossPerShareFromDiscontinuedOperations contextRef="OneD" unitRef="INRPerShare" decimals="INF">0</in-capmkt:BasicEarningsLossPerShareFromDiscontinuedOperations>
+  <in-capmkt:DilutedEarningsLossPerShareFromDiscontinuedOperations contextRef="OneD" unitRef="INRPerShare" decimals="INF">0</in-capmkt:DilutedEarningsLossPerShareFromDiscontinuedOperations>
+  <in-capmkt:BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations contextRef="OneD" unitRef="INRPerShare" decimals="INF">13.69</in-capmkt:BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations>
+  <in-capmkt:DilutedEarningsLossPerShareFromContinuingAndDiscontinuedOperations contextRef="OneD" unitRef="INRPerShare" decimals="INF">13.69</in-capmkt:DilutedEarningsLossPerShareFromContinuingAndDiscontinuedOperations>
+  <in-capmkt:DisclosureOfNotesOnFinancialResultsExplanatoryTextBlock contextRef="OneD">Notes: &lt;br /&gt; 
+1. The above unaudited consolidated financial results have been reviewed by the Audit Committee and subsequently approved by the Board of Directors of Ashika Global Securities Limited ("Parent Company") at their respective meetings held on July 31, 2026. The Statutory Auditors of the Parent Company have reviewed the results for the quarter ended June 30, 2026 pursuant to the Regulation 33 of SEBI (Listing Obligations and Disclosure Requirements) Regulations, 2015, as amended. &lt;br /&gt; 
+ &lt;br /&gt; 
+2.These Consolidated financial results have been prepared in accordance with the recognition and measurement principles of Indian Accounting Standard ("Ind AS") prescribed under section 133 of the Companies Act. 2013 (the ''Act") read with relevant rules issued thereunder, circular, directions &amp; guidelines issued by the Reserve Bank of India (RBI) and the other accounting principles generally accepted in India. &lt;br /&gt; 
+ &lt;br /&gt; 
+These Consolidated financial results have been prepared in accordance with the requirement of Regulation 33 of the Securities and Exchange Board of India ('"SEBI") (Listing Obligations and Disclosure Requirements) Regulations, 2015, as amended. &lt;br /&gt; 
+ &lt;br /&gt; 
+3. The consolidated financial results of the Parent Company include the result of the Parent Company and its subsidiaries (the Parent Company and its subsidiaries together referred to as ‘the Group’), details of which are given below :- &lt;br /&gt; 
+ &lt;br /&gt; 
+Name of Company	% shareholding and voting power of Ashika Credit Capital Limited	Consolidated as &lt;br /&gt; 
+Ashika Private Equity Advisors Private Limited (Formerly known as Ashika Entercon Private Limited)	51%	Subsidiary (from January 21, 2025) &lt;br /&gt; 
+Ashika Global Insurance Advisors Private Limited	100%	Subsidiary &lt;br /&gt; 
+Ashika Global Wealth Services Private Limited	100%	Subsidiary &lt;br /&gt; 
+Ashika Logistics Private Limited (Upto May 11, 2026)	100%	Subsidiary(Refer Note-8) &lt;br /&gt; 
+Ashika Business Private Limited	100%	Subsidiary(^) &lt;br /&gt; 
+Ashika Global Family Office Services Private Limited	100%	Subsidiary(^) &lt;br /&gt; 
+Ashika Investment Managers Private Limited	100%	Subsidiary(^) &lt;br /&gt; 
+Ashika Stock Services Limited (Formerly known as Ashika Stock Broking Limited)	100%	Subsidiary(^) &lt;br /&gt; 
+Ashika Capital Limited (w.e.f June 30, 2026)	100%	Subsidiary(Refer Note-7) &lt;br /&gt; 
+Ashika Stock Broking IFSC Private Limited	100%	Subsidiary of Ashika Stock Services Limited(^) &lt;br /&gt; 
+ &lt;br /&gt; 
+^Pursuant to the implementation of Composite Scheme. &lt;br /&gt; 
+ &lt;br /&gt; 
+4. Disclosures pertaining to RBI Direction - RBI/DOR/2025-26/359 DOR.ACC.REC.No.278/21.04.018/2025-26 - Reserve Bank of India (Non-Banking Financial Companies — Financial Statements: Presentation and Disclosures) Directions, 2025 dated November 28, 2025 : &lt;br /&gt; 
+ &lt;br /&gt; 
+(i) Read with RBI Direction - RBI/DOR/2025-26/352DOR.STR.REC.271/21.04.048 /2025-26 - Reserve Bank of India (Non-Banking Financial Companies - Transfer and Distribution of Credit Risk) Directions, 2025. &lt;br /&gt; 
+ &lt;br /&gt; 
+(a) The Group has neither acquired nor transferred any loans (not in default) through assignment during the quarter ended June 30, 2026. &lt;br /&gt; 
+(b) The Group has neither acquired nor transferred any stressed loan during the quarter ended June 30, 2026.  &lt;br /&gt; 
+(c) The Group does not hold any Security Receipts (SRs) during the quarter and June 30, 2026. &lt;br /&gt; 
+ &lt;br /&gt; 
+5. A Composite Scheme of Amalgamation was approved involving (i) merger of Ashika Commodities &amp; Derivatives Private Limited ("ACDPL", wholly owned subsidiary of Ashika Global Securities Private Limited ("AGSPL")) with AGSPL, and (ii) merger of AGSPL with the Parent Company. The Scheme was sanctioned by the Hon'ble NCLT, Kolkata Bench, on May 8, 2026, and was accounted for in standalone financial statements of the company in the Financial Year ended March 31, 2026, using the pooling of interest method under Appendix C to Ind AS 103.  &lt;br /&gt; 
+  &lt;br /&gt; 
+Further, pursuant to the Scheme of Amalgamation involving the Parent Company and Yaduka Financial Services Limited, the Scheme was approved by the Hon'ble National Company Law Tribunal, Kolkata Bench, vide its order dated November 4, 2025. The certified copy of the said order was received on November 17, 2025, and was accounted for standalone financial statements of the parent company in the Financial Year ended March 31, 2026, using the pooling of interest method under Appendix C to Ind AS 103.  &lt;br /&gt; 
+ &lt;br /&gt; 
+Accordingly, effect has been given for in the comparative financial results for the quarter ended June 30, 2025 and the same have been restated by management based on the management-certified financial information. Hence, the reported figures are management certified financial results for the quarter ended June 30, 2025 and are not strictly comparable with previously published results. &lt;br /&gt; 
+ &lt;br /&gt; 
+6. During the year ended March 31, 2025, pursuant to special resolution passed at Extraordinary General Meeting held on December 12, 2024, the Parent Company had, on December 26, 2024, made allotment of 18,00,000 Convertible Warrants on Preferential Basis for cash to Non-Promoter at a price of Rs.609 per Warrant each convertible into, or exchangeable for, 1 (one) fully paid-up equity share of the Parent Company having face value of Rs 10 each at a premium of Rs. 599 aggregating to Rs. 10,962 Lakhs. The Parent Company had received 25% of the issue price per warrant i.e. Rs. 152.25 each as upfront payment aggregating to Rs. 2,740.50 Lakhs. Each warrant, so allotted, is convertible into an equal number of equity shares of face value Rs. 10 each of the Parent Company, subject to receipt of balance consideration of Rs. 456.75 each (being 75% of the issue price per warrant) aggregating to Rs. 8,221.50 Lakhs from the allottees to exercise conversion option against each such warrant.  &lt;br /&gt; 
+ &lt;br /&gt; 
+The Parent Company, during the quarter ended June 30, 2026, has received the balance 75% of the consideration amount for 2,00,000 warrants (out of total 18,00,000 outstanding warrants as of March 31, 2026). Accordingly, the aforesaid warrants were converted during the quarter ended June 30, 2026, to equal number of equity shares of face value of Rs. 10 each. &lt;br /&gt; 
+Further the Parent Company has forfeited 25% of consideration, being the upfront payment aggregating to Rs. 2,436.00 Lakhs, for 16,00,000 warrants due to non-receipt of balance 75% consideration within the stipulated exercise period of Eighteen months from the date of allotment i.e. by June 25, 2026. &lt;br /&gt; 
+ &lt;br /&gt; 
+7. The Parent Company held a 19.87% equity stake in Ashika Capital Ltd ('ACL'), comprising 2,60,000 equity shares as on March 31, 2026. On June 30, 2026, the parent company acquired additional 10,50,000 equity shares of ACL at a consideration of Rs.374.52 per share. Consequently, ACL became a wholly owned subsidiary of the parent company. Accordingly, as on acquisition date, previously held equity interest has been fair valued and impact amounting to Rs 534.41 Lakhs has been recognised in Other Comprehensive Income of the current quarter. &lt;br /&gt; 
+ &lt;br /&gt; 
+Consequently, the acquisition has been accounted for as a business combination. The purchase price allocation, including the valuation of identifiable assets acquired and liabilities assumed, is under finalisation. Accordingly, the acquisition has been initially accounted for on a provisional basis as at the reporting date. The Parent Company will adjust the provisional amounts, if required, during the measurement period in accordance with applicable accounting standards. &lt;br /&gt; 
+ &lt;br /&gt; 
+8. The Parent Company, on May 11, 2026, disposed of its investment in Ashika Logistics Private Limited (ALPL) by selling 9,22,200 equity shares, representing 100% of the equity share capital of ALPL, at a consideration of Rs 20 per share. The Book value of these shares in the standalone financials of the parent company was Rs 152.80 Lakhs. &lt;br /&gt; 
+ &lt;br /&gt; 
+Pursuant to the aforesaid transaction, the parent company ceased to hold controlling interest in ALPL. Accordingly, with effect from May 11, 2026, ALPL ceased to be a subsidiary of the parent company. &lt;br /&gt; 
+ &lt;br /&gt; 
+9. Pursuant to the approval by the Ministry of Corporate Affairs, the parent company changed its name from "Ashika Credit Capital Limited" to "Ashika Global Securities Limited" during the quarter ended June 30, 2026. &lt;br /&gt; 
+ &lt;br /&gt; 
+10. The Figures for the quarter ended March 31, 2026 are balancing figure between audited figures in respect of full financial year and the published unaudited year to date figures up to the third quarter ended December 31, 2025 which were subject to limited review, which being the financial information of comparative period have been restated, pursuant to the approval of the Scheme and the Composite Scheme by the Hon’ble National Company Law Tribunal as described in Note 5 above. &lt;br /&gt; 
+</in-capmkt:DisclosureOfNotesOnFinancialResultsExplanatoryTextBlock>
+  <in-capmkt:DescriptionOfOtherExpenses contextRef="OneExpenses1D">Other expenses</in-capmkt:DescriptionOfOtherExpenses>
+  <in-capmkt:OtherExpenses contextRef="OneExpenses1D" unitRef="INR" decimals="-3">85389000</in-capmkt:OtherExpenses>
+  <in-capmkt:DescriptionOfReportableSegment contextRef="OneReportable1D">Financial Activities</in-capmkt:DescriptionOfReportableSegment>
+  <in-capmkt:SegmentRevenue contextRef="OneReportable1D" unitRef="INR" decimals="-4">1362550000</in-capmkt:SegmentRevenue>
+  <in-capmkt:DescriptionOfReportableSegment contextRef="OneReportable2D">Broking &amp; Distribution</in-capmkt:DescriptionOfReportableSegment>
+  <in-capmkt:SegmentRevenue contextRef="OneReportable2D" unitRef="INR" decimals="-3">365268000</in-capmkt:SegmentRevenue>
+  <in-capmkt:DescriptionOfReportableSegment contextRef="OneReportable3D">Investment Management</in-capmkt:DescriptionOfReportableSegment>
+  <in-capmkt:SegmentRevenue contextRef="OneReportable3D" unitRef="INR" decimals="-3">2811000</in-capmkt:SegmentRevenue>
+  <in-capmkt:DescriptionOfReportableSegment contextRef="OneReportable4D">Others</in-capmkt:DescriptionOfReportableSegment>
+  <in-capmkt:SegmentRevenue contextRef="OneReportable4D" unitRef="INR" decimals="-4">39830000</in-capmkt:SegmentRevenue>
+  <in-capmkt:SegmentRevenue contextRef="OneD" unitRef="INR" decimals="-3">1770459000</in-capmkt:SegmentRevenue>
+  <in-capmkt:InterSegmentRevenue contextRef="OneD" unitRef="INR" decimals="-3">48981000</in-capmkt:InterSegmentRevenue>
+  <in-capmkt:SegmentRevenueFromOperations contextRef="OneD" unitRef="INR" decimals="-3">1721478000</in-capmkt:SegmentRevenueFromOperations>
+  <in-capmkt:DescriptionOfReportableSegment contextRef="OneReportableFinance1D">Financial Activities</in-capmkt:DescriptionOfReportableSegment>
+  <in-capmkt:SegmentProfitLossBeforeTaxAndFinanceCosts contextRef="OneReportableFinance1D" unitRef="INR" decimals="-3">1286261000</in-capmkt:SegmentProfitLossBeforeTaxAndFinanceCosts>
+  <in-capmkt:DescriptionOfReportableSegment contextRef="OneReportableFinance2D">Broking &amp; Distribution</in-capmkt:DescriptionOfReportableSegment>
+  <in-capmkt:SegmentProfitLossBeforeTaxAndFinanceCosts contextRef="OneReportableFinance2D" unitRef="INR" decimals="-3">39774000</in-capmkt:SegmentProfitLossBeforeTaxAndFinanceCosts>
+  <in-capmkt:DescriptionOfReportableSegment contextRef="OneReportableFinance3D">Investment Management</in-capmkt:DescriptionOfReportableSegment>
+  <in-capmkt:SegmentProfitLossBeforeTaxAndFinanceCosts contextRef="OneReportableFinance3D" unitRef="INR" decimals="-3">-25615000</in-capmkt:SegmentProfitLossBeforeTaxAndFinanceCosts>
+  <in-capmkt:DescriptionOfReportableSegment contextRef="OneReportableFinance4D">Others</in-capmkt:DescriptionOfReportableSegment>
+  <in-capmkt:SegmentProfitLossBeforeTaxAndFinanceCosts contextRef="OneReportableFinance4D" unitRef="INR" decimals="-3">-3126000</in-capmkt:SegmentProfitLossBeforeTaxAndFinanceCosts>
+  <in-capmkt:SegmentProfitLossBeforeTaxAndFinanceCosts contextRef="OneD" unitRef="INR" decimals="-3">1297294000</in-capmkt:SegmentProfitLossBeforeTaxAndFinanceCosts>
+  <in-capmkt:SegmentFinanceCosts contextRef="OneD" unitRef="INR" decimals="-5">0</in-capmkt:SegmentFinanceCosts>
+  <in-capmkt:OtherUnallocableExpenditureNetOffUnAllocableIncome contextRef="OneD" unitRef="INR" decimals="-5">0</in-capmkt:OtherUnallocableExpenditureNetOffUnAllocableIncome>
+  <in-capmkt:SegmentProfitBeforeTax contextRef="OneD" unitRef="INR" decimals="-3">1297294000</in-capmkt:SegmentProfitBeforeTax>
+  <in-capmkt:DescriptionOfReportableSegment contextRef="OneReportable31D">Financial Activities</in-capmkt:DescriptionOfReportableSegment>
+  <in-capmkt:SegmentAssets contextRef="OneReportable31I" unitRef="INR" decimals="-3">12422889000</in-capmkt:SegmentAssets>
+  <in-capmkt:DescriptionOfReportableSegment contextRef="OneReportable32D">Broking &amp; Distribution</in-capmkt:DescriptionOfReportableSegment>
+  <in-capmkt:SegmentAssets contextRef="OneReportable32I" unitRef="INR" decimals="-3">10570566000</in-capmkt:SegmentAssets>
+  <in-capmkt:DescriptionOfReportableSegment contextRef="OneReportable33D">Investment Management</in-capmkt:DescriptionOfReportableSegment>
+  <in-capmkt:SegmentAssets contextRef="OneReportable33I" unitRef="INR" decimals="-4">20010000</in-capmkt:SegmentAssets>
+  <in-capmkt:DescriptionOfReportableSegment contextRef="OneReportable34D">Others</in-capmkt:DescriptionOfReportableSegment>
+  <in-capmkt:SegmentAssets contextRef="OneReportable34I" unitRef="INR" decimals="-3">551822000</in-capmkt:SegmentAssets>
+  <in-capmkt:SegmentAssets contextRef="OneI" unitRef="INR" decimals="-3">23565287000</in-capmkt:SegmentAssets>
+  <in-capmkt:UnAllocableAssets contextRef="OneI" unitRef="INR" decimals="-3">-4934507000</in-capmkt:UnAllocableAssets>
+  <in-capmkt:NetSegmentAssets contextRef="OneI" unitRef="INR" decimals="-4">18630780000</in-capmkt:NetSegmentAssets>
+  <in-capmkt:DescriptionOfReportableSegment contextRef="OneReportable41D">Financial Activities</in-capmkt:DescriptionOfReportableSegment>
+  <in-capmkt:SegmentLiabilities contextRef="OneReportable41I" unitRef="INR" decimals="-3">655564000</in-capmkt:SegmentLiabilities>
+  <in-capmkt:DescriptionOfReportableSegment contextRef="OneReportable42D">Broking &amp; Distribution</in-capmkt:DescriptionOfReportableSegment>
+  <in-capmkt:SegmentLiabilities contextRef="OneReportable42I" unitRef="INR" decimals="-3">6778964000</in-capmkt:SegmentLiabilities>
+  <in-capmkt:DescriptionOfReportableSegment contextRef="OneReportable43D">Investment Management</in-capmkt:DescriptionOfReportableSegment>
+  <in-capmkt:SegmentLiabilities contextRef="OneReportable43I" unitRef="INR" decimals="-3">23505000</in-capmkt:SegmentLiabilities>
+  <in-capmkt:DescriptionOfReportableSegment contextRef="OneReportable44D">Others</in-capmkt:DescriptionOfReportableSegment>
+  <in-capmkt:SegmentLiabilities contextRef="OneReportable44I" unitRef="INR" decimals="-3">61201000</in-capmkt:SegmentLiabilities>
+  <in-capmkt:SegmentLiabilities contextRef="OneI" unitRef="INR" decimals="-3">7519234000</in-capmkt:SegmentLiabilities>
+  <in-capmkt:UnAllocableLiabilities contextRef="OneI" unitRef="INR" decimals="-3">-1716703000</in-capmkt:UnAllocableLiabilities>
+  <in-capmkt:NetSegmentLiabilities contextRef="OneI" unitRef="INR" decimals="-3">5802531000</in-capmkt:NetSegmentLiabilities>
+  <in-capmkt:DescriptionOfItemThatWillNotBeReclassifiedToProfitAndLoss contextRef="D_ItemsThatWillNotBeReclassifiedToProfitAndLoss11">Remeasurement Gain/(loss) on defined Benefit Plans</in-capmkt:DescriptionOfItemThatWillNotBeReclassifiedToProfitAndLoss>
+  <in-capmkt:AmountOfItemThatWillNotBeReclassifiedToProfitAndLoss contextRef="D_ItemsThatWillNotBeReclassifiedToProfitAndLoss11" unitRef="INR" decimals="-3">724000</in-capmkt:AmountOfItemThatWillNotBeReclassifiedToProfitAndLoss>
+  <in-capmkt:DescriptionOfItemThatWillNotBeReclassifiedToProfitAndLoss contextRef="D_ItemsThatWillNotBeReclassifiedToProfitAndLoss12">Fair Valuation of Equity Instruments through OCI</in-capmkt:DescriptionOfItemThatWillNotBeReclassifiedToProfitAndLoss>
+  <in-capmkt:AmountOfItemThatWillNotBeReclassifiedToProfitAndLoss contextRef="D_ItemsThatWillNotBeReclassifiedToProfitAndLoss12" unitRef="INR" decimals="-3">53259000</in-capmkt:AmountOfItemThatWillNotBeReclassifiedToProfitAndLoss>
+  <in-capmkt:DescriptionOfItemThatWillNotBeReclassifiedToProfitAndLoss contextRef="D_ItemsThatWillNotBeReclassifiedToProfitAndLoss13">Foreign Exchange Translation Reserve</in-capmkt:DescriptionOfItemThatWillNotBeReclassifiedToProfitAndLoss>
+  <in-capmkt:AmountOfItemThatWillNotBeReclassifiedToProfitAndLoss contextRef="D_ItemsThatWillNotBeReclassifiedToProfitAndLoss13" unitRef="INR" decimals="-3">-2000</in-capmkt:AmountOfItemThatWillNotBeReclassifiedToProfitAndLoss>
+  <in-capmkt:AmountOfItemThatWillNotBeReclassifiedToProfitAndLoss contextRef="OneD" unitRef="INR" decimals="-3">53981000</in-capmkt:AmountOfItemThatWillNotBeReclassifiedToProfitAndLoss>
+  <in-capmkt:IncomeTaxRelatingToItemsThatWillNotBeReclassifiedToProfitOrLoss contextRef="OneD" unitRef="INR" decimals="-3">7642000</in-capmkt:IncomeTaxRelatingToItemsThatWillNotBeReclassifiedToProfitOrLoss>
+  <in-capmkt:IncomeTaxRelatingToItemsThatWillBeReclassifiedToProfitOrLoss contextRef="OneD" unitRef="INR" decimals="-5">0</in-capmkt:IncomeTaxRelatingToItemsThatWillBeReclassifiedToProfitOrLoss>
+  <in-capmkt:OtherComprehensiveIncome contextRef="OneD" unitRef="INR" decimals="-3">46339000</in-capmkt:OtherComprehensiveIncome>
+  <in-capmkt:WhetherResultsAreAuditedOrUnauditedForImpactOfAuditQualification contextRef="OneD">Unaudited</in-capmkt:WhetherResultsAreAuditedOrUnauditedForImpactOfAuditQualification>
+  <in-capmkt:DeclarationPursuantToClauseDOfSubRegulation3OfRegulation33OfSEBILODRRegulation2015 contextRef="OneD">true</in-capmkt:DeclarationPursuantToClauseDOfSubRegulation3OfRegulation33OfSEBILODRRegulation2015>
+  <in-capmkt:AuditorsFirmName contextRef="D_Auditor1">JKVS &amp; Co.</in-capmkt:AuditorsFirmName>
+  <in-capmkt:WhetherTheFirmHoldsAValidPeerReviewCertificateIssuedByPeerReviewBoardOfICAI contextRef="D_Auditor1">true</in-capmkt:WhetherTheFirmHoldsAValidPeerReviewCertificateIssuedByPeerReviewBoardOfICAI>
+  <in-capmkt:ValidityDateOfCertificate contextRef="D_Auditor1">2027-11-30</in-capmkt:ValidityDateOfCertificate>
+</xbrli:xbrl>

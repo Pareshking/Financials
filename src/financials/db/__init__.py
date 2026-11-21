@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import functools
+import importlib.util
 import re
+import sys
 from collections.abc import Iterable, Mapping, Sequence
 from importlib.resources import files
 from pathlib import Path
@@ -10,6 +13,13 @@ from typing import Any
 
 import duckdb
 import pyarrow as pa
+
+# DuckDB's Python binding tries `import pandas` for every bound parameter (to recognise a DataFrame). pandas is not a
+# dependency: without it each attempt searches sys.path again (~0.1 ms a parameter; a 3-parameter query cost 0.55 ms
+# instead of 0.23 ms, ~20 ms of every incremental materialised day). Recording the absence once makes the attempt
+# fail at once (ModuleNotFoundError, as before). Nothing changes when pandas is installed.
+if importlib.util.find_spec("pandas") is None:
+    sys.modules.setdefault("pandas", None)
 
 SCHEMA_SQL = files(__package__).joinpath("schema.sql").read_text(encoding="utf-8")
 VIEWS_MARKER = "-- views (after column upgrade)\n"  # schema.sql: views run after upgrade_columns
@@ -66,7 +76,13 @@ _LEGACY_HISTORY = (
 def declared_columns(schema_sql: str | None = None) -> dict[str, list[tuple[str, str]]]:
     """{table: [(column, definition)]} in declaration order, parsed from schema.sql (read at call time)."""
     schema_sql = SCHEMA_SQL if schema_sql is None else schema_sql
-    out: dict[str, list[tuple[str, str]]] = {}
+    return {table: list(cols) for table, cols in _parse_columns(schema_sql)}
+
+
+@functools.lru_cache(maxsize=8)
+def _parse_columns(schema_sql: str) -> tuple[tuple[str, tuple[tuple[str, str], ...]], ...]:
+    """The parse behind declared_columns, memoised on the schema text (a pure function of it; ~13 ms a call)."""
+    out = []
     for table, body in _TABLE_RE.findall(schema_sql):
         cols = []
         for raw in body.splitlines():
@@ -75,8 +91,8 @@ def declared_columns(schema_sql: str | None = None) -> dict[str, list[tuple[str,
                 continue
             name, _, definition = line.partition(" ")
             cols.append((name, definition.strip()))
-        out[table] = cols
-    return out
+        out.append((table, tuple(cols)))
+    return tuple(out)
 
 
 # Deliberate migrations that relax a NOT NULL column of an existing database to the nullable declaration of schema.sql
@@ -99,8 +115,13 @@ def upgrade_columns(con: duckdb.DuckDBPyConnection) -> list[str]:
             stmt = f"ALTER TABLE {table} ALTER COLUMN {column} DROP NOT NULL"
             con.execute(stmt)
             executed.append(stmt)
+    present: dict[str, set[str]] = {}  # one catalog read, not one per table (same rows as table_columns)
+    for table, column in con.execute("SELECT table_name, column_name FROM information_schema.columns").fetchall():
+        present.setdefault(table, set()).add(column)
     for table, cols in declared.items():
-        existing = set(table_columns(con, table))
+        if table not in present:
+            raise KeyError(f"unknown table {table}")
+        existing = present[table]
         for name, definition in cols:
             if name in existing:
                 continue
@@ -113,13 +134,17 @@ def upgrade_columns(con: duckdb.DuckDBPyConnection) -> list[str]:
 
 
 def table_columns(con: duckdb.DuckDBPyConnection, table: str) -> list[str]:
-    rows = con.execute(
-        "SELECT column_name FROM information_schema.columns WHERE table_name = ? ORDER BY ordinal_position",
-        [table],
-    ).fetchall()
-    if not rows:
+    """Column names of `table` (resolved like the statements that use it), in declaration order.
+
+    Read from an empty result's description: an information_schema query costs ~9 ms against this schema and
+    runs once per bulk insert, this ~0.3 ms."""
+    if not re.fullmatch(r"\w+", table):
         raise KeyError(f"unknown table {table}")
-    return [r[0] for r in rows]
+    try:
+        cur = con.execute(f"SELECT * FROM {table} LIMIT 0")
+    except duckdb.CatalogException:
+        raise KeyError(f"unknown table {table}") from None
+    return [d[0] for d in cur.description]
 
 
 def insert_rows(

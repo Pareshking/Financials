@@ -94,11 +94,11 @@ context) and Reg. 34 FY25/FY26 comparatives. Due dates assumed: Q1-Q3 results wi
 
 | ID | Name (Screener variants) | Family | Definition (our tags) | Status | Data / notes |
 |---|---|---|---|---|---|
-| A2.1 | ★ Return on equity | returns | TTM owners' profit / closing owners' equity (C16) | BUILT | `roe` (+ `roe_continuing`) |
+| A2.1 | ★ Return on equity | returns | TTM owners' profit / closing owners' equity (C16) | BUILT | `roe` (+ `roe_continuing`); Screener's website form (last FY owners' profit × 2 / (opening + closing owners' equity), NULL unless both > 0) = `roe_screener` (X227, DSL `roe screener`) |
 | A2.2 | ROE preceding year | returns | FY(−1) owners' PAT / closing owners' equity at that FY end | BUILT | `roe_preceding_year` (closing owners' equity, as `roe`); batch C |
 | A2.3 | ★ Average return on equity 3/5Years; Average ROE 3/5/7/10Years | returns | mean of FY ROE over N FYs | WHEN HISTORY | ~May 2027 / 2029 / 2031 / 2034 |
 | A2.4 | ROE 5years growth | returns | ROE(FY) − ROE(FY−5) (definition UNVERIFIED) | WHEN HISTORY | ~May 2030 |
-| A2.5 | ★ Return on capital employed | returns | TTM ebit / closing (equity + debt) | BUILT | `roce`; Screener form (PBT + interest) / avg capital = `roce_screener` |
+| A2.5 | ★ Return on capital employed | returns | TTM ebit / closing (equity + debt) | BUILT | `roce`; Screener form (PBT + interest) / avg capital = `roce_screener` (NULL unless capital employed > 0 at both year ends, X194) |
 | A2.6 | ROCE preceding year | returns | FY(−1) ROCE | BUILT | `roce_preceding_year` (FY EBIT / closing debt + total equity, as `roce`); Screener average-capital form not built; batch C |
 | A2.7 | Average ROCE 3/5/7/10Years; Median ROCE 3/5/7/10Years | returns | mean / median of FY ROCE | WHEN HISTORY | closing form ~May 2027/2029/2031/2034; `roce_screener` form ~May 2028/2030/2032/2035 |
 | A2.8 | ★ Return on assets | returns | TTM owners' PAT / avg total assets (opening = BS 12 months earlier) | BUILT | `roa` now also for industrial books: TTM owners' profit / avg total assets over the 12 months to `bs_as_of` (NULL until the BS 12 months earlier is visible); batch C |
@@ -116,7 +116,7 @@ context) and Reg. 34 FY25/FY26 comparatives. Due dates assumed: Q1-Q3 results wi
 | A2.20 | Inventory turnover 3/5/7/10Years back | efficiency history | FY value N years back | BUILT | `inventory_turnover_{3,5,7,10}y_back` (history-gated, NULL until ~May 2028 / 2030 / 2032 / 2035); batch C |
 | A2.21 | Current ratio | liquidity | current_assets / current_liabilities | BUILT | `current_ratio`; batch C |
 | A2.22 | Quick ratio | liquidity | (current_assets − inventories) / current_liabilities | BUILT | `quick_ratio`; batch C |
-| A2.23 | ★ Debt to equity | leverage | total_debt / total_equity | BUILT | `debt_to_equity` |
+| A2.23 | ★ Debt to equity | leverage | total_debt / total_equity | BUILT | `debt_to_equity`; lending NBFCs: (debt securities + borrowings + deposits + subordinated liabilities) / total equity (X228); banks and insurers NULL |
 | A2.24 | ★ Interest Coverage Ratio (G175) | leverage | TTM ebit (or PBT + finance costs) / TTM finance costs | BUILT | `interest_coverage`. Filed `li_interest_service_coverage_ratio` exists in 38 INDAS_CORP filings (listed-debt issuers only) |
 | A2.25 | Debtor days; Days Receivable Outstanding | working capital | closing trade receivables / (FY sales / 365) | BUILT | `debtor_days` |
 | A2.26 | Days Inventory Outstanding | working capital | closing inventory / (COGS / 365) | BUILT | `inventory_days` |

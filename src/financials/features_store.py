@@ -31,7 +31,8 @@ Everything here runs inside the caller's transaction (the single writer, feature
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date
+from collections.abc import Iterator
+from datetime import date, timedelta
 
 from financials.db import declared_columns
 
@@ -132,7 +133,7 @@ EVENT_COLUMNS = (
     "insider_receivables_to_receivables", "has_insider_receivables", "subsidiary_fy_end", "parent_profit_share",
     "largest_subsidiary_profit_share", "largest_subsidiary_name", "consolidated_entities_count", "audit_opinion",
     "audit_opinion_fy_end", "audit_opinion_conflict", "going_concern_uncertainty", "emphasis_of_matter",
-    "audit_opinion_quarterly", "audit_opinion_quarter_end",
+    "audit_opinion_quarterly", "audit_opinion_quarter_end", "roe_screener",
 )  # fmt: skip
 
 _DECLARED = declared_columns()
@@ -188,16 +189,16 @@ def _set_events(con, as_of: date, rows: list[dict]) -> None:
         # The securities whose values differ from the interval covering as_of (or that have none), with the next
         # materialised day of each (the daily rows of as_of are already written).
         con.execute(
-            "CREATE OR REPLACE TEMP TABLE _ev_chg AS SELECT a.security_id, nx.next_day FROM _ev_new a "
+            "CREATE OR REPLACE TEMP TABLE _ev_chg AS SELECT a.security_id, CAST(NULL AS DATE) AS next_day "
+            "FROM _ev_new a "
             "LEFT JOIN features_events b ON b.security_id = a.security_id AND b.valid_from_date <= ? "
             "AND ? < coalesce(b.valid_to_date, DATE '9999-12-31') "
-            "LEFT JOIN (SELECT security_id, min(as_of_date) AS next_day FROM features_daily WHERE as_of_date > ? "
-            "AND security_id IN (SELECT security_id FROM _ev_new) GROUP BY 1) nx ON nx.security_id = a.security_id "
             f"WHERE b.security_id IS NULL OR NOT ({_SAME})",
-            [as_of, as_of, as_of],
+            [as_of, as_of],
         )
         if not con.execute("SELECT count(*) FROM _ev_chg").fetchone()[0]:
             return
+        _next_days(con, as_of)
         # Every interval overlapping [as_of, next_day) is cut out: its parts before as_of and from next_day stay.
         con.execute(
             "CREATE OR REPLACE TEMP TABLE _ev_ov AS SELECT e.*, g.next_day FROM features_events e JOIN _ev_chg g "
@@ -228,6 +229,30 @@ def _set_events(con, as_of: date, rows: list[dict]) -> None:
     finally:
         for t in ("_ev_new", "_ev_chg", "_ev_ov", "_ev_pairs", "_ev_isl"):
             con.execute(f"DROP TABLE IF EXISTS {t}")
+
+
+NEXT_DAY_WINDOW_DAYS = 45
+
+
+def _next_days(con, as_of: date) -> None:
+    """Set `_ev_chg.next_day`: each changed security's first materialised day after as_of (NULL: none). The changed
+    securities are usually few and their next day is the next materialised day: their rows are looked up in the
+    NEXT_DAY_WINDOW_DAYS after the first materialised day after as_of, and only the securities without a row there
+    in the rest of the history, if it reaches further (a scan of every later row used to cost ~50 ms a day)."""
+    near, last = con.execute(
+        "SELECT min(as_of_date) FILTER (WHERE as_of_date > ?), max(as_of_date) FROM features_daily", [as_of]
+    ).fetchone()
+    if near is None:  # as_of is the last materialised day
+        return
+    end = near + timedelta(days=NEXT_DAY_WINDOW_DAYS)
+    sql = (
+        "UPDATE _ev_chg g SET next_day = nx.d FROM (SELECT security_id, min(as_of_date) AS d FROM features_daily "
+        "WHERE as_of_date > ? AND as_of_date <= ? AND security_id IN (SELECT security_id FROM _ev_chg "
+        "WHERE next_day IS NULL) GROUP BY 1) nx WHERE g.security_id = nx.security_id"
+    )
+    con.execute(sql, [as_of, end])
+    if end < last:
+        con.execute(sql, [end, last])
 
 
 def _merge_adjacent(con, as_of: date) -> None:
@@ -265,6 +290,29 @@ def _merge_adjacent(con, as_of: date) -> None:
         "AND e.security_id = i.security_id AND e.valid_from_date = i.valid_from_date "
         "AND e.valid_to_date IS DISTINCT FROM i.isl_to"
     )
+
+
+def stored_days(con, columns, days) -> Iterator[tuple[date, list[dict]]]:
+    """(day, rows) for each of `days` that has stored rows, ascending: the history view's `columns` of the day's
+    rows (dicts), in security_id order. One read for all the days (the cross-section refresh of a batch of days)."""
+    days = sorted(set(days))
+    if not days:
+        return
+    cur = con.execute(
+        f"SELECT as_of_date, {', '.join(columns)} FROM screener_features_history WHERE as_of_date >= ? "
+        "AND as_of_date <= ? AND as_of_date IN (SELECT unnest(CAST(? AS DATE[]))) ORDER BY as_of_date, security_id",
+        [days[0], days[-1], days],
+    )
+    names = [d[0] for d in cur.description][1:]
+    day, out = None, []
+    for row in cur.fetchall():
+        if row[0] != day:
+            if out:
+                yield day, out
+            day, out = row[0], []
+        out.append(dict(zip(names, row[1:], strict=True)))
+    if out:
+        yield day, out
 
 
 def write_rows(con, rows) -> int:

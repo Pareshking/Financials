@@ -25,7 +25,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
-from conftest import Market, build_full_market
+from conftest import Market, full_market_db
 
 from financials import features, features_more, features_price
 from financials.bench import extend_synthetic
@@ -225,10 +225,7 @@ def _run(con, days, buf) -> int:
 
 @pytest.fixture(scope="module")
 def fixture_db(tmp_path_factory):
-    root = tmp_path_factory.mktemp("fast_path_base")
-    m = build_full_market(root)
-    m.con.close()
-    return root / "market.duckdb"
+    return full_market_db(tmp_path_factory, "fast_path_base")
 
 
 def test_full_fixture_market_legacy_and_fast_paths_are_identical(fixture_db, tmp_path, monkeypatch):

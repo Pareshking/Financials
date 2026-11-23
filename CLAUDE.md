@@ -134,6 +134,16 @@ data/                  local only, gitignored: vault/, staging/, market.duckdb
   `tests/test_benchmarks.py` guards this; refresh `docs/benchmarks.md` when timings change materially.
 - New parser or profile work starts from a real fixture of that exact profile and period type.
 
+## PRs and CI (owner 2026-11-23: fewer CI runs)
+
+- `ci.yml` runs on `pull_request` and on pushes to `main` only; a newer push cancels the older run on the same PR.
+  A push to a branch without a PR runs no CI.
+- Batch: commit as you go, push once per finished batch (the fix, its tests and its docs together), not per commit.
+  Docs are tested too, so a docs-only change rides with the next code push unless the owner needs it now.
+- Keep one draft PR per branch; put a decision round's items in it together. Never open a PR early to iterate on CI.
+- Before every push run what CI runs: `ruff check` / `ruff format --check` and the full offline suite, each exit code
+  checked (never piped into `tail`), so CI passes on its first run. Never push only to re-run CI.
+
 ## Fetching (local machine only for now)
 
 - `nsearchives.nseindia.com`: archives (bhavcopy, delivery, XBRL files, RSS). `www.nseindia.com`

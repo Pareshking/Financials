@@ -668,7 +668,7 @@ def _accept_corp_action(con, q: dict, details: dict, payload: dict, entity: str 
         action = CorpAction(
             action_id=stable_id("ca", "NSE", details["isin"], ex, details["subject"], i), security_id=sec,
             action_type=c.action_type, ex_date=ex, ratio_num=c.ratio_num, ratio_den=c.ratio_den,
-            issue_price=c.issue_price, cash_per_share=c.cash_per_share,
+            issue_price=c.issue_price, cash_per_share=c.cash_per_share, issue_price_floor=c.issue_price_floor,
         )  # fmt: skip
         record_corp_action(con, action, source_filing_id=q["filing_id"], entity_id=entity)
         ids.append(action.action_id)

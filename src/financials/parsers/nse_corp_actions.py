@@ -25,7 +25,7 @@ from financials.parsers import ParseError
 
 UNIVERSE_SERIES = frozenset({"EQ", "BE", "BZ"})
 # Bumped whenever the purpose rules change: a restaged answer is a new batch, so `promote` re-reads it [CA11].
-PURPOSE_RULES_VERSION = "ca-4"
+PURPOSE_RULES_VERSION = "ca-5"  # ca-5: RIGHTS_PRICE_UNSTATED (X355)
 
 _RS = r"R[SE]\.?\s*"
 _NUM = r"(\d+(?:\.\d+)?)"
@@ -48,6 +48,7 @@ RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
         ),
     ),
     ("RIGHTS", re.compile(rf"^RIGHTS\s+(\d+)\s*:\s*(\d+)\s*@\s*(?:PREMIUM|PRM)\s+(?:{_RS})?{_NUM}\s*(?:/-)?$")),
+    ("RIGHTS_UNPRICED", re.compile(r"^RIGHTS\s+(\d+)\s*:\s*(\d+)$")),  # no issue price stated (X355, PRAXIS)
     ("DEMERGER", re.compile(r"^DEMERGER$")),
     ("BUYBACK", re.compile(r"^BUY ?BACK$")),  # RSS 13-Nov-2026 (FDC): no price factor, like a dividend [CA10]
     ("MEETING", re.compile(r"^(?:ANNUAL|EXTRA ?ORDINARY) GENERAL MEETING$")),  # a notice, not an action [CA11]
@@ -65,6 +66,7 @@ class ParsedComponent:
     ratio_den: Decimal | None = None
     issue_price: Decimal | None = None
     cash_per_share: Decimal | None = None
+    issue_price_floor: Decimal | None = None  # RIGHTS without a stated price: face value (X355)
 
 
 @dataclass(frozen=True)
@@ -118,6 +120,10 @@ def parse_purpose(subject: str, face_value: Decimal | None) -> tuple[str, str | 
                 if face_value is None:
                     return "UNPARSED", "rights premium without face value", ()
                 out.append(ParsedComponent("RIGHTS", ratio_num=g[0], ratio_den=g[1], issue_price=face_value + g[2]))
+            elif kind == "RIGHTS_UNPRICED":
+                if face_value is None:
+                    return "UNPARSED", "rights without issue price or face value", ()
+                out.append(ParsedComponent("RIGHTS", ratio_num=g[0], ratio_den=g[1], issue_price_floor=face_value))
             elif kind == "BUYBACK":
                 out.append(ParsedComponent("BUYBACK"))
             elif kind == "MEETING":

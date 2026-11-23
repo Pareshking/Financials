@@ -101,7 +101,7 @@ CREATE TABLE stg_corp_actions (
     symbol VARCHAR NOT NULL, series VARCHAR NOT NULL, isin VARCHAR NOT NULL, ex_date DATE NOT NULL,
     record_date DATE, face_value DECIMAL(18,4), subject VARCHAR NOT NULL, parse_status VARCHAR NOT NULL,
     parse_reason VARCHAR, action_type VARCHAR, ratio_num DECIMAL(18,6), ratio_den DECIMAL(18,6),
-    issue_price DECIMAL(18,4), cash_per_share DECIMAL(18,4),
+    issue_price DECIMAL(18,4), cash_per_share DECIMAL(18,4), issue_price_floor DECIMAL(18,4),
     PRIMARY KEY (filing_id, seq, component)
 );
 CREATE TABLE stg_holidays (
@@ -669,7 +669,14 @@ def stage_corp_actions(
             "parse_status": r.parse_status,
             "parse_reason": r.parse_reason,
         }
-        empty = {"action_type": None, "ratio_num": None, "ratio_den": None, "issue_price": None, "cash_per_share": None}
+        empty = {
+            "action_type": None,
+            "ratio_num": None,
+            "ratio_den": None,
+            "issue_price": None,
+            "cash_per_share": None,
+            "issue_price_floor": None,
+        }
         if not r.components:
             rows.append(
                 {**base, "component": 0, **empty, "action_type": "UNKNOWN" if r.parse_status == "UNPARSED" else None}
@@ -684,6 +691,7 @@ def stage_corp_actions(
                     "ratio_den": c.ratio_den,
                     "issue_price": c.issue_price,
                     "cash_per_share": c.cash_per_share,
+                    "issue_price_floor": c.issue_price_floor,
                 }
             )
     return write_stage(

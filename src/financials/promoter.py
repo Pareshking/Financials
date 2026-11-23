@@ -588,6 +588,7 @@ def _actions(con, where: str, params: list[Any]) -> list[CorpAction]:
             ratio_den=r["ratio_den"],
             issue_price=r["issue_price"],
             cash_per_share=r["cash_per_share"],
+            issue_price_floor=r.get("issue_price_floor"),
             status=r["status"],
             price_factor=None if r["price_factor"] is None else Decimal(str(r["price_factor"])),
             eps_factor=None if r["eps_factor"] is None else Decimal(str(r["eps_factor"])),
@@ -621,6 +622,7 @@ def record_corp_action(
                 "ratio_den": action.ratio_den,
                 "issue_price": action.issue_price,
                 "cash_per_share": action.cash_per_share,
+                "issue_price_floor": action.issue_price_floor,
                 "status": status,
                 "source_filing_id": source_filing_id,
                 "recorded_at": utc_now(),
@@ -1000,6 +1002,7 @@ def _promote_corp_actions(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
             ratio_den=r["ratio_den"],
             issue_price=r["issue_price"],
             cash_per_share=r["cash_per_share"],
+            issue_price_floor=r.get("issue_price_floor"),
         )
         unparsed = r["parse_status"] == "UNPARSED"
         if not unparsed:
@@ -1042,10 +1045,11 @@ def _upgrade_unparsed(con, action: CorpAction) -> None:
     verification, and its UNPARSED_PURPOSE finding closes [CA11]. Manual decisions (SUPERSEDED, REJECTED) stand."""
     hit = con.execute(
         "UPDATE corp_actions SET action_type = ?, ratio_num = ?, ratio_den = ?, issue_price = ?, cash_per_share = ?, "
-        "status = 'PENDING', price_factor = NULL, eps_factor = NULL, observed_gap = NULL, decided_at = NULL "
+        "issue_price_floor = ?, status = 'PENDING', price_factor = NULL, eps_factor = NULL, observed_gap = NULL, "
+        "decided_at = NULL "
         "WHERE action_id = ? AND action_type = 'UNKNOWN' AND status = 'QUARANTINED' RETURNING 1",
         [action.action_type, action.ratio_num, action.ratio_den, action.issue_price, action.cash_per_share,
-         action.action_id],
+         action.issue_price_floor, action.action_id],
     ).fetchall()  # fmt: skip
     if hit:
         con.execute(

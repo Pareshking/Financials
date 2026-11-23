@@ -62,7 +62,7 @@ def test_bonus_rights_dividend_and_same_day_pair(records):
     [
         "Scheme of Arrangement",
         "Bonus 1:1 And Something Else",
-        "Rights 1:2",  # no premium
+        "Rights 1:2 @ Premium",  # premium without an amount (a bare "Rights 1:2" is X355: price floor = face value)
         "Face Value Split (Sub-Division) - From Rs 10/- Per Share",
         "Bonus 0:1",
         "Capital Reduction",

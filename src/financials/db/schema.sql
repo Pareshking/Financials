@@ -407,7 +407,8 @@ CREATE TABLE IF NOT EXISTS corp_actions (
     coa_pct           DOUBLE,                                         -- never written: entity_lineage.coa_pct
     source_filing_id  VARCHAR NOT NULL REFERENCES filings(filing_id),
     recorded_at       TIMESTAMP,                 -- when the ledger first held the action (system time)
-    decided_at        TIMESTAMP                  -- when status last changed (verification / manual resolution)
+    decided_at        TIMESTAMP,                 -- when status last changed (verification / manual resolution)
+    issue_price_floor DECIMAL(18,4)              -- RIGHTS without a stated price: face value, a legal floor (X355)
 );
 
 -- Directed corporate lineage (G37, architecture §11.7). Read as "child RELATION parent":

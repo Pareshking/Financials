@@ -40,6 +40,7 @@ class CorpAction:
     status: str = "PENDING"
     price_factor: Decimal | None = None
     eps_factor: Decimal | None = None
+    issue_price_floor: Decimal | None = None  # RIGHTS with no stated price: face value (X355)
 
     def __post_init__(self) -> None:
         if self.action_type not in ACTION_TYPES:
@@ -76,9 +77,15 @@ def theoretical_factors(action: CorpAction, close_prev: Decimal | None) -> tuple
     if t == "RIGHTS":
         a, b = _need(action.ratio_num, "ratio_num", action), _need(action.ratio_den, "ratio_den", action)
         p = action.issue_price
-        if p is None or p < 0:
-            raise ValueError(f"RIGHTS {action.action_id}: issue_price required")
         c = _need(close_prev, "close_prev", action)
+        floor = action.issue_price_floor
+        if p is None and floor is not None and floor >= c:
+            # RIGHTS_PRICE_UNSTATED (X355): shares are never issued below face value (Companies Act 2013 s.53), so an
+            # issue price >= face value >= the cum-rights close carries no bonus element: nothing to adjust.
+            return Decimal(1), Decimal(1)
+        if p is None or p < 0:
+            why = f" (face value {floor} is below the cum-rights close {c})" if floor is not None else ""
+            raise ValueError(f"RIGHTS {action.action_id}: issue_price required{why}")
         f = (b * c + a * p) / ((a + b) * c)
         return f, f
     if t == "DEMERGER":

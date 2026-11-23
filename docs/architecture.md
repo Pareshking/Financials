@@ -1021,11 +1021,14 @@ Paths assume the checkout at `~/Financials` with a `.venv`; edit them. `tests/te
 that the files call only existing CLI commands. The quarterly sweeps (`discover-filings --universe nifty500`,
 `fetch-classification`, `fetch-index`) are not scheduled: the daily run's RSS hint covers new results.
 
-**GitHub Actions nightly (batch K, 22:00 IST = cron `30 16 * * *` UTC).** Two workflows, both also `workflow_dispatch`:
+**GitHub Actions nightly (batch K).** Two workflows, **manual only** (`workflow_dispatch`; owner 2026-11-23: their
+22:00 IST schedule was removed. `ci.yml` already tests every change, so the nightly test run re-tested an unchanged
+`main`; no self-hosted runner is registered, so the pipeline run waited a day and was cancelled. Daily and weekly data
+runs are scheduled tasks of the cloud session that holds the database, `docs/handover.md` §3):
 
 | Workflow | Runner | What it does |
 |---|---|---|
-| `.github/workflows/nightly-tests.yml` | GitHub-hosted `ubuntu-latest` | the CI checks (ruff check / format, offline pytest) on the default branch every night |
+| `.github/workflows/nightly-tests.yml` | GitHub-hosted `ubuntu-latest` | the CI checks (ruff check / format, offline pytest) on the default branch, when dispatched |
 | `.github/workflows/nightly-pipeline.yml` | **self-hosted**, labels `[self-hosted, financials]`, i.e. the owner's own machine | `run-day`, then `fetch-classification --universe nifty500 --missing-only` + `promote` (only entities with no current classification, so not the ~9 min full sweep), then `materialize --incremental` |
 
 The data pipeline cannot run on a GitHub-hosted runner: (1) the market database (~10 GB) and the vault are gitignored
@@ -1039,7 +1042,7 @@ the workspace, a step refuses otherwise). It has `permissions: contents: read`, 
 cancellation (single writer: runs queue, never overlap), a 240 min timeout, and uploads only the run log
 (`$RUNNER_TEMP/nightly-log/nightly-pipeline.log`, 14 days). It never commits or uploads data. Use it **instead of** the
 `ops/` scheduler, not with it: two schedulers would race for the DuckDB write lock. Registration steps: `ops/README.md`.
-`tests/test_nightly_workflows.py` pins the cron, the runner labels, the CLI commands and the no-data rules.
+`tests/test_nightly_workflows.py` pins manual-only triggers, the runner labels, the CLI commands and the no-data rules.
 
 ## 14. Screener DSL
 

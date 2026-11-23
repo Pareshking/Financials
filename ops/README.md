@@ -8,7 +8,7 @@ once would race for the DuckDB write lock (single writer, CLAUDE.md invariant 10
 | systemd user timer | `systemd/financials-daily.service`, `systemd/financials-daily.timer` | 20:15 IST |
 | cron | `cron/financials.cron` | 20:15 IST |
 | Windows Task Scheduler | `windows/financials-daily.xml` | 20:15 IST |
-| GitHub Actions, self-hosted runner | `.github/workflows/nightly-pipeline.yml` | 22:00 IST (cron `30 16 * * *` UTC) |
+| GitHub Actions, self-hosted runner | `.github/workflows/nightly-pipeline.yml` | manual dispatch only (owner 2026-11-23; add a `schedule:` once the runner is registered) |
 
 `.github/workflows/nightly-tests.yml` (offline lint + pytest on a GitHub-hosted runner, 22:00 IST) is independent of
 the data and can run alongside any of them.

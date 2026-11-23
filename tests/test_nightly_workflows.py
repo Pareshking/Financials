@@ -18,7 +18,6 @@ from financials.sources import ROOT
 from financials.staging import stage_classification
 
 WORKFLOWS = ROOT / ".github" / "workflows"
-NIGHTLY_CRON = "30 16 * * *"  # 22:00 IST = 16:30 UTC (GitHub cron is UTC)
 
 
 def _load(name: str) -> dict:
@@ -35,11 +34,10 @@ def _cli_commands(text: str) -> list[str]:
     return re.findall(r"-m financials (?:--data-dir \S+ )?([a-z][a-z-]+)", text)
 
 
-def test_nightly_workflows_parse_and_run_at_22_00_ist_with_manual_dispatch():
+def test_nightly_workflows_parse_and_run_only_on_manual_dispatch():
     for name in ("nightly-tests.yml", "nightly-pipeline.yml"):
         doc = _load(name)
-        assert doc["on"]["schedule"] == [{"cron": NIGHTLY_CRON}], name
-        assert "workflow_dispatch" in doc["on"], name
+        assert list(doc["on"]) == ["workflow_dispatch"], name  # owner 2026-11-23: no schedule (manual only)
         assert doc["permissions"] == {"contents": "read"}, name  # nothing can be pushed back
         for job in doc["jobs"].values():
             assert job["timeout-minutes"] > 0

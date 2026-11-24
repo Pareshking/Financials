@@ -242,6 +242,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ba.add_argument("--limit", type=int)
     ba.add_argument("--workers", type=int, help="parse processes (default: os.cpu_count())")
+    sub.add_parser("backfill-price-bands", help="stage the price-band file of every vaulted PR zip without rows [X359]")
     sub.add_parser("rpt-periods", help="which period each Reg. 23(9) filing's amounts cover, from the balances [X358]")
     sub.add_parser("audit-annual", help="re-run the Reg. 34 prior-year and share-count checks on every annual [X180]")
     sub.add_parser("audit-ytd", help="raise YTD_QUARTER_MISMATCH findings for every entity and scope [X80]")
@@ -529,6 +530,29 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
             con.close()
         print(json.dumps(r, indent=1), file=out)
         return 1 if r["error_count"] else 0
+    if args.cmd == "backfill-price-bands":
+        from financials.staging import stage_price_bands
+
+        if not db_path.exists():
+            print(f"error: no market database at {db_path}", file=out)
+            return 2
+        con = connect(db_path, read_only=True)
+        try:
+            have = {t for (t,) in con.execute("SELECT table_name FROM information_schema.tables").fetchall()}
+            missing = "AND f.filing_id NOT IN (SELECT filing_id FROM raw_price_band_hits) " if (
+                "raw_price_band_hits" in have) else ""  # fmt: skip
+            rows = con.execute(
+                "SELECT f.source_url, f.fetched_at, f.broadcast_ts, b.storage_path, b.sha256 FROM filings f "
+                "JOIN blobs b USING (sha256) WHERE f.category = 'PR_MCAP' " + missing + "ORDER BY f.broadcast_ts"
+            ).fetchall()
+        finally:
+            con.close()
+        vault = Vault(vault_dir)
+        for url, fetched, bts, path, sha in rows:
+            s = stage_price_bands(vault, stage_root, data=vault.read_path(path, sha), source_url=url,
+                                  fetched_at=fetched, broadcast_ts=bts)  # fmt: skip
+            print(f"staged {s.relative_to(stage_root).as_posix()}", file=out)
+        return 0
     if args.cmd == "rpt-periods":
         from financials.rpt_periods import write_periods
 

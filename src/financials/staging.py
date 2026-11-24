@@ -158,6 +158,7 @@ TABLE_ORDER = (
     "raw_results_listing",
     "raw_quote_classification",
     "raw_nse_mcap",
+    "raw_price_band_hits",
     "raw_bse_securities",
     "stg_holidays",
     "stg_shp_meta",
@@ -1030,9 +1031,11 @@ def stage_index_closes(vault: Vault, stage_root: Path, *, data: bytes, source_ur
 def stage_mcap_day(vault: Vault, stage_root: Path, *, data: bytes, source_url: str, fetched_at: datetime) -> Path:
     """Vault one PRddmmyy.zip and parse its mcap file [X130-X133]. The blob is the whole zip (the evidence); the batch
     is filed under the file's own trade date, visible at the end of that IST day (as the bhavcopy: EOD_RULE)."""
+    from financials.parsers.pr_bands import parse_price_band_hits
     from financials.parsers.pr_mcap import parse_pr_mcap
 
     rows = parse_pr_mcap(data)
+    bands = parse_price_band_hits(data)  # X359: the same zip's price-band file
     day = rows[0].trade_date
     blob = vault.put(data, ext="zip", media_type="application/zip", fetched_at=fetched_at)
     filing = make_filing(blob, exchange="NSE", category="PR_MCAP", source_url=source_url, fetched_at=fetched_at,
@@ -1040,8 +1043,35 @@ def stage_mcap_day(vault: Vault, stage_root: Path, *, data: bytes, source_url: s
     return write_stage(
         stage_root, "mcap_day", f"{day:%Y%m%d}-{blob.sha256[:12]}",
         {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)],
-         "raw_nse_mcap": [{**asdict(r), "filing_id": filing.filing_id} for r in rows]},
+         "raw_nse_mcap": [{**asdict(r), "filing_id": filing.filing_id} for r in rows],
+         "raw_price_band_hits": [{**asdict(r), "filing_id": filing.filing_id} for r in bands]},
         extra={"trade_date": day.isoformat()},
+    )  # fmt: skip
+
+
+def stage_price_bands(
+    vault: Vault, stage_root: Path, *, data: bytes, source_url: str, fetched_at: datetime, broadcast_ts: datetime
+) -> Path:
+    """Backfill [X359]: the price-band file of a PR zip already promoted for its mcap file (same blob, same filing)."""
+    from financials.parsers.pr_bands import parse_price_band_hits
+
+    bands = parse_price_band_hits(data)
+    blob = vault.put(data, ext="zip", media_type="application/zip", fetched_at=fetched_at)
+    filing = make_filing(
+        blob,
+        exchange="NSE",
+        category="PR_MCAP",
+        source_url=source_url,
+        fetched_at=fetched_at,
+        broadcast_ts=broadcast_ts,
+        broadcast_ts_source="EOD_RULE",
+    )
+    day = broadcast_ts.date() if not bands else bands[0].trade_date
+    return write_stage(
+        stage_root, "price_bands", f"{day:%Y%m%d}-{blob.sha256[:12]}",
+        {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)],
+         "raw_price_band_hits": [{**asdict(r), "filing_id": filing.filing_id} for r in bands]},
+        extra={"trade_date": day.isoformat(), "filing_id": filing.filing_id},
     )  # fmt: skip
 
 

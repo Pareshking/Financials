@@ -36,7 +36,7 @@
 | F28 | NSE equity master (EQUITY_L.csv) | 1 | VERIFIED | CONTAINER_DIRECT | IDX10 |
 | F29 | Nifty 500 total-return index (TRI) | 1 | UNVERIFIED | UNKNOWN | — |
 | F30 | NSE 4-level industry classification (quote API) | 1 | VERIFIED | CONTAINER_DIRECT | IC1, IC2, IC3, A14 |
-| F31 | NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv) | 1 | VERIFIED | CONTAINER_DIRECT | X130, X131, X132, X133, X134, P18 |
+| F31 | NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv) and price-band file (bhddmmyyyy.csv) | 1 | VERIFIED | CONTAINER_DIRECT | X130, X131, X132, X133, X134, X359, P18 |
 | F34 | BSE equity UDiFF bhavcopy | 1 | VERIFIED | CONTAINER_DIRECT | X165, A16 |
 | F35 | BSE list of securities (ListofScripData, per BSE group) | 1 | VERIFIED | GITHUB_RUNNER | X169, A17, A18 |
 | F36 | BSE announcements (+ AttachLive attachments), shareholding filings (+ inline XBRL) and results XBRL | 1 | VERIFIED | GITHUB_RUNNER | A17, A18, X166, X167, X168, X170, X247, X265 |
@@ -551,22 +551,22 @@
 | evidence | IC1, IC2, IC3, A14 |
 | notes | fetch-classification [SYMBOLS] --universe nifty500 (API host, 1 request/s). /api/quote-equity answers 403 from the container (A14). Point in time from the first fetch (C25): never backdated. |
 
-## F31 — NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv)
+## F31 — NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv) and price-band file (bhddmmyyyy.csv)
 
 | Field | Value |
 |---|---|
 | exchange_or_agency | NSE |
 | url_or_endpoint_pattern | https://nsearchives.nseindia.com/archives/equities/bhavcopy/pr/PR<DDMMYY>.zip |
-| format | ZIP of 14 files (15 in Oct 2024); only mcapddmmyyyy.csv is parsed (fixed-width values between commas, summary rows Listed / Permitted / Total) |
+| format | ZIP of 14 files (15 in Oct 2024); mcapddmmyyyy.csv (fixed-width values between commas, summary rows Listed / Permitted / Total) and bhddmmyy(yy).csv (symbol, series, H / L) are parsed |
 | cadence | Daily (trading days) |
 | fetch_runtime | CONTAINER_DIRECT |
 | join_keys | Trade Date, Symbol, Series |
-| target_tables | raw_nse_mcap, universe_membership |
-| unlocked_metrics | NSE market cap per security, NSE Issue Size (shares listed on NSE), Rs 500 Cr universe (rule U1), Issue Size vs Reg. 31 cross-check |
+| target_tables | raw_nse_mcap, universe_membership, raw_price_band_hits |
+| unlocked_metrics | band_hit_days_20d, upper_circuit_days_20d, lower_circuit_days_20d (X359), NSE market cap per security, NSE Issue Size (shares listed on NSE), Rs 500 Cr universe (rule U1), Issue Size vs Reg. 31 cross-check |
 | phase | 1 |
 | verification_status | VERIFIED |
-| evidence | X130, X131, X132, X133, X134, P18 |
-| notes | Fetched by fetch-days / run-day with each trading day's bhavcopy; fetch-mcap START END --weekly backfills the week ends for the universe. No ISIN: rows resolve by symbol and series on the file date. Issue Size is not the market-cap share count (X133: 98.4% within 0.5% of Reg. 31, below the 99% bar); it is stored and used as a cross-check (check-issue-size). The zip's other files (corporate actions, price bands, SME, ...) are not parsed. |
+| evidence | X130, X131, X132, X133, X134, X359, P18 |
+| notes | Fetched by fetch-days / run-day with each trading day's bhavcopy; fetch-mcap START END --weekly backfills the week ends for the universe. No ISIN: rows resolve by symbol and series on the file date. Issue Size is not the market-cap share count (X133: 98.4% within 0.5% of Reg. 31, below the 99% bar); it is stored and used as a cross-check (check-issue-size). The price-band file is parsed with the mcap file (backfill-price-bands for zips vaulted before X359); the other files (corporate actions, board meetings, bonds, SME, ...) are not parsed: docs/data_catalogue.md. |
 
 ## F34 — BSE equity UDiFF bhavcopy
 

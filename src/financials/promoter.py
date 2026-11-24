@@ -72,6 +72,7 @@ def promote(con: duckdb.DuckDBPyConnection, stage_dir: Path) -> PromotionResult:
         "equity_master": _promote_vault_and_raw,
         "classification": _promote_classification,
         "mcap_day": _promote_mcap_day,
+        "price_bands": _promote_price_bands,
         "bse_securities": _promote_bse_securities,
     }.get(job)
     if handler is None:
@@ -2364,11 +2365,23 @@ def _promote_mcap_day(con, stage_dir: Path, manifest: dict[str, Any]) -> Promoti
     ).fetchall()]  # fmt: skip
     if prior and Decimal(n) < G1_MIN_RATIO * Decimal(statistics.median(prior)):
         raise GateFailure("G1", f"{n} EQ/BE/BZ mcap rows < {G1_MIN_RATIO} x median {statistics.median(prior)}")
-    _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_nse_mcap"))
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_nse_mcap", "raw_price_band_hits"))
     # Rule SHARES_REG31_OUTLIER [X221] reads Issue Size: rows from this day on (up to features.ISSUE_SIZE_MAX_AGE_DAYS
     # later) may change share count; marked like a market day.
     dirty.mark_all(con, day, "MCAP_DAY", read_table(con, stage_dir, "filings")[0]["filing_id"])
     return PromotionResult("PROMOTED", "mcap_day", message=f"{day}: {n} EQ/BE/BZ rows")
+
+
+def _promote_price_bands(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
+    """PR-zip price-band file of an already vaulted zip [X359]: raw rows, append-only; circuit-day columns read them
+    from that day on."""
+    day = date.fromisoformat(manifest["trade_date"])
+    if not market_in_scope(day):
+        return _out_of_scope(con, stage_dir, "price_bands", f"trade_date {day} < {MIN_TRADE_DATE}")
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_price_band_hits"))
+    dirty.mark_all(con, day, "PRICE_BANDS", manifest["filing_id"])
+    n = con.execute("SELECT count(*) FROM raw_price_band_hits WHERE filing_id = ?", [manifest["filing_id"]]).fetchone()
+    return PromotionResult("PROMOTED", "price_bands", message=f"{day}: {n[0]} band hits")
 
 
 def _promote_bse_securities(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:

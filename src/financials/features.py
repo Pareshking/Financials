@@ -28,6 +28,7 @@ from decimal import Decimal
 from financials import (
     dirty,
     features_audit,
+    features_bands,
     features_bs,
     features_disclosures,
     features_extra,
@@ -97,7 +98,7 @@ from financials.timeutil import ist_to_utc, utc_now
 # Reader version of materialised rows. Bump it whenever features.py, fundamentals.py (or another file pinned by
 # tests/test_incremental_materialize.py) changes any output: `materialize --incremental` refuses days built by another
 # version, because only a full run then reproduces the history.
-FEATURES_VERSION = "2026.11.21-21N"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
+FEATURES_VERSION = "2026.11.24-24C"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
 # -21A: core profit (fundamentals._core) quantized to the paisa (Arrow decimal256 on the expanded universe)
 # -21B: gate G4 compares only securities present on the previous day (rule G4_NEW_ENTRANT; output unchanged)
 # -21C: X173 YTD copies of a quarter withheld (TTM sums the quarters); X194 roce_screener needs positive capital
@@ -112,6 +113,7 @@ FEATURES_VERSION = "2026.11.21-21N"  # -2: X106 restatement TTM bridge + flag, X
 # -21L: X334 IGAAP_CORP is its own accounting basis (QG Indian GAAP SME-era results)
 # -21M: X325 show and flag (owner decision V): stated values shown with dq_flags / dq_suspect instead of NULL
 # -21N: SP2 batched full materialize (20-day publish), dirty markers from the change date; same rows
+# -24C: price-band circuit days from the PR-zip bh file (features_bands.py, X359): 20-session hit / lock counts
 # -3: QoQ sales / profit growth, NPM, interest coverage, OPM same quarter last year, dividend yield / payout,
 #     promoter holding QoQ change (owner_requirements items 1, 3, 4)
 # -4A: period P&L family (features_pl: quarter / fiscal-year lines, quarter YoY growth, result dates, history-gated
@@ -751,6 +753,7 @@ def compute_rows(
         features_pl.clear(con, as_of_ts)
         features_bs.clear(con, as_of_ts)
     add_price_columns(con, rows, as_of, exchange, factors, frozen, secs, prices)  # batch B (price/technicals)
+    features_bands.add_columns(con, rows, as_of, exchange)  # 24C (price-band circuit days, X359)
     features_audit.add_columns(con, rows, as_of_ts, entities)  # 20A (audit opinions, X121; before forensic_clean)
     features_gems.add_columns(con, rows, as_of, as_of_ts, fundamentals_cache, entities, cross)  # batch D
     features_peers.add_columns(con, rows, as_of, as_of_ts, entities, cross)  # batch H (industry / peers)

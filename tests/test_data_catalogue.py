@@ -60,4 +60,5 @@ def test_pr_zip_members_quote_nse_readme(entries):
         readme
     )
     md = cat.MD_PATH.read_text(encoding="utf-8")
-    assert re.search(r"^\| \[NSE PR zip: bh price-band hits\].* \| NOT_INGESTED \| .*G207", md, flags=re.M)
+    row = r"^\| \[NSE PR zip: bh price-band hits\].* \| INGESTED \| raw_price_band_hits .*G207"
+    assert re.search(row, md, flags=re.M)

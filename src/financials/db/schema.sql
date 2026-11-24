@@ -602,6 +602,9 @@ CREATE TABLE IF NOT EXISTS features_daily (
     rs_nifty500_12m     DOUBLE,              -- 252 bars
     beta_1y_nifty500    DOUBLE,              -- OLS beta of daily log returns vs Nifty 500, 252 returns
     turnover_median_20d DECIMAL(24,2),       -- median daily traded value (TtlTrfVal), 20 bars, rupees
+    band_hit_days_20d      INTEGER,          -- sessions touching the price band, last 20 (PR-zip bh file, X359)
+    upper_circuit_days_20d INTEGER,          -- touched the upper band and closed at the high, last 20
+    lower_circuit_days_20d INTEGER,          -- touched the lower band and closed at the low, last 20
     deliv_pct           DOUBLE,              -- today's deliv_qty / volume (fraction) [P16]
     deliv_pct_avg_20d   DOUBLE,              -- mean daily delivery fraction, 20 bars
     vwap                DECIMAL(18,4),       -- today's turnover / volume (= AVG_PRICE) [P16]
@@ -1396,6 +1399,9 @@ CREATE TABLE IF NOT EXISTS screener_features (
     rs_nifty500_12m     DOUBLE,              -- 252 bars
     beta_1y_nifty500    DOUBLE,              -- OLS beta of daily log returns vs Nifty 500, 252 returns
     turnover_median_20d DECIMAL(24,2),       -- median daily traded value (TtlTrfVal), 20 bars, rupees
+    band_hit_days_20d      INTEGER,          -- sessions touching the price band, last 20 (PR-zip bh file, X359)
+    upper_circuit_days_20d INTEGER,          -- touched the upper band and closed at the high, last 20
+    lower_circuit_days_20d INTEGER,          -- touched the lower band and closed at the low, last 20
     deliv_pct           DOUBLE,              -- today's deliv_qty / volume (fraction) [P16]
     deliv_pct_avg_20d   DOUBLE,              -- mean daily delivery fraction, 20 bars
     vwap                DECIMAL(18,4),       -- today's turnover / volume (= AVG_PRICE) [P16]
@@ -2279,6 +2285,19 @@ CREATE TABLE IF NOT EXISTS raw_nse_mcap (
     PRIMARY KEY (filing_id, symbol, series)
 );
 
+-- NSE PR-zip price-band file bhddmmyy(yy).csv [X359]: the securities that touched their price band that day, H
+-- (upper) or L (lower), every series, as filed. Raw, append-only; read by features_bands (circuit days).
+CREATE TABLE IF NOT EXISTS raw_price_band_hits (
+    filing_id        VARCHAR NOT NULL REFERENCES filings(filing_id),
+    exchange         VARCHAR NOT NULL,
+    trade_date       DATE    NOT NULL,
+    symbol           VARCHAR NOT NULL,
+    series           VARCHAR NOT NULL,
+    security_name    VARCHAR NOT NULL,
+    band             VARCHAR NOT NULL,          -- H | L
+    PRIMARY KEY (filing_id, symbol, series, band)
+);
+
 -- L2: point-in-time, sticky universe membership (financials.universe, rule U1 [X134]). One row per security and
 -- universe; members never leave. PIT read: joined_date <= as_of (and visible_from_ts <= as_of_ts).
 CREATE TABLE IF NOT EXISTS universe_membership (
@@ -2337,7 +2356,8 @@ SELECT d.as_of_date, d.security_id, d.entity_id, d.symbol, d.series, d.price_dat
        d.volume_1w_avg, d.volume_1m_avg, d.volume_1y_avg, d.high_52w, d.low_52w, d.dist_52w_low,
        d.high_since_data_start, d.low_since_data_start, d.dma50, d.dma200, d.dma50_prev, d.dma200_prev,
        d.rsi_14, d.rsi_14_prev, d.macd, d.macd_signal, d.macd_prev, d.macd_signal_prev,
-       d.atr_14_pct, d.rs_nifty500_3m, d.rs_nifty500_6m, d.rs_nifty500_12m, d.beta_1y_nifty500, d.turnover_median_20d,
+       d.atr_14_pct, d.rs_nifty500_3m, d.rs_nifty500_6m, d.rs_nifty500_12m, d.beta_1y_nifty500, d.turnover_median_20d, d.band_hit_days_20d, d.upper_circuit_days_20d,
+       d.lower_circuit_days_20d,
        d.deliv_pct, d.deliv_pct_avg_20d, d.vwap, d.vwap_20d, e.sales_latest_quarter, e.sales_preceding_quarter,
        e.sales_preceding_year_quarter, e.operating_profit_latest_quarter, e.operating_profit_preceding_quarter, e.operating_profit_preceding_year_quarter, e.other_income_latest_quarter, e.other_income_preceding_quarter,
        e.other_income_preceding_year_quarter, e.depreciation_latest_quarter, e.depreciation_preceding_quarter, e.depreciation_preceding_year_quarter, e.ebit_latest_quarter, e.ebit_preceding_quarter,

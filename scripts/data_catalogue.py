@@ -104,10 +104,12 @@ FAMILIES: tuple[Family, ...] = (
     Family(
         "NSE PR zip: bh price-band hits",
         _pr("bh"),
-        "NOT_INGESTED",
+        "INGESTED",
         "Securities that hit their upper (H) or lower (L) price band during the day. The band itself and whether the "
-        "stock stayed locked are not in the file.",
+        "stock stayed locked are not in the file (circuit days read the close from our own bar, X359).",
         ("F31",),
+        ("raw_price_band_hits",),
+        "financials.parsers.pr_bands:parse_price_band_hits",
         serves=(
             ("G207", "circuit days: one H / L row per security per day that touched its band"),
             ("G140", "band hits per day; the band percentage itself is not in the file"),

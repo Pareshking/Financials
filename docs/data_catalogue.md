@@ -4,7 +4,7 @@
 
 What every committed fixture file contains (every zip member too), which feed it belongs to, whether the pipeline ingests it, and which open owner requirement (`docs/owner_requirements.md`) its columns could serve. Check here before saying data is unavailable. Feeds: `docs/data_sources.md`; XBRL elements: `docs/tag_registry.yaml`; sha256 and source URLs: `tests/fixtures/MANIFEST.md`.
 
-441 fixture files (534 entries counting zip members) in 46 families; 0 unclassified (the generator fails on a file that matches no family).
+442 fixture files (548 entries counting zip members) in 46 families; 0 unclassified (the generator fails on a file that matches no family).
 
 Status: **INGESTED** parsed into the named table(s) by the named parser (checked against the code by this script); **DISCOVERY_ONLY** vaulted (blob + `filings` row) and parsed for links / broadcast times only; no table of its own; **VAULTED_RAW** fetched and vaulted (blob + `filings` row) but never parsed; **NOT_INGESTED** nothing fetches, stages or promotes it (a parser may exist; see the note); **REFERENCE** documentation or test metadata, not a data feed.
 
@@ -15,7 +15,7 @@ Status: **INGESTED** parsed into the named table(s) by the named parser (checked
 | [NSE UDiFF CM bhavcopy](#nse-udiff-cm-bhavcopy) | `bhavcopy/BhavCopy_NSE_CM_0_0_0_20241206_F_0000.csv.zip!BhavCopy_NSE_CM_0_0_0_20241206_F_0000.csv` | F01 | INGESTED | raw_cm_bhavcopy, ohlcv, security_identifier_history, trading_calendar | none identified |
 | [NSE security-wise delivery (sec_bhavdata_full)](#nse-security-wise-delivery-sec_bhavdata_full) | `bhavcopy/sec_bhavdata_full_12112026.csv` | F02 | INGESTED | raw_delivery, ohlcv | none identified |
 | [NSE PR zip: mcap market capitalisation](#nse-pr-zip-mcap-market-capitalisation) | `pr_zip/PR011024.zip!MCAP01102024.csv` | F31 | INGESTED | raw_nse_mcap, universe_membership | none identified |
-| [NSE PR zip: bh price-band hits](#nse-pr-zip-bh-price-band-hits) | `pr_zip/PR011024.zip!bh011024.csv` | F31 | NOT_INGESTED | — | G207 (MISSING), G140 (DOCUMENTED_PLANNED) |
+| [NSE PR zip: bh price-band hits](#nse-pr-zip-bh-price-band-hits) | `pr_zip/PR011024.zip!bh011024.csv` | F31 | INGESTED | raw_price_band_hits | G207 (MISSING), G140 (DOCUMENTED_PLANNED) |
 | [NSE PR zip: bm board meetings](#nse-pr-zip-bm-board-meetings) | `pr_zip/PR011024.zip!Bm011024.txt` | F31 | NOT_INGESTED | — | G193 (DOCUMENTED_PLANNED) |
 | [NSE PR zip: bc corporate actions (equity and debt series)](#nse-pr-zip-bc-corporate-actions-equity-and-debt-series) | `pr_zip/PR011024.zip!Bc011024.csv` | F31 | NOT_INGESTED | — | G195 (DOCUMENTED_PLANNED) |
 | [NSE PR zip: an announcements](#nse-pr-zip-an-announcements) | `pr_zip/PR011024.zip!An011024.txt` | F31 | NOT_INGESTED | — | G193 (DOCUMENTED_PLANNED) |
@@ -121,12 +121,12 @@ Columns: `SYMBOL`, `SERIES`, `DATE1`, `PREV_CLOSE`, `OPEN_PRICE`, `HIGH_PRICE`, 
 |---|---|
 | Content | Market cap, issue size, face value, category (Listed / Permitted) per symbol and series; rule U1 universe. |
 | NSE readme.txt | mcapddmmyyyy.csv file contains market capitalization of all the listed and permitted companies of the exchange by using latest available price. |
-| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv)) |
+| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv) and price-band file (bhddmmyyyy.csv)) |
 | Status | INGESTED |
 | Tables | `raw_nse_mcap`, `universe_membership` |
 | Parser | `financials.parsers.pr_mcap:parse_pr_mcap` |
 | Could serve | none identified |
-| Files | 7 |
+| Files | 8 |
 
 Columns: `Trade Date`, `Symbol`, `Series`, `Security Name`, `Category`, `Last Trade Date`, `Face Value(Rs.)`, `Issue Size`, `Close Price/Paid up value(Rs.)`, `Market Cap(Rs.)`
 
@@ -134,6 +134,7 @@ Columns: `Trade Date`, `Symbol`, `Series`, `Security Name`, `Category`, `Last Tr
 |---|---|---|---|
 | `pr_zip/PR011024.zip!MCAP01102024.csv` | CSV in ZIP | 2451 | member of the PR zip of trade date 2024-10-01 |
 | `pr_zip/PR061224.zip!MCAP06122024.csv` | CSV in ZIP | 2498 | member of the PR zip of trade date 2024-12-06 |
+| `pr_zip/PR120126.zip!mcap12012026.csv` | CSV in ZIP | 2803 | member of the PR zip of trade date 2026-01-12 |
 | `pr_zip/PR131126.zip!mcap13112026.csv` | CSV in ZIP | 3249 | member of the PR zip of trade date 2026-11-13 |
 | `pr_zip/PR250926.zip!mcap25092026.csv` | CSV in ZIP | 3188 | member of the PR zip of trade date 2026-09-25 |
 | `pr_zip/PR300625.zip!MCAP30062025.csv` | CSV in ZIP | 2631 | member of the PR zip of trade date 2025-06-30 |
@@ -144,23 +145,24 @@ Columns: `Trade Date`, `Symbol`, `Series`, `Security Name`, `Category`, `Last Tr
 
 | Field | Value |
 |---|---|
-| Content | Securities that hit their upper (H) or lower (L) price band during the day. The band itself and whether the stock stayed locked are not in the file. |
+| Content | Securities that hit their upper (H) or lower (L) price band during the day. The band itself and whether the stock stayed locked are not in the file (circuit days read the close from our own bar, X359). |
 | NSE readme.txt | bhddmmyyyy.csv file contains a list of securities which have hit their price bands during the day. |
-| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv)) |
-| Status | NOT_INGESTED |
-| Tables | — |
-| Parser | — |
+| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv) and price-band file (bhddmmyyyy.csv)) |
+| Status | INGESTED |
+| Tables | `raw_price_band_hits` |
+| Parser | `financials.parsers.pr_bands:parse_price_band_hits` |
 | Could serve | G207 (MISSING): circuit days: one H / L row per security per day that touched its band; G140 (DOCUMENTED_PLANNED): band hits per day; the band percentage itself is not in the file |
-| Files | 7 |
+| Files | 8 |
 
-Columns (3 of 7 files): `SYMBOL`, `SERIES`, `SECURITY`, `HIGH/LOW`, `INDEX FLAG`
+Columns (3 of 8 files): `SYMBOL`, `SERIES`, `SECURITY`, `HIGH/LOW`, `INDEX FLAG`
 
-Columns (4 of 7 files): `SYMBOL`, `SERIES`, `SECURITY`, `HIGH/LOW`
+Columns (5 of 8 files): `SYMBOL`, `SERIES`, `SECURITY`, `HIGH/LOW`
 
 | File | Format | Rows | Description |
 |---|---|---|---|
 | `pr_zip/PR011024.zip!bh011024.csv` | CSV in ZIP | 243 | member of the PR zip of trade date 2024-10-01 |
 | `pr_zip/PR061224.zip!bh061224.csv` | CSV in ZIP | 202 | member of the PR zip of trade date 2024-12-06 |
+| `pr_zip/PR120126.zip!bh12012026.csv` | CSV in ZIP | 0 | member of the PR zip of trade date 2026-01-12 |
 | `pr_zip/PR131126.zip!bh13112026.csv` | CSV in ZIP | 251 | member of the PR zip of trade date 2026-11-13 |
 | `pr_zip/PR250926.zip!bh25092026.csv` | CSV in ZIP | 259 | member of the PR zip of trade date 2026-09-25 |
 | `pr_zip/PR300625.zip!bh300625.csv` | CSV in ZIP | 225 | member of the PR zip of trade date 2025-06-30 |
@@ -173,12 +175,12 @@ Columns (4 of 7 files): `SYMBOL`, `SERIES`, `SECURITY`, `HIGH/LOW`
 |---|---|
 | Content | Board meetings intimated: company, symbol, meeting date and purpose (financial results, dividend, fund raising, re-scheduling). |
 | NSE readme.txt | bmddmmyyyy.txt file contains details of Board Meetings of companies |
-| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv)) |
+| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv) and price-band file (bhddmmyyyy.csv)) |
 | Status | NOT_INGESTED |
 | Tables | — |
 | Parser | — |
 | Could serve | G193 (DOCUMENTED_PLANNED): board-meeting intimations with the meeting date (forward calendar) |
-| Files | 7 |
+| Files | 8 |
 
 Columns: header line `COMPANY NAME SYMBOL : BM DATE : BM PURPOSE`
 
@@ -186,6 +188,7 @@ Columns: header line `COMPANY NAME SYMBOL : BM DATE : BM PURPOSE`
 |---|---|---|---|
 | `pr_zip/PR011024.zip!Bm011024.txt` | TXT in ZIP | 40 | member of the PR zip of trade date 2024-10-01 |
 | `pr_zip/PR061224.zip!Bm061224.txt` | TXT in ZIP | 6 | member of the PR zip of trade date 2024-12-06 |
+| `pr_zip/PR120126.zip!bm12012026.txt` | TXT in ZIP | 81 | member of the PR zip of trade date 2026-01-12 |
 | `pr_zip/PR131126.zip!bm13112026.txt` | TXT in ZIP | 14 | member of the PR zip of trade date 2026-11-13 |
 | `pr_zip/PR250926.zip!bm25092026.txt` | TXT in ZIP | 22 | member of the PR zip of trade date 2026-09-25 |
 | `pr_zip/PR300625.zip!Bm300625.txt` | TXT in ZIP | 23 | member of the PR zip of trade date 2025-06-30 |
@@ -198,12 +201,12 @@ Columns: header line `COMPANY NAME SYMBOL : BM DATE : BM PURPOSE`
 |---|---|
 | Content | Record / book-closure / ex / no-delivery dates and purpose per series, including debt series (interest payment, redemption, call). |
 | NSE readme.txt | bcddmmyyyy.csv file contains the corporate action details for securities. |
-| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv)) |
+| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv) and price-band file (bhddmmyyyy.csv)) |
 | Status | NOT_INGESTED |
 | Tables | — |
 | Parser | — |
 | Could serve | G195 (DOCUMENTED_PLANNED): scheduled interest / redemption record dates of listed debt series (not defaults) |
-| Files | 7 |
+| Files | 8 |
 
 Columns: `SERIES`, `SYMBOL`, `SECURITY`, `RECORD_DT`, `BC_STRT_DT`, `BC_END_DT`, `EX_DT`, `ND_STRT_DT`, `ND_END_DT`, `PURPOSE`
 
@@ -211,6 +214,7 @@ Columns: `SERIES`, `SYMBOL`, `SECURITY`, `RECORD_DT`, `BC_STRT_DT`, `BC_END_DT`,
 |---|---|---|---|
 | `pr_zip/PR011024.zip!Bc011024.csv` | CSV in ZIP | 48 | member of the PR zip of trade date 2024-10-01 |
 | `pr_zip/PR061224.zip!Bc061224.csv` | CSV in ZIP | 89 | member of the PR zip of trade date 2024-12-06 |
+| `pr_zip/PR120126.zip!bc12012026.csv` | CSV in ZIP | 230 | member of the PR zip of trade date 2026-01-12 |
 | `pr_zip/PR131126.zip!bc13112026.csv` | CSV in ZIP | 367 | member of the PR zip of trade date 2026-11-13 |
 | `pr_zip/PR250926.zip!bc25092026.csv` | CSV in ZIP | 82 | member of the PR zip of trade date 2026-09-25 |
 | `pr_zip/PR300625.zip!Bc300625.csv` | CSV in ZIP | 51 | member of the PR zip of trade date 2025-06-30 |
@@ -223,12 +227,12 @@ Columns: `SERIES`, `SYMBOL`, `SECURITY`, `RECORD_DT`, `BC_STRT_DT`, `BC_END_DT`,
 |---|---|
 | Content | One line per announcement: company, symbol, subject category and the summary text. |
 | NSE readme.txt | anddmmyyyy.txt file contains name of the co., its symbol and the announcements made during the day. |
-| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv)) |
+| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv) and price-band file (bhddmmyyyy.csv)) |
 | Status | NOT_INGESTED |
 | Tables | — |
 | Parser | — |
 | Could serve | G193 (DOCUMENTED_PLANNED): subject lines such as 'Shareholders meeting' (text only, no structured date) |
-| Files | 7 |
+| Files | 8 |
 
 Columns: header line `COMPANY NAME SYMBOL : ANNOUNCEMENTS`
 
@@ -236,6 +240,7 @@ Columns: header line `COMPANY NAME SYMBOL : ANNOUNCEMENTS`
 |---|---|---|---|
 | `pr_zip/PR011024.zip!An011024.txt` | TXT in ZIP | 2109 | member of the PR zip of trade date 2024-10-01 |
 | `pr_zip/PR061224.zip!An061224.txt` | TXT in ZIP | 657 | member of the PR zip of trade date 2024-12-06 |
+| `pr_zip/PR120126.zip!an12012026.txt` | TXT in ZIP | 1778 | member of the PR zip of trade date 2026-01-12 |
 | `pr_zip/PR131126.zip!an13112026.txt` | TXT in ZIP | 2105 | member of the PR zip of trade date 2026-11-13 |
 | `pr_zip/PR250926.zip!an25092026.txt` | TXT in ZIP | 2543 | member of the PR zip of trade date 2026-09-25 |
 | `pr_zip/PR300625.zip!An300625.txt` | TXT in ZIP | 1472 | member of the PR zip of trade date 2025-06-30 |
@@ -248,12 +253,12 @@ Columns: header line `COMPANY NAME SYMBOL : ANNOUNCEMENTS`
 |---|---|
 | Content | Prices, traded value / quantity and 52-week range of corporate bonds traded on the day (coupon and maturity only inside the security name). |
 | NSE readme.txt | corpbondddmmyyyy.csv file contains market data of Corporate bonds traded during the day. |
-| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv)) |
+| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv) and price-band file (bhddmmyyyy.csv)) |
 | Status | NOT_INGESTED |
 | Tables | — |
 | Parser | — |
 | Could serve | G136 (MISSING): secondary-market bond prices; a yield would have to be computed from the name's coupon and maturity |
-| Files | 7 |
+| Files | 8 |
 
 Columns: `MARKET`, `SERIES`, `SYMBOL`, `SECURITY`, `PREV_CL_PR`, `OPEN_PRICE`, `HIGH_PRICE`, `LOW_PRICE`, `CLOSE_PRICE`, `NET_TRDVAL`, `NET_TRDQTY`, `CORP_IND`, `TRADES`, `HI_52_WK`, `LO_52_WK`
 
@@ -261,6 +266,7 @@ Columns: `MARKET`, `SERIES`, `SYMBOL`, `SECURITY`, `PREV_CL_PR`, `OPEN_PRICE`, `
 |---|---|---|---|
 | `pr_zip/PR011024.zip!corpbond011024.csv` | CSV in ZIP | 144 | member of the PR zip of trade date 2024-10-01 |
 | `pr_zip/PR061224.zip!corpbond061224.csv` | CSV in ZIP | 138 | member of the PR zip of trade date 2024-12-06 |
+| `pr_zip/PR120126.zip!corpbond12012026.csv` | CSV in ZIP | 134 | member of the PR zip of trade date 2026-01-12 |
 | `pr_zip/PR131126.zip!corpbond13112026.csv` | CSV in ZIP | 142 | member of the PR zip of trade date 2026-11-13 |
 | `pr_zip/PR250926.zip!corpbond25092026.csv` | CSV in ZIP | 123 | member of the PR zip of trade date 2026-09-25 |
 | `pr_zip/PR300625.zip!corpbond300625.csv` | CSV in ZIP | 129 | member of the PR zip of trade date 2025-06-30 |
@@ -273,12 +279,12 @@ Columns: `MARKET`, `SERIES`, `SYMBOL`, `SECURITY`, `PREV_CL_PR`, `OPEN_PRICE`, `
 |---|---|
 | Content | Prices, traded value / quantity and underlying index of every ETF traded. |
 | NSE readme.txt | etfddmmyyyy.csv file contains market data of exchange traded funds traded during the day. |
-| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv)) |
+| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv) and price-band file (bhddmmyyyy.csv)) |
 | Status | NOT_INGESTED |
 | Tables | — |
 | Parser | — |
 | Could serve | none identified |
-| Files | 7 |
+| Files | 8 |
 
 Columns: `MARKET`, `SERIES`, `SYMBOL`, `SECURITY`, `PREVIOUS CLOSE PRICE`, `OPEN PRICE`, `HIGH PRICE`, `LOW PRICE`, `CLOSE PRICE`, `NET TRADED VALUE`, `NET TRADED QTY`, `TRADES`, `52 WEEK HIGH`, `52 WEEK LOW`, `UNDERLYING`
 
@@ -286,6 +292,7 @@ Columns: `MARKET`, `SERIES`, `SYMBOL`, `SECURITY`, `PREVIOUS CLOSE PRICE`, `OPEN
 |---|---|---|---|
 | `pr_zip/PR011024.zip!etf011024.csv` | CSV in ZIP | 219 | member of the PR zip of trade date 2024-10-01 |
 | `pr_zip/PR061224.zip!etf061224.csv` | CSV in ZIP | 224 | member of the PR zip of trade date 2024-12-06 |
+| `pr_zip/PR120126.zip!etf12012026.csv` | CSV in ZIP | 304 | member of the PR zip of trade date 2026-01-12 |
 | `pr_zip/PR131126.zip!etf13112026.csv` | CSV in ZIP | 312 | member of the PR zip of trade date 2026-11-13 |
 | `pr_zip/PR250926.zip!etf25092026.csv` | CSV in ZIP | 306 | member of the PR zip of trade date 2026-09-25 |
 | `pr_zip/PR300625.zip!etf300625.csv` | CSV in ZIP | 257 | member of the PR zip of trade date 2025-06-30 |
@@ -298,12 +305,12 @@ Columns: `MARKET`, `SERIES`, `SYMBOL`, `SECURITY`, `PREVIOUS CLOSE PRICE`, `OPEN
 |---|---|
 | Content | Top gainers / losers of Nifty 50, Nifty Next 50 and other securities (close, previous close, % change). |
 | NSE readme.txt | glddmmyyyy.csv file contains a list of the gainers and losers for Nifty Securities, Nifty Next 50 Securities and for other Securities. |
-| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv)) |
+| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv) and price-band file (bhddmmyyyy.csv)) |
 | Status | NOT_INGESTED |
 | Tables | — |
 | Parser | — |
 | Could serve | none identified |
-| Files | 7 |
+| Files | 8 |
 
 Columns: `GAIN_LOSS`, `SECURITY`, `CLOSE_PRIC`, `PREV_CL_PR`, `PERCENT_CG`
 
@@ -311,6 +318,7 @@ Columns: `GAIN_LOSS`, `SECURITY`, `CLOSE_PRIC`, `PREV_CL_PR`, `PERCENT_CG`
 |---|---|---|---|
 | `pr_zip/PR011024.zip!Gl011024.csv` | CSV in ZIP | 162 | member of the PR zip of trade date 2024-10-01 |
 | `pr_zip/PR061224.zip!Gl061224.csv` | CSV in ZIP | 162 | member of the PR zip of trade date 2024-12-06 |
+| `pr_zip/PR120126.zip!gl12012026.csv` | CSV in ZIP | 3013 | member of the PR zip of trade date 2026-01-12 |
 | `pr_zip/PR131126.zip!gl13112026.csv` | CSV in ZIP | 3381 | member of the PR zip of trade date 2026-11-13 |
 | `pr_zip/PR250926.zip!gl25092026.csv` | CSV in ZIP | 3279 | member of the PR zip of trade date 2026-09-25 |
 | `pr_zip/PR300625.zip!Gl300625.csv` | CSV in ZIP | 163 | member of the PR zip of trade date 2025-06-30 |
@@ -323,12 +331,12 @@ Columns: `GAIN_LOSS`, `SECURITY`, `CLOSE_PRIC`, `PREV_CL_PR`, `PERCENT_CG`
 |---|---|
 | Content | Securities (equity and ETFs) at a new high or low: new and previous value, H / L. |
 | NSE readme.txt | hlddmmyyyy.csv file contains the list of securities (Equity and ETFs) which have reached a new high or a new low. |
-| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv)) |
+| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv) and price-band file (bhddmmyyyy.csv)) |
 | Status | NOT_INGESTED |
 | Tables | — |
 | Parser | — |
 | Could serve | none identified |
-| Files | 7 |
+| Files | 8 |
 
 Columns: `SECURITY`, `NEW`, `PREVIOUS`, `NEW_STATUS`
 
@@ -336,6 +344,7 @@ Columns: `SECURITY`, `NEW`, `PREVIOUS`, `NEW_STATUS`
 |---|---|---|---|
 | `pr_zip/PR011024.zip!HL011024.csv` | CSV in ZIP | 173 | member of the PR zip of trade date 2024-10-01 |
 | `pr_zip/PR061224.zip!HL061224.csv` | CSV in ZIP | 167 | member of the PR zip of trade date 2024-12-06 |
+| `pr_zip/PR120126.zip!hl12012026.csv` | CSV in ZIP | 209 | member of the PR zip of trade date 2026-01-12 |
 | `pr_zip/PR131126.zip!hl13112026.csv` | CSV in ZIP | 85 | member of the PR zip of trade date 2026-11-13 |
 | `pr_zip/PR250926.zip!hl25092026.csv` | CSV in ZIP | 108 | member of the PR zip of trade date 2026-09-25 |
 | `pr_zip/PR300625.zip!HL300625.csv` | CSV in ZIP | 170 | member of the PR zip of trade date 2025-06-30 |
@@ -348,12 +357,12 @@ Columns: `SECURITY`, `NEW`, `PREVIOUS`, `NEW_STATUS`
 |---|---|
 | Content | Index rows then security rows: prices, traded value / quantity, trades, 52-week range (unadjusted), with symbol and series. |
 | NSE readme.txt | pdddmmyyyy.csv file also contains Symbol and Series codes for each Security in addition to the information contained in the prddmmyyyy.csv file. 52 week high & 52 week low prices are not adjusted for Bonus, Split & Rights corporate actions |
-| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv)) |
+| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv) and price-band file (bhddmmyyyy.csv)) |
 | Status | NOT_INGESTED |
 | Tables | — |
 | Parser | — |
 | Could serve | none identified |
-| Files | 7 |
+| Files | 8 |
 
 Columns: `MKT`, `SERIES`, `SYMBOL`, `SECURITY`, `PREV_CL_PR`, `OPEN_PRICE`, `HIGH_PRICE`, `LOW_PRICE`, `CLOSE_PRICE`, `NET_TRDVAL`, `NET_TRDQTY`, `IND_SEC`, `CORP_IND`, `TRADES`, `HI_52_WK`, `LO_52_WK`
 
@@ -361,6 +370,7 @@ Columns: `MKT`, `SERIES`, `SYMBOL`, `SECURITY`, `PREV_CL_PR`, `OPEN_PRICE`, `HIG
 |---|---|---|---|
 | `pr_zip/PR011024.zip!Pd011024.csv` | CSV in ZIP | 2969 | member of the PR zip of trade date 2024-10-01 |
 | `pr_zip/PR061224.zip!Pd061224.csv` | CSV in ZIP | 3013 | member of the PR zip of trade date 2024-12-06 |
+| `pr_zip/PR120126.zip!pd12012026.csv` | CSV in ZIP | 3380 | member of the PR zip of trade date 2026-01-12 |
 | `pr_zip/PR131126.zip!pd13112026.csv` | CSV in ZIP | 3873 | member of the PR zip of trade date 2026-11-13 |
 | `pr_zip/PR250926.zip!pd25092026.csv` | CSV in ZIP | 3800 | member of the PR zip of trade date 2026-09-25 |
 | `pr_zip/PR300625.zip!Pd300625.csv` | CSV in ZIP | 3203 | member of the PR zip of trade date 2025-06-30 |
@@ -373,12 +383,12 @@ Columns: `MKT`, `SERIES`, `SYMBOL`, `SECURITY`, `PREV_CL_PR`, `OPEN_PRICE`, `HIG
 |---|---|
 | Content | The pd file without symbol and series columns. |
 | NSE readme.txt | prddmmyyyy.csv file contains security wise market data information along with the Index details. 52 week high & 52 week low prices are not adjusted for Bonus, Split & Rights corporate actions |
-| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv)) |
+| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv) and price-band file (bhddmmyyyy.csv)) |
 | Status | NOT_INGESTED |
 | Tables | — |
 | Parser | — |
 | Could serve | none identified |
-| Files | 7 |
+| Files | 8 |
 
 Columns: `MKT`, `SECURITY`, `PREV_CL_PR`, `OPEN_PRICE`, `HIGH_PRICE`, `LOW_PRICE`, `CLOSE_PRICE`, `NET_TRDVAL`, `NET_TRDQTY`, `IND_SEC`, `CORP_IND`, `TRADES`, `HI_52_WK`, `LO_52_WK`
 
@@ -386,6 +396,7 @@ Columns: `MKT`, `SECURITY`, `PREV_CL_PR`, `OPEN_PRICE`, `HIGH_PRICE`, `LOW_PRICE
 |---|---|---|---|
 | `pr_zip/PR011024.zip!Pr011024.csv` | CSV in ZIP | 2967 | member of the PR zip of trade date 2024-10-01 |
 | `pr_zip/PR061224.zip!Pr061224.csv` | CSV in ZIP | 3011 | member of the PR zip of trade date 2024-12-06 |
+| `pr_zip/PR120126.zip!pr12012026.csv` | CSV in ZIP | 3380 | member of the PR zip of trade date 2026-01-12 |
 | `pr_zip/PR131126.zip!pr13112026.csv` | CSV in ZIP | 3873 | member of the PR zip of trade date 2026-11-13 |
 | `pr_zip/PR250926.zip!pr25092026.csv` | CSV in ZIP | 3800 | member of the PR zip of trade date 2026-09-25 |
 | `pr_zip/PR300625.zip!Pr300625.csv` | CSV in ZIP | 3201 | member of the PR zip of trade date 2025-06-30 |
@@ -398,12 +409,12 @@ Columns: `MKT`, `SECURITY`, `PREV_CL_PR`, `OPEN_PRICE`, `HIGH_PRICE`, `LOW_PRICE
 |---|---|
 | Content | Market data of SME securities (SME is outside the universe). |
 | NSE readme.txt | smeddmmyyyy.csv file contains market data of SME securities traded during the day. |
-| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv)) |
+| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv) and price-band file (bhddmmyyyy.csv)) |
 | Status | NOT_INGESTED |
 | Tables | — |
 | Parser | — |
 | Could serve | none identified |
-| Files | 7 |
+| Files | 8 |
 
 Columns: `MARKET`, `SERIES`, `SYMBOL`, `SECURITY`, `PREV_CL_PR`, `OPEN_PRICE`, `HIGH_PRICE`, `LOW_PRICE`, `CLOSE_PRICE`, `NET_TRDVAL`, `NET_TRDQTY`, `CORP_IND`, `HI_52_WK`, `LO_52_WK`
 
@@ -411,6 +422,7 @@ Columns: `MARKET`, `SERIES`, `SYMBOL`, `SECURITY`, `PREV_CL_PR`, `OPEN_PRICE`, `
 |---|---|---|---|
 | `pr_zip/PR011024.zip!sme011024.csv` | CSV in ZIP | 357 | member of the PR zip of trade date 2024-10-01 |
 | `pr_zip/PR061224.zip!sme061224.csv` | CSV in ZIP | 368 | member of the PR zip of trade date 2024-12-06 |
+| `pr_zip/PR120126.zip!sme12012026.csv` | CSV in ZIP | 431 | member of the PR zip of trade date 2026-01-12 |
 | `pr_zip/PR131126.zip!sme13112026.csv` | CSV in ZIP | 472 | member of the PR zip of trade date 2026-11-13 |
 | `pr_zip/PR250926.zip!sme25092026.csv` | CSV in ZIP | 465 | member of the PR zip of trade date 2026-09-25 |
 | `pr_zip/PR300625.zip!sme300625.csv` | CSV in ZIP | 413 | member of the PR zip of trade date 2025-06-30 |
@@ -423,12 +435,12 @@ Columns: `MARKET`, `SERIES`, `SYMBOL`, `SECURITY`, `PREV_CL_PR`, `OPEN_PRICE`, `
 |---|---|
 | Content | The day's 25 securities with the highest traded value. |
 | NSE readme.txt | ttddmmyyyy.csv file contains a list of top twenty five securities by traded value. |
-| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv)) |
+| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv) and price-band file (bhddmmyyyy.csv)) |
 | Status | NOT_INGESTED |
 | Tables | — |
 | Parser | — |
 | Could serve | none identified |
-| Files | 7 |
+| Files | 8 |
 
 Columns: `SECURITY`, `PREV_CL_PR`, `CLOSE_PRIC`, `NET_TRDQTY`, `NET_TRDVAL`
 
@@ -436,6 +448,7 @@ Columns: `SECURITY`, `PREV_CL_PR`, `CLOSE_PRIC`, `NET_TRDQTY`, `NET_TRDVAL`
 |---|---|---|---|
 | `pr_zip/PR011024.zip!Tt011024.csv` | CSV in ZIP | 25 | member of the PR zip of trade date 2024-10-01 |
 | `pr_zip/PR061224.zip!Tt061224.csv` | CSV in ZIP | 25 | member of the PR zip of trade date 2024-12-06 |
+| `pr_zip/PR120126.zip!tt12012026.csv` | CSV in ZIP | 25 | member of the PR zip of trade date 2026-01-12 |
 | `pr_zip/PR131126.zip!tt13112026.csv` | CSV in ZIP | 25 | member of the PR zip of trade date 2026-11-13 |
 | `pr_zip/PR250926.zip!tt25092026.csv` | CSV in ZIP | 25 | member of the PR zip of trade date 2026-09-25 |
 | `pr_zip/PR300625.zip!Tt300625.csv` | CSV in ZIP | 25 | member of the PR zip of trade date 2025-06-30 |
@@ -448,7 +461,7 @@ Columns: `SECURITY`, `PREV_CL_PR`, `CLOSE_PRIC`, `NET_TRDQTY`, `NET_TRDVAL`
 |---|---|
 | Content | NSE's Symbol P/E and Adjusted P/E per symbol (four quarters' profit; adjusted excludes exceptional items net of tax). Present in the 2024 zips only, absent from 2025 on. |
 | NSE readme.txt | PE_ddmmyy.csv file contains list of Companies indicated with its Symbol, Symbol P/E and Adjusted P/E where,Symbol P/E ratio is computed considering consecutive four quarters Net Profit, issued capital and previous day closing price of the Company. Adjusted P/E ratio is computed considering consecutive four quarters Net Profit after adjustment of Exceptional items (net of tax), issued capital and previous day closing price of the Company. |
-| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv)) |
+| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv) and price-band file (bhddmmyyyy.csv)) |
 | Status | NOT_INGESTED |
 | Tables | — |
 | Parser | — |
@@ -468,17 +481,18 @@ Columns: `SYMBOL`, `SYMBOL P/E`, `ADJUSTED P/E`
 |---|---|
 | Content | NSE's own description of every member; the source of the per-member sentences in this catalogue. |
 | NSE readme.txt | readme.txt is a informative file which contains information about data and structure of all other files. |
-| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv)) |
+| Source | F31 (NSE daily PR zip market-capitalisation file (mcapddmmyyyy.csv) and price-band file (bhddmmyyyy.csv)) |
 | Status | REFERENCE |
 | Tables | — |
 | Parser | — |
 | Could serve | none identified |
-| Files | 7 |
+| Files | 8 |
 
 | File | Format | Rows | Description |
 |---|---|---|---|
 | `pr_zip/PR011024.zip!Readme.txt` | TXT in ZIP | 62 lines | member of the PR zip of trade date 2024-10-01 |
 | `pr_zip/PR061224.zip!Readme.txt` | TXT in ZIP | 62 lines | member of the PR zip of trade date 2024-12-06 |
+| `pr_zip/PR120126.zip!readme.txt` | TXT in ZIP | 55 lines | member of the PR zip of trade date 2026-01-12 |
 | `pr_zip/PR131126.zip!readme.txt` | TXT in ZIP | 55 lines | member of the PR zip of trade date 2026-11-13 |
 | `pr_zip/PR250926.zip!readme.txt` | TXT in ZIP | 55 lines | member of the PR zip of trade date 2026-09-25 |
 | `pr_zip/PR300625.zip!Readme.txt` | TXT in ZIP | 53 lines | member of the PR zip of trade date 2025-06-30 |
@@ -1121,4 +1135,4 @@ Columns (1 of 2 files): object: Table (list of 3); record: HFQ, HFQDISPLAY, Regi
 
 | File | Format | Rows | Description |
 |---|---|---|---|
-| `MANIFEST.md` | Markdown | 875 lines | — |
+| `MANIFEST.md` | Markdown | 876 lines | — |

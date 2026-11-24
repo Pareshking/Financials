@@ -1033,6 +1033,7 @@ def _promote_corp_actions(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
             )
         recorded += 1
     _requeue_orphaned(con)
+    _requeue_rights_above_market(con)
     verify_pending_actions(con, exchange)
     resolve_market_moves(con)
     message = f"{recorded} actions" + (f", {skipped} before {MIN_TRADE_DATE} skipped" if skipped else "")
@@ -1079,6 +1080,15 @@ def _retire_ignored(con, action_id: str) -> None:
         )
     if hit:
         _requeue_siblings(con, action_id)
+
+
+def _requeue_rights_above_market(con) -> None:
+    """RIGHTS_AT_OR_ABOVE_MARKET (X356): rights decided before the rule with a price factor above 1 (issue price above
+    the cum-rights close) go back to PENDING and are re-verified at factor 1. Manual decisions stand; idempotent."""
+    con.execute(
+        "UPDATE corp_actions SET status = 'PENDING', price_factor = NULL, eps_factor = NULL, observed_gap = NULL, "
+        "decided_at = NULL WHERE action_type = 'RIGHTS' AND status IN ('VERIFIED', 'UNOBSERVABLE') AND price_factor > 1"
+    )
 
 
 def _requeue_orphaned(con) -> None:

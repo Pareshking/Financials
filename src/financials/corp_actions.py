@@ -86,7 +86,9 @@ def theoretical_factors(action: CorpAction, close_prev: Decimal | None) -> tuple
         if p is None or p < 0:
             why = f" (face value {floor} is below the cum-rights close {c})" if floor is not None else ""
             raise ValueError(f"RIGHTS {action.action_id}: issue_price required{why}")
-        f = (b * c + a * p) / ((a + b) * c)
+        # RIGHTS_AT_OR_ABOVE_MARKET (X356): an issue price at or above the cum-rights close carries no bonus element
+        # (Ind AS 33 para 27(b), A2), so the factor never exceeds 1; the formula alone would raise earlier prices.
+        f = min((b * c + a * p) / ((a + b) * c), Decimal(1))
         return f, f
     if t == "DEMERGER":
         return None, Decimal(1)

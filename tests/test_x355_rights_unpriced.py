@@ -62,3 +62,23 @@ def test_the_floor_is_kept_in_the_ledger(market):
     record_corp_action(m.con, a, source_filing_id=fil)
     (back,) = _actions(m.con, "action_id = ?", ["ca_x355"])
     assert back.issue_price_floor == 5 and back.issue_price is None
+
+
+def test_restage_open_findings_selects_corp_action_files_with_an_unparsed_purpose(market):
+    """X357: `restage --category CORP_ACTIONS --open-findings` re-parses the file behind an UNPARSED_PURPOSE finding."""
+    import json
+
+    from conftest import FETCHED_AT
+
+    from financials.cli import restage_rows
+    from financials.staging import stage_corp_actions
+
+    m = market
+    promote(m.con, m.stage_day("20250922"))
+    rows = json.loads(
+        (FIXTURES / "corp_actions" / "nse_corporateActions_equities_15-09-2025_17-10-2025.json").read_bytes()
+    )
+    bad = [dict(next(r for r in rows if r["symbol"] == "PIDILITIND"), subject="Bonus one for one")]
+    promote(m.con, stage_corp_actions(m.vault, m.stage_root, data=json.dumps(bad).encode(), source_url="memory://bad",
+                                      fetched_at=FETCHED_AT))  # fmt: skip
+    assert [r[0] for r in restage_rows(m.con, "CORP_ACTIONS", "OPEN_FINDINGS_ONLY")] == ["memory://bad"]

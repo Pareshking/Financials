@@ -369,9 +369,10 @@ def restage_rows(con, category: str, mode: str = "OPEN_FINDINGS") -> list[tuple]
     # RESULTS_XBRL takes BSE results filings vaulted raw only before X313 too (their broadcast time from filing_meta)
     cats = list(RESULTS_FILING_CATEGORIES) if category == "RESULTS_XBRL" else [category]
     where, params = "", [cats]
+    # corporate-action filings carry their parse findings under stage CORP_ACTION (UNPARSED_PURPOSE), X357
+    stages = FILING_FINDING_STAGES + (("CORP_ACTION",) if category == "CORP_ACTIONS" else ())
     open_findings = (
-        "f.filing_id IN (SELECT filing_id FROM quarantine_queue WHERE resolved_at IS NULL "
-        f"AND stage IN {FILING_FINDING_STAGES}) "
+        f"f.filing_id IN (SELECT filing_id FROM quarantine_queue WHERE resolved_at IS NULL AND stage IN {stages}) "
     )
     if category == "RESULTS_XBRL" and mode == "VISIBILITY":
         from financials.promoter import filings_with_later_visibility

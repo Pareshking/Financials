@@ -1,4 +1,13 @@
-# Phase 1 and Phase 2: done and pending (2026-11-16)
+# Phase 1 and Phase 2: done and pending (2026-11-16; status updated 2026-11-24)
+
+**Status 2026-11-24: Phases 1 and 2 are done** (owner condition, 2026-11-21: a clean weekly run, i.e. every open
+finding carries a stated cause; first clean week 21 Nov 2026, `docs/open_findings.md`). Closed since 2026-11-16:
+G93 listed side, G214, scheduling (the cloud session's daily / late / weekly tasks, `docs/handover.md` §3; the GitHub
+nightly workflows are manual only), exchange rates (X354), rights without a price (X355), rights at or above market
+(X356), `restage --open-findings` for corporate actions (X357). What remains is **blocked on evidence, not on work**:
+the seven "Phase 2 pending" items below each need a real source file this engine does not have (rule 1 of the
+evidence rules), plus the share classes (G275 / G336, out of scope by decision 2026-11-21). They move only when a
+source appears. Open findings (767 on 24 Nov) are filed-data problems with a stated cause, not unbuilt features.
 
 Measured against the owner's PDF (`docs/inputs/Aligning_Financial_Results_Databases.pdf`). The PDF defines the phases
 twice: an early roadmap (§7, "Core Engine / Deep Edge / Alpha") and the final "Phased Implementation Plan" (§5,

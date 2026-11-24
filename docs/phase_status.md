@@ -5,7 +5,7 @@ finding carries a stated cause; first clean week 21 Nov 2026, `docs/open_finding
 G93 listed side, G214, scheduling (the cloud session's daily / late / weekly tasks, `docs/handover.md` §3; the GitHub
 nightly workflows are manual only), exchange rates (X354), rights without a price (X355), rights at or above market
 (X356), `restage --open-findings` for corporate actions (X357). What remains is **blocked on evidence, not on work**:
-the seven "Phase 2 pending" items below each need a real source file this engine does not have (rule 1 of the
+the "Phase 2 pending" items below (item 4 done 24 Nov, X358) each need a real source file this engine does not have (rule 1 of the
 evidence rules), plus the share classes (G275 / G336, out of scope by decision 2026-11-21). They move only when a
 source appears. Open findings (767 on 24 Nov) are filed-data problems with a stated cause, not unbuilt features.
 
@@ -98,7 +98,9 @@ the full line-by-line audit of the PDF is `docs/master_backlog.md`; ratios are i
    count per class, and whether Reg. 31 counts DVR shares with the ordinary shares is unverified: no DVR issuer is in
    the Nifty 500 and no such pattern is committed or in the vault, (c) no fixture states a DVR voting-rights ratio or
    face value.
-4. **A half-yearly RPT view from the Reg. 23(9) rows: period settled** (R13 resolved 2026-11-17). The amounts cover
+4. **DONE (2026-11-24, X358)** half-yearly RPT view: the cross-filing balance check (`rpt-periods`,
+   `reg23_period_basis`) settles each filing's window, and `rpt_half_year` sums only settled filings. History of the
+   item: **A half-yearly RPT view from the Reg. 23(9) rows: period settled** (R13 resolved 2026-11-17). The amounts cover
    the half-year ending on the period end (X160; `disclosure_start` / `disclosure_months`, parser `reg23-2`), but a
    few filers put financial-year-to-date amounts in Q4 with nothing in the filing to say so (X161), so the rows still
    feed no ratio or feature; a view would need a cross-filing check (Q4 opening vs Q2 closing balances) first.

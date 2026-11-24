@@ -242,6 +242,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ba.add_argument("--limit", type=int)
     ba.add_argument("--workers", type=int, help="parse processes (default: os.cpu_count())")
+    sub.add_parser("rpt-periods", help="which period each Reg. 23(9) filing's amounts cover, from the balances [X358]")
     sub.add_parser("audit-annual", help="re-run the Reg. 34 prior-year and share-count checks on every annual [X180]")
     sub.add_parser("audit-ytd", help="raise YTD_QUARTER_MISMATCH findings for every entity and scope [X80]")
     ls = sub.add_parser("rescale-level-slips", help="X201: rescale filings that declared the wrong LevelOfRounding")
@@ -528,6 +529,19 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
             con.close()
         print(json.dumps(r, indent=1), file=out)
         return 1 if r["error_count"] else 0
+    if args.cmd == "rpt-periods":
+        from financials.rpt_periods import write_periods
+
+        con = connect(db_path)
+        try:
+            apply_schema(con)
+            con.execute("BEGIN")
+            r = write_periods(con)
+            con.execute("COMMIT")
+        finally:
+            con.close()
+        print(json.dumps(r, indent=1), file=out)
+        return 0
     if args.cmd == "audit-annual":
         from financials.promoter import audit_annual_checks
 

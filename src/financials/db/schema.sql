@@ -2145,6 +2145,37 @@ CREATE TABLE IF NOT EXISTS reg23_related_party_transactions (
     visible_from_ts     TIMESTAMP NOT NULL,
     PRIMARY KEY (filing_id, parser_version, row_member)
 );
+-- Which period a filing's Reg. 23(9) amounts cover, checked across filings (rule RPT_BALANCE_ROLL, X358;
+-- financials.rpt_periods, `rpt-periods`): HALF_YEAR (format D, X160), TWELVE_MONTHS (financial year to date in Q4,
+-- X161), UNDETERMINED (the balances do not tell) or NO_HISTORY (no filing six or twelve months earlier). Derived and
+-- deterministic: rewritten per rule_version. A reader takes the amounts' window from here, never from the context.
+CREATE TABLE IF NOT EXISTS reg23_period_basis (
+    filing_id               VARCHAR NOT NULL REFERENCES filings(filing_id),
+    rule_version            VARCHAR NOT NULL,
+    entity_id               VARCHAR NOT NULL REFERENCES entity_master(entity_id),
+    scope                   VARCHAR NOT NULL,
+    period_end              DATE NOT NULL,
+    basis                   VARCHAR NOT NULL,
+    disclosure_start        DATE NOT NULL,
+    disclosure_months       INTEGER NOT NULL,
+    pairs_compared          INTEGER NOT NULL,    -- counterparty x type pairs whose two earlier closings differ
+    pairs_from_half_year    INTEGER NOT NULL,    -- opening = closing of the filing six months earlier
+    pairs_from_year         INTEGER NOT NULL,    -- opening = closing of the filing twelve months earlier
+    half_year_ago_filing_id VARCHAR,
+    year_ago_filing_id      VARCHAR,
+    visible_from_ts         TIMESTAMP NOT NULL,  -- the filing's: the earlier filings are the ones visible by then
+    PRIMARY KEY (filing_id, rule_version)
+);
+-- Half-yearly (or, for financial-year-to-date filers, twelve-month) related-party amounts per filing and type, only
+-- where the balance roll settled the window (X358). The versions are the current REG23_PARSER_VERSION and
+-- RPT_PERIOD_RULE_VERSION (tests/test_x358_rpt_periods.py pins them). PIT readers filter visible_from_ts <= as-of.
+CREATE OR REPLACE VIEW rpt_half_year AS
+SELECT r.entity_id, r.scope, r.filing_id, b.basis, b.disclosure_start, r.period_end AS disclosure_end,
+       b.disclosure_months, r.txn_type, count(*) AS rows, sum(r.amount_inr) AS amount_inr, b.visible_from_ts
+FROM reg23_related_party_transactions r
+JOIN reg23_period_basis b ON b.filing_id = r.filing_id AND b.rule_version = 'rpt-period-1'
+WHERE r.parser_version = 'reg23-2' AND b.basis IN ('HALF_YEAR', 'TWELVE_MONTHS')
+GROUP BY ALL;
 -- Audit-opinion flags per results / annual filing (parsers/audit_report.py, owner decision 2026-11-17) [X121-X124]:
 -- derived from the auditor's report text (Reg. 34 `DisclosureInAuditorsReportExplanatory`, read whole from the vault
 -- blob) and the Integrated Filing audit fields, never from the checkbox, which is recorded next to it

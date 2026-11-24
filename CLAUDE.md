@@ -13,6 +13,8 @@ No redistribution.
 from `config/data_sources.yaml` by `python -m financials.sources --write`; edit the YAML, never the MD),
 and `docs/tag_registry.yaml` (every XBRL element seen per profile + named label rules; extend it with
 `python scripts/inspect_xbrl_exhaustive.py FILES --registry docs/tag_registry.yaml --batch <id>`).
+`docs/data_catalogue.md`: what every fixture file (and zip member) contains and whether we ingest it; regenerate with
+`python scripts/data_catalogue.py --write`; check it before saying data is unavailable.
 
 ## Commands
 

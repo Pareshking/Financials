@@ -54,14 +54,17 @@ If the data moves to a new session: disable these, recreate them bound to the ne
 
 ## 4. Open work (no owner decision needed unless marked)
 
-1. Task #25: statements and ratios vs industry practice for new members (**owner**: which practice / reference).
+1. Task #25 (statements and ratios vs industry practice): ratios are built; what remains is one check that new members
+   got the right statement archetype (bank / NBFC / insurer / industrial), since a wrong archetype gives wrong ratios.
 2. Optional: slim PK/ART indexes (DB 5.3 GB = ~1.8 GB data + ~3.3 GB indexes; target ~2.5 GB).
-3. **Owner decision:** off-container storage for automatic backups (R2 or another); until then, manual exports.
-4. **Owner decision:** bid-ask history (G207) needs a daily quote-API call per member (~2,066 a day from the runner).
-5. **Owner decision:** share classes (G275 / G336) need series E1 admitted to the universe.
-6. Blocked on evidence: merger / scheme ratios and credit ratings are PDF-only in the RSS (no XBRL family); filed
+3. Backups: private repo `Pareshking/financials-backup` (one dated folder per backup, README with restore steps;
+   2026-11-24 pushed and verified from a fresh clone). Automatic since 2026-11-24 (`tools/backup.py` there): nightly
+   irreplaceable blobs + hand-entered tables in the 23:37 late run (~3 MB), a full bundle on the first Saturday of
+   the month in the weekly sweep (~680 MB of history each).
+4. Dropped by owner decision 2026-11-24: bid-ask history (G207) and share classes (G275 / G336).
+5. Blocked on evidence: merger / scheme ratios and credit ratings are PDF-only in the RSS (no XBRL family); filed
    ISCR / DSCR values are implausible (C26).
-7. Phase 3: start from `docs/phase3_reuse_map.md` (owner's NSE-BSE-Insider-Tracker already has MF portfolios,
+6. Phase 3: start from `docs/phase3_reuse_map.md` (owner's NSE-BSE-Insider-Tracker already has MF portfolios,
    PIT/SAST, deals, flows, buybacks, surveillance). Import its pure parsers; keep this repo's evidence rules.
 
 ## 5. Standing rules (owner)

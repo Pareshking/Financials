@@ -15,7 +15,7 @@ Status: **INGESTED** parsed into the named table(s) by the named parser (checked
 | [NSE UDiFF CM bhavcopy](#nse-udiff-cm-bhavcopy) | `bhavcopy/BhavCopy_NSE_CM_0_0_0_20241206_F_0000.csv.zip!BhavCopy_NSE_CM_0_0_0_20241206_F_0000.csv` | F01 | INGESTED | raw_cm_bhavcopy, ohlcv, security_identifier_history, trading_calendar | none identified |
 | [NSE security-wise delivery (sec_bhavdata_full)](#nse-security-wise-delivery-sec_bhavdata_full) | `bhavcopy/sec_bhavdata_full_12112026.csv` | F02 | INGESTED | raw_delivery, ohlcv | none identified |
 | [NSE PR zip: mcap market capitalisation](#nse-pr-zip-mcap-market-capitalisation) | `pr_zip/PR011024.zip!MCAP01102024.csv` | F31 | INGESTED | raw_nse_mcap, universe_membership | none identified |
-| [NSE PR zip: bh price-band hits](#nse-pr-zip-bh-price-band-hits) | `pr_zip/PR011024.zip!bh011024.csv` | F31 | INGESTED | raw_price_band_hits | G207 (MISSING), G140 (DOCUMENTED_PLANNED) |
+| [NSE PR zip: bh price-band hits](#nse-pr-zip-bh-price-band-hits) | `pr_zip/PR011024.zip!bh011024.csv` | F31 | INGESTED | raw_price_band_hits | G207 (DONE), G140 (DOCUMENTED_PLANNED) |
 | [NSE PR zip: bm board meetings](#nse-pr-zip-bm-board-meetings) | `pr_zip/PR011024.zip!Bm011024.txt` | F31 | NOT_INGESTED | — | G193 (DOCUMENTED_PLANNED) |
 | [NSE PR zip: bc corporate actions (equity and debt series)](#nse-pr-zip-bc-corporate-actions-equity-and-debt-series) | `pr_zip/PR011024.zip!Bc011024.csv` | F31 | NOT_INGESTED | — | G195 (DOCUMENTED_PLANNED) |
 | [NSE PR zip: an announcements](#nse-pr-zip-an-announcements) | `pr_zip/PR011024.zip!An011024.txt` | F31 | NOT_INGESTED | — | G193 (DOCUMENTED_PLANNED) |
@@ -37,7 +37,7 @@ Status: **INGESTED** parsed into the named table(s) by the named parser (checked
 | [NSE Indices change notices (PDF + pdftotext)](#nse-indices-change-notices-pdf--pdftotext) | `index_changes/pdf/ind_prs04042025_2.pdf` | F05 | INGESTED | index_constituents_history | none identified |
 | [NSE daily index closes (ind_close_all)](#nse-daily-index-closes-ind_close_all) | `indices/ind_close_all_13112026.csv` | F27 | INGESTED | index_ohlcv | none identified |
 | [NSE equity master (EQUITY_L)](#nse-equity-master-equity_l) | `indices/nse_EQUITY_L_20261114.csv` | F28 | INGESTED | raw_equity_master | none identified |
-| [NSE quote API industry classification](#nse-quote-api-industry-classification) | `classification/GetQuoteApi_getSymbolData_HDFCBANK.json` | F30 | INGESTED | raw_quote_classification, entity_classification_history | G207 (MISSING), G140 (DOCUMENTED_PLANNED), G141 (DOCUMENTED_PLANNED), G129 (MISSING) |
+| [NSE quote API industry classification](#nse-quote-api-industry-classification) | `classification/GetQuoteApi_getSymbolData_HDFCBANK.json` | F30 | INGESTED | raw_quote_classification, entity_classification_history | G207 (DONE), G140 (DOCUMENTED_PLANNED), G141 (DOCUMENTED_PLANNED), G129 (MISSING) |
 | [NSE Integrated Filing listing API](#nse-integrated-filing-listing-api) | `discovery/nse_integrated-filing-results_equities_ABBOTINDIA_20261117.json` | F06 | INGESTED | raw_results_listing | none identified |
 | [NSE annual report XBRL listing API](#nse-annual-report-xbrl-listing-api) | `annual/nse_annual-reports-xbrl_TCS_20261113.json` | F07 | DISCOVERY_ONLY | — | none identified |
 | [NSE shareholding master API](#nse-shareholding-master-api) | `discovery/nse_corporate-share-holdings-master_equities_ABBOTINDIA_20261117.json` | F08 | DISCOVERY_ONLY | — | none identified |
@@ -152,7 +152,7 @@ Columns: `Trade Date`, `Symbol`, `Series`, `Security Name`, `Category`, `Last Tr
 | Status | INGESTED |
 | Tables | `raw_price_band_hits` |
 | Parser | `financials.parsers.pr_bands:parse_price_band_hits` |
-| Could serve | G207 (MISSING): circuit days: one H / L row per security per day that touched its band; G140 (DOCUMENTED_PLANNED): band hits per day; the band percentage itself is not in the file |
+| Could serve | G207 (DONE): circuit days: one H / L row per security per day that touched its band; G140 (DOCUMENTED_PLANNED): band hits per day; the band percentage itself is not in the file |
 | Files | 8 |
 
 Columns (3 of 8 files): `SYMBOL`, `SERIES`, `SECURITY`, `HIGH/LOW`, `INDEX FLAG`
@@ -691,7 +691,7 @@ Columns: `SYMBOL`, `NAME OF COMPANY`, `SERIES`, `DATE OF LISTING`, `PAID UP VALU
 | Status | INGESTED |
 | Tables | `raw_quote_classification`, `entity_classification_history` |
 | Parser | `financials.parsers.classification:parse_quote_classification` |
-| Could serve | G207 (MISSING): orderBook buyPrice1..5 / sellPrice1..5 and tradeInfo.impactCost (bid-ask), a snapshot at fetch time, not stored; G140 (DOCUMENTED_PLANNED): priceInfo.priceBand, a snapshot at fetch time, not stored; G141 (DOCUMENTED_PLANNED): secInfo.varMargin / extremelossMargin / securityvar, a snapshot at fetch time, not stored; G129 (MISSING): tradeInfo.ffmc (free-float market cap), a snapshot at fetch time, not stored |
+| Could serve | G207 (DONE): orderBook buyPrice1..5 / sellPrice1..5 and tradeInfo.impactCost (bid-ask), a snapshot at fetch time, not stored; G140 (DOCUMENTED_PLANNED): priceInfo.priceBand, a snapshot at fetch time, not stored; G141 (DOCUMENTED_PLANNED): secInfo.varMargin / extremelossMargin / securityvar, a snapshot at fetch time, not stored; G129 (MISSING): tradeInfo.ffmc (free-float market cap), a snapshot at fetch time, not stored |
 | Files | 3 |
 
 Columns: object: equityResponse (list of 1); record: orderBook{buyPrice1, buyQuantity1, buyPrice2, buyQuantity2, buyPrice3, buyQuantity3, buyPrice4, buyQuantity4, buyPrice5, buyQuantity5, sellPrice1, sellQuantity1, sellPrice2, sellQuantity2, sellPrice3, sellQuantity3, sellPrice4, sellQuantity4, sellPrice5, sellQuantity5, lastPrice, totalBuyQuantity, totalSellQuantity, perBuyQty, perSellQty}, metaData{identifier, companyName, isinCode, symbol, series, marketType, open, dayHigh, dayLow, previousClose, averagePrice, change, basePrice, closePrice, indicativeClose, ic_change, ic_pchange, spoChange, spoPchange, symbolStatus, adjPrice, iep, ieq, casStatus, pChange}, tradeInfo{totalTradedVolume, totalTradedValue, series, lastPrice, issuedSize, basePrice, ffmc, faceValue, impactCost, deliveryToTradedQuantity, applicableMargin, marketLot, quantitytraded, deliveryquantity, totalMarketCap, secwisedelposdate}, priceInfo{yearHightDt, yearLowDt, yearHigh, yearLow, cmDailyVolatility, cmAnnualVolatility, tickSize, inav, isINav, nav, navDate, priceBand, ppriceBand}, secInfo{secStatus, listingDate, pdSectorInd, pdSectorPe, pdSymbolPe, isSuspended, basicIndustry, index, deliveryQuantity, deliveryTotradedQuantity, securityvar, indexvar, extremelossMargin, varMargin, adhocMargin, applicableMargin, bondType, issueDesc, issueDate, maturityDate, couponRate, nxtIpDate, creditRating, macro, sector, industryInfo, indexList, boardStatus, tradingSegment, sessionNo, classShare, nameOfComplianceOfficer, casEligible, mainCatagory, subCatagory, sddcompliance}, lastUpdateTime

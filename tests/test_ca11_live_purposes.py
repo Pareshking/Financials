@@ -24,7 +24,7 @@ def _all():
 
 def test_every_live_purpose_parses_except_six_genuinely_ambiguous_texts():
     rows = _all()
-    assert len(LIVE) == 15  # 14 live windows + the original 2025 window
+    assert len(LIVE) == 18  # 14 live windows + the 2025 window + 16-11-2026 (X355), 30-03-2025, 23-02-2026 (X356)
     left = sorted(r.subject for r in rows if r.parse_status == "UNPARSED")
     assert left == sorted([
         "Capital Reduction", "Interim Dividend - Rs Per 0.50 Share", "Rights - 7 Ccps And 7 Warrants:40",

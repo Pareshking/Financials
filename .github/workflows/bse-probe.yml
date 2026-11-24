@@ -1,0 +1,43 @@
+name: bse-probe
+
+# BSE request-gap probe (owner 2026-11-20). Dispatch only; one runner; answers discarded; stops at the first refusal.
+on:
+  workflow_dispatch:
+    inputs:
+      scrips:
+        description: "comma-separated BSE scrip codes (2 x n)"
+        default: "532067,500488,505036,530745,530499,524634,506597,526173,531381,530245,543766,531847,523850,504731,507944,506285,539018,509438,533095,514183,532485,539607,541096,535693,500147,512068,538715,500068,526783,530643,500123,539533,509525,533477,500672,511628,539730,522195,513536,500168"
+      gaps:
+        description: "seconds between requests, one phase each"
+        default: "4,2"
+      n:
+        description: "requests per phase"
+        default: "20"
+  push:  # GitHub registers a dispatch-only workflow on a branch only after it has run: a push of this file runs it once
+    paths:
+      - ".github/workflows/bse-probe.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -e ".[bse]"
+      - run: mkdir -p bse_probe && python scripts/bse_rate_probe.py --scrips "$SCRIPS" --gaps "$GAPS" --n "$N" --out bse_probe/bse_probe.jsonl
+        env:
+          SCRIPS: ${{ inputs.scrips || '532067,500488,505036,530745,530499,524634,506597,526173,531381,530245,543766,531847,523850,504731,507944,506285,539018,509438,533095,514183,532485,539607,541096,535693,500147,512068,538715,500068,526783,530643,500123,539533,509525,533477,500672,511628,539730,522195,513536,500168' }}
+          GAPS: ${{ inputs.gaps || '4,2' }}
+          N: ${{ inputs.n || '20' }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bse-probe
+          path: bse_probe/
+          retention-days: 3

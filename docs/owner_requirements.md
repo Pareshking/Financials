@@ -8,16 +8,16 @@ Every concrete item in the chat is mapped to the repository as of 2026-11-14. Th
 
 ## Status summary
 
-Recounted from the rows on 2026-11-16.
+Recounted from the rows on 2026-11-21 (G93 DONE 2026-11-17; G214 DONE, G275 / G336 out of scope 2026-11-21).
 
 | Status | Meaning | Count |
 |---|---|---|
-| DONE | implemented and tested (file and test cited) | 223 |
-| DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 56 |
+| DONE | implemented and tested (file and test cited) | 225 |
+| DOCUMENTED_PLANNED | planned in architecture.md / references.md / data_sources.md | 52 |
 | IN_PROGRESS | being built now | 2 |
 | MISSING | not anywhere in docs or code | 12 |
 | CONFLICTS_WITH_EVIDENCE | contradicted by our verified fixtures or tests | 19 |
-| OUT_OF_SCOPE_BY_DECISION | excluded by a recorded decision (C2, C7, C9, invariants, CLAUDE.md Don'ts, owner decisions A-H) | 31 |
+| OUT_OF_SCOPE_BY_DECISION | excluded by a recorded decision (C2, C7, C9, invariants, CLAUDE.md Don'ts, owner decisions A-V) | 33 |
 | NEEDS_OWNER_DECISION | the docs do not settle it | 0 |
 | **Total** | | **343** |
 
@@ -38,15 +38,15 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G90 | Quarterly + annual XBRL: statements, notes (borrowings, leases, fixed assets) | DONE | F06, F07; parsers/integrated.py, parsers/reg34_annual.py; X71-X73. Segments tracked separately |
 | G91 | Shareholding XBRL: promoter, FII, DII (MF, insurance, banks), public, pledged shares | DONE | F08; SHP7-SHP15; tests/test_batch8_shareholding.py |
 | G92 | SAST Reg. 31(1)/31(2) encumbrance events with lender details | DOCUMENTED_PLANNED | F12 (Phase 3, OBSERVED) |
-| G93 | Reg. 76 reconciliation of share capital audit (exact issued / listed shares) | DOCUMENTED_PLANNED | F09 UNVERIFIED, BLOCKED: probed 2026-11-15 (vault ledger, announcements RSS, TCS announcements API Jul-Nov 2026; BSE 403), no Reg. 76 file found (A15); Reg. 31 x paid-up cross-check (X103) stands in; batch J adds the annual stand-in: Reg. 34 year-end issued / subscribed / paid-up counts vs Reg. 31 and paid-up / face (X114, ANNUAL_SHARE_COUNT_DIFFERS) |
-| G99 | Related-party transactions from Reg. 23(9) half-yearly Integrated Filing | DONE | X19; RPT contexts land in `reg23_related_party_transactions` / `disclosure_facts` (raw facts: the vault blob, decision J). Batch J: per counterparty from the Reg. 34 annual schedule (X113, `related_party_transactions`, `backfill-rpt`); the Reg. 23(9) rows per counterparty of standalone Q2 / Q4 Integrated Filings are parsed into `reg23_related_party_transactions` (X115, parsers/reg23_rpt.py, promoted with the results filing and by `backfill-rpt`; tests/test_reg23_rpt.py); they feed no feature because their period coverage is UNVERIFIED (R13) |
+| G93 | Reg. 76 reconciliation of share capital audit (exact issued / listed shares) | DONE | Listed side (2026-11-17, owner "check bhavcopy zip, everything is inside it"): NSE Issue Size per security daily from the PR-zip mcap file (F31, X133; `raw_nse_mcap`; tests/test_mcap_universe.py), cross-checked against Reg. 31 by `check-issue-size` (0.5%). Measured 98.4% of 4,035 same-date pairs within 0.5% (84.6% exact), below the 99% bar (listing lag after allotments, buy-backs, partly-paid E1, bonus ex-date), so Reg. 31 stays the market-cap count (decision C). The Reg. 76 audit report itself (demat vs physical) is still unsourced: F09 UNVERIFIED, probed 2026-11-15 (vault ledger, announcements RSS, TCS announcements API Jul-Nov 2026; BSE 403), no Reg. 76 file found (A15); Reg. 31 x paid-up cross-check (X103) stands in; batch J adds the annual stand-in: Reg. 34 year-end issued / subscribed / paid-up counts vs Reg. 31 and paid-up / face (X114, ANNUAL_SHARE_COUNT_DIFFERS) Owner 2026-11-24: "Demat vs physical not required": the Reg. 76 report is not needed; G93 is closed on the listed side. |
+| G99 | Related-party transactions from Reg. 23(9) half-yearly Integrated Filing | DONE | X19; RPT contexts land in `reg23_related_party_transactions` / `disclosure_facts` (raw facts: the vault blob, decision J). Batch J: per counterparty from the Reg. 34 annual schedule (X113, `related_party_transactions`, `backfill-rpt`); the Reg. 23(9) rows per counterparty of standalone Q2 / Q4 Integrated Filings are parsed into `reg23_related_party_transactions` (X115, parsers/reg23_rpt.py, promoted with the results filing and by `backfill-rpt`; tests/test_reg23_rpt.py); they cover the Reg. 23(9) half-year (X160, `disclosure_start` / `disclosure_months`, tests/test_reg23_period.py) and feed no feature because a few filers report FY-to-date in Q4 (X161) |
 | G101 | Daily delivery % | DONE | F02; P10; tests/test_market_parsers.py |
 | G105 | Audit qualification / modified opinion flag | DONE | E8; X75 filing_meta.auditor_qualified; since 2026-11-17 (owner decision: the text decides) X121-X124 `audit_opinions` from the auditor's report text and the Integrated Filing audit fields, tests/test_audit_opinions.py. Screener columns `audit_opinion`, `audit_opinion_quarterly`, `audit_opinion_conflict`, `going_concern_uncertainty`, `emphasis_of_matter` (20A), `rf_audit_qualified` (batch G), and the `forensic_clean` gate |
 | G106 | Reg. 30 director / auditor / KMP change alerts | DONE | E5; kmp_resignations_90d, auditor_resignations_90d; tests/test_batch10_events.py |
 | G107 | Reg. 30 scheme of arrangement (merger / demerger) filings | DOCUMENTED_PLANNED | E2 (REG30_Restructuring vaulted raw); arch 15 Phase 3 |
 | G114 | Reg. 30 order wins (client type, value, timeline) | DONE | E3; order_wins_90d, order_value_90d; tests/test_batch10_events.py |
 | G116 | Fraud / default / arrest / forensic-audit filings | DONE | E7; fraud_or_default_90d; tests/test_batch10_events.py. Amount is free text, never parsed |
-| G118 | Regulatory / judicial actions and penalty amounts | DOCUMENTED_PLANNED | penalties_90d (NULL); E12 (contents UNVERIFIED) |
+| G118 | Regulatory / judicial actions and penalty amounts | DONE | X360: penalties_90d, penalty_amount_90d, regulatory_actions_90d from AIATOP XBRL (E12); NULL until a full 90-day window is captured (X361, first 2027-02-11) |
 | G119 | Allotments, preferential issues, QIPs, warrants (price, allottees, dilution) | DONE | E6; corporate_events; tests/test_batch10_events.py. Screener column `allotments_90d` (count, batch G); no warrant tracker yet |
 | G120 | Agreements, JVs, MoUs (counterparty, stake) | DOCUMENTED_PLANNED | E2 (ANN_AGREEMENT vaulted raw); arch 15 Phase 3 |
 | G130 | Segment reporting (Ind AS 108): revenue, result, assets, liabilities per segment | DONE | X49, X97-X99; parsers/segments.py, `segment_observations` (point in time, `fundamentals.load_segments`); screener columns `segment_count`, `largest_segment_revenue_share`, `fastest_growing_segment(_growth_yoy)`, `largest_segment_margin_change_yoy_pp` (batch I, features_more.py); tests/test_segment_observations.py, tests/test_features_more.py |
@@ -60,7 +60,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G296 | Review: price table needs exchange and series columns *(owner)* | DONE | ohlcv PK (security_id, exchange, series, trade_date) |
 | G306 | Review: DVR shares get INE ISINs; only partly-paid get IN9 *(owner)* | CONFLICTS_WITH_EVIDENCE | P17, R10: partly-paid are IN9 + series E1 (true); DVRs carry IN9 (JISLDVREQS, FELDVR) or INE (GATECHDVR) ISINs; tests/test_share_class_fixture_facts.py |
 | G313 | Review: insurer and new-gen KPIs (VNB, EV, APE, platform KPIs) are not in XBRL *(owner)* | DONE | X62; supplemental_kpis; tests/test_supplemental_kpis.py |
-| G336 | Share classes COMMON / DVR / PARTLY_PAID with voting-rights ratio and face value | DOCUMENTED_PLANNED | arch 8; securities.share_class. BLOCKED (2026-11-15): P17 shows the classes exist, but partly-paid trade only in series E1 (outside the v1 universe: owner decision), DVR voting ratio and face value are in no fixture, and no DVR issuer's Reg. 31 pattern is committed |
+| G336 | Share classes COMMON / DVR / PARTLY_PAID with voting-rights ratio and face value | OUT_OF_SCOPE_BY_DECISION | owner 2026-11-19 "Ignore DVR"; partly-paid series E1 stays outside the universe (P17) |
 
 ## Taxonomy/profile (17)
 
@@ -163,9 +163,9 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G203 | YoY sales-growth acceleration (current YoY - prior-quarter YoY) | DONE | growth_acceleration_pp (quarter form: sales YoY latest - preceding quarter); TTM form waits for 9 quarters (C9); batch D; tests/test_features_gems.py |
 | G204 | Operating-margin expansion vs the same quarter last year | DONE | opm_change_yoy_pp (quarter OPM - same quarter last year, NULL for lenders); batch D; tests/test_features_gems.py |
 | G205 | Sector earnings breadth during results season | DONE | `industry_earnings_breadth` (+ `_n`): share of the NSE industry's companies reporting its latest quarter with core profit YoY > 0, >= 3 companies, refresh step over the stored day (batch I, features_more.py); tests/test_features_more.py |
-| G207 | Liquidity: 20D median traded value; bid-ask / circuit-lock days | MISSING | 20D median traded value built (turnover_median_20d; tests/test_features_price.py); bid-ask is in no ingested EOD file; circuit-lock days wait for an F20 price-band fixture |
+| G207 | Liquidity: 20D median traded value; bid-ask / circuit-lock days | MISSING | 20D median traded value built (turnover_median_20d; tests/test_features_price.py); circuit days built 2026-11-24 from the PR-zip price-band file (band_hit_days_20d, upper_circuit_days_20d, lower_circuit_days_20d; X359; tests/test_x359_price_bands.py). Still missing: bid-ask, which exists only as a fetch-time snapshot in the quote API (orderBook, docs/data_catalogue.md), with no daily history |
 | G208 | Market regime / breadth: % of Nifty 500 above 50/200 DMA, 52W high/low ratio, advance-decline | DONE | market_breadth table, one row per materialised day from the in_nifty500 rows (arch 10.7); tests/test_features_price.py |
-| G214 | 20-30 distinctive ratios for all companies *(owner)* | DOCUMENTED_PLANNED | arch 10 catalogue. Most built; rest Phase 2 |
+| G214 | 20-30 distinctive ratios for all companies *(owner)* | DONE | arch 10 catalogue built (batches B-J, gems, forensic scores; Piotroski / Beneish filled where two annuals exist). Not built by evidence rule: Screener "Price to Quarterly Earning" (definition UNVERIFIED), filed ISCR / DSCR (implausible filed values) |
 | G215 | Incremental ROIC (3Y/5Y) | DONE | incremental_roic_1y (on now, FY26 vs FY25), incremental_roic_3y / _5y (history-gated: FY28 ~May 2028 / FY30); ΔNOPAT / Δ invested capital, NULL when ΔIC <= 0; features_bs; tests/test_balance_sheet_cash_flow_family.py |
 | G216 | Reinvestment rate | DONE | reinvestment_rate = FY (capex - D&A + Δ non-cash working capital) / NOPAT; features_bs; tests/test_balance_sheet_cash_flow_family.py |
 | G217 | Cash ROIC (CROIC) | DONE | croic; tests/test_fundamentals.py |
@@ -218,8 +218,8 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G266 | ARPU and MTU growth | DONE | batch G: KPI names arpu (INR), mtu (COUNT) in parsers/kpis.py; arpu, mtu, arpu_ / mtu_ / gov_growth_yoy_pct; tests/test_features_extra.py |
 | G269 | Insurance archetype metrics: P/EV, VNB margin, combined ratio | DONE | combined_ratio (X66), vnb_margin, embedded_value (supplemental); tests/test_batch6_insurers.py. P/EV itself not built |
 | G270 | P/EV for life insurers | DONE | batch G: price_to_embedded_value; tests/test_features_extra.py |
-| G275 | Dual-ISIN securities (partly paid, DVR): sum market cap over all linked ISINs | DOCUMENTED_PLANNED | arch 8 (market_cap over active share classes). BLOCKED (2026-11-15): P17 links DVR / partly-paid ISINs to the ordinary share by issuer code, but the share count per class is unknown (whether Reg. 31 counts DVRs is unverified; no DVR issuer pattern committed or vaulted; none is in the Nifty 500), and partly-paid E1 is outside the universe |
-| G276 | Organic vs inorganic perimeter flag (business-combination outflows, acquisition filings) | DONE | C26; `inorganic_growth_flag` from the business-combination cash outflow (features_extra.py, batch G); tests/test_features_extra.py (test_business_combination_outflows_and_the_inorganic_flag, test_inorganic_flag_is_three_valued). Reg. 30 acquisition events are not an input (no event type parsed) |
+| G275 | Dual-ISIN securities (partly paid, DVR): sum market cap over all linked ISINs | OUT_OF_SCOPE_BY_DECISION | owner 2026-11-19 "Ignore DVR": each listed security keeps its own market cap |
+| G276 | Organic vs inorganic perimeter flag (business-combination outflows, acquisition filings) | DONE | C26; `inorganic_growth_flag` from the business-combination cash outflow (features_extra.py, batch G); tests/test_features_extra.py (test_business_combination_outflows_and_the_inorganic_flag, test_inorganic_flag_is_three_valued). Reg. 30 acquisition events are parsed since X360 (`acquisitions_90d`, `acquisition_value_90d`, E13) but are not an input to the flag |
 | G278 | Standalone-to-consolidated profit leakage | DONE | `profit_leakage_pct`, `profit_leakage_latest_quarter_pct`, `standalone_pat_ttm` (features_extra.py, batch G); tests/test_features_extra.py (test_reliance_profit_leakage_latest_quarter, test_ttm_profit_leakage) |
 | G314 | Review: forensic scores have different scales; never sum; Altman not for financials *(owner)* | DONE | arch 10.2 |
 | G315 | Review: delivery velocity must divide by free float, not multiply *(owner)* | DONE | arch 10.3 (float_turnover_pct) |
@@ -334,7 +334,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G280 | Commodity / input-cost feeds (World Bank Pink Sheet, FRED, MCX, PPAC, CEA) mapped to industries | DOCUMENTED_PLANNED | F25. FRED not listed |
 | G308 | Review: decide explicitly that the universe is NSE-only *(owner)* | DONE | C7 |
 | G312 | Review: AMFI publishes per-AMC files, not one ISIN file (verify) *(owner)* | DOCUMENTED_PLANNED | R8 (UNVERIFIED); F26 |
-| G331 | Universe can grow from Nifty 500 to all NSE mainboard stocks | DONE | C7; discover-filings --universe active |
+| G331 | Universe can grow from Nifty 500 to all NSE mainboard stocks | DONE | C7; discover-filings --universe active; owner 2026-11-17: sticky Rs 500 Cr universe `mcap500` (decision O, X134, arch 11.12; tests/test_mcap_universe.py) |
 
 ## UI/screener (20)
 
@@ -441,7 +441,7 @@ None open. Decided 2026-11-15: no paid sources at all (G74, by the owner); E-H b
 11. **DONE (2026-11-16)** G11, G39, G49, G59, G75, G77, G87 and the BRSR tag count / nine-RSS-feed list (G323) are UNVERIFIED rows R14-R22 in `docs/references.md`, each with what would verify it. G32 is OUT_OF_SCOPE_BY_DECISION (G74); G279 stays MISSING. No code.
 
 11a. **DONE (2026-11-15)** ~~the `restatement_suspected` flag (architecture §7.6).~~ YTD trigger (X106), discontinued operations (X108), logged merger / demerger (X109); Reg. 34 prior-year comparison as a finding (X110).
-11b. Documented but not implemented: market cap summed across share classes (architecture §8; the code creates only COMMON securities). The two-class listing exists (P17: JISLDVREQS / JISLJALEQS, FELDVR / FEL, GATECHDVR / GATECH in the bhavcopy fixtures). **BLOCKED**: needs the share count per class (a DVR issuer's Reg. 31 pattern, none committed or vaulted) and, for partly-paid, an owner decision to admit series E1.
+11b. **Dropped (owner, 2026-11-19: "Ignore DVR")** ~~market cap summed across share classes (architecture §8).~~ Each listed security keeps its own market cap (rule U1 already: owner "ignore DVR", no share-class aggregation); the code creates only COMMON securities; partly-paid series E1 stays outside the universe (P17).
 
 **Phase 2 completion**
 12. **DONE (2026-11-15, batch G; cash-flow element only, Reg. 30 acquisition events unparsed)** G276: organic vs inorganic perimeter flag. Verify: a Reg. 34 fixture with a business-combination cash-flow element and a Reg. 30 acquisition XBRL fixture.
@@ -468,6 +468,13 @@ None open. Decided 2026-11-15: no paid sources at all (G74, by the owner); E-H b
 29. Automatic merger detection and the demerger cost-of-acquisition split (entitlement ratios, COA percentages). Today
     both are admin-entered, audited edges (architecture §11.7); the terms are announced only in PDFs (R7 UNVERIFIED).
 30. Reg. 30 penalty amounts (G117 red flags carry the event, not the amount). Verify: an E12 content fixture.
+
+**Later (owner, 2026-11-17: "Companies listed only on BSE but having market cap > 500 Cr must be also added in our
+Universe, this will be later, not right now. Companies like NSE are listed on BSE and we miss such companies.")**
+31. BSE-only companies with market cap >= Rs 500 Cr join the universe (same sticky weekly rule as U1). Needs: a
+    verified BSE market-cap / share-count source (fetched with headless Chrome on a GitHub runner, as for the
+    permitted securities), identity without an NSE symbol (BSE scrip code + ISIN), BSE price history (no NSE
+    bhavcopy rows exist for them), and BSE filings. Not started.
 
 
 ## Decisions taken on the owner's behalf (2026-11-15)
@@ -532,7 +539,127 @@ The owner asked the assistant to take these with its recommendation. Each is rev
   caught after the load instead of refused at entry. All constraints stay. Consequence for decision K: 7 daily
   snapshots of the ~2.5 GB file (~17 GB) do not fit R2's 10 GB free tier; snapshots would need to be fewer or stored
   as the zstd Parquet bundle (~0.47 GB measured), to be settled with decision K.
+- **P. Exchange data in public places (owner, 2026-11-17):** "Everything on exchange is public limited company data
+  and do not worry about it again and again." Workflow artifacts and fixtures with exchange data in this public
+  repository are acceptable; not to be raised again (as decision L). Artifact retention is a size choice only.
+- **Q. Re-validate every rule on the expanded universe (owner, 2026-11-17):** "When we are expanding our universe, we
+  need to be careful about rules we made to match our data with Screener etc. ... be careful once all 3 financial
+  statements are available for expanded universe." The named rules (X82 onward) and the Screener / Tijori
+  cross-checks were derived on ~595 mostly large companies. Before the ~1,350 new members' fundamentals are trusted,
+  once their results, balance sheets, cash flows and annual reports are promoted: (1) the existing companies' values
+  must be unchanged (or every change explained by a rule or parser change); (2) quarantine rate per reason and the
+  firing rate of each named rule, new members vs the original set, with any outlier investigated; (3) accounting
+  identity pass rates (balance sheet, P&L lines, cash flow) per accounting profile and size band; (4) a fresh,
+  stratified sample of new members cross-checked against Screener / Tijori as before (compared, never stored); (5) a
+  rule found wrong is fixed for every company with a new parser version, a fixture and a test, never special-cased for
+  the new set. Until then the new members' fundamentals are marked as not yet validated.
 - **Site data layout (agreed 2026-11-17, part of the proposed decision K):** the site never reads the DuckDB file.
   Page views read small precomputed files (per-company JSON, saved-screen results); custom screens read one Parquet
   file of the latest screener table (3,003 x 665: 2.9 MB zstd measured) with column-only range reads; Cloudflare
   caching in front of R2. DuckDB runs only on the writer (GitHub runner or PC).
+- **O. Market-cap universe (owner, 2026-11-17: "Add all the companies having market cap of 500 Cr and above. Every
+  week download marketcap from bhavcopy file and add companies qualified for 500 cr and above. Companies which are
+  already in universe will not go out. No SME. Ignore DVR."):** rule U1 (version `U1-2026.11.17-L`) (`financials/universe.py`, X134, architecture
+  §11.12). Source: the `mcapddmmyyyy.csv` of NSE's daily `PRddmmyy.zip` (X130-X132), fetched with every market day
+  and backfilled weekly from 2024-10-01. On each week's last trading day every EQ / BE / BZ row with Market Cap >=
+  Rs 500 Cr and Category `Listed` joins `universe_membership`; members never leave; SME series and the zip's SME file are not used; each
+  row stands on its own (no DVR aggregation). Seed: the ~595 companies that already have financials. Live
+  2026-11-17: 595 seeded + 1,352 joined = 1,947 members; `discover-filings --universe mcap500-new` fetches the new
+  members' filings. `Permitted` rows (listed on another exchange, only permitted to trade on NSE) never qualify
+  (coordinator 2026-11-17: the universe is NSE Mainboard listed companies and the filings pipeline is NSE-only;
+  none of them had NSE financials); their raw rows stay stored.
+- **Share count (owner, 2026-11-17: "check bhavcopy zip, everything is inside it"):** the same mcap file carries NSE's
+  Issue Size. Evaluated against Reg. 31 (X133): 98.4% of 4,035 pairs within 0.5%, under the 99% bar set for a
+  switch, with the disagreements explained (listing lag, buy-backs, partly-paid, bonus timing). Decision C stands
+  (Reg. 31 is the market-cap share count); Issue Size is stored and is a cross-check (`check-issue-size`).
+
+## Owner decisions (2026-11-18)
+
+- **Decision R (wrong declared unit, rule X201 LEVEL_OF_ROUNDING_SLIP):** approved. A filing whose declared
+  `LevelOfRounding` contradicts the company's other filings, proven by at least two of three independent checks
+  (paid-up capital vs other filings, Reg. 31 shares x face value vs paid-up, EPS x shares vs profit) and none reading
+  1:1, is rescaled as rule-made rows in `fact_corrections` (raw facts untouched; a later PDF correction revokes the
+  rule's value). This is a correction of a unit label, not a price or share-count adjustment (CLAUDE.md invariant 8).
+  Applied live 2026-11-18: 16 filings, 12 entities (5 Nifty 500 seed filings: AFCONS, COROMANDEL x3, IGIL, MARKSANS,
+  METROBRAND; their PDF corrections kept).
+- **Decision S (share count when Reg. 31 is the outlier, rule X221 SHARES_REG31_OUTLIER):** when the results
+  filing's paid-up / face value and NSE PR-zip Issue Size agree and the same-date Reg. 31 total does not, market cap
+  uses NSE's count. When all three differ (HMT), Reg. 31 is kept and the finding stays open.
+- **Decision T (fixed assets at the fiscal-year end; delegated, owner-approved 2026-11-18: "you check industry
+  practice and decide; already approved"):** the audited Reg. 34 annual report stays the source of the March balance
+  sheet, but every balance-sheet line has one definition across all periods of a company (as screeners keep line
+  definitions consistent across periods). Rule X273 FIXED_ASSET_ONE_DEFINITION: the fixed-asset lines of a year end
+  (PPE, right-of-use, other intangibles, goodwill, investment property, CWIP, intangibles under development) come from
+  one filing, never mixed line by line; when the annual and the results filing report the same total split
+  differently (right-of-use inside PPE or inside intangibles), the split the company's half-year balance sheets use is
+  taken; when the annual restates the year end, its own lines stand. Screener rows are unchanged (Net Block = PPE +
+  right-of-use + other intangibles + goodwill + investment property; CWIP = CWIP + intangibles under development).
+  Raw facts are untouched; nothing changes before the annual report is visible.
+- **Decision U (restated comparatives; delegated, owner-approved 2026-11-18):** as point-in-time databases keep "as
+  first reported" and "restated" side by side: the history keeps every figure as first filed (a backtest sees only
+  what was published then); a later filing's restated comparatives are visible from that filing's broadcast and are
+  what "latest" readers use. Verified to be how the engine already works (X274); exception by the existing rule X100:
+  an annual report's re-presented income-statement comparative does not replace a results filing's figure for that
+  year (it is reported as the X182 prior-year finding). No separate `restated` column; the prior-year findings list
+  which annual reports restate.
+
+## Decisions taken on the owner's behalf (2026-11-18, owner: "use agents where needed to speed up"; reversible)
+
+My 19:31 (2026-11-17) recommendations, unanswered, applied:
+1. **REGROUPED prior-year findings** (X182) are bulk-ACCEPTed with their class in the note when every statement
+   total agrees; restatements of the bottom line or the cash flow stay open (X233, X234 sub-classes).
+2. **`roe_screener`** (X227) is added beside `roe` (Screener's form: last full year's owners' profit over average
+   owners' equity); `roe` is unchanged, and C16 no longer claims to match Screener.
+3. **Debt/equity for lending NBFCs** (X228): (debt securities + borrowings + deposits + subordinated liabilities) /
+   total equity; banks and insurers stay NULL.
+4. **TTM is NULL on a proven mis-filed YTD** (X226 YTD_MISFILED_NO_BRIDGE) instead of the X106 bridge (NAZARA).
+5. **Restated TTM windows bridge the operating lines too** (X300 OPERATING_LINES_BRIDGE; main session, owner:
+   "continue doing what you are doing"): other income, D&A, finance costs, PBT before exceptional items, PBT and
+   labelled excise follow revenue and PAT through the YTD bridge (X106) when their own YTD identity breaks in
+   a restated row, so OPM, EBITDA, EBIT (ROCE) and interest coverage are on one basis (POLYPLEX TTM other income
+   105 Cr via the YTD instead of 158 Cr from the quarters). X226 (no bridge on a proven mis-filed YTD) and X173
+   hold for these lines; a row whose operating lines have no bridge on one basis keeps the quarter sums.
+6. **X106 bridges revenue and profit only on one basis** (X301 GUARDED_BRIDGE_ONE_BASIS; main session, owner:
+   "continue doing what you are doing"): the guarded tags (revenue, total income, PAT, PBT incl. JV, owners' PAT)
+   use the YTD bridge only when the prior year's FY and YTD are on one basis. When one of them holds the YTD
+   identity and the other breaks it (Swiggy standalone FY26 revenue 8,258 Cr continuing vs H1 FY26 5,693 Cr as
+   first filed), TTM is the sum of the latest 4 quarters as filed, as Screener and data vendors show it (Swiggy Q2
+   FY27 TTM revenue 10,468 Cr instead of 7,673), NULL only if a quarter is missing or proven mis-filed (X226 first);
+   the row carries `restatement_suspected`. (A first version returned NULL unless the quarters were provably on one
+   basis: 1,231 NULLs incl. Bajaj Finance, HUL, Coal India and LTTS revenue; judged too costly.) Owners' profit TTM
+   (EPS, P/E, ROE) follows the same rules with PAT's basis. On the snapshot 1,238 guarded values change (239
+   entities, 57 in the Nifty 500 seed), 14 NULL (missing quarters); owners' TTM 584 values (180 entities), 23 NULL.
+   Reversible.
+7. **Rights entitlements leave the Rs 500 Cr universe** (X311 RE_NOT_A_MEMBER, rule `U1-2026.11.18-R`; main
+   session brief QU): the PR-zip mcap file lists an NSE rights entitlement (symbol `-RE[n]`, series BE, Category
+   Permitted, ISIN type code 20) like any security, so rule U1 admitted 5 of them above Rs 500 Cr (UPL-RE,
+   LLOYDS-RE1, M&MFIN-RE1, LLOYDSE-RE, ADANI-RE). An RE is a short-lived right to subscribe a rights issue, not an
+   equity share: no financials, and its "market cap" is meaningless; index providers and screeners exclude them,
+   and the parent equity (UPL, LLOYDSENGG, M&MFIN, LLOYDSENT, ADANIENT) is the member. REs no longer join, and
+   although membership is sticky ("members never leave"), the 5 admitted before the rule are removed because they
+   were never valid members; each removed row is logged in full in admin_log (UNIVERSE_REMOVE_RIGHTS_ENTITLEMENT)
+   and `update-universe` reports the count. Members 2,070 -> 2,065 (Permitted 128 -> 123); no other member changes.
+   Reversible: re-insert the logged rows, or re-run rule U1-2026.11.17-P.
+
+8. **Owners' profit = PAT less NCI when owners is filed 0 and NCI is within rounding** (X318 OWNERS_ZERO_NCI_WITHIN_ROUNDING, with X317 widening X214; main session, owner: "use agents where needed"). Industry practice: with nil minority interest, profit attributable to owners equals PAT (EPS and P/E use it). This supersedes the earlier ACCEPT note on 4 KAYNES findings ("X86 withholding is correct"); those filings have no open finding and stay withheld until they are restaged. Owners + NCI = continuing profit only (AURUM, NAZARA, UNIECOM, URAVI) stays withheld: the X52 assumption is wrong for NAZARA FY25 (annual owners 758.2 Mn vs 753.5 Mn). Reversible: drop X318 and re-parse.
+
+9. **A long first financial period is stored as a one-off period** (X337 FIRST_PERIOD_LONG, X338
+   PRE_CUTOFF_DECLARED_PERIOD_IGNORED; work QF5, 2026-11-19, delegated by the main session). Industry practice: a
+   newly incorporated (e.g. demerged) company's first financial year runs from incorporation to the next 31 March and
+   may exceed 12 months (Companies Act 2013 s. 2(41)); it is reported as such and never annualised or compared.
+   A declared period starting mid-month with 13..18 calendar months (invariant 6 allows 1..18) is a regular period
+   with `period_months` 13..18; no TTM, YoY or annual-on-annual reader uses it (they take 3- / 12-month periods);
+   its year-end balance sheet is ordinary. A pre-cutoff comparative that is irregular, or whose declared dates
+   disagree with its context (TRANSRAILL: day and month swapped), is out of scope (invariant 14) and ignored instead
+   of holding the filing back. Releases 4 annual reports (BLUSPRING, DIGITIDE x2, TRANSRAILL; 8 PERIOD findings).
+   Reversible: drop the two rules and re-parse.
+
+## Owner decisions (2026-11-19)
+
+- **Done criterion for Phases 1-2 (expanded universe):** done when the random-sample accuracy is >= 98% (QD2: 99.54% adjudicated, met) and every open finding carries a stated cause, even where it stays withheld. Withheld numbers are NULL in screens, never shown wrong. Stop chasing the long tail of filer errors after the in-flight reviews (QY3, QA2).
+- **DVR:** ignored (to-do 11b dropped).
+- **Decision V (show everything, flag the suspect):** "Ensure we show everything for all companies, if required flag suspected one, using the correct way." Supersedes "Withheld numbers are NULL in screens" above. Every number a filing states is shown in the feature rows; where a check failed, the row shows the validated value if there is one, else the figure as filed, and names the reason in `dq_flags` / `dq_suspect` (rule SHOW_AND_FLAG, X325; architecture §7.7). Open non-blocking findings flag the rows they concern (`OPEN_FINDING:<reason>`). Screens include flagged rows; `Data Suspect = 0` excludes them. Genuine absence stays NULL (fewer than 4 quarters, pre-cutoff windows, no filing, undefined ratios), and a failed identity, unknown taxonomy or undetermined period still parses nothing.
+- **Exchange request rates (X354):** after a measured probe with no refusals, the NSE archive host runs at 12 req/s and the NSE API at 2 req/s with 3 in flight (was 8 and 1). BSE 2-3 s apart (owner 2026-11-21 "Yes"; probe: 2 s held for 20 of 20; was 4-6 s).
+- **Reg. 76 (owner 2026-11-24, "Demat vs physical not required"):** G93 closes on the listed-share checks already built (NSE Issue Size from the PR-zip mcap file vs Reg. 31, X133; Reg. 34 year-end counts, X114); no Reg. 76 source is needed.
+- **Weekly sweep runs `audit-annual` (owner 2026-11-21 "Add"):** after promote and the incremental materialize, so new annual prior-year findings get their X312 class the same day. A week is clean only when `docs/open_findings.md` shows UNCLASSIFIED 0 (first clean week 21 Nov 2026: 750 open, 0 unclassified).
+- **Phase 3 reference (owner 2026-11-21):** many Phase 3 feeds (F&O, AMFI MF portfolios, PIT / SAST insider trading, bulk / block deals, BRSR, governance, RBI macro, backtester) are already built in the owner's repo `Pareshking/NSE-BSE-Insider-Tracker`. Reuse it (import, not copy) before building any Phase 3 feed here.

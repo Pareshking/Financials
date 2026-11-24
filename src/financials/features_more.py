@@ -46,7 +46,8 @@ Definitions (fractions as DOUBLE, `_pp` = fraction points, days as DOUBLE):
 - segments (B9.1, B9.2): BUSINESS-axis SEGMENT members of the latest filed segment period (`load_segments` point in
   time rule, batched), the row's scope; count, largest revenue / sum of segment revenue (before eliminations),
   fastest-growing segment vs the same period a year earlier (matched by filed label within the entity, base > 0)
-  and the largest segment's margin (RESULT / REVENUE) change YoY.
+  and the largest segment's margin (RESULT / REVENUE) change YoY. X250: a `ReportableSegmentsNMember` whose filed
+  label names a reconciling line (Unallocated / Unallocable, inter-segment, Eliminations, Total) is not a segment.
 - industry earnings breadth (B4.9, G205) = share of the NSE industry's companies (one per company) reporting the
   industry's latest quarter whose core profit grew YoY (`core_profit_yoy_latest_q` > 0); >= 3 companies.
 """
@@ -55,6 +56,7 @@ from __future__ import annotations
 
 import bisect
 import math
+import re
 import statistics
 from collections import defaultdict
 from datetime import date, datetime, timedelta
@@ -75,6 +77,7 @@ from financials.fundamentals import (
     piotroski_signals,
     safe_div,
 )
+from financials.run_memo import by_visibility
 from financials.scope import MIN_TRADE_DATE
 
 # ── columns (schema order: `-- batch I (last catalogue rows)` in db/schema.sql) ───────────────────────────────────
@@ -94,6 +97,13 @@ EVENT_COLUMNS = ("nifty500_inclusion_90d", "nifty500_exclusion_90d", "days_to_ne
                  "dividend_365d", "bonus_365d", "split_365d")  # fmt: skip
 SEGMENT_COLUMNS = ("segment_period_end", "segment_count", "largest_segment_revenue_share", "fastest_growing_segment",
                    "fastest_growing_segment_growth_yoy", "largest_segment_margin_change_yoy_pp")  # fmt: skip
+# X250: filers put reconciling lines on the segment axis as ordinary `ReportableSegmentsNMember`s (Suryoday SFB
+# "Unallocated", SGLTL "Eliminations" -12.90 Cr, Sandesh's Reg. 34 "Total"): member_role stays SEGMENT (it is
+# derived from the member name, never the label), so the readers that count segments drop them by the filed label.
+NON_SEGMENT_LABEL = re.compile(
+    r"^(?:less\s*:?\s*)?(?:un[\s-]?allocated|un[\s-]?allocable|inter[\s-]?segment(?:al)?|eliminations?)\b"
+    r"|^(?:total|segment total|total segments?)$"
+)
 CROSS_COLUMNS = ("rs_rank_12m_1m", "industry_earnings_breadth", "industry_earnings_breadth_n")
 MORE_COLUMNS = (
     *BENEISH_COLUMNS, *PIOTROSKI_COLUMNS, *FORENSIC_COLUMNS, *DAYS_COLUMNS, *PERCENTILES, *PRICE_COLUMNS,
@@ -182,7 +192,7 @@ def depreciation_ratios(book, fy: tuple[date, date]) -> tuple[Decimal | None, De
     """(FY D&A / average gross block, accumulated depreciation / gross block at the FY end) (B2.12)."""
     at = lambda t, d: book.instants.get(t, {}).get(d)  # noqa: E731
     gb1, gb0 = at("ppe_gross_block", fy[1]), at("ppe_gross_block", _add_months(fy[1], -12))
-    dep = book.durations.get("depreciation_amortisation", {}).get(fy)
+    dep = book.stated("depreciation_amortisation", fy)  # X325: as filed (flagged) where a rule withheld it
     rate = None if None in (dep, gb1, gb0) or gb1 + gb0 <= 0 else dep / ((gb1 + gb0) / 2)
     acc = at("ppe_accumulated_depreciation", fy[1])
     return rate, (safe_div(acc, gb1) if gb1 and gb1 > 0 else None)
@@ -435,6 +445,7 @@ def action_columns(actions: list[tuple], as_of: date) -> dict:
     return out
 
 
+@by_visibility  # read once per visibility interval of an incremental run (run_memo)
 def segment_inputs(con, as_of_ts: datetime, entities=None) -> dict[tuple[str, str], list[tuple]]:
     """(entity, scope) -> [(metric, period, months, key, label, value, member)] of BUSINESS SEGMENT members, point in
     time (the `load_segments` rule: per axis / element / period, every member of the latest visible filing), in a
@@ -470,6 +481,8 @@ def segment_columns(rows: list[tuple] | None) -> dict:
     members: dict[tuple, dict[tuple, dict]] = defaultdict(lambda: defaultdict(dict))
     labels: dict[tuple, str] = {}
     for metric, period, months, key, label, value, *member in rows:
+        if NON_SEGMENT_LABEL.match(key):  # X250
+            continue
         per = members[metric][(period, months, key)]
         per.setdefault(member[0] if member else key, value)
         labels.setdefault((period, months, key), label)
@@ -527,13 +540,18 @@ def row_columns(row: dict, more: dict | None, hist: dict | None, bars, factors, 
 
 
 def add_columns(con, rows: list[dict], as_of: date, as_of_ts: datetime, fundamentals: dict, factors, frozen,
-                entities=None, exchange: str = "NSE", prices=None) -> None:  # fmt: skip
+                entities=None, exchange: str = "NSE", prices=None, cross: bool = True) -> None:  # fmt: skip
     """The features.compute_rows hook: batched reads, each row's columns, then the cross-section, in place. With the
-    run's `price_history.PriceHistory` (`prices`) the price columns are sliced from it (the same values)."""
+    run's `price_history.PriceHistory` (`prices`) the price columns are sliced from it (the same values). `cross=False`:
+    no cross-section (as features_gems.add_columns)."""
     from financials.features_price import index_closes
 
     secs = None if entities is None else {r["security_id"] for r in rows}
-    hist = valuation_history(con, as_of, secs)
+    run = prices.fundamentals if prices is not None else None
+    if run is not None:  # one read per quarter of the run (features.FundamentalsCache.per_quarter)
+        hist = run.per_quarter("more_valuation", as_of, secs, lambda: valuation_history(con, as_of, secs))
+    else:
+        hist = valuation_history(con, as_of, secs)
     bars = {} if prices is not None else load_bars(con, exchange, as_of, secs)
     index = prices.index if prices is not None else index_closes(con, as_of)
     events = index_events(con, as_of, secs)
@@ -545,7 +563,8 @@ def add_columns(con, rows: list[dict], as_of: date, as_of_ts: datetime, fundamen
         row.update(row_columns(row, fund.get("_more"), hist.get(sec), bars.get(sec, []), factors.get(sec, []),
                                frozen.get(sec), index, events, actions.get(sec),
                                segments.get((ent, row.get("scope_used"))), prices))  # fmt: skip
-    cross_section(rows)
+    if cross:
+        cross_section(rows)
 
 
 def _representatives(rows: list[dict]) -> list[dict]:
@@ -583,33 +602,40 @@ CROSS_INPUTS = ("security_id", "entity_id", "market_cap", "nse_industry", "core_
 
 def refresh_cross_section(con, as_of: date) -> None:
     """Recompute CROSS_COLUMNS for every stored row of `as_of` (inside the materialize transaction, after the day's
-    rows are written): one read of the history view, one UPDATE of features_daily (CROSS_COLUMNS are DAILY columns,
-    tests/test_features_store.py) through Arrow."""
+    rows are written)."""
+    refresh_cross_sections(con, [as_of])
+
+
+def refresh_cross_sections(con, days) -> None:
+    """Recompute CROSS_COLUMNS for every stored row of each of `days`, each day's cross-section from that day's rows
+    alone, in security order (inside the materialize transaction, after the days' rows are written): one read of the
+    history view, one UPDATE of features_daily (CROSS_COLUMNS are DAILY columns, tests/test_features_store.py)
+    through Arrow, for all the days (a full run publishes many days per transaction, features.materialize_days)."""
     import pyarrow as pa
 
-    from financials.db import fetch_dicts
+    from financials.features_store import stored_days
 
-    rows = fetch_dicts(con, f"SELECT {', '.join(CROSS_INPUTS)} FROM screener_features_history WHERE as_of_date = ? "
-                       "ORDER BY security_id",
-                       [as_of])  # fmt: skip
+    rows = []
+    for day, day_rows in stored_days(con, CROSS_INPUTS, days):
+        cross_section(day_rows)
+        rows += [{**r, "as_of_date": day} for r in day_rows]
     if not rows:
         return
-    cross_section(rows)
     fields = [
+        pa.field("as_of_date", pa.date32()),
         pa.field("security_id", pa.string()),
         pa.field("rs_rank_12m_1m", pa.float64()),
         pa.field("industry_earnings_breadth", pa.float64()),
         pa.field("industry_earnings_breadth_n", pa.int32()),
     ]
-    table = pa.Table.from_pylist([{c: r[c] for c in ("security_id", *CROSS_COLUMNS)} for r in rows],
+    table = pa.Table.from_pylist([{c: r[c] for c in ("as_of_date", "security_id", *CROSS_COLUMNS)} for r in rows],
                                  schema=pa.schema(fields))  # fmt: skip
     con.register("_more_cross", table)
     try:
         sets = ", ".join(f"{c} = s.{c}" for c in CROSS_COLUMNS)
         con.execute(
             f"UPDATE features_daily h SET {sets} FROM _more_cross s "  # DAILY columns (features_store)
-            "WHERE h.as_of_date = ? AND h.security_id = s.security_id",
-            [as_of],
+            "WHERE h.as_of_date = s.as_of_date AND h.security_id = s.security_id"
         )
     finally:
         con.unregister("_more_cross")

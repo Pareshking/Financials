@@ -301,6 +301,56 @@ OVERRIDES: dict[tuple[str, str], str] = {
     ("REG34_ANNUAL", "IncomeExportIncentives"): "ANNUAL_INCOME_DETAIL",
     ("REG34_ANNUAL", "RevenueFromInterest"): "ANNUAL_INCOME_DETAIL",
     ("REG34_ANNUAL", "MATCreditRecognisedDuringYear"): "ANNUAL_TAX_NOTE",
+    # QF5 (BLUSPRING first annual report): Ind AS 12 tax-note and Ind AS 33 share-count lines
+    (
+        "REG34_ANNUAL",
+        "TaxBenefitArisingFromPreviouslyUnrecognisedTaxLossTaxCreditOrTemporaryDifferenceOfPriorPeriod"
+        "UsedToReduceCurrentTaxExpense",
+    ): "ANNUAL_TAX_NOTE",
+    (
+        "REG34_ANNUAL",
+        "TaxBenefitArisingFromPreviouslyUnrecognisedTaxLossTaxCreditOrTemporaryDifferenceOfPriorPeriod"
+        "UsedToReduceDeferredTaxExpense",
+    ): "ANNUAL_TAX_NOTE",
+    (
+        "REG34_ANNUAL",
+        "TaxExpenseIncomeRelatingToChangesInAccountingPoliciesAndErrorsIncludedInProfitOrLoss",
+    ): "ANNUAL_TAX_NOTE",
+    ("REG34_ANNUAL", "DilutiveEffectOfConvertibleInstrumentsOnNumberOfOrdinaryShares"): "PER_SHARE_DUPLICATE",
+    # Seen first in the X150-X155 fixtures (Choice International, Premier Energies, Siemens Energy India FY25).
+    ("REG34_ANNUAL", "CateringCanteenExpenses"): "ANNUAL_EXPENSE_DETAIL",
+    ("REG34_ANNUAL", "SeminarsConferenceExpenses"): "ANNUAL_EXPENSE_DETAIL",
+    ("REG34_ANNUAL", "ReclassificationAdjustmentsOnExchangeDifferencesOnTranslationNetOfTax"): "OCI_SUBLINE",
+    # Ind AS 7.40: consideration paid / received on obtaining or losing control of subsidiaries.
+    ("REG34_ANNUAL", "ConsiderationPaidReceived"): "CASH_FLOW_DETAIL",
+    # Seen first in the QP3 fixtures: TD Power Systems FY26 (other-expenses note), Vintage Coffee FY26 (inventories
+    # carried at net realisable value, Ind AS 2.36(c)).
+    ("REG34_ANNUAL", "BooksPeriodicals"): "ANNUAL_EXPENSE_DETAIL",
+    ("REG34_ANNUAL", "InventoriesAtNetRealisableValue"): "BALANCE_SHEET_DETAIL",
+    # Seen first in the QT fixtures (NYKAA / MPSLTD FY26 other-expenses notes).
+    ("REG34_ANNUAL", "AfterSalesServiceExpenses"): "ANNUAL_EXPENSE_DETAIL",
+    ("REG34_ANNUAL", "HireChargesAssetsContracts"): "ANNUAL_EXPENSE_DETAIL",
+    # Seen first in the QF4 fixtures (auditors' remuneration note: cost auditor, reimbursement of expenses).
+    ("REG34_ANNUAL", "PaymentToCostAuditorForReimbursementOfExpenses"): "ANNUAL_EXPENSE_DETAIL",
+    # IGAAP_CORP (QG, X331): Schedule III Division I balance-sheet components of the mapped totals (shareholders'
+    # funds, non-current / current liabilities and assets); the tangible + intangible subtotal of mapped lines.
+    **{
+        ("IGAAP_CORP", e): "BALANCE_SHEET_DETAIL"
+        for e in (
+            "ForeignCurrencyMonetaryItemTranslationDifferenceAssetAccount",
+            "ForeignCurrencyMonetaryItemTranslationDifferenceLiabilityAccount",
+            "LongTermLoansAndAdvances",
+            "LongTermProvisions",
+            "MoneyReceivedAgainstShareWarrants",
+            "OtherLongTermLiabilities",
+            "PreproducingProperties",
+            "ProducingProperties",
+            "ShareApplicationMoneyPendingAllotment",
+            "ShortTermLoansAndAdvances",
+            "ShortTermProvisions",
+        )
+    },
+    ("IGAAP_CORP", "PropertyPlantAndEquipmentAndIntangibleAssets"): "DERIVED_SUBTOTAL",
 }
 
 

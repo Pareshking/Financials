@@ -64,7 +64,9 @@ def _csv_bytes(data: bytes) -> bytes:
     return data
 
 
-def parse_udiff_cm(data: bytes) -> list[BhavRow]:
+def parse_udiff_cm(data: bytes, *, exchange: str = "NSE") -> list[BhavRow]:
+    """NSE CM UDiFF; `exchange="BSE"` reads the BSE equity UDiFF bhavcopy, same columns, `Src` BSE, `FinInstrmId`
+    = BSE scrip code, `SctySrs` = BSE group [A16, X165]."""
     text = _csv_bytes(data).decode("utf-8-sig")
     reader = csv.DictReader(io.StringIO(text))
     missing = [c for c in REQUIRED_COLUMNS if c not in (reader.fieldnames or [])]
@@ -73,14 +75,14 @@ def parse_udiff_cm(data: bytes) -> list[BhavRow]:
     rows: list[BhavRow] = []
     trade_dates: set[date] = set()
     for i, r in enumerate(reader, start=2):
-        if r["Sgmt"] != "CM" or r["Src"] != "NSE":
+        if r["Sgmt"] != "CM" or r["Src"] != exchange:
             raise ParseError(f"line {i}: unexpected Sgmt/Src {r['Sgmt']}/{r['Src']}")
         try:
             close = to_price(parse_decimal(r["ClsPric"]))
             if close is None:
                 raise ParseError(f"line {i}: missing ClsPric")
             row = BhavRow(
-                exchange="NSE",
+                exchange=exchange,
                 trade_date=date.fromisoformat(r["TradDt"]),
                 fin_instrm_id=r["FinInstrmId"].strip() or None,
                 isin=r["ISIN"].strip(),

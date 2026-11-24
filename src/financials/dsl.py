@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
+from financials.db import table_columns
 from financials.timeutil import utc_now
 
 # alias (lower-case, single-spaced) -> (SQL over screener_features columns, unit note)
@@ -38,6 +39,14 @@ ALIASES: dict[str, tuple[str, str]] = {
     "book value per share": ("book_value_per_share", "INR per share, owners' equity / shares"),
     "net worth": ("(total_equity / 10000000)", "INR crore, total equity (latest H1/FY BS)"),
     "price to earning": ("pe", "x"),
+    # A1.12, Screener's definition (docs/changelog/Quarterly-PE, S24): current price / (EPS latest quarter x 4);
+    # NULL unless the quarter's EPS is positive, as pe
+    "price to quarterly earning": ("(CASE WHEN eps_latest_quarter > 0 THEN close / (4 * eps_latest_quarter) END)", "x"),
+    "price to quarterly earnings": (
+        "(CASE WHEN eps_latest_quarter > 0 THEN close / (4 * eps_latest_quarter) END)",
+        "x",
+    ),
+    "quarterly pe": ("(CASE WHEN eps_latest_quarter > 0 THEN close / (4 * eps_latest_quarter) END)", "x"),
     "pe": ("pe", "x"),
     "price to book value": ("pb", "x"),
     "pb": ("pb", "x"),
@@ -49,7 +58,7 @@ ALIASES: dict[str, tuple[str, str]] = {
     "roce": ("(roce * 100)", "%"),
     "roic": ("(roic * 100)", "%"),
     "croic": ("(croic * 100)", "%"),
-    "debt to equity": ("debt_to_equity", "x"),
+    "debt to equity": ("debt_to_equity", "x (lending NBFCs: borrowed funds / equity, X228; NULL for banks)"),
     "fcf yield": ("(fcff_yield * 100)", "% of EV (unlevered)"),
     "other income to pbt": ("(other_income_to_pbt * 100)", "%"),
     "altman z": ("altman_z_dd", "Z'' score"),
@@ -61,6 +70,8 @@ ALIASES: dict[str, tuple[str, str]] = {
     "cwip to gross block": ("(cwip_to_gross_block * 100)", "%"),
     "rote": ("(rote * 100)", "%"),
     "roce screener": ("(roce_screener * 100)", "% (Screener: PBT + interest over average capital)"),
+    "roe screener": ("(roe_screener * 100)", "% (Screener: last FY owners' profit over average owners' equity)"),
+    "return on equity screener": ("(roe_screener * 100)", "% (Screener: last FY profit / average equity)"),
     "debtor days": ("debtor_days", "days (closing debtors)"),
     "inventory turnover": ("inventory_turnover", "x (sales / closing inventory)"),
     "working capital": ("(working_capital / 10000000)", "Rs Cr (Other Assets - Other Liabilities)"),
@@ -85,7 +96,14 @@ ALIASES: dict[str, tuple[str, str]] = {
     "kmp resignations 90d": ("kmp_resignations_90d", "count"),
     "auditor resignations 90d": ("auditor_resignations_90d", "count"),
     "fraud default 90d": ("fraud_or_default_90d", "count"),
-    "penalties 90d": ("penalties_90d", "count (NULL: no verified penalty event yet)"),
+    "penalties 90d": ("penalties_90d", "count, Reg. 30 fines / penalties imposed in 90 days"),
+    "penalty amount 90d": ("(penalty_amount_90d / 10000000)", "Rs Cr, Reg. 30 fines / penalties in 90 days"),
+    "regulatory actions 90d": ("regulatory_actions_90d", "count, Reg. 30 actions taken or initiated in 90 days"),
+    "acquisitions 90d": ("acquisitions_90d", "count, Reg. 30 acquisitions in 90 days"),
+    "acquisition value 90d": ("(acquisition_value_90d / 10000000)", "Rs Cr, Reg. 30 acquisition cash consideration"),
+    "upper circuit days": ("upper_circuit_days_20d", "count, closes at the upper band in 20 sessions"),
+    "lower circuit days": ("lower_circuit_days_20d", "count, closes at the lower band in 20 sessions"),
+    "band hit days": ("band_hit_days_20d", "count, sessions touching a price band in 20 sessions"),
     "contingent liabilities to net worth": ("(contingent_liabilities_to_net_worth * 100)", "%"),
     "return 1m": ("(return_1m * 100)", "%"),
     "return 3m": ("(return_3m * 100)", "%"),
@@ -473,6 +491,31 @@ def _audit_aliases() -> dict[str, tuple[str, str]]:
 
 ALIASES.update(_audit_aliases())
 
+
+def _dq_aliases() -> dict[str, tuple[str, str]]:
+    """X325 (rule SHOW_AND_FLAG, owner decision V): screens include flagged rows by default; `Data Suspect = 0`
+    excludes them, `Data Flag <code> = 1` keeps only rows carrying one code (code words lower-case, spaces for
+    underscores and the colon, e.g. "Data Flag Open Finding Ytd Quarter Mismatch"). Missing flags read as 0."""
+    from financials.features import DQ_CODES, DQ_FINDING_REASONS
+
+    out = {
+        "data suspect": ("CAST(coalesce(dq_suspect, FALSE) AS INTEGER)", "1/0, any data-quality flag (X325)"),
+        "data open finding": (
+            "CAST(coalesce(dq_flags LIKE '%OPEN_FINDING:%', FALSE) AS INTEGER)",
+            "1/0, an open finding concerns the row's window (X325)",
+        ),
+    }
+    for code in (*DQ_CODES, *(f"OPEN_FINDING:{r}" for r in DQ_FINDING_REASONS)):
+        name = "data flag " + code.lower().replace("_", " ").replace(":", " ")
+        out[name] = (
+            f"CAST(coalesce(list_contains(string_split(dq_flags, ','), '{code}'), FALSE) AS INTEGER)",
+            f"1/0, row flagged {code} (X325)",
+        )
+    return out
+
+
+ALIASES.update(_dq_aliases())
+
 KEYWORDS = {"and", "or", "not"}
 COMPARATORS = {"<", "<=", ">", ">=", "=", "!="}
 NAME_RE = re.compile(r"^[a-z][a-z0-9 ]{0,62}$")
@@ -809,7 +852,10 @@ def run_screen(
             extra_cols.append((label, sql, params))
     select_params = [p for _, _, ps in extra_cols for p in ps]
     extra = ", ".join(f'{sql} AS "{label}"' for label, sql, _ in extra_cols)
-    select = "as_of_date, symbol, series, close" + (f", {extra}" if extra else "")
+    # X325: every match shows its data-quality flags (a database not yet upgraded has none to show)
+    table = "screener_features" if as_of is None else "screener_features_history"
+    dq = ", dq_suspect, dq_flags" if "dq_flags" in table_columns(con, table) else ""
+    select = "as_of_date, symbol, series, close" + dq + (f", {extra}" if extra else "")
     order, order_params = "symbol", []
     if order_by:
         ((_, order_sql, order_params),) = compile_columns([order_by], custom)

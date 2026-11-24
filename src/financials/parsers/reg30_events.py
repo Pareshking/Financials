@@ -6,11 +6,15 @@ Three event families are parsed (namespace path segment -> family):
   `ChangeInManagementAxis` [E5];
 - `Alteration_Of_Capital_And_Fund_Raising`: allotments of securities (ESOP, debt, ...) [E6];
 - `Announcement_For_Fraud_Or_Default`: fraud / default / arrest disclosures; no ISIN (symbol only) and the amount is
-  free text, never parsed into a number [E7].
-Other families (analyst meets, board outcomes, agreements, restructuring) are vaulted raw only [E2].
+  free text, never parsed into a number [E7];
+- `Action_Initiation_Or_Action_Taken_Or_Order_Passed` (`AIATOP_*.xml`, Para B sub-para 20): one record per action
+  taken (`REGULATORY_ACTION`) or initiated (`REGULATORY_ACTION_INITIATED`); the fine is `AmountOfFineOrPenalty`
+  (X360, E12);
+- `Regulation_30_Restructuring` (`REG30_Restructuring_*.xml`): one acquisition, incorporation or sale / disposal per
+  filing; the amount is the cash consideration (X360, E13).
+Other families (analyst meets, board outcomes, agreements) are vaulted raw only [E2].
 
-Pure: bytes -> event rows. Amounts are absolute rupees (unit INR). Penalties / regulatory actions: no filing of
-that kind has been observed, so no event type exists for them (UNVERIFIED [E7]).
+Pure: bytes -> event rows. Amounts are absolute rupees (unit INR).
 """
 
 from __future__ import annotations
@@ -28,6 +32,8 @@ FAMILIES = {
     "Changes_In_Management": "CHANGE_IN_MANAGEMENT",
     "Alteration_Of_Capital_And_Fund_Raising": "FUND_RAISING",
     "Announcement_For_Fraud_Or_Default": "FRAUD_OR_DEFAULT",
+    "Action_Initiation_Or_Action_Taken_Or_Order_Passed": "REGULATORY_ACTION",
+    "Regulation_30_Restructuring": "RESTRUCTURING",
 }
 NOT_APPLICABLE = {"NOT APPLICABLE", "NA", "N.A.", "NIL", "-"}
 
@@ -97,7 +103,8 @@ def parse_reg30_event(data: bytes) -> ParsedEvents:
         out.issues.append(EventIssue("PARSE", "MISSING_META", {k: str(v) for k, v in out.meta.items()}))
         return out
     handlers = {"PARA_B": _para_b, "CHANGE_IN_MANAGEMENT": _cim, "FUND_RAISING": _fund_raising,
-                "FRAUD_OR_DEFAULT": _fraud}  # fmt: skip
+                "FRAUD_OR_DEFAULT": _fraud, "REGULATORY_ACTION": _regulatory_action,
+                "RESTRUCTURING": _restructuring}  # fmt: skip
     handlers[family](main, records, out)
     # Zero-drop (C24): every numeric element of the filing is kept on its event rows' details.
     numeric = {}
@@ -240,6 +247,93 @@ def _fraud(main: dict, records: dict, out: ParsedEvents) -> None:
             "details": {
                 "stage": main.get("TypeOfEventOfFraudOrDefaults"),
                 "amount_text": main.get("EstimatedAmountInvolvedInFraudOrDefaultOrArrestWasUnearthingOrOccurred"),
+            },
+        }
+    )
+
+
+def _regulatory_action(main: dict, records: dict, out: ParsedEvents) -> None:
+    """X360 (E12): one event per `ActionsTaken<n>` / `ActionsInitiated<n>` record; the persons-against sub-records
+    (`..._PersonsAgainstWhom...<n>`) and signatories are details, not events."""
+    for key, rec in sorted(records.items()):
+        if "|" in key:
+            continue
+        for word, event_type in (("Taken", "REGULATORY_ACTION"), ("Initiated", "REGULATORY_ACTION_INITIATED")):
+            kind = _val(rec, f"TypeOfActions{word}OrOrdersPassed")
+            if kind is None and f"Actions{word}OrOrdersPassedBy" not in rec:
+                continue
+            against = sorted(
+                {v for k2, r2 in records.items() if k2.startswith(key + "|")
+                 for v in [_val(r2, f"NameOfPersonAgainstWhomActions{word}OrOrdersPassed")] if v}
+            )  # fmt: skip
+            out.events.append(
+                {
+                    "record_key": key,
+                    "event_type": event_type,
+                    "event_subtype": _clean(kind),
+                    "occurred_on": _date(
+                        _val(rec, f"DateOfReceiptOfCommunicationReceivedForActions{word}OrOrdersPassed")
+                    )
+                    or out.meta["occurred_on"],
+                    "counterparty": _clean(_val(rec, f"NameOfAuthorityFromWhomActions{word}OrOrdersPassed")),
+                    "amount_inr": _money(rec.get("AmountOfFineOrPenalty")),
+                    "details": {
+                        "by": _val(rec, f"Actions{word}OrOrdersPassedBy"),
+                        "against": _val(rec, f"Actions{word}OrOrdersPassedAgainst"),
+                        "persons_against": against,
+                        "nature": _val(rec, f"NatureAndDetailsOfTheActions{word}OrOrdersPassed"),
+                        "period": _val(
+                            rec, f"PeriodForWhichCommunicationWouldBeApplicableForActions{word}OrOrdersPassed"
+                        ),
+                        "announcement": main.get("TypeOfAnnouncement"),
+                    },
+                }
+            )
+            break
+
+
+RESTRUCTURING_TYPES = {  # filed type -> (event type, cash consideration element, counterparty element)
+    "Acquisition (including agreement to acquire)": (
+        "ACQUISITION", "AmountOfCashConsiderationForAcquisitionEvent", "NameOfTheTargetEntity"),
+    "Acquisition of \u201cto be incorporated companies\u201d": (
+        "INCORPORATION", "AmountOfCashConsiderationForIncorporation", "NameOfTheIncorporatedEntity"),
+    "Sale or disposal of unit(s)/division(s)/subsidiary": (
+        "SALE_OR_DISPOSAL", None, "NameOfUnitOrDivisionOrSubsidiaryOfTheListedEntity"),
+}  # fmt: skip
+
+
+def _restructuring(main: dict, records: dict, out: ParsedEvents) -> None:
+    """X360 (E13): one event per filing, all facts in non-dimensional contexts; `Update` filings restate an earlier
+    announcement (kept as their own event, flagged in details). Unknown event types become RESTRUCTURING_OTHER."""
+    raw = {k: v for k, v in main.items()}
+    for rec in records.values():  # the unit / division name sits in a typed context (sale or disposal)
+        for k, (v, _) in rec.items():
+            raw.setdefault(k, v)
+    kind = main.get("TypeOfEventOfAnnouncementPertainingToRegulation30Restructuring")
+    event_type, amount_el, name_el = RESTRUCTURING_TYPES.get(kind or "", ("RESTRUCTURING_OTHER", None, None))
+    if kind is None and main.get("TypeOfAnnouncementPertainingToRegulation30Restructuring") == "Update":
+        event_type = "RESTRUCTURING_UPDATE"  # an update names no event type: never counted as a new acquisition
+    amount = None
+    if amount_el and raw.get(amount_el) is not None:
+        try:
+            amount = Decimal(raw[amount_el])
+        except ArithmeticError:
+            amount = None
+    out.events.append(
+        {
+            "record_key": "MAIN",
+            "event_type": event_type,
+            "event_subtype": kind,
+            "occurred_on": out.meta["occurred_on"],
+            "counterparty": _clean(raw.get(name_el)) if name_el else None,
+            "amount_inr": amount,
+            "details": {
+                "announcement": main.get("TypeOfAnnouncementPertainingToRegulation30Restructuring"),
+                "consideration": main.get("NatureOfConsiderationForAcquisitionEvent"),
+                "control_acquired": main.get("PercentageOfControlAcquired"),
+                "related_party": main.get("WhetherTheAcquisitionWouldFallWithinRelatedPartyTransactions"),
+                "industry": main.get("IndustryToWhichTheEntityBeingAcquiredBelongs"),
+                "share_exchange_ratio": main.get("ShareExchangeRatioForAcquisitionEvent"),
             },
         }
     )

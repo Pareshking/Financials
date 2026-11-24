@@ -23,8 +23,9 @@ from financials import PARSER_VERSION, dirty
 from financials.corp_actions import ACCEPTED_STATUSES, CorpAction, adjust_closes, audit_day, verify_group
 from financials.db import fetch_dicts, insert_rows, version_key
 from financials.fundamentals import CURRENT_VERSION
-from financials.identity import UNIVERSE_SERIES, Interval, SecurityRegistry
+from financials.identity import UNIVERSE_SERIES, Interval, SecurityRegistry, rights_entitlement_sql
 from financials.ids import stable_id
+from financials.money import ROUNDING_UNITS
 from financials.parsers.udiff import BhavRow
 from financials.scope import MIN_PERIOD_END_DATE, MIN_TRADE_DATE, financials_in_scope, market_in_scope
 from financials.staging import read_manifest, read_table
@@ -70,6 +71,9 @@ def promote(con: duckdb.DuckDBPyConnection, stage_dir: Path) -> PromotionResult:
         "index_close": _promote_vault_and_raw,
         "equity_master": _promote_vault_and_raw,
         "classification": _promote_classification,
+        "mcap_day": _promote_mcap_day,
+        "price_bands": _promote_price_bands,
+        "bse_securities": _promote_bse_securities,
     }.get(job)
     if handler is None:
         raise ValueError(f"unknown job {job!r}")
@@ -301,6 +305,7 @@ def _promote_market_day(con, stage_dir: Path, manifest: dict[str, Any]) -> Promo
     quarantined += _audit_gaps(con, exchange, trade_date, obs)
     resolve_market_moves(con)
     resolve_isin_changes(con, exchange)
+    resolve_rights_entitlement_gaps(con)
     closed = close_inactive_securities(con, exchange, trade_date)
     message = str(trade_date) + (f", {closed} inactive securities closed" if closed else "")
     return PromotionResult("PROMOTED", "market_day", message=message, quarantined=quarantined)
@@ -396,6 +401,38 @@ def resolve_market_moves(con) -> int:
     return len(rows)
 
 
+# X140 (live backfill 2024-10 .. 2026-11): 87 of the 104 gap findings left after CA12 / CA13 were rights entitlements
+# (RE): a temporary instrument that carries the right to subscribe a rights issue, traded for a few sessions and then
+# deactivated (SEBI circular SEBI/HO/CFD/DIL2/CIR/P/2020/13, 22 Jan 2020: separate ISIN, secondary-market trading,
+# ISIN permanently deactivated after allotment). NSE lists it with the parent's issuer code, security-type code 20
+# (ISIN chars 8-9) and symbol <prefix>-RE[n] (fixture: SHIVAM-RE1 INE637H20024 beside SHIVAMAUTO INE637H01024). No
+# split, bonus or other share-count event ever applies to an RE, so its gaps are market moves (worthless-or-not
+# pricing of a right with days to live, penny ticks: 0.02 -> 0.03 is +50%). Both markers and an equity listing of
+# the same issuer are required; nothing else is touched.
+RIGHTS_ENTITLEMENT_NOTE = "rights entitlement: no share-count event applies, market move [X140]"
+
+
+def resolve_rights_entitlement_gaps(con) -> int:
+    """Named rule X140: close open UNEXPLAINED_GAP findings of rights entitlements (ISIN security-type 20, symbol
+    ending -RE or -RE<n>, an equity ISIN of the same issuer with type 01 in the identifier history) as FIXED_BY_RULE.
+    One batched statement."""
+    rows = con.execute(
+        """UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ?
+           WHERE quarantine_id IN (
+             SELECT q.quarantine_id FROM quarantine_queue q
+             JOIN security_identifier_history h ON h.security_id = q.security_id
+                  AND h.valid_from <= CAST(json_extract_string(q.details, '$.trade_date') AS DATE)
+                  AND (h.valid_to IS NULL OR h.valid_to > CAST(json_extract_string(q.details, '$.trade_date') AS DATE))
+             WHERE q.stage = 'GAP' AND q.reason_code = 'UNEXPLAINED_GAP' AND q.resolved_at IS NULL
+               AND """
+        + rights_entitlement_sql("h")
+        + """)
+           RETURNING 1""",
+        [utc_now(), RIGHTS_ENTITLEMENT_NOTE],
+    ).fetchall()
+    return len(rows)
+
+
 # CA13 (live backfill): 15 ETF units (INF ISINs) changed ISIN with an opening price at ~1/10 or ~1/100 of the previous
 # close (GROWWGOLD 2026-02-06: -0.903; LICMFGOLD 2026-03-06: -0.99): unit splits, absent from the equities
 # corporate-action feed. And a re-ISIN without price effect (HDFCLIQUID 2025-02-28: gap 0.0) has nothing to adjust.
@@ -448,7 +485,8 @@ INACTIVITY_TRADING_DAYS = 20  # CHOICE: an open interval with no bar in the last
 def close_inactive_securities(con, exchange: str, as_of: date, threshold: int | None = None) -> int:
     """P1-11: close the open identifier interval of a security that has not traded in the last `threshold`
     promoted sessions (delisted, merged, suspended, moved to a series outside the universe). valid_to = the day
-    after its last bar. A security that trades again reopens through its FinInstrmId (identity.py)."""
+    after its last bar. A security that trades again reopens through its FinInstrmId, or, back in another series
+    with a new FinInstrmId, through the ISIN of its latest interval (rule X320, identity.py)."""
     n = INACTIVITY_TRADING_DAYS if threshold is None else threshold
     recent = [r[0] for r in con.execute(
         "SELECT DISTINCT trade_date FROM ohlcv WHERE exchange = ? AND trade_date <= ? ORDER BY 1 DESC LIMIT ?",
@@ -551,6 +589,7 @@ def _actions(con, where: str, params: list[Any]) -> list[CorpAction]:
             ratio_den=r["ratio_den"],
             issue_price=r["issue_price"],
             cash_per_share=r["cash_per_share"],
+            issue_price_floor=r.get("issue_price_floor"),
             status=r["status"],
             price_factor=None if r["price_factor"] is None else Decimal(str(r["price_factor"])),
             eps_factor=None if r["eps_factor"] is None else Decimal(str(r["eps_factor"])),
@@ -584,6 +623,7 @@ def record_corp_action(
                 "ratio_den": action.ratio_den,
                 "issue_price": action.issue_price,
                 "cash_per_share": action.cash_per_share,
+                "issue_price_floor": action.issue_price_floor,
                 "status": status,
                 "source_filing_id": source_filing_id,
                 "recorded_at": utc_now(),
@@ -785,6 +825,76 @@ def resolve_unregistered_isin(
     return [sec]
 
 
+ISIN_ONE_CHAR_RULE = "ISIN_ONE_CHAR_SYMBOL_NAME_MATCH"
+_LEADING_ARTICLE = re.compile(r"^THE\s+")
+_TRAILING_SUFFIX = re.compile(r"(LIMITED|LTD)$")
+
+
+def compact_name(name: str | None) -> str:
+    """X336: a company name reduced to its letters and digits, upper case, without a leading THE and a trailing
+    LIMITED / LTD: "J.KUMAR INFRAPROJECTS LIMITED" -> JKUMARINFRAPROJECTS, exchange "JKUMAR INFR.LTD." -> JKUMARINFR,
+    "THE ANDHRA SUGARS LIMITED" and "ANDHRA SUGARS LTD" -> ANDHRASUGARS."""
+    s = _LEADING_ARTICLE.sub("", (name or "").upper().strip())
+    return _TRAILING_SUFFIX.sub("", re.sub(r"[^A-Z0-9]", "", s))
+
+
+def company_names_match(stated: str | None, legal: str | None) -> bool:
+    """X336: the filed company name matches the entity's (exchange, often abbreviated) name: names_agree (X88), or
+    the compact exchange name is the compact filed name or a prefix of it ("JKUMARINFR" of "JKUMARINFRAPROJECTS")."""
+    if names_agree(stated, legal):
+        return True
+    a, b = compact_name(stated), compact_name(legal)
+    return bool(a) and bool(b) and a.startswith(b)
+
+
+def _hamming1(a: str, b: str) -> bool:
+    return len(a) == len(b) and sum(x != y for x, y in zip(a, b, strict=True)) == 1
+
+
+def isin_one_char_match(con, exchange: str, isin: str | None, symbol: str | None, company_name: str | None,
+                        on_date: date) -> tuple[str, str, str] | None:  # fmt: skip
+    """The decision of rule ISIN_ONE_CHAR_SYMBOL_NAME_MATCH [X336] (read-only): (security_id, its ISIN, legal name)
+    or None. See resolve_isin_one_char."""
+    if not symbol or not isin:
+        return None
+    if con.execute("SELECT count(*) FROM security_identifier_history WHERE isin = ?", [isin]).fetchone()[0]:
+        return None
+    rows = con.execute(
+        "SELECT DISTINCT h.security_id, h.isin, e.legal_name FROM security_identifier_history h "
+        "JOIN securities s USING (security_id) JOIN entity_master e USING (entity_id) WHERE h.exchange = ? "
+        "AND h.symbol = ? AND h.valid_from <= ? AND (h.valid_to IS NULL OR h.valid_to > ?)",
+        [exchange, symbol, on_date, on_date],
+    ).fetchall()
+    if len(rows) != 1:
+        return None
+    sec, actual, legal = rows[0]
+    if not _hamming1(isin, actual) or not company_names_match(company_name, legal):
+        return None
+    return sec, actual, legal
+
+
+def resolve_isin_one_char(
+    con, exchange: str, isin: str, symbol: str | None, company_name: str | None, on_date: date, filing_id: str
+) -> list[str]:
+    """Rule ISIN_ONE_CHAR_SYMBOL_NAME_MATCH [X336], in the X88 family: the stated ISIN belongs to no security we know
+    (any exchange, any time), the stated symbol held exactly one ISIN on `on_date` (no any-interval fallback), the
+    stated ISIN differs from it in exactly one character (Hamming distance 1), and the filed company name matches
+    the entity's name (company_names_match). J. Kumar Infraprojects files INE576101022 (digit 1 for the letter I of
+    INE576I01022, 10 results filings Q4 FY25..Q1 FY27); Andhra Sugars Q4 FY26 files INE715N01021 for INE715B01021.
+    X81 (O / 0, adjacent swap) and X88 (same issuer code or names_agree) do not cover them: the typo is inside the
+    issuer code and the exchange name is abbreviated ("JKUMAR INFR.LTD.") or lacks the filed "THE". Anything else
+    stays quarantined. Logged in admin_log; raw keeps the ISIN as sent (invariant 3)."""
+    hit = isin_one_char_match(con, exchange, isin, symbol, company_name, on_date)
+    if hit is None:
+        return []
+    sec, actual, _ = hit
+    params = json.dumps({"filing_id": filing_id, "stated_isin": isin, "symbol": symbol, "isin": actual,
+                         "security_id": sec, "company_name": company_name}, sort_keys=True)  # fmt: skip
+    row = [stable_id("adm", ISIN_ONE_CHAR_RULE, params), "RULE:" + ISIN_ONE_CHAR_RULE, params, "X336", utc_now()]
+    con.execute("INSERT OR IGNORE INTO admin_log VALUES (?, ?, ?, NULL, ?, ?)", row)
+    return [sec]
+
+
 ISIN_OF_OTHER_ISSUER_RULE = "ISIN_OF_OTHER_ISSUER"
 
 
@@ -893,6 +1003,7 @@ def _promote_corp_actions(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
             ratio_den=r["ratio_den"],
             issue_price=r["issue_price"],
             cash_per_share=r["cash_per_share"],
+            issue_price_floor=r.get("issue_price_floor"),
         )
         unparsed = r["parse_status"] == "UNPARSED"
         if not unparsed:
@@ -923,6 +1034,7 @@ def _promote_corp_actions(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
             )
         recorded += 1
     _requeue_orphaned(con)
+    _requeue_rights_above_market(con)
     verify_pending_actions(con, exchange)
     resolve_market_moves(con)
     message = f"{recorded} actions" + (f", {skipped} before {MIN_TRADE_DATE} skipped" if skipped else "")
@@ -935,10 +1047,11 @@ def _upgrade_unparsed(con, action: CorpAction) -> None:
     verification, and its UNPARSED_PURPOSE finding closes [CA11]. Manual decisions (SUPERSEDED, REJECTED) stand."""
     hit = con.execute(
         "UPDATE corp_actions SET action_type = ?, ratio_num = ?, ratio_den = ?, issue_price = ?, cash_per_share = ?, "
-        "status = 'PENDING', price_factor = NULL, eps_factor = NULL, observed_gap = NULL, decided_at = NULL "
+        "issue_price_floor = ?, status = 'PENDING', price_factor = NULL, eps_factor = NULL, observed_gap = NULL, "
+        "decided_at = NULL "
         "WHERE action_id = ? AND action_type = 'UNKNOWN' AND status = 'QUARANTINED' RETURNING 1",
         [action.action_type, action.ratio_num, action.ratio_den, action.issue_price, action.cash_per_share,
-         action.action_id],
+         action.issue_price_floor, action.action_id],
     ).fetchall()  # fmt: skip
     if hit:
         con.execute(
@@ -968,6 +1081,15 @@ def _retire_ignored(con, action_id: str) -> None:
         )
     if hit:
         _requeue_siblings(con, action_id)
+
+
+def _requeue_rights_above_market(con) -> None:
+    """RIGHTS_AT_OR_ABOVE_MARKET (X356): rights decided before the rule with a price factor above 1 (issue price above
+    the cum-rights close) go back to PENDING and are re-verified at factor 1. Manual decisions stand; idempotent."""
+    con.execute(
+        "UPDATE corp_actions SET status = 'PENDING', price_factor = NULL, eps_factor = NULL, observed_gap = NULL, "
+        "decided_at = NULL WHERE action_type = 'RIGHTS' AND status IN ('VERIFIED', 'UNOBSERVABLE') AND price_factor > 1"
+    )
 
 
 def _requeue_orphaned(con) -> None:
@@ -1093,23 +1215,50 @@ def audit_ytd_identity(con, pairs: Iterable[tuple[str, str]]) -> list[str]:
     filing that restores the identity is the only fix."""
     from financials.fundamentals import YTD_GUARDED_TAGS, load_factbook
 
-    rows, pairs = [], list(pairs)
+    rows, pairs, rule_notes = [], list(pairs), {}
     for entity_id, scope in pairs:
         book = load_factbook(con, entity_id, scope, datetime(9999, 12, 31))
         for tag in sorted(YTD_GUARDED_TAGS):
             for b in book.ytd_breaks(tag):
                 rows.append(_quarantine_row(stage="CONSISTENCY", reason_code="YTD_QUARTER_MISMATCH",
                                             entity_id=entity_id, details={"scope": scope, **b}))  # fmt: skip
+            # X260 / X314: the id the finding had, to name the rule when closing it
+            ruled = ((ROUNDING_ONLY_NOTE, book.ytd_rounding_only), (NET_LINE_SIDE_NOTE, book.ytd_net_line_side))
+            for note, found in ((n, f(tag)) for n, f in ruled):
+                for b in found:
+                    row = _quarantine_row(stage="CONSISTENCY", reason_code="YTD_QUARTER_MISMATCH",
+                                          entity_id=entity_id, details={"scope": scope, **b})  # fmt: skip
+                    rule_notes[row["quarantine_id"]] = note
         for b in book.tax_copied:  # X94: already withheld by load_factbook; the finding makes it visible
             rows.append(_quarantine_row(stage="CONSISTENCY", reason_code="TAX_COPIED_FROM_PRIOR_YEAR",
                                         entity_id=entity_id, details={"scope": scope, **b}))  # fmt: skip
-    _close_stale_ytd_findings(con, pairs, {r["quarantine_id"] for r in rows})
+    _close_stale_ytd_findings(con, pairs, {r["quarantine_id"] for r in rows}, rule_notes=rule_notes)
     return _quarantine_many(con, rows) if rows else []
 
 
-def _close_stale_ytd_findings(con, pairs: list[tuple[str, str]], current: set[str]) -> None:
+ROUNDING_ONLY_NOTE = (
+    "ROUNDING_ONLY [X260]: the difference is within the rounding of the figures compared (half a unit of the "
+    "coarser LevelOfRounding per rounded figure)"
+)
+NET_LINE_SIDE_NOTE = (
+    "NBFC_NET_LINE_SIDE [X314]: the identity holds with every period's net loss on fair value changes / on "
+    "derecognition netted against revenue; the NBFC template shows that net result in revenue in a period with a net "
+    "gain and in expenses in a period with a net loss, so revenue and total income are not additive across periods"
+)
+
+
+def _close_stale_ytd_findings(
+    con,
+    pairs: list[tuple[str, str]],
+    current: set[str],
+    rounding_only: set[str] = frozenset(),
+    rule_notes: dict[str, str] | None = None,
+) -> None:
     """An open YTD_QUARTER_MISMATCH of an audited (entity, scope) that the audit no longer raises is closed: a
-    corrected filing or a later rule (X82: a non-FY-start duration is not a YTD) removed the break."""
+    corrected filing or a later rule (X82: a non-FY-start duration is not a YTD) removed the break. One whose
+    difference is a rounding difference (`rounding_only`, rule X260) or that another named rule explains
+    (`rule_notes`: id -> note, X314) is closed with a note naming the rule."""
+    notes = {q: ROUNDING_ONLY_NOTE for q in rounding_only} | dict(rule_notes or {})
     if not pairs:
         return
     open_rows = con.execute(
@@ -1120,11 +1269,37 @@ def _close_stale_ytd_findings(con, pairs: list[tuple[str, str]], current: set[st
     audited = set(pairs)
     stale = [q for q, e, s in open_rows if (e, s) in audited and q not in current]
     if stale:
-        con.execute(
-            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', "
-            "resolution_note = 'consistency holds on re-audit' WHERE quarantine_id IN (SELECT unnest(?))",
-            [utc_now(), stale],
-        )
+        by_note: dict[str, list[str]] = {}
+        for q in stale:
+            by_note.setdefault(notes.get(q, "consistency holds on re-audit"), []).append(q)
+        now = utc_now()
+        for note, ids in sorted(by_note.items()):
+            con.execute(
+                "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ? "
+                "WHERE quarantine_id IN (SELECT unnest(?))",
+                [now, note, sorted(ids)],
+            )
+
+
+def _entities_by_staged_scrip_code(con, stage_dir: Path) -> list[tuple[str]]:
+    """Entities whose identifier rows hold the BSE scrip code a staged BSE results file states (its non-dimensional
+    `ScripCode`, rule SC0; codes filled by rule BSE1 from BSE's list of securities) [X265]."""
+    from financials import filing_checks as fc
+
+    path = Path(stage_dir) / "stg_disclosures.parquet"
+    if not path.exists():
+        return []
+    vals = {fc.scrip_code(v) for (v,) in con.execute(
+        "SELECT value_text FROM read_parquet(?) WHERE element = 'ScripCode' AND dimensions IS NULL",
+        [path.as_posix()]).fetchall()}  # fmt: skip
+    vals.discard(None)
+    if len(vals) != 1:
+        return []
+    return con.execute(
+        "SELECT DISTINCT s.entity_id FROM security_identifier_history h JOIN securities s USING (security_id) "
+        "WHERE h.exchange <> 'BSE' AND h.bse_scrip_code = ?",
+        [vals.pop()],
+    ).fetchall()
 
 
 def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
@@ -1155,6 +1330,9 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     ).fetchone()[0]:
         return PromotionResult("ALREADY_PROMOTED", "results_xbrl", message=fid)
 
+    # A BSE results file (Permitted member, X265) resolves through the NSE identifier rows of the same security, as
+    # BSE shareholding does (X170); with no ISIN match, by its filed ScripCode (codes of rule BSE1).
+    ix = "NSE" if filing["exchange"] == "BSE" else filing["exchange"]
     if meta["stated_isin"] is None and meta["accounting_profile"] == "REG34_ANNUAL":
         # Reg. 34 annual XBRL carries no ISIN: the symbol in the NSE file name, resolved on the broadcast date (the
         # file is named when it is filed), plus the filed CIN when the entity has one on record [X70].
@@ -1173,16 +1351,18 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
         ent = con.execute(
             "SELECT DISTINCT s.entity_id FROM security_identifier_history h "
             "JOIN securities s USING (security_id) WHERE h.exchange = ? AND h.isin = ?",
-            [filing["exchange"], meta["stated_isin"]],
+            [ix, meta["stated_isin"]],
         ).fetchall()
         if not ent:
-            typo = resolve_isin_typo(con, filing["exchange"], meta["stated_isin"], meta["stated_symbol"],
-                                     meta["period_end"], fid)  # fmt: skip
-            typo = typo or resolve_unregistered_isin(con, filing["exchange"], meta["stated_isin"],
-                                                     meta["stated_symbol"], meta.get("company_name"),
-                                                     meta["period_end"], fid)  # fmt: skip
+            typo = resolve_isin_typo(con, ix, meta["stated_isin"], meta["stated_symbol"], meta["period_end"], fid)
+            typo = typo or resolve_unregistered_isin(con, ix, meta["stated_isin"], meta["stated_symbol"],
+                                                     meta.get("company_name"), meta["period_end"], fid)  # fmt: skip
+            typo = typo or resolve_isin_one_char(con, ix, meta["stated_isin"], meta["stated_symbol"],
+                                                 meta.get("company_name"), meta["period_end"], fid)  # fmt: skip
             ent = con.execute("SELECT entity_id FROM securities WHERE security_id IN (SELECT unnest(?))",
                               [typo]).fetchall()  # fmt: skip
+        if not ent and filing["exchange"] == "BSE":
+            ent = _entities_by_staged_scrip_code(con, stage_dir)
         reason = "UNKNOWN_ISIN" if not ent else "AMBIGUOUS_ISIN"
     ovr = filing_overrides(con, fid)
     conflict = None
@@ -1190,7 +1370,7 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
         ent = con.execute("SELECT entity_id FROM securities WHERE security_id = ?", [ovr["security_id"]]).fetchall()
     elif len(ent) == 1 and meta["stated_isin"] is not None:
         resolved, conflict = resolve_isin_symbol_conflict(
-            con, filing["exchange"], ent[0][0], meta["stated_symbol"], meta.get("company_name"), meta["period_end"], fid
+            con, ix, ent[0][0], meta["stated_symbol"], meta.get("company_name"), meta["period_end"], fid
         )
         ent = [(resolved,)] if resolved else []
         reason = "ISIN_SYMBOL_CONFLICT"
@@ -1273,7 +1453,7 @@ def _promote_results_xbrl(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
     insert_rows(con, "related_party_transactions", [{**r, "entity_id": entity_id, "visible_from_ts": visible}
                                                     for r in rpt], or_ignore=True)  # fmt: skip
     # Reg. 23(9) rows of a standalone Q2 / Q4 Integrated Filing [X115]: same entity, scope and visibility; never feed a
-    # ratio or a feature column (period coverage UNVERIFIED, R13).
+    # ratio or a feature column (half-year amounts, X160, but some filers put FY-to-date in Q4, X161).
     reg23 = read_table(con, stage_dir, "stg_reg23_rpt")
     insert_rows(con, "reg23_related_party_transactions", [{**r, "entity_id": entity_id, "visible_from_ts": visible}
                                                           for r in reg23], or_ignore=True)  # fmt: skip
@@ -1319,16 +1499,28 @@ def _filing_check_rows(con, fid: str, exchange: str, entity_id: str, meta: dict,
 
     rows = []
     if meta["accounting_profile"] == "REG34_ANNUAL":
-        diffs = fc.annual_prior_year_differences(
+        diffs, ctx = fc.annual_prior_year_comparison(
             con, filing_id=fid, parser_version=meta["parser_version"], entity_id=entity_id, scope=meta["scope"],
             fy_start=meta["fy_start"], level_of_rounding=meta["level_of_rounding"], visible_from_ts=visible,
         )  # fmt: skip
         if diffs:
-            details = {"scope": meta["scope"], "differences": diffs}
+            details = {"scope": meta["scope"], "differences": diffs, **fc.prior_year_class(diffs, ctx)}  # X182
             rows.append(_quarantine_row(stage="CONSISTENCY", reason_code=fc.PRIOR_YEAR_REASON, filing_id=fid,
                                         entity_id=entity_id, details=details))  # fmt: skip
-    conflicts = fc.apply_bse_scrip_code(con, exchange=exchange, entity_id=entity_id, isin=meta["stated_isin"],
-                                        symbol=meta["stated_symbol"], code=fc.filed_scrip_code(con, fid))  # fmt: skip
+    code = fc.filed_scrip_code(con, fid)
+    if exchange == "BSE":  # X265: BSE's own file states the code BSE lists; a different stored code is a finding
+        conflicts = [
+            {"security_id": sec, "valid_from": str(vf), "stored": old, "filed": code, "isin": meta["stated_isin"],
+             "symbol": sym}
+            for sec, vf, old, sym in con.execute(
+                "SELECT h.security_id, h.valid_from, h.bse_scrip_code, h.symbol FROM security_identifier_history h "
+                "JOIN securities s USING (security_id) WHERE s.entity_id = ? AND h.exchange <> 'BSE' AND h.isin = ? "
+                "ORDER BY h.security_id, h.valid_from", [entity_id, meta["stated_isin"]]).fetchall()
+            if code and fc.scrip_code(old) is not None and old != code
+        ]  # fmt: skip
+    else:
+        conflicts = fc.apply_bse_scrip_code(con, exchange=exchange, entity_id=entity_id, isin=meta["stated_isin"],
+                                            symbol=meta["stated_symbol"], code=code)  # fmt: skip
     for c in conflicts:
         rows.append(_quarantine_row(stage="IDENTIFIER", reason_code=fc.SCRIP_CONFLICT_REASON, filing_id=fid,
                                     entity_id=entity_id, security_id=c["security_id"], details=c))  # fmt: skip
@@ -1343,12 +1535,30 @@ def filing_overrides(con, filing_id: str) -> dict[str, str]:
     return dict(rows)
 
 
+# X313: BSE results XBRL vaulted raw only before its form was proven (NBFC plain XML) keeps the raw-only category and
+# no broadcast_ts in `filings` (append-only); the re-import that parses it stages the ledger's broadcast time, so its
+# visibility sits in filing_meta (visible_from_source BROADCAST). Readers of results filings take both categories,
+# and that broadcast time where the filings row has none.
+RESULTS_FILING_CATEGORIES = ("RESULTS_XBRL", "BSE_RESULTS_XBRL")
+RESULTS_CATEGORY_SQL = "f.category IN ('RESULTS_XBRL', 'BSE_RESULTS_XBRL')"
+FILING_BROADCAST_SQL = (
+    "coalesce(f.broadcast_ts, CASE WHEN f.category = 'BSE_RESULTS_XBRL' THEN (SELECT min(x.visible_from_ts) "
+    "FROM filing_meta x WHERE x.filing_id = f.filing_id AND x.visible_from_source = 'BROADCAST') END)"
+)
+FILING_BROADCAST_SOURCE_SQL = (
+    "CASE WHEN f.broadcast_ts IS NULL AND " + FILING_BROADCAST_SQL + " IS NOT NULL THEN 'API_CREATION' "
+    "ELSE f.broadcast_ts_source END"
+)
+
+
 def filings_with_later_visibility(con) -> list[str]:
     """Promoted results filings whose current visibility rule [X83] gives a later time than their latest
     filing_meta row (backdated re-filings). `restage --category RESULTS_XBRL --visibility` re-parses these."""
     rows = con.execute(
-        "SELECT m.filing_id, f.exchange, f.broadcast_ts, f.source_url, m.board_meeting_end_ts, m.visible_from_ts "
-        "FROM filing_meta m JOIN filings f USING (filing_id) WHERE f.category = 'RESULTS_XBRL' AND m.parser_version = "
+        "SELECT m.filing_id, f.exchange, " + FILING_BROADCAST_SQL + ", f.source_url, m.board_meeting_end_ts, "
+        "m.visible_from_ts FROM filing_meta m JOIN filings f USING (filing_id) WHERE "
+        + RESULTS_CATEGORY_SQL
+        + " AND m.parser_version = "
         "(SELECT arg_max(x.parser_version, " + version_key("x.parser_version") + ") FROM filing_meta x "
         "WHERE x.filing_id = m.filing_id) ORDER BY m.filing_id"
     ).fetchall()
@@ -1549,9 +1759,10 @@ def share_disagreement(con, entity_id: str, as_of: date) -> dict | None:
     ).fetchone()
     # Every results filing of the latest visibility (standalone and consolidated can both state paid-up capital);
     # the worst disagreement is reported, so the outcome does not depend on row order.
+    # X188: a count <= 0 is not a share count (paid-up capital tagged 0: ATLANTAELE Q1 FY27), as in features._preload.
     rows = con.execute(
-        "SELECT value_other, filing_id FROM fact_observations WHERE entity_id = ? AND canonical_tag = "
-        "'shares_from_paid_up' AND period_end = ? AND "
+        "SELECT value_other, filing_id, visible_from_ts FROM fact_observations WHERE entity_id = ? AND canonical_tag = "
+        "'shares_from_paid_up' AND period_end = ? AND value_other > 0 AND "
         + CURRENT_VERSION
         + " QUALIFY visible_from_ts = max(visible_from_ts) OVER () ORDER BY filing_id",
         [entity_id, as_of],
@@ -1563,10 +1774,32 @@ def share_disagreement(con, entity_id: str, as_of: date) -> dict | None:
         "SELECT max(shares) FROM shareholding_observations WHERE filing_id = ? AND category = 'EMPLOYEE_TRUSTS'",
         [shp[2]],
     ).fetchone()[0]
-    totals = [shp_total] + ([shp_total - Decimal(trust)] if trust else [])
-    diff, derived, res_filing = max(
-        (min(abs(t - Decimal(v)) / t for t in totals), Decimal(v), f) for v, f in rows
-    )  # fmt: skip
+    totals = treasury_totals(con, shp[2], shp_total, trust)
+    capital = _paid_up_capital(con, [f for _, f, _ in rows], as_of)
+    events = _share_events_after(con, entity_id, as_of)
+    worst = []
+    for v, f, vis in rows:
+        # X187: a split / bonus / consolidation with ex-date after the period end but before the results were
+        # published is already in the results' face value (Ind AS 33.64 restates EPS too), not in the Reg. 31 total.
+        # X211: or it is not: paid-up capital is a balance-sheet figure of the period end, so a filing (or a late
+        # re-send of it) stating the period-end face value agrees with the unadjusted total (AJMERA Q2 FY26 re-sent
+        # after its 1:5 split, Goldiam Q1 FY27 published before its 1:3 bonus went ex).
+        mult = Decimal(1)
+        for ex, eps_factor in events:
+            if ex <= vis.date():
+                mult /= eps_factor
+        expected = [t * mult for t in totals] + (totals if mult != 1 else [])
+        diff = min(abs(t - Decimal(v)) / t for t in expected)
+        if diff > SHARE_CROSS_CHECK_TOLERANCE and _within_rounding(capital.get(f), expected):
+            diff = Decimal(0)
+        worst.append((diff, Decimal(v), f, vis))
+    if max(worst)[0] > SHARE_CROSS_CHECK_TOLERANCE:
+        # X212: paid-up / face value may be a genuine count of a later date (an allotment after the period end, at or
+        # before the results); only the disagreeing filings are re-checked.
+        for i, (d, v, f, vs) in enumerate(worst):
+            if d > SHARE_CROSS_CHECK_TOLERANCE and _count_after_period_end(con, entity_id, as_of, v, vs):
+                worst[i] = (Decimal(0), v, f, vs)
+    diff, derived, res_filing, _ = max(worst)
     if diff <= SHARE_CROSS_CHECK_TOLERANCE:
         return None
     return {
@@ -1578,6 +1811,135 @@ def share_disagreement(con, entity_id: str, as_of: date) -> dict | None:
         "shp_filing": shp[2],
         "results_filing": res_filing,
     }
+
+
+TREASURY_TRUST_CATEGORY = "OTHER_NON_INSTITUTIONS"  # shareholding_major_holders rows of the "Others" axis [X213]
+
+
+def treasury_totals(con, shp_filing: str, total: Decimal, employee_trusts) -> list[Decimal]:
+    """The Reg. 31 total and the totals less the treasury shares it may contain. X103: shares of employee benefit
+    trusts (category EMPLOYEE_TRUSTS). X213 TRUST_HOLDERS_OUTSIDE_EMPLOYEE_TRUSTS: trusts holding the company's own
+    shares that the pattern names under non-institutions "Others" (the 'More than 1 percentage' rows of that axis);
+    Ind AS 32 deducts them from equity share capital as well. Digispice Q4 FY25 results PDF note 6: paid-up capital
+    7,008.69 lakhs, presented as 6,226.65 lakhs net of the shares of 'Independent Non Promoter Trust' and
+    'Independent Non Promoter (Spice Employee Benefit) Trust' (15,912,776 + 10,155,067 shares of Rs 3 = 782.04
+    lakhs). A total less these shares is a candidate only: it agrees only when paid-up / face value equals it
+    within the 0.5% tolerance."""
+    trusts = con.execute(
+        "SELECT sum(shares) FROM (SELECT DISTINCT row_member, holder_name, shares FROM shareholding_major_holders "
+        "WHERE filing_id = ? AND holder_category = ? AND regexp_matches(holder_name, '(?i)\\btrust\\b'))",
+        [shp_filing, TREASURY_TRUST_CATEGORY],
+    ).fetchone()[0]
+    return treasury_candidates(total, employee_trusts, trusts)
+
+
+def treasury_candidates(total: Decimal, employee_trusts, trusts) -> list[Decimal]:
+    """`treasury_totals` from the two trust holdings already read (share_capital reads them for many filings)."""
+    out = [total]
+    both = (employee_trusts or 0) + (trusts or 0) if employee_trusts and trusts else 0
+    for less in (employee_trusts, trusts, both):
+        if less and Decimal(less) < total and total - Decimal(less) not in out:
+            out.append(total - Decimal(less))
+    return out
+
+
+def _count_after_period_end(con, entity_id: str, as_of: date, derived: Decimal, visible: datetime) -> bool:
+    """X212 ALLOTMENT_BEFORE_RESULTS: a results filing may state paid-up capital after an allotment made after the
+    period end, at or before the board meeting that approved the results. Selan Q1 FY26: XBRL paid-up 35.16 Cr =
+    35,162,358 shares of Rs 10 after the allotment of 19,962,358 shares under its scheme of arrangement at the
+    results meeting of 12-Aug-2025 (Reg. 31 of that date), while the PDF prints the period-end 15.20 Cr. True when
+    paid-up / face value agrees (0.5%) with NSE's Issue Size (PR-zip) of the entity's EQ / BE / BZ securities on a
+    trading day from the last file on or before the period end through the results' visibility date, or with a Reg. 31
+    total dated after the period end and on or before that date (allotment-dated patterns: Orchid Pharma's re-filed
+    Q4 FY26 of 14-Aug-2026 after the allotment of 1-Aug-2026), or the first one dated after it. Market cap keeps the
+    period end's Reg. 31 total."""
+    tol = float(SHARE_CROSS_CHECK_TOLERANCE)
+    issue = con.execute(
+        "SELECT count(*) FROM raw_nse_mcap m JOIN security_identifier_history h ON h.exchange = m.exchange "
+        "AND h.symbol = m.symbol AND h.series = m.series AND h.valid_from <= m.trade_date "
+        "AND (h.valid_to IS NULL OR h.valid_to > m.trade_date) JOIN securities s ON s.security_id = h.security_id "
+        "WHERE s.entity_id = ? AND m.series IN (SELECT unnest(?)) AND m.trade_date <= ? AND m.trade_date >= "
+        "(SELECT coalesce(max(trade_date), CAST(? AS DATE)) FROM raw_nse_mcap WHERE trade_date <= ?) "
+        "AND abs(CAST(m.issue_size AS DOUBLE) - ?) <= ? * ?",
+        [entity_id, sorted(UNIVERSE_SERIES), visible.date(), as_of, as_of, float(derived), tol, float(derived)],
+    ).fetchone()[0]
+    if issue:
+        return True
+    later = con.execute(
+        "SELECT as_of_date, shares FROM shareholding_observations WHERE entity_id = ? AND category = 'TOTAL' "
+        "AND as_of_date > ? AND shares > 0 QUALIFY row_number() OVER (PARTITION BY as_of_date ORDER BY visible_from_ts "
+        "DESC, " + version_key("parser_version") + " DESC) = 1 ORDER BY as_of_date",
+        [entity_id, as_of],
+    ).fetchall()
+    # every Reg. 31 dated up to the results' visibility (allotment-dated patterns, SHP17), and the first one after
+    near = [s for d, s in later if d <= visible.date()] + [s for d, s in later if d > visible.date()][:1]
+    return any(abs(Decimal(s) - derived) / Decimal(s) <= SHARE_CROSS_CHECK_TOLERANCE for s in near)
+
+
+SHARE_COUNT_ACTIONS = ("SPLIT", "BONUS", "CONSOLIDATION")
+
+
+def _share_events_after(con, entity_id: str, as_of: date) -> list[tuple[date, Decimal]]:
+    """(ex-date, EPS factor) of the entity's split / bonus / consolidation actions with ex-date after `as_of`
+    [X187]. PENDING counts as well as the accepted statuses: the action is NSE's own record, and it only explains a
+    disagreement when its factor reproduces paid-up / face value exactly (within the 0.5% tolerance)."""
+    return [
+        (ex, Decimal(str(ef)))
+        for ex, ef in con.execute(
+            # a PENDING action has no eps_factor yet: the theoretical one from its ratio (corp_actions.py)
+            "SELECT ex_date, ef FROM (SELECT ca.ex_date, coalesce(ca.eps_factor, CASE WHEN ca.action_type = 'BONUS' "
+            "THEN ca.ratio_den / (ca.ratio_num + ca.ratio_den) ELSE ca.ratio_num / ca.ratio_den END) AS ef "
+            "FROM corp_actions ca JOIN securities s USING (security_id) "
+            "WHERE coalesce(ca.entity_id, s.entity_id) = ? AND ca.ex_date > ? "
+            "AND ca.action_type IN (SELECT unnest(?)) AND ca.status IN (SELECT unnest(?))) WHERE ef > 0 ORDER BY 1",
+            [entity_id, as_of, list(SHARE_COUNT_ACTIONS), sorted(ACCEPTED_STATUSES | {"PENDING"})],
+        ).fetchall()
+    ]
+
+
+def _paid_up_capital(con, filing_ids: list[str], as_of: date) -> dict[str, tuple[Decimal, Decimal, str]]:
+    """{filing_id: (paid-up capital, face value, LevelOfRounding)} of the results filings at `as_of` that state every
+    rupee figure in whole LevelOfRounding units (no canonical rupee fact with digits below the unit) [X188]."""
+    units = " ".join(f"WHEN '{k}' THEN {int(v)}" for k, v in ROUNDING_UNITS.items())
+    whole = {
+        fid
+        for fid, n, off in con.execute(
+            "SELECT o.filing_id, count(*), count(*) FILTER (WHERE o.value_inr % (CASE m.level_of_rounding "
+            + units
+            + " ELSE 1 END) <> 0) FROM fact_observations o JOIN filing_meta m USING (filing_id, parser_version) "
+            "WHERE o.filing_id IN (SELECT unnest(?)) AND o.value_inr IS NOT NULL AND o.value_inr <> 0 "
+            "AND NOT (starts_with(o.canonical_tag, 'li_') OR starts_with(o.canonical_tag, 'oth_') "
+            "OR starts_with(o.canonical_tag, 'asfiled_')) GROUP BY 1",
+            [filing_ids],
+        ).fetchall()
+        if n and not off
+    }
+    out = {}
+    for fid, paid, face, lor in con.execute(
+        "SELECT o.filing_id, "
+        "max(coalesce(o.value_inr, o.value_other)) FILTER (WHERE o.canonical_tag = 'paid_up_equity_capital'), "
+        "max(coalesce(o.value_other, o.value_inr)) FILTER (WHERE o.canonical_tag = 'face_value_per_share'), "
+        "any_value(m.level_of_rounding) "
+        "FROM fact_observations o JOIN filing_meta m USING (filing_id, parser_version) "
+        "WHERE o.filing_id IN (SELECT unnest(?)) AND o.period_end = ? "
+        "AND o.canonical_tag IN ('paid_up_equity_capital', 'face_value_per_share') GROUP BY 1",
+        [filing_ids, as_of],
+    ).fetchall():
+        if paid is not None and face and fid in whole:
+            out[fid] = (Decimal(paid), Decimal(face), lor)
+    return out
+
+
+def _within_rounding(capital: tuple[Decimal, Decimal, str] | None, totals: list[Decimal]) -> bool:
+    """X188: in a filing that states every rupee figure in whole LevelOfRounding units, paid-up capital was rounded to
+    that unit, so shares x face value need only agree with it to half a unit (Navneet Q1 FY26 consolidated, whole
+    crores: 221,213,181 x Rs 2 = 44.24 Cr filed as 44 Cr). A filing with digits below the unit states its own
+    precision and keeps the 0.5% relative test (Rallis 19.00 Cr in a 2-decimal filing; Lux 6.26 vs 6.01 Cr)."""
+    if capital is None or capital[2] not in ROUNDING_UNITS:
+        return False
+    paid, face, lor = capital
+    unit = ROUNDING_UNITS[lor]
+    return paid % unit == 0 and any(abs(t * face - paid) <= unit / 2 for t in totals)
 
 
 def cross_check_shares(con, entity_id: str, as_of: date) -> str | None:
@@ -1611,14 +1973,136 @@ def close_resolved_share_findings(con) -> int:
     if fixed:
         con.execute(
             "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = "
-            "'share cross-check agrees on re-check (X103 employee trust shares)' "
+            "'share cross-check agrees on re-check (X103 / X213 trust shares, X187 / X211 share-count event, "
+            "X188 rounding, X212 allotment before the results)' "
             "WHERE quarantine_id IN (SELECT unnest(?))",
             [utc_now(), fixed],
         )
     return len(fixed)
 
 
-SHP_PARSE_FINDINGS = ("PARSE_ERROR", "CONTEXT_CONFLICT", "MISSING_CRITICAL", "PCT_SCALE_UNKNOWN")
+ANNUAL_RECHECK_NOTE = "annual re-check [X180]: "
+
+
+def audit_annual_checks(con, entity_ids=None) -> dict[str, int]:
+    """X180: re-run the two Reg. 34 annual checks (G328 prior-year columns [X110, X182]; G93 year-end share counts
+    [X114, X181]) for every promoted annual filing on the data now stored. Both run only at promotion, so their
+    outcome depended on what had been promoted before (an FY26 annual promoted before the FY25 annual or the FY-end
+    Reg. 31 filing of the same company compared against less, and annuals promoted before the checks existed were
+    never checked). The checks are point-in-time (prior year: what a reader had one microsecond before the annual
+    became visible), so a re-run gives the answer promotion in broadcast order would have given. New findings are
+    queued (deterministic ids: an unchanged finding, or one a human resolved, is kept as it is); an open finding of
+    the same reason and filing that the re-run no longer produces is closed FIXED_BY_RULE. Returns counts.
+    `entity_ids`: re-run only those entities' annuals (X235: after rule X201 rescaled one of their filings).
+    X312: in the same write, open findings of an owner-accepted class, or with the same totals as an earlier
+    ACCEPTED finding of the filing, are resolved ACCEPTED (`accept_prior_year_findings`); they stay visible."""
+    from financials import filing_checks as fc
+    from financials.share_capital import REASON as SHARE_REASON
+    from financials.share_capital import annual_share_disagreements
+
+    metas = con.execute(
+        "SELECT filing_id, parser_version, entity_id, scope, fy_start, fy_end, level_of_rounding, visible_from_ts "
+        "FROM filing_meta WHERE accounting_profile = 'REG34_ANNUAL' QUALIFY row_number() OVER (PARTITION BY "
+        "filing_id ORDER BY " + version_key() + " DESC) = 1 ORDER BY filing_id"
+    ).fetchall()
+    if entity_ids is not None:
+        wanted = set(entity_ids)
+        metas = [m for m in metas if m[2] in wanted]
+    rows, prior = [], []
+    shares = annual_share_disagreements(con, [(m[0], m[2], m[5]) for m in metas])  # X349: one batch
+    for fid, pv, ent, scope, fy_start, _fy_end, lor, visible in metas:
+        diffs, ctx = fc.annual_prior_year_comparison(
+            con, filing_id=fid, parser_version=pv, entity_id=ent, scope=scope, fy_start=fy_start,
+            level_of_rounding=lor, visible_from_ts=visible,
+        )  # fmt: skip
+        if diffs:
+            details = {"scope": scope, "differences": diffs, **fc.prior_year_class(diffs, ctx)}
+            rows.append(_quarantine_row(stage="CONSISTENCY", reason_code=fc.PRIOR_YEAR_REASON, filing_id=fid,
+                                        entity_id=ent, details=details))  # fmt: skip
+            prior.append((rows[-1]["quarantine_id"], fid, details, ctx))
+        share = shares[fid]
+        if share is not None:
+            rows.append(_quarantine_row(stage="SHARES", reason_code=SHARE_REASON, entity_id=ent, filing_id=fid,
+                                        details=share))  # fmt: skip
+    keep = [r["quarantine_id"] for r in rows]
+    if rows:
+        _quarantine_many(con, rows)
+    closed = con.execute(
+        "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ? || "
+        "CASE WHEN reason_code = ? THEN 'prior-year comparison re-run: none, or the current finding of this filing'"
+        " ELSE 'share counts re-run: they agree, or the current finding of this filing' END "
+        "WHERE resolved_at IS NULL AND reason_code IN (?, ?) AND filing_id IN (SELECT unnest(?)) "
+        "AND quarantine_id NOT IN (SELECT unnest(?)) RETURNING reason_code",
+        [utc_now(), ANNUAL_RECHECK_NOTE, fc.PRIOR_YEAR_REASON, fc.PRIOR_YEAR_REASON, SHARE_REASON,
+         [m[0] for m in metas], keep],
+    ).fetchall()  # fmt: skip
+    accepted = accept_prior_year_findings(con, prior)  # X312, after the insert: also an unchanged open finding
+    open_now = dict(con.execute(
+        "SELECT reason_code, count(*) FROM quarantine_queue WHERE resolved_at IS NULL AND reason_code IN (?, ?) "
+        "GROUP BY 1", [fc.PRIOR_YEAR_REASON, SHARE_REASON]).fetchall())  # fmt: skip
+    return {"annual_filings": len(metas), "findings": len(rows), "closed": len(closed), **accepted,
+            "open_prior_year": open_now.get(fc.PRIOR_YEAR_REASON, 0),
+            "open_share_counts": open_now.get(SHARE_REASON, 0)}  # fmt: skip
+
+
+def accept_prior_year_findings(con, findings: list[tuple[str, str, dict, dict]]) -> dict[str, int]:
+    """X312: resolve ACCEPTED, in one batched write, the open findings among `findings` (id, filing_id, details,
+    comparison context) that rule PRIOR_YEAR_ACCEPTED_CLASS (owner-accepted class / sub-class) or
+    PRIOR_YEAR_ACCEPTANCE_CARRIED (same totals as an earlier ACCEPTED finding of the filing) settles. One read of the
+    earlier ACCEPTED findings of these filings; a finding already resolved (by a human or an earlier run) is kept as
+    it is, so a re-run changes nothing. Returns counts by rule."""
+    from financials import filing_checks as fc
+
+    if not findings:
+        return {"accepted_by_class": 0, "accepted_carried": 0}
+    earlier = [(q, f, json.loads(d)) for q, f, d in con.execute(
+        "SELECT quarantine_id, filing_id, details FROM quarantine_queue WHERE reason_code = ? AND resolution = "
+        "'ACCEPTED' AND filing_id IN (SELECT unnest(?)) ORDER BY resolved_at DESC, quarantine_id",
+        [fc.PRIOR_YEAR_REASON, sorted({f for _, f, _, _ in findings})]).fetchall()]  # fmt: skip
+    notes = fc.prior_year_resolutions(findings, earlier)
+    done = []
+    if notes:
+        done = con.execute(
+            "UPDATE quarantine_queue AS q SET resolved_at = $1, resolution = 'ACCEPTED', resolution_note = v.note "
+            "FROM (SELECT unnest($2) AS id, unnest($3) AS note) AS v WHERE q.quarantine_id = v.id "
+            "AND q.resolved_at IS NULL RETURNING q.resolution_note",
+            [utc_now(), list(notes), list(notes.values())],
+        ).fetchall()
+    carried = sum(1 for (n,) in done if fc.CARRIED_RULE in n)
+    return {"accepted_by_class": len(done) - carried, "accepted_carried": carried}
+
+
+def close_resolved_annual_share_findings(con) -> int:
+    """X180 / X181: re-run the annual share-count check for every open ANNUAL_SHARE_COUNT_DIFFERS finding and close
+    those that now agree (typically the FY-end Reg. 31 filing was promoted after the annual). Cheap: open findings
+    only; run after every promote batch like close_resolved_share_findings."""
+    from financials.share_capital import REASON as SHARE_REASON
+    from financials.share_capital import annual_share_disagreements
+
+    rows = con.execute(
+        "SELECT quarantine_id, filing_id, entity_id, CAST(json_extract_string(details, '$.as_of') AS DATE) "
+        "FROM quarantine_queue WHERE reason_code = ? AND resolved_at IS NULL",
+        [SHARE_REASON],
+    ).fetchall()
+    rows = [r for r in rows if r[1] and r[2]]
+    # X349: one batch; a filing with findings of two dates is checked at each (keyed by finding, not filing)
+    by_date: dict = {}
+    for q, fid, ent, as_of in rows:
+        by_date.setdefault(as_of, []).append((q, fid, ent))
+    fixed = []
+    for as_of, group in by_date.items():
+        got = annual_share_disagreements(con, [(fid, ent, as_of) for _, fid, ent in group])
+        fixed += [q for q, fid, _ in group if got[fid] is None]
+    if fixed:
+        con.execute(
+            "UPDATE quarantine_queue SET resolved_at = ?, resolution = 'FIXED_BY_RULE', resolution_note = ? "
+            "WHERE quarantine_id IN (SELECT unnest(?))",
+            [utc_now(), ANNUAL_RECHECK_NOTE + "annual share counts agree on re-check (X181)", fixed],
+        )
+    return len(fixed)
+
+
+SHP_PARSE_FINDINGS = ("PARSE_ERROR", "CONTEXT_CONFLICT", "MISSING_CRITICAL", "PCT_SCALE_UNKNOWN", "UNKNOWN_TAXONOMY")
 FILING_FINDING_STAGES = ("PARSE", "IDENTITY", "PERIOD")
 
 
@@ -1752,12 +2236,16 @@ def _promote_shareholding(con, stage_dir: Path, manifest: dict[str, Any]) -> Pro
         [fid, meta["parser_version"]],
     ).fetchone()[0]:
         return PromotionResult("ALREADY_PROMOTED", "shareholding", message=fid)
-    secs = resolve_security_by_isin(con, filing["exchange"], meta["stated_isin"], meta["as_of_date"])
+    # A BSE filing (Permitted member, X166) resolves by ISIN through the NSE identifier rows of the same security:
+    # identifier history holds NSE rows only (a BSE-only company needs its own rows first, owner to-do 31).
+    ix = "NSE" if filing["exchange"] == "BSE" else filing["exchange"]
+    secs = resolve_security_by_isin(con, ix, meta["stated_isin"], meta["as_of_date"])
     if not secs:
-        secs = resolve_isin_typo(con, filing["exchange"], meta["stated_isin"], meta["stated_symbol"],
-                                 meta["as_of_date"], fid)  # fmt: skip
-        secs = secs or resolve_unregistered_isin(con, filing["exchange"], meta["stated_isin"], meta["stated_symbol"],
+        secs = resolve_isin_typo(con, ix, meta["stated_isin"], meta["stated_symbol"], meta["as_of_date"], fid)
+        secs = secs or resolve_unregistered_isin(con, ix, meta["stated_isin"], meta["stated_symbol"],
                                                  meta.get("company_name"), meta["as_of_date"], fid)  # fmt: skip
+        secs = secs or resolve_isin_one_char(con, ix, meta["stated_isin"], meta["stated_symbol"],
+                                             meta.get("company_name"), meta["as_of_date"], fid)  # fmt: skip
     entities = sorted(
         {con.execute("SELECT entity_id FROM securities WHERE security_id = ?", [s_]).fetchone()[0] for s_ in secs}
     )
@@ -1857,6 +2345,61 @@ def _promote_vault_and_raw(con, stage_dir: Path, manifest: dict[str, Any]) -> Pr
     tables = {"index_close": "index_ohlcv", "equity_master": "raw_equity_master"}
     _insert_vault_rows(con, stage_dir, ("blobs", "filings", tables[manifest["job"]]))
     return PromotionResult("PROMOTED", manifest["job"], message=manifest.get("trade_date") or manifest["snapshot_date"])
+
+
+def _promote_mcap_day(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
+    """NSE PR-zip mcap file [X130-X133]: vault rows + raw_nse_mcap, append-only. Out of scope before MIN_TRADE_DATE
+    (C9). G1: the file's EQ / BE / BZ rows must be at least G1_MIN_RATIO x the median of the previous G1_LOOKBACK_DAYS
+    promoted files (the parser has already checked the rows against the file's own summary sums)."""
+    day = date.fromisoformat(manifest["trade_date"])
+    if not market_in_scope(day):
+        return _out_of_scope(con, stage_dir, "mcap_day", f"trade_date {day} < {MIN_TRADE_DATE}")
+    path = (Path(stage_dir) / "raw_nse_mcap.parquet").as_posix()
+    n = con.execute(
+        "SELECT count(*) FROM read_parquet(?) WHERE series IN (SELECT unnest(?))", [path, list(UNIVERSE_SERIES)]
+    ).fetchone()[0]
+    prior = [c for (c,) in con.execute(
+        "SELECT count(DISTINCT (symbol, series)) FROM raw_nse_mcap WHERE trade_date < ? "
+        "AND series IN (SELECT unnest(?)) GROUP BY trade_date ORDER BY trade_date DESC LIMIT ?",
+        [day, list(UNIVERSE_SERIES), G1_LOOKBACK_DAYS],
+    ).fetchall()]  # fmt: skip
+    if prior and Decimal(n) < G1_MIN_RATIO * Decimal(statistics.median(prior)):
+        raise GateFailure("G1", f"{n} EQ/BE/BZ mcap rows < {G1_MIN_RATIO} x median {statistics.median(prior)}")
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_nse_mcap", "raw_price_band_hits"))
+    # Rule SHARES_REG31_OUTLIER [X221] reads Issue Size: rows from this day on (up to features.ISSUE_SIZE_MAX_AGE_DAYS
+    # later) may change share count; marked like a market day.
+    dirty.mark_all(con, day, "MCAP_DAY", read_table(con, stage_dir, "filings")[0]["filing_id"])
+    return PromotionResult("PROMOTED", "mcap_day", message=f"{day}: {n} EQ/BE/BZ rows")
+
+
+def _promote_price_bands(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
+    """PR-zip price-band file of an already vaulted zip [X359]: raw rows, append-only; circuit-day columns read them
+    from that day on."""
+    day = date.fromisoformat(manifest["trade_date"])
+    if not market_in_scope(day):
+        return _out_of_scope(con, stage_dir, "price_bands", f"trade_date {day} < {MIN_TRADE_DATE}")
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_price_band_hits"))
+    dirty.mark_all(con, day, "PRICE_BANDS", manifest["filing_id"])
+    n = con.execute("SELECT count(*) FROM raw_price_band_hits WHERE filing_id = ?", [manifest["filing_id"]]).fetchone()
+    return PromotionResult("PROMOTED", "price_bands", message=f"{day}: {n[0]} band hits")
+
+
+def _promote_bse_securities(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:
+    """BSE list of securities [A17, X169]: vault rows + raw_bse_securities (append-only), then rule BSE1 fills
+    `bse_scrip_code` by ISIN on the identifier rows valid on the observed date; a different stored code is a
+    non-blocking IDENTIFIER / BSE_SCRIP_CODE_CONFLICT finding, nothing is overwritten."""
+    from financials import filing_checks as fc
+
+    _insert_vault_rows(con, stage_dir, ("blobs", "filings", "raw_bse_securities"))
+    fid = read_table(con, stage_dir, "filings")[0]["filing_id"]
+    filled, conflicts = fc.apply_bse_scrip_codes_by_isin(con, fid)
+    q = _quarantine_many(con, [
+        _quarantine_row(stage="IDENTIFIER", reason_code=fc.SCRIP_CONFLICT_REASON, filing_id=fid,
+                        security_id=c["security_id"], details=c) for c in conflicts
+    ]) if conflicts else []  # fmt: skip
+    n = con.execute("SELECT count(*) FROM raw_bse_securities WHERE filing_id = ?", [fid]).fetchone()[0]
+    return PromotionResult("PROMOTED", "bse_securities", message=f"{manifest['snapshot_date']}: {n} securities, "
+                           f"{filled} identifier rows given a BSE scrip code (BSE1)", quarantined=q)  # fmt: skip
 
 
 def _promote_kpis(con, stage_dir: Path, manifest: dict[str, Any]) -> PromotionResult:

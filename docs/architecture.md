@@ -9,6 +9,7 @@ UNVERIFIED there must not be hard-coded; code that depends on it quarantines on 
 
 - **Purpose:** personal, single-user research, screening and point-in-time (PIT) backtesting. No redistribution [C8].
 - **Universe v1:** NSE Mainboard `EQ`, `BE`, `BZ`, starting with the Nifty 500 [C7]. SME (`SM`, `ST`) out of scope. BSE is used only as a fallback and for historical Reg. 34 annual XBRL backfill.
+- **Filings universe `mcap500`** (owner 2026-11-17, rule U1 [X134], §11.12): every `EQ`/`BE`/`BZ` row of NSE's mcap file, Category `Listed` or `Permitted` (rule U1-P, owner 2026-11-17; Permitted securities are listed on another exchange, mostly BSE, and file there [X166], §11.13), whose NSE market cap (PR-zip mcap file [X130]) is >= Rs 500 Cr on the last trading day of a week joins `universe_membership`; members never leave; SME series and the zip's SME file are never read for it; no share-class aggregation ("ignore DVR"). The Nifty 500 set the project started with is its seed. `discover-filings --universe mcap500` (or `mcap500-new`: members without financials yet) fetches their filings; `nifty500` keeps working. The feature universe is unchanged (every security with a recent bar, §4.1).
 - **Data scope (v1, CHOICE [C9]):** `trade_date >= 2024-10-01` for prices, delivery, corporate actions and index snapshots; `period_end >= 2025-03-31` for financials and shareholding (Q4 FY25, the first Integrated Filing quarter [X38]; `financials/scope.py`). As of Nov 2026 that is 7 quarters: TTM works, YoY-on-TTM is NULL until Q3 FY27 (Dec-2026) results are filed. Promotion returns `OUT_OF_SCOPE` for older inputs (vaulted, not parsed); `fetch-days` / `fetch-corp-actions` clamp start dates. Multi-year windows use `fundamentals.cagr(..., min_periods_required)` and stay NULL until enough in-scope quarters exist.
 - **Non-goals (v1):** multi-user, UI hosting, Cloudflare (R2/D1/Workers), real-time intraday prices, SME/Indian-GAAP corporates.
 
@@ -26,15 +27,19 @@ Operator commands (`python -m financials --data-dir data …`):
 | Command | Effect |
 |---|---|
 | `init-db` | apply `schema.sql` to `data/market.duckdb` |
-| `fetch-days START [END]`, `fetch-corp-actions START END`, `fetch-holidays`, `fetch-index --as-of D`, `fetch-shareholding SYM…\|--universe U`, `fetch-annual SYM…\|--universe U`, `fetch-results [URL] [--symbols …\|--universe U]`, `discover-filings [--symbols …\|--universe nifty500\|active\|--from-rss] [--workers N]` | download → vault → staging only (`--workers` threads overlap hosts; each host stays at ≥ 1 s between requests). Vaulted archive files are never downloaded again (vault URL index); a failed day or file is reported and the run goes on; corporate actions are asked in 30-day windows |
-| `promote` | the single writer: applies pending stages in order (holidays, market days by date, index snapshots, corporate actions, results, shareholding, raw-only) and records them in `promotion_log`. ABORTED batches stay pending, and every later market day waits behind an aborted one |
+| `fetch-days START [END]`, `fetch-corp-actions START END`, `fetch-holidays`, `fetch-index --as-of D`, `fetch-shareholding SYM…\|--universe U`, `fetch-annual SYM…\|--universe U`, `fetch-results [URL] [--symbols …\|--universe U]`, `discover-filings [--symbols …\|--universe nifty500\|mcap500\|mcap500-new\|active\|--from-rss] [--workers N]` | download → vault → staging only (`--workers` threads overlap hosts; each host stays at ≥ 1 s between requests). Vaulted archive files are never downloaded again (vault URL index); a failed day or file is reported and the run goes on; corporate actions are asked in 30-day windows |
+| `promote` | the single writer: applies pending stages in order (holidays, market days by date, index snapshots and PR-zip mcap files, corporate actions, results, shareholding, raw-only) and records them in `promotion_log`. ABORTED batches stay pending, and every later market day waits behind an aborted one |
 | `rebuild-market --from D` | rolls market-derived state back to `D` (bars, bhavcopy/inferred calendar rows, identifier intervals, auto-decided corporate actions, feature history), replays the staged days and re-materialises; raw tables untouched; audited in `admin_log` |
 | `materialize D` / `materialize --from D1 --to D2` | builds features for `D` (or every promoted trading day in the range, ascending) with gates G4/G5; consumes the dirty markers the range covers (§11.10) |
 | `materialize --incremental [--to D]` | recomputes only the rows marked dirty since the last run, on already-materialised days, with G4/G5 on each merged day (§11.10); refuses when a day was built by another `FEATURES_VERSION` |
 | `compact [--keep-old \| --spill DIR]` | `--spill`: low-disk mode through verified Parquet (§4.1). Otherwise CHECKPOINT, copy every table into a sibling file created from `schema.sql`, verify row counts and views, swap the files atomically (§4.1). Refuses when free disk < 1.1 x the live size. Also runs at the end of a full `materialize --from/--to`, `rebuild-market` and `prune-versions` when there is dead space and room (`--no-compact` skips it) |
 | `prune-versions [--archive DIR] [--dry-run]` | archives (zstd Parquet + manifest + `admin_log`) and then deletes the rows of superseded parser versions no reader can select (decision I, §4.1) |
 | `drop-raw-xbrl [--spill DIR] [--no-compact] [--note N]` | one-shot, owner decision J: refuses unless the coverage check (`scripts/disclosure_coverage.py`) reports 0 uncaptured elements per profile, then drops `raw_xbrl_facts` with an `admin_log` entry in one transaction (idempotent) and compacts (§4.1) |
-| `run-day --date D` | holiday list, market days D−7..D, corporate actions D−7..D+30, discovery for symbols with results in the day's RSS (A9) + Reg. 30 events, promote, `materialize --incremental --to D−1`, materialise D in full; idempotent |
+| `run-day --date D` | holiday list, market days D−7..D (each with its PR-zip mcap file [X130]), corporate actions D−7..D+30, discovery for symbols with results in the day's RSS (A9) + Reg. 30 events (one RSS fetch, asked again when it does not parse, X350), promote, rule U1 for the week ends in D−7..D (§11.12), `materialize --incremental --to D−1`, materialise D in full; idempotent; prints each step's wall time and the total (X351) |
+| `fetch-mcap START [END] [--weekly]` | the PR-zip mcap files of promoted trading days (`--weekly`: each ISO week's last trading day only, the universe backfill); vaulted zips are not downloaded again (`fetch-days` fetches each day's zip too) |
+| `import-bse DIR`, `bse-members [--as-of D]` | vault + stage a BSE runner ledger (then `promote`; rule BSE1 for the list of securities); list the Permitted members with ISIN and BSE scrip code (§11.13) |
+| `update-universe [--from D] [--to D]` | rule U1 over the week ends in the range (default 2024-10-01 → today) plus the one-time seed; sticky, idempotent, audited in `admin_log` (§11.12) |
+| `check-issue-size --as-of D [--all]` | read-only cross-check: NSE Issue Size vs Reg. 31 total per security on a quarter end, 0.5% tolerance [X133] |
 | `screen "QUERY" [--as-of D]` | runs a DSL screen on the live table or point-in-time on history (read-only connection) |
 | `load-kpis FILE` | stages a supplemental-KPI CSV/JSON (`parsers.kpis`) for `promote` into `supplemental_kpis` |
 | `export-bundle --out DIR [--max-file-mb 50 --max-total-mb 250]`, `import-bundle DIR --db PATH` | zstd Parquet shards of every table of schema.sql with a manifest of row counts and checksums; import verifies them (a `raw_xbrl_facts` part of an older `--include-raw` bundle is skipped: decision J). Local or private storage only: the data is NSE-derived and the repository is public |
@@ -70,6 +75,7 @@ data/vault/ab/ab12…ef.<ext>   ───────────▶  ▼  in on
 | Corporate actions | `www.nseindia.com/api/corporates-corporateActions?index=equities&from_date=…&to_date=…` | JSON | VERIFIED [P12, CA1-CA9] | 1 |
 | Corporate actions (discovery) | `nsearchives…/content/RSS/Corporate_action.xml` (no symbol/ISIN) | RSS | VERIFIED [CA6] | discovery only |
 | Trading holidays | `www.nseindia.com/api/holiday-master?type=trading` | JSON (current year) | VERIFIED [CAL1] | 1 |
+| Market cap + Issue Size per security | `nsearchives…/archives/equities/bhavcopy/pr/PR<DDMMYY>.zip` → `mcapddmmyyyy.csv` | CSV in zip (fixed-width) | VERIFIED [X130-X133] | 1 |
 | Shareholding (Reg. 31) | `www.nseindia.com/api/corporate-share-holdings-master?index=equities&symbol=X` → `nsearchives…/corporate/xbrl/SHP_*.xml` | JSON + XBRL | VERIFIED [SHP1-SHP15] | 1 |
 | Reg. 34 annual XBRL | UNVERIFIED [R2] | XBRL | — | 2 |
 | F&O, SLBM, AMC portfolios, macro | UNVERIFIED | various | — | 3 |
@@ -90,7 +96,7 @@ Fetch etiquette (implemented in `financials.fetch.http.PoliteFetcher`): ≥1 s b
 | Where | What | Size (live database, 2026-11-16) |
 |---|---|---|
 | `data/vault/` | every downloaded file, by sha256; the source of truth for every parse | |
-| `data/staging/` | parsed Parquet batches waiting for (or recorded by) `promote` | |
+| `data/staging/` | parsed Parquet batches waiting for (or recorded by) `promote`; `promote --clean-staging` / `clean-staging [--dry-run]` remove promoted filing batches no reader needs (X352, opt-in) | |
 | `data/market.duckdb` | every table below; one file, one writer | 22.4 GiB file, ~6 GB in use by tables |
 | `raw_xbrl_facts` | **removed by `drop-raw-xbrl` (owner decision J)**: every XBRL fact verbatim, once per parser version. Every element of every parsed filing reaches a clean table (`disclosure_facts`, X116); the vault blobs (0.7 GB) stay the source of truth | was 48.9 M rows, 4.4 GB (~24.9 M rows, ~2.2 GB after `prune-versions`) |
 | `disclosure_facts` | every fact of an element no other clean table holds (X116), as filed, slimmed by parser `disc-2` (owner decision M, X120): the 783 (source kind, element) pairs of `reference/disclosure_exclusions.csv` and values that are asterisks only (`******` masks) are not stored, and a value longer than 1,000 characters is a pointer row (`value_text` NULL; `text_len`, `text_sha256`, `text_snippet` of 300 plain-text characters). `disclosures.full_text(con, vault, filing_id, seq)` returns such a text from the vault blob after checking its sha256. Elements a reader selects (`parsers.disclosures.READ_ELEMENTS`) are exempt, so every reader's answer is the same as under `disc-1`. Re-parse: `backfill-disclosures`, then `prune-versions` (archives and removes disc-1), then `compact` | disc-2: 3.01 M rows (28,779 pointers), 0.15 GB of table blocks (disc-1: 4.61 M rows, 1.49 GB); scratch copy 2026-11-16: file 3.87 GB -> 2.47 GB after `backfill-disclosures`, `prune-versions`, `compact` |
@@ -137,8 +143,8 @@ deleted and rewrote the history, and every re-parse added a full copy of a filin
     entity and as-of date is visible from the same instant (a re-parse that moved visibility leaves it selectable,
     X83); observations also need the same category in the newer version (the promoter's share cross-check).
   - `related_party_transactions`: ranked per (entity, scope, period end) by visibility, filing, version: an old row
-    goes only when a newer version covers the same period from the same instant. `group_structure`: the latest
-    version per filing stays (no feature reader).
+    goes only when a newer version covers the same period from the same instant. `group_structure` and
+    `reg23_related_party_transactions` (X160): the latest version per filing stays (no feature reader).
   - Never pruned: versions named by a quarantine finding (`details.parser_version`) and every version of a filing
     with an open finding; `filing_meta` and `shareholding_meta` whole (read across versions: rounding level, fiscal
     year starts, accounting basis, visibility timestamps; small); `corporate_events` (one row per event);
@@ -251,7 +257,7 @@ This section only records the decisions; it does not duplicate the DDL.
 | L1 | `raw_cm_bhavcopy`, `raw_delivery`, `raw_index_snapshot`. Keyed by source identifiers plus `filing_id`. No surrogate IDs. XBRL facts have no raw table (decision J): the vault blob. |
 | L2 identity | `entity_master`, `securities`, `security_identifier_history` (date-bounded; `valid_to` exclusive), `trading_calendar` |
 | L2 market | `ohlcv` (resolved, unadjusted; delivery joined) |
-| L2 fundamentals | `filing_meta` (per filing × parser_version), `fact_observations` (long format), `segment_observations` (Ind AS 108 segment and geography rows, §14b-1), `group_structure` (AOC-1 subsidiaries / associates / JVs per fiscal year from Reg. 34 [X112]), `related_party_transactions` (Ind AS 24 related-party schedule per counterparty, category and transaction element from Reg. 34 [X113]), `reg23_related_party_transactions` (Reg. 23(9) rows per counterparty from standalone Q2 / Q4 Integrated Filings [X115]; period as tagged, never feeds a ratio, R13), `disclosure_facts` (every fact of an element no other clean table holds per element, as filed: results, annual, Reg. 31 and Reg. 30 filings; typed value columns, `in_window`; [X116, C28]) |
+| L2 fundamentals | `filing_meta` (per filing × parser_version), `fact_observations` (long format), `segment_observations` (Ind AS 108 segment and geography rows, §14b-1), `group_structure` (AOC-1 subsidiaries / associates / JVs per fiscal year from Reg. 34 [X112]), `related_party_transactions` (Ind AS 24 related-party schedule per counterparty, category and transaction element from Reg. 34 [X113]), `reg23_related_party_transactions` (Reg. 23(9) rows per counterparty from standalone Q2 / Q4 Integrated Filings [X115]; the half-year in `disclosure_start` / `disclosure_months` [X160, exceptions X161], never feeds a ratio), `disclosure_facts` (every fact of an element no other clean table holds per element, as filed: results, annual, Reg. 31 and Reg. 30 filings; typed value columns, `in_window`; [X116, C28]) |
 | Control | `corp_actions`, `quarantine_queue`, `company_overrides` |
 | L2 calendar/index | `trading_calendar`, `calendar_coverage`, `raw_index_snapshot`, `index_constituents_history` |
 | L2 shareholding | `shareholding_meta`, `shareholding_observations` |
@@ -337,9 +343,45 @@ Flag `restatement_suspected` for an entity-period when any of these hold:
 Built (2026-11-15): the YTD identity break [X106], discontinued operations in the last 5 quarter ends [X108] and a
 MERGER / DEMERGER ledger action with ex-date in the last 5 quarters [X109] set the flag (`FactBook.restatement_triggers`).
 The Reg. 34 comparison runs at promotion and raises CONSISTENCY / ANNUAL_PRIOR_YEAR_DIFFERS [X110]; it is a finding,
-not yet a flag input.
+not yet a flag input, classed SCALE / RESTATED / REGROUPED for triage [X182]. Because the outcome at promotion depends on
+what was promoted before, `audit-annual` re-runs it and the annual share-count check on the stored data [X180].
 
 YoY growth across a flagged boundary is set to NULL in screens (with a reason). The PDF anchor-locking extractor from the original blueprint is **deferred**. If built, it must prove its numbers against the same filing's XBRL `OneD`/`FourD` before any row is promoted.
+
+### 7.7 Show and flag: withheld values and open findings (owner decision V, 2026-11-19) [X325]
+"Show everything for all companies; if required flag the suspect one." A number a filing states is never blanked
+because a check failed: the feature row shows the best stated figure and names the reason in `dq_flags`
+(sorted, comma-separated codes; NULL when none) and `dq_suspect` (any flag). This is the practice of financial data
+vendors (the reported figure with a data-quality footnote). Precedence per value: the validated value; else the figure
+as filed. Rule SHOW_AND_FLAG (`FactBook.withheld`, `fill_as_filed`, `dq`): load_factbook still applies every
+withholding rule, but keeps what it removed beside the book with its class code. Only the feature layer reads in
+as-filed mode (`features._fundamentals`; `resolve_scope` tries it only after no scope has its flows on validated
+values). A reader (`quarter`, `ttm`, `stated`, the annual-year inputs) first computes on the validated values; only
+when that gives NULL does it recompute with the withheld values restored, and records the code. Validated readers
+(promotion audits, statements, tests of the rules) are unchanged.
+
+| Withholding point (rule) | Validated value | Shown instead (as filed) | Flag |
+|---|---|---|---|
+| X86 ATTRIBUTION_WITHHELD (owners + NCI != PAT, no recovery) | owners' profit NULL: EPS, P/E, ROE, NPM, net profit NULL | owners = PAT - NCI as filed (the attribution identity; the owners line is the defective one: 0 placeholders, OCI), from the NCI kept as filed (`asfiled_..._non_controlling_interests`, C24); PAT only when the NCI is filed 0; never PAT when a non-zero NCI is filed (owner 2026-11-19). NULL when the NCI as filed is not in the facts (preserve_withheld skips an element the filing uses for another period) | `ATTRIBUTION_PAT_LESS_NCI` / `ATTRIBUTION_AS_FILED` |
+| X94 tax copied from the prior year | tax, PAT, TCI of the period NULL | the period's values as filed | `TAX_COPY_AS_FILED` |
+| Derived per-period lines (sales net of excise, EBITDA, EBIT, material cost, PBT incl. JV, coalesced owners / excise) and the single-period reads of features_bs / _extra / _more (`stated`) | NULL when a withheld input is missing | the same formula on the inputs as filed (`FactBook.withhold_combined`), only where the withholding is the reason | the input's code |
+| X173 / X315 YTD copies a quarter / the prior year | the copied YTD values NULL (TTM sums the quarters) | the YTD as filed, only where no validated path exists (e.g. an FY ratio whose 12-month figure is the copy) | `YTD_AS_FILED` |
+| X226 bridge reads a proven mis-filed YTD | TTM NULL | the sum of the 4 latest quarters as filed, derived quarters included (never the refused bridge; NULL when a quarter is missing) | `TTM_MISFILED_YTD` |
+| X301 bridge on two bases | 4-quarter sum (NULL when a derived quarter is mis-filed) | the 4-quarter sum as filed | `TTM_MIXED_BASIS` (also on every X301 quarter sum) |
+| open non-blocking finding (YTD_QUARTER_MISMATCH, ANNUAL_PRIOR_YEAR_DIFFERS, ATTRIBUTION_WITHHELD, CROSS_CHECK_FAILED, ANNUAL_SHARE_COUNT_DIFFERS, TAX_COPIED_FROM_PRIOR_YEAR) | value already shown | unchanged | `OPEN_FINDING:<reason>` when its period end lies in the row's 5-quarter window (`RESTATEMENT_QUARTERS`) on the row's scope |
+| open GAP finding (unexplained > 10% gap) | adjusted price columns NULL from the gap | unchanged: a return across a possibly missed split is no figure anyone stated; the raw close, volume and market cap stay shown | `PRICE_GAP_UNRESOLVED` |
+
+Genuine absence stays NULL and is never flagged into a number: fewer than 4 quarters for TTM (invariant 6), windows
+before the cutoff (invariant 14, `min_periods_required`), no filing, a ratio undefined by its definition (a zero or
+negative denominator, X194), lender / insurer columns that do not apply. Blocking quarantines still parse nothing
+(unknown taxonomy, invalid XBRL, failed identity, undetermined period): there is no entity, or no period, to show a
+number for. Not filled, with the reason: the choice of the last fiscal year (`latest_fiscal_year`, a period choice from filed PAT: an FY whose PAT a tax copy withholds is not picked as the last FY); X86 periods whose NCI as filed was not kept (needs a parser change: keep the withheld period's NCI under `asfiled_` whatever other periods use, then a re-parse); lines read as whole dictionaries (paid-up capital, face value, EPS, RPT totals: no rule withholds them). Open findings are read with today's resolution state ("valid" knowledge, §11.9, as the GAP freeze and PDF
+corrections): a rebuilt history flags every as-of date from the finding's filing visibility while the finding is
+open, and none once it is resolved, so a backtest sees today's judgement of each date's filings. This is a known non-bitemporal choice (owner 2026-11-19): the history does not record when a finding was opened or resolved, so `screen --as-of D` cannot reproduce the flags a screen run on D itself showed (the same holds for the GAP freeze and PDF corrections). Findings change
+outside the fundamentals inputs, so the two columns are DAILY (§4.1) and `materialize --incremental` diffs the open
+findings against `features_dq_findings` (the set the stored rows reflect) and marks each changed finding's entity from
+its period end (`dirty.mark_finding_changes`). Screens include flagged rows; `Data Suspect = 0` excludes them,
+`Data Flag <code> = 1` selects one code (§14), and `screen` prints `dq_suspect` / `dq_flags` with every match.
 
 ## 8. Canonical building blocks (defined once; every ratio uses these)
 
@@ -372,6 +414,7 @@ Element names are VERIFIED in the INDAS_CORP fixture unless marked otherwise.
 | `INDAS_CORP` | `IntegratedFinance_IndAS` | §8 (VERIFIED, one standalone Q2) | Consolidated fixture needed |
 | `INDAS_NBFC` | `IntegratedFinance_NBFC` | `InterestEarned`, `FeesAndCommissionIncome`, `NetGainOnFairValueChanges`, `FinanceCosts`, `ImpairmentOnFinancialInstruments` (tags VERIFIED [X20]) | Fixture is an investment company; lending behaviour UNVERIFIED |
 | `IGAAP_BANK` | `IntegratedFinance_Banking` | [X21] (VERIFIED, Q1) | No BS in Q1 [X22]; CASA not tagged [X23]; CRAR UNVERIFIED [X24] |
+| `IGAAP_CORP` | `IntegratedFinance_OtherThanBank` and `TypeOfCompany` = `SME` [X330] | Division I P&L with exceptional and extraordinary items, minority line, Division I balance sheet (VERIFIED [X331]) | `parsers/igaap_corp.py`; derived PAT / owners / NCI [X332]; Main Board filers on this template stay UNKNOWN_TAXONOMY (X89); own accounting basis in a FactBook [X334] |
 | `IRDAI_GENERAL` | `GeneralInsurance` namespace | `GrossPremiumsWritten`, `NetPremiumWritten`, `PremiumEarned`, `NetCommission`, `OperatingExpensesRelatedToInsuranceBusiness` (VERIFIED, legacy) | Context-date defect [X26] |
 | `IRDAI_LIFE` | `IntegratedFinance_LI` (2025-01-31) [X33] | premium, actuarial, benefits, surplus, policyholder investments (VERIFIED) | Parser not built; extra `OcurI`/`OprevI` instants |
 
@@ -458,8 +501,9 @@ parser (`parsers/igaap_bank.py`, X58-X61). Industrial ratios (EBITDA, OPM, ROCE,
 NULL for both. Bank `sales_ttm` = TTM interest earned (Screener's bank "Revenue", S4). Bank regulatory ratios come from
 the standalone book (X60).
 
-**Denominators (C16):** ROE and ROE (continuing) use the latest **closing** owners' equity (Screener's convention,
-available from the first balance sheet). RoA, NIM proxy, credit cost, **ROIC and CROIC** use **(opening + closing) / 2** over 12
+**Denominators (C16):** ROE and ROE (continuing) use the latest **closing** owners' equity (Screener's export
+formula S22, available from the first balance sheet; Screener's website ROE averages opening and closing equity over
+the last FY and is stored separately as `roe_screener`, X227). RoA, NIM proxy, credit cost, **ROIC and CROIC** use **(opening + closing) / 2** over 12
 months and stay NULL until the opening balance sheet exists.
 
 | Column | NBFC formula | Bank formula |
@@ -540,9 +584,11 @@ Ratios still read only curated tags; line items are for statements, sub-rows and
 | `piotroski_f` | Piotroski F-score 0..9 for the latest 12-month FY in the row's scope; year-end total assets (C23); NULL without a post-cutoff prior FY |
 | `beneish_m` | Beneish 8-variable M-score (SG&A proxy = `OtherExpenses`); NULL without a post-cutoff prior FY |
 | `capex_to_depreciation`, `cwip_to_gross_block`, `rote`, `rnd_and_royalty_intensity`, `contingent_liabilities_to_net_worth`, `annual_fy_end` | FY ratios from the Reg. 34 notes (PPE schedule X71, notes X73) |
-| `order_wins_90d`, `order_value_90d`, `kmp_resignations_90d`, `auditor_resignations_90d`, `fraud_or_default_90d` | Reg. 30 events visible at the as-of and disclosed in the 90 days to it (`corporate_events`) |
-| `penalties_90d` | NULL: no penalty / regulatory-action filing observed (UNVERIFIED, E7) |
+| `order_wins_90d`, `order_value_90d`, `kmp_resignations_90d`, `auditor_resignations_90d`, `fraud_or_default_90d` | Reg. 30 events visible at the as-of and disclosed in the 90 days to it (`corporate_events`); every Reg. 30 window column is NULL until the window lies inside the announcements-RSS capture (X361), and a lower bound inside it |
+| `penalties_90d`, `penalty_amount_90d`, `regulatory_actions_90d` | Reg. 30 sub-para 20 (AIATOP, E12, X360): fines imposed (count, sum of `AmountOfFineOrPenalty`), every action taken or initiated |
+| `acquisitions_90d`, `acquisition_value_90d` | Reg. 30 restructuring (E13, X360): acquisitions and to-be-incorporated companies, sum of cash consideration |
 | `roce_screener`, `debtor_days`, `inventory_turnover`, `working_capital` | Screener export formulas (S22) on our Screener-style statement rows, latest FY; kept beside our own `roce` (operating EBIT over closing capital) |
+| `roe_screener` | Screener website ROE (X195, X227): last FY owners' profit × 2 / (opening + closing owners' equity), every profile; NULL unless both balance sheets are filed and positive; kept beside `roe` (TTM, closing equity, C16) |
 | `inventory_days`, `days_payable`, `cash_conversion_cycle`, `working_capital_days` | closing balance / (Sales / 365); cycle = debtor + inventory − payable days; working-capital days on (CA − cash − current investments − CL) (S23: matches the website on TCS; CCC does not) |
 
 Revisions (E9, E10): `filing_revisions` links a filing to the one it supersedes (REVISION or byte-identical RESEND);
@@ -562,7 +608,7 @@ Source of truth: `screener_features` in `schema.sql` (the history view has the s
 |---|---|
 | **Active** (always computed when a bar exists) | `close`, `price_date`, `return_1m/3m/6m/12m` (need 22/64/127/253 bars), `price_to_dma50/200` (50/200 bars), `dist_52w_high` (252 bars), `deliv_avg_5d/20d`, `delivery_velocity`, `in_nifty500` |
 | **Price / volume / technicals** (batch B, `features_price.py`; bars counted in stored sessions; adjusted = close, high, low × the accepted `price_factor`s with later ex-dates, volume ÷ the same, never dividends [C2]; every adjusted column NULL while an unresolved gap freezes the series; a window longer than the bars held is NULL, never partial [C9]) | Active now: `return_1d` (2 bars), `return_1w` (6), `volume` (as filed), `volume_1w_avg` / `volume_1m_avg` / `volume_1y_avg` (5 / 21 / 252 adjusted volumes), `high_52w` / `low_52w` / `dist_52w_low` (252 adjusted closes), `high_since_data_start` / `low_since_data_start` (every adjusted close since the first bar ≥ 2024-10-01; **not** all-time highs, which are not possible under C9), `dma50` / `dma200` (50 / 200 adjusted closes) and `dma50_prev` / `dma200_prev` (window ending one bar earlier: 51 / 201 bars), `rsi_14` / `rsi_14_prev` (Wilder: gains and losses averaged over the first 14 changes, then `avg = (avg × 13 + x) / 14`, recursion from the first bar; 15 / 16 bars; 100 with no losses, NULL when flat), `macd` / `macd_prev` (EMA12 − EMA26, EMAs alpha 2/(n+1) seeded by the SMA of their first n closes; 26 / 27 bars), `macd_signal` / `macd_signal_prev` (EMA9 of MACD, same seeding; 34 / 35 bars), `atr_14_pct` (Wilder ATR(14) of adjusted true ranges / adjusted close; restarts after a bar without high or low), `rs_nifty500_3m/6m/12m` (stock return − Nifty 500 price-index return over 63 / 126 / 252 bars, `index_ohlcv` [IDX9]; NULL when the index close is missing on either date), `beta_1y_nifty500` (OLS slope of 252 daily log returns on the index's over the stock's bar dates; NULL if any index close is missing), `turnover_median_20d` (median `turnover_inr`, rupees), `deliv_pct` / `deliv_pct_avg_20d` (`deliv_qty / volume`, today / mean of 20 days), `vwap` (today's `turnover_inr / volume` = `AVG_PRICE` [P16]), `vwap_20d` (20-day traded value / adjusted volume). Raw same-day columns (`volume`, `vwap`, `deliv_pct`, `deliv_pct_avg_20d`, `turnover_median_20d`) are not frozen by a gap. When history exists: `return_3y/5y/7y/10y` (756 / 1,260 / 1,764 / 2,520 bars, cumulative, not annualised; ~Oct 2027 / 2029 / 2031 / 2034). Market level: `market_breadth` (one row per materialised day, universe NIFTY 500 = the day's `in_nifty500` rows): members, % above DMA 50 / 200 (`price_to_dma50/200 > 1` among members with a value), new 52-week highs / lows (`dist_52w_high = 0` / `dist_52w_low = 0`) and their ratio, advances / declines / unchanged (`return_1d`) and their ratio; rewritten inside the materialize transaction from the stored rows (full or incremental) and deleted by `rebuild-market` with the history |
-| **Active once the input filing is visible** | `shares` (+`shares_source`), `market_cap`, `promoter_holding_pct`, `promoter_pledge_pct`, `promoter_encumbered_pct`, `fii_holding_pct`, `fpi_holding_pct`, `dii_holding_pct`, `public_holding_pct`, `non_promoter_non_public_pct`, `float_turnover_pct`, `shp_as_of` (Reg. 31; `promoter_pct`/`fii_pct`/`dii_pct` kept as deprecated duplicates for saved screens); `fii_dii_qoq_change_pct` and `promoter_holding_change_qoq_pp` (need the filing for the immediately preceding quarter end, both visible; the promoter change is in percentage points, the FII + DII change in fraction points); `dividend_yield_pct` (sum of the accepted cash dividends the total-return index adds, ex-date in the 365 days to as-of, each multiplied by the EPS factor of every later accepted share-count action up to as-of, over the raw close; 0 when none went ex, NULL while the window starts before `MIN_TRADE_DATE` [C9] or an unresolved gap freezes the price series); `total_equity`, `net_debt`, `pb`, `debt_to_equity`, `bs_as_of` (H1/FY balance sheet); `altman_z_dd` (H1/FY BS + TTM EBIT; OtherEquity proxy) |
+| **Active once the input filing is visible** | `shares` (+`shares_source`), `market_cap`, `promoter_holding_pct`, `promoter_pledge_pct`, `promoter_encumbered_pct`, `fii_holding_pct`, `fpi_holding_pct`, `dii_holding_pct`, `public_holding_pct`, `non_promoter_non_public_pct`, `float_turnover_pct`, `shp_as_of` (Reg. 31; `shares` from NSE Issue Size instead when rule SHARES_REG31_OUTLIER finds the Reg. 31 total the outlier [X221]; `promoter_pct`/`fii_pct`/`dii_pct` kept as deprecated duplicates for saved screens); `fii_dii_qoq_change_pct` and `promoter_holding_change_qoq_pp` (need the filing for the immediately preceding quarter end, both visible; the promoter change is in percentage points, the FII + DII change in fraction points); `dividend_yield_pct` (sum of the accepted cash dividends the total-return index adds, ex-date in the 365 days to as-of, each multiplied by the EPS factor of every later accepted share-count action up to as-of, over the raw close; 0 when none went ex, NULL while the window starts before `MIN_TRADE_DATE` [C9] or an unresolved gap freezes the price series); `total_equity`, `net_debt`, `pb`, `debt_to_equity`, `bs_as_of` (H1/FY balance sheet); `altman_z_dd` (H1/FY BS + TTM EBIT; OtherEquity proxy) |
 | **Active once 2 adjacent same-scope quarters exist** | `sales_growth_qoq_pct` (latest quarter's `sales_ttm` line, i.e. revenue net of excise / interest earned for banks / premium for insurers, over the previous quarter's, − 1), `profit_growth_qoq_pct` (same for `COALESCE(owners, PAT)` per filing; NULL when the base ≤ 0). Same scope book as the TTM columns; a missing quarter is NULL, never a longer-gap change |
 | **Active once 4 same-scope quarters exist** | `sales_ttm`, `ebitda_ttm`, `pat_ttm`, `pe`, `ev_ebitda`, `enterprise_value`, `opm`, `roe`, `roce`, `roic`, `other_income_to_pbt`; `npm_pct` (`ttm(COALESCE(owners, PAT)) / sales_ttm`); `interest_coverage` (`ttm(PBT + FinanceCosts) / ttm(FinanceCosts)`, NULL when finance costs ≤ 0 and for `FINANCIAL_LENDING` / `INSURANCE`; the filed `InterestServiceCoverageRatio` is not exposed); `dividend_payout_pct` (the `dividend_yield_pct` dividends per share / `eps_ttm`, NULL when EPS ≤ 0); `fcf_ttm`, `croic`, `fcff_yield`, `cf_as_of` via the H1/FY bridge |
 | **Active once the same quarter a year earlier exists** | `opm_preceding_year_quarter_pct` (named `opm_last_year_pct` until features `2026.11.15-4A`): quarterly EBITDA / revenue (the §8 definitions on one quarter) of the quarter ending 12 months before `fundamentals_end`; NULL for lenders and insurers. Period P&L family (below): every `*_preceding_year_quarter` column, `sales_growth_yoy_quarter_pct`, `profit_growth_yoy_quarter_pct` (owners), `operating_profit_growth_yoy_quarter_pct` (latest quarter / same quarter last year − 1, NULL when the base ≤ 0) |
@@ -617,7 +663,7 @@ Every security, every trading day: if the residual gap after dividing out the da
 - raw and `ohlcv` rows are still stored;
 - the **adjusted** series and price-derived features for that security are frozen at t−1 until resolved.
 
-Expected volume is 0–7 per day [P4]. When an action verifies later, matching gap quarantines are resolved (`FIXED_BY_RULE`) only after re-auditing the residual. The auditor compares consecutive *stored* bars, so promote every trading day: a gap of months between bars (as in the test fixtures) quarantines most of the market.
+Named rules close findings that are not missing actions: CA12 (equity market moves ≤ 20%), CA13 (ETF unit splits / re-ISINs), X140 (rights entitlements: ISIN type `20`, symbol `-RE[n]`; no share-count event ever applies). Expected volume is 0–7 per day [P4]. When an action verifies later, matching gap quarantines are resolved (`FIXED_BY_RULE`) only after re-auditing the residual. The auditor compares consecutive *stored* bars, so promote every trading day: a gap of months between bars (as in the test fixtures) quarantines most of the market.
 
 ### 11.5 Total return
 `financials.returns.total_return_index`: r_t = (close_t + accepted cash dividends_t) / (close_{t−1} · F_t) − 1. Adjusted prices never include dividends [C2]. Both series stop at the first unresolved gap.
@@ -733,7 +779,44 @@ was and every marker stays, so a rerun resumes. After a successful run the consu
 to `D + 1` when materialised days after `D` exist. A full `materialize --from/--to` consumes the markers whose date
 falls in the range (or after the last materialised day before it), provided every materialised day in the range was
 rebuilt. Equivalence with a full rebuild, row for row, is pinned by `tests/test_incremental_materialize.py` for a
-results filing, a shareholding filing, a corporate-action batch, a gap resolution and a scope override.
+results filing, a shareholding filing, a corporate-action batch, a gap resolution and a scope override, for
+markers whose change left every row as it was, and for both mixed in one run.
+
+**Per-day cost (2026-11-19, QS2).** The run's cost used to be a fixed ~1.1 s per materialised day whatever the
+number of dirty entities (live: 2 entities over 363 days took 6 min): each of a day's ~60 batched reads scanned the
+full fact / disclosure / shareholding tables for a handful of entities, and every day was gated, written and
+cross-sectioned. Four run-scoped devices, none of which changes a value, cut it to 0.08-0.15 s a day for 12-50
+entities on the live-size database (docs/benchmarks.md section 7 has the synthetic numbers):
+
+- *Entity slices* (`features.entity_slices`): for the run, a TEMP table of the same name shadows each of
+  `features.SLICED_TABLES` (fact_observations, filing_meta, fact_corrections, disclosure_facts, the shareholding
+  tables, segments, RPT, audit opinions) with the rows of the run's entities plus every row of a filing any of them
+  has a row in (a filing whose versions moved between entities keeps all its versions). Every compute_rows read of
+  those tables is restricted to the requested entities or reaches rows through such a filing, so it returns the same
+  rows (checked on the 2026-11-19 snapshot: 137 entities on 5 days and 77 entities on 43 days, every column equal).
+  Only compute_rows reads them; the run writes only the feature tables; the slices are dropped (by their
+  `temp.main.` name) when the run ends. `ohlcv`, `raw_nse_mcap`, `corp_actions` and the identifier tables are not
+  sliced (the gates and the issue-size pick read them for every security or every file).
+- *Visibility memo* (`financials.run_memo`): the readers that depend on the as-of only through `visible_from_ts <=
+  as_of_ts` on the slices (or `supplemental_kpis`) and return per-entity results keep each entity's part with the
+  number of its visibility timestamps (its rows' and its filings' rows') <= the as-of; a day re-reads only the
+  entities whose number moved. Parts are shared read-only, as FundamentalsCache blocks are (the tests run with
+  `CHECK_MUTATIONS`, which fails a run whose consumer changed one). The valuation-history reads
+  (`_valuation_history`, `features_more.valuation_history`) read only days before the as-of's quarter and are read
+  once per quarter of a run (`FundamentalsCache.per_quarter`, full runs too); fundamentals prefetches are skipped
+  when every entity's block is reused.
+- *Unchanged days*: a day whose recomputed rows equal the stored rows the publish would replace (same securities,
+  equal values in every column compute_rows sets; read ahead in 32-day chunks) is left as stored, status
+  `UNCHANGED`: publishing it would rewrite the same rows, recompute the cross-section from the same inputs and pass
+  the same gates. Every other day is published as before, and so is the day after it (its G4 compares with the
+  changed day). A value that storage would cast compares unequal, so the check can only cost a publish, never skip
+  a change.
+- `financials.db` records once that pandas is not installed: DuckDB's binding tried `import pandas` for every
+  bound parameter (~0.3 ms a 3-parameter query).
+
+A day that does change still costs ~0.6 s (G5 / G4 reads of the whole day, the write including the EVENT
+intervals, the three cross-section refreshes of the whole day): 10-50 entities with new results over the ~9 days
+since their filings took 10-15 s; a change that really moves rows over a year of days takes minutes.
 
 **Reader changes**: `FEATURES_VERSION` must be bumped whenever `features.py`, `fundamentals.py`, `scope.py`,
 `money.py`, `price_history.py`, `features_store.py` or `reference/valuation_archetypes.csv` changes; a test pins a hash of those files together with the
@@ -804,10 +887,90 @@ only because the pinned files changed).
   blocks. Now only the run's last day rewrites it, inside its own publish transaction (`materialize(...,
   snapshot=False)` on the others reports `snapshot_due`); a run that stops early rewrites it from the last
   published day. The tables end identical to the day-by-day publish (`tests/test_storage.py`).
+- **Batched full runs** (SP2, 2026-11-20; `features._materialize_batched`): a run over every entity
+  (`materialize --from/--to`, `rebuild-market`) computes and gates each day as before (compute_rows, G5, G4 against
+  the previous day: a `DaySummary` of the rows the run just published, equal to what the stored day returns) but
+  publishes up to `FULL_RUN_BATCH_DAYS` (20) days per transaction: each day's `write_day` in order, then the
+  breadth and the three cross-sections of all the batch's days in one read and one UPDATE each, the live table
+  when the batch holds the run's last day. A batch never spans a quarter (the per-quarter valuation histories read
+  the committed earlier quarters) and, once `features_gems.pe_medians` reads daily history (C9: from 2029-10-01),
+  such days publish one by one. The first day that fails a gate stops the run with the days before it published;
+  an error publishes the days computed before it; a failed batch transaction rolls back the whole batch (each day
+  stays atomic). The run also holds the **full-run visibility memo** (`features.full_run_memo`): the
+  `run_memo.by_visibility` readers, called with `entities=None`, re-read only the entities whose visibility moved
+  (as in an incremental run), from run-scoped slices of those entities (SLICED_TABLES rows, built on a second
+  connection, `con.cursor()`, for 5 days at a time, when at most 400 entities change in them:
+  busier days read the database) instead of scanning the full tables; the
+  FundamentalsCache prefetch of recomputed entities reads them the same way. The in-compute cross-sections are
+  skipped (`compute_rows(cross=False)`): the publish recomputes them from the stored rows. With `_add_months`
+  memoised, the reverse DCF's bisection stopping at its fixed point and DuckDB's failed `import pandas` per bound
+  statement short-circuited for the run, a live-size day went from ~9.5 s to ~4.5 s on a loaded 4-CPU machine
+  (docs/benchmarks.md section 6). `materialize_days(..., batch_days=1)` keeps the day-by-day path;
+  `tests/test_materialize_batched.py` pins that both leave identical tables (features_daily, features_events,
+  market_breadth, screener_features, features_meta, materialize_dirty). Compaction after a full run: the rewrite
+  leaves about one copy of features_daily as free blocks, which the next run reuses; `maybe_compact` still decides.
+- **Dirty windows** (SP2): a changed identifier or Nifty 500 interval marks its security from the first date whose
+  coverage differs (`dirty._interval_changes`), not from the interval's start (closing an identifier on the last
+  day used to mark from the first listing day, so `--incremental` walked every materialised day); a changed open
+  finding marks from the later of its period end and its filing's visibility (the first as-of it can flag), and a
+  finding without a period end (which flags no row) marks nothing.
 - Not done: parallel day computation. DuckDB lets no other process open the database file while the single writer
   holds it, and the per-day Python work is GIL-bound, so worker processes would need their own copy of every input;
   after the changes above a day of ~3,000 securities is ~1.5-2 s (half per-row Python, half the Arrow insert, the
   cross-section SQL and the WAL), see docs/benchmarks.md section 6.
+
+## 11.12 Market-cap universe (rule U1, owner 2026-11-17) [X130-X134]
+- **Source.** `PRddmmyy.zip` (one per trading day, ~0.6 MB) is vaulted whole; only `mcapddmmyyyy.csv` is parsed
+  (`parsers/pr_mcap.py`, member name matched case-insensitively). The parser checks the file's own summary rows
+  (Listed / Permitted / Total sums, paisa rounding), so a truncated file fails; promotion (`mcap_day`) is
+  OUT_OF_SCOPE before 2024-10-01 and G1 needs the EQ / BE / BZ row count >= 0.92 x the median of the previous five
+  files. `raw_nse_mcap` keeps every row as sent (all series, symbol / series as printed, Issue Size BIGINT, close and
+  market cap DECIMAL); the file has no ISIN.
+- **Rule U1** (`financials/universe.py`, `RULE_VERSION`): a day is its ISO week's last trading day when every later
+  day of that week is known not to trade (holiday master / CAL3 rows / weekend of a covered year). On it, every
+  EQ / BE / BZ row with Category `Listed` or `Permitted` (U1-P; the row's category is kept as
+  `universe_membership.listing_category`) and filed Market Cap >= Rs 500 Cr joins (`universe_membership`, MCAP_GE_500CR, visible from the
+  file's EOD broadcast time), resolving symbol + series on that date through `security_identifier_history`; an
+  unresolved row is quarantined (UNIVERSE / UNRESOLVED_SYMBOL, one finding per symbol / series, closed by rule once it
+  joins). Seed, once: EQ / BE / BZ securities with a bar of entities with financials, on their first bar date
+  (SEED_EXISTING; hindsight, L1). Members never leave; a backfill that finds an earlier qualifying week moves the
+  join date earlier. Each row stands alone: a DVR or other listed class joins only on its own market cap.
+- **PIT read**: `joined_date <= as_of` (`universe.members`). `discover-filings --universe mcap500` lists members
+  joined by today; `mcap500-new` only those whose entity has no `filing_meta` yet.
+- **Backfill** (once): `fetch-days` for the scope, `promote`, `fetch-mcap 2024-10-01 <today> --weekly` (111 zips on
+  2026-11-17), `promote`, `update-universe`. Live result (rule U1-2026.11.17-L): 595 seeded + 1,352 joined = 1,947 members;
+  the next `update-universe` (U1-P) adds the Permitted joiners and fills `listing_category` (sticky, idempotent).
+
+## 11.13 BSE for Permitted members (owner 2026-11-17) [X165-X169, A16-A18]
+- **Who**: `universe.bse_members(as_of)` = members whose latest mcap row is `Permitted` (they file results, annual
+  reports and shareholding on BSE, not NSE [X166]); `mcap500-new` NSE discovery skips them. CLI `bse-members` prints
+  them with ISIN and BSE scrip code. Identity keys on **ISIN + BSE scrip code**, never on an NSE symbol or NSE bars,
+  so a BSE-only company (owner to-do 31) fits the same path once it has identifier rows.
+- **Identity, rule BSE1** [X169]: the BSE list of securities (`ListofScripData`, per group: scrip code, ISIN, ticker,
+  BSE market cap) is staged `bse_securities` -> `raw_bse_securities` (append-only); promotion fills
+  `security_identifier_history.bse_scrip_code` by ISIN on rows valid on the observed date; a different stored code is
+  a non-blocking BSE_SCRIP_CODE_CONFLICT. The in-filing ScripCode (G79, X111) keeps working beside it. The BSE
+  bhavcopy (UDiFF, FinInstrmId = scrip code [X165]) gives the same map and is reachable from the container; it is
+  parsed (`parse_udiff_cm(exchange="BSE")`) but not yet fetched or promoted.
+- **Fetching** [A16, A17]: the container is refused by `api.bseindia.com`; BSE is fetched only on GitHub-hosted runners
+  with the owner's method, ported as-is (`financials/fetch/bse.py`: BSE's headers, plain requests, 2-3 s apart (X354; was 4-6 s), 3
+  retries on network / 5xx, hard stop on 401/403/429, then in-page XHR in headless Chrome; HTTP 400 ends that call
+  only). Workflows: `bse-reach` (probe) and `bse-fetch` (by hand, scrip codes from `bse-members`;
+  `scripts/bse_fetch.py`: every group's list of securities, per scrip announcements + `Result` attachments, shareholding
+  filings + inline XBRL). The runner writes only a **ledger** (bytes as sent in `blobs/<sha256>` + `ledger.jsonl`)
+  uploaded as a 1-day artifact; it never sees the database.
+- **Import** (owner's machine): `import-bse DIR` checks every blob against its ledger sha256, vaults it as a `filings`
+  row with exchange `BSE` (blob != filing: an NSE and a BSE filing may share one sha256), and stages it; `promote`
+  (single writer) promotes. The same ledger format is the owner-provided route (files fetched elsewhere by the same
+  client). Parsed: the list of securities (BSE1) and the shareholding inline XBRL: `parsers/ixbrl.py` rebuilds the
+  instance it denotes (rule IXBRL1_BOOLEAN_TEXT for BSE's Yes / No tags) and the unchanged shareholding parser reads
+  it; the filing resolves by ISIN through the NSE identifier rows of the same security, visible from the listing's
+  broadcast `D` [X170]. Announcements and their PDFs stay raw. BSE announcements link no results XBRL (X168), but
+  BSE's results listing `Corp_FinanceResult_ng_new` does (X247): each row's `XMLName` / `Consol_XMLName` is the
+  Integrated Filing (Finance) as inline XBRL of NSE's `in-capmkt` taxonomy, which `parse_instance` reads as the
+  instance it denotes, so the NSE results parser stages it unchanged (exchange `BSE`, `bse_fetch.py --only results`).
+  It resolves by ISIN through the NSE identifier rows, else by the filed ScripCode (BSE1 codes), visible from the
+  latest of the row's `Fld_CreateDate` and its file name's same-day readings [X265].
 
 ## 12. Promoter quality gates (in order)
 
@@ -836,6 +999,7 @@ only because the pinned files changed).
 | After each quarter's Reg. 31 deadline | Shareholding master + XBRL per symbol in the universe |
 | After each fetch batch | Promoter: gates → canonical → corp-action verification → gap auditor → features |
 | Monthly, and after an index change | `fetch-classification --universe nifty500` (quote API, 1 request/s, ~9 min) then `promote` [IC1] |
+| Daily, inside `run-day` | PR-zip mcap file with each market day; on the week's last trading day rule U1 adds the Rs 500 Cr joiners (§11.12); `discover-filings --universe mcap500-new` then fetches the new members' filings |
 
 **Automation (G40, G60, G289).** `ops/` holds the scheduler files; each runs, every day at 20:15 IST:
 
@@ -858,11 +1022,14 @@ Paths assume the checkout at `~/Financials` with a `.venv`; edit them. `tests/te
 that the files call only existing CLI commands. The quarterly sweeps (`discover-filings --universe nifty500`,
 `fetch-classification`, `fetch-index`) are not scheduled: the daily run's RSS hint covers new results.
 
-**GitHub Actions nightly (batch K, 22:00 IST = cron `30 16 * * *` UTC).** Two workflows, both also `workflow_dispatch`:
+**GitHub Actions nightly (batch K).** Two workflows, **manual only** (`workflow_dispatch`; owner 2026-11-23: their
+22:00 IST schedule was removed. `ci.yml` already tests every change, so the nightly test run re-tested an unchanged
+`main`; no self-hosted runner is registered, so the pipeline run waited a day and was cancelled. Daily and weekly data
+runs are scheduled tasks of the cloud session that holds the database, `docs/handover.md` §3):
 
 | Workflow | Runner | What it does |
 |---|---|---|
-| `.github/workflows/nightly-tests.yml` | GitHub-hosted `ubuntu-latest` | the CI checks (ruff check / format, offline pytest) on the default branch every night |
+| `.github/workflows/nightly-tests.yml` | GitHub-hosted `ubuntu-latest` | the CI checks (ruff check / format, offline pytest) on the default branch, when dispatched |
 | `.github/workflows/nightly-pipeline.yml` | **self-hosted**, labels `[self-hosted, financials]`, i.e. the owner's own machine | `run-day`, then `fetch-classification --universe nifty500 --missing-only` + `promote` (only entities with no current classification, so not the ~9 min full sweep), then `materialize --incremental` |
 
 The data pipeline cannot run on a GitHub-hosted runner: (1) the market database (~10 GB) and the vault are gitignored
@@ -876,7 +1043,7 @@ the workspace, a step refuses otherwise). It has `permissions: contents: read`, 
 cancellation (single writer: runs queue, never overlap), a 240 min timeout, and uploads only the run log
 (`$RUNNER_TEMP/nightly-log/nightly-pipeline.log`, 14 days). It never commits or uploads data. Use it **instead of** the
 `ops/` scheduler, not with it: two schedulers would race for the DuckDB write lock. Registration steps: `ops/README.md`.
-`tests/test_nightly_workflows.py` pins the cron, the runner labels, the CLI commands and the no-data rules.
+`tests/test_nightly_workflows.py` pins manual-only triggers, the runner labels, the CLI commands and the no-data rules.
 
 ## 14. Screener DSL
 
@@ -903,6 +1070,10 @@ ALIAS      := a name in financials.dsl.ALIASES or user_custom_ratios (case-insen
   comma-separated arithmetic expression (aliases, saved custom ratios, arithmetic) to every match, labelled by its
   normalised text; `--order-by EXPR [--desc]` sorts (NULLs last, then symbol); `--limit N`. Custom ratios are saved with
   `save-ratio NAME EXPRESSION` (validated by compiling it; built-in names refused) and listed with `ratios`.
+- Data quality (X325, owner decision V, §7.7): every match carries `dq_suspect` and `dq_flags`. Screens include
+  flagged rows by default; `Data Suspect = 0` excludes them, `Data Open Finding = 1` keeps rows an open finding
+  concerns, and `Data Flag <code> = 1` one code, written in words ("Data Flag Attribution As Filed", "Data Flag Ttm
+  Mixed Basis", "Data Flag Open Finding Ytd Quarter Mismatch"). These aliases read a missing flag as 0.
 
 - Aliases map **only** to whitelisted `screener_features` columns or saved custom ratios.
 - Saved custom ratios are expanded before compilation; cycles are rejected.
@@ -980,7 +1151,7 @@ period_end): no nullable key column.
 | Borrowings | borrowings (NC + C) + lease liabilities (NC + C, label rule) | the four lines |
 | Other Liabilities | Total − Equity Capital − Reserves − Borrowings | NCI, trade payables, other |
 | Total | `total_assets − min(DTA, DTL)` when both are positive | deferred tax netted |
-| Net Block | PPE + investment property + goodwill + other intangibles + ROU (label rule) | the five lines |
+| Net Block | PPE + investment property + goodwill + other intangibles + ROU (label rule); at a year end the lines come from one filing on one definition (X273, decision T) | the five lines |
 | CWIP | CWIP + intangibles under development | both |
 | Investments | non-current + current + equity-method | the three lines |
 | Other Assets | Total − Net Block − CWIP − Investments | receivables (current), inventory, cash & bank, other |
@@ -1008,7 +1179,8 @@ CFF = borrowings in/out, interest, dividends, leases, shares, other; Net Cash Fl
 **Phase 1: thin slice, screenable end-to-end (Nifty 500)**
 
 Status (2026-11-13): **built and tested end to end** on real fixtures, all listed items below, plus index backfill (§11.6), quarantine resolution (D-6) and benchmarks (`docs/benchmarks.md`). Known gaps inside Phase 1:
-- `piotroski_f` / `beneish_m` columns exist but stay NULL: both need year-over-year annual data (Reg. 34, Phase 2).
+- `piotroski_f` / `beneish_m` need two consecutive annual reports (Reg. 34): filled for 1,645 / 1,625 of 3,005 rows on
+  2026-11-20 (55%); NULL until a company's second in-scope annual exists (genuine absence, C9).
 - Altman Z'' uses OtherEquity as the retained-earnings proxy; ROCE and ROE use the latest balance sheet (ROE by decision, C16); ROIC, CROIC, RoA, NIM proxy and credit cost use opening + closing averages.
 - EV adds minority interest (`NonControllingInterest`, VERIFIED [X34, X42]); preference capital is still excluded (no tag seen). PE and ROE use the owners' share of profit and equity [X42].
 - Results-XBRL discovery API is UNVERIFIED [A7]; `fetch-results` takes URLs.
@@ -1044,8 +1216,11 @@ Status (2026-11-13): **built and tested end to end** on real fixtures, all liste
   [X113] (`parsers/rpt.py`), promoted with each annual filing; `backfill-rpt` fills filings promoted earlier. The
   Reg. 23(9) per-counterparty rows of the Integrated Filing (X19) are **built** too: `reg23_related_party_transactions`
   [X115] (`parsers/reg23_rpt.py`), promoted with each results filing and filled by the same `backfill-rpt`. They are a
-  separate table and feed no feature: their context period is the filing's own quarter context, so whether the
-  amounts cover the quarter or the half-year is UNVERIFIED (R13).
+  separate table and feed no feature. Their context is the filing's own quarter context, but the amounts cover the
+  Reg. 23(9) half-year ending on the period end (SEBI format D note 4; Q2 + Q4 tie out to the Ind AS 24 year and Q4
+  opening balances to Q2 closing balances: X160, R13 resolved), recorded as `disclosure_start` / `disclosure_months`
+  (HALF_YEAR_RULE, parser `reg23-2`). A few filers put financial-year-to-date amounts in the Q4 filing with nothing in
+  the filing to say so (X161), which is why the rows still feed no ratio; `prune-versions` keeps the latest version.
 - Everything else filed in XBRL: **built** (18D): `disclosure_facts` [X116] (`parsers/disclosures.py`, parser
   `disc-2` since owner decision M, X120) holds every fact of every element that no other clean table holds per
   element, for results, annual, Reg. 31 and Reg. 30 filings, promoted with each filing, except what the named disc-2
@@ -1060,9 +1235,14 @@ is pinned per profile by `tests/test_disclosures.py`, which parses the fixture b
 - Merger lineage and the demerger cost-of-acquisition split are **built** as admin-entered, audited edges (§11.7).
   Still open: automatic merger detection (no merger purpose in the corp-action feed, no delisting-circular fixture
   [CA14]) and automatic entitlement ratios / COA percentages (announced only in PDFs; R7 UNVERIFIED).
-- Reg. 76 exact share count: BLOCKED, no machine-readable NSE source found (F09, probes A15); Reg. 31 cross-checked
-  with paid-up capital stands in, and since batch J the Reg. 34 year-end issued / subscribed / paid-up counts are
-  cross-checked against both at annual promotion (`share_capital.py`, SHARES / ANNUAL_SHARE_COUNT_DIFFERS, X114).
+- Exact share count: the listed count is now daily: NSE's Issue Size in the PR-zip mcap file (`raw_nse_mcap`, X133;
+  owner 2026-11-17 "check bhavcopy zip, everything is inside it"). Evaluated against Reg. 31 on the live data: 98.4%
+  of 4,035 same-date pairs within 0.5% (84.6% exact), below the 99% bar, because Issue Size counts only shares
+  already listed on NSE (allotments wait for listing, bought-back shares stay until extinguished, partly-paid shares
+  are a separate E1 security, a bonus counts from its ex-date). So Reg. 31 stays the market-cap share count and
+  Issue Size is a cross-check (`check-issue-size`). The Reg. 76 reconciliation audit report itself (issued vs listed vs
+  demat) still has no machine-readable source (F09, A15); Reg. 31 x paid-up capital (X103) and the Reg. 34 year-end
+  counts (`share_capital.py`, ANNUAL_SHARE_COUNT_DIFFERS, X114) remain the other cross-checks.
 - The blueprint files AMFI holdings, PIT/SAST/SDD and bulk/block deals under Phase 2; they stay in Phase 3 here
   because their sources are UNVERIFIED (F11, F13, R8) or only OBSERVED (F14).
 - Deliberate divergences: special dividends never adjust prices (invariant 8; the blueprint's §4.2 factor is not
@@ -1088,5 +1268,5 @@ is pinned per profile by `tests/test_disclosures.py`, which parses the fixture b
 | D-2 | Which known-defect rules (§7.4) to allow | None yet; quarantine |
 | D-3 | Phase 2 fixtures | **Done** (2026-11-13): lending NBFC, life insurer, consolidated corporate with NCI, H1 bank, Reg. 34 annual and pledged Reg. 31 committed with evidence tests [X32-X38, SHP7]. Still useful later: Q1/Q3 corp, a loss-valued exceptional item. (Employee-trust shareholding: Batch 8, Vedanta/JSW [SHP8].) |
 | D-4 | Corporate-actions source | **Decided**: NSE API adapter (+ RSS for discovery); unparseable purposes → QUARANTINED. BSE fallback not built (`api.bseindia.com` returned 403 [A1]) |
-| D-6 | How a human resolves a quarantine | **Built**: `financials quarantine list` / `inspect Q` (context + the exact resolving commands) / `resolve --action ACCEPT\|REJECT\|OVERRIDE\|CORP_ACTION\|MERGE_SECURITIES --note …` / `reprocess` (`financials.admin`). One transaction; rows are never deleted; every change is logged in `company_overrides`. `CORP_ACTION` must verify against the observed gap; records of that date the parser could not factor (UNKNOWN purpose, failed verification) are retired as `SUPERSEDED`, the manual action is stored `VERIFIED_MANUAL`, and the adjusted series unfreezes. `REJECT` on a corporate-action finding retires that record (`REJECTED`). `OVERRIDE` takes only fields the promoter reads: `broadcast_ts` for `NO_VISIBILITY` and `security_id` for identity failures of a filing (`filing_overrides`), applied at once by promoting that filing again. `MERGE_SECURITIES` repoints identity, prices, actions, index rows and quarantine links to the `FinInstrmId` owner, tombstones the duplicate entity as `MERGED`, and loads the colliding bar from raw (SIGMA case [P14]). `reprocess` re-promotes batches with open identity / visibility findings. Known-defect rules (D-2) are still not built |
+| D-6 | How a human resolves a quarantine | **Built**: `financials quarantine list` / `inspect Q` (context + the exact resolving commands) / `resolve --action ACCEPT\|REJECT\|OVERRIDE\|CORP_ACTION\|MERGE_SECURITIES --note …` / `reprocess` (`financials.admin`). One transaction; rows are never deleted; every change is logged in `company_overrides`. `CORP_ACTION` must verify against the observed gap; records of that date the parser could not factor (UNKNOWN purpose, failed verification) are retired as `SUPERSEDED`, the manual action is stored `VERIFIED_MANUAL`, and the adjusted series unfreezes. `REJECT` on a corporate-action finding retires that record (`REJECTED`). `OVERRIDE` takes only fields the promoter reads: `broadcast_ts` for `NO_VISIBILITY` and `security_id` for identity failures of a filing (`filing_overrides`), applied at once by promoting that filing again. `MERGE_SECURITIES` repoints identity, prices, actions, index rows and quarantine links to the `FinInstrmId` owner, tombstones the duplicate entity as `MERGED`, and loads the colliding bar from raw (SIGMA case [P14]). `ACCEPT` with a payload on a corporate-action finding [X142]: `{"accept_recorded_factor": true}` accepts a `VERIFY_FAILED` record whose ratio other evidence proves (status `VERIFIED_MANUAL`, the day re-audited, a residual gap raised for its own decision); `{"security_id": …}` records a `STALE_ISIN_OTHER_ISSUER` / `UNKNOWN_ISIN` / `AMBIGUOUS_SECURITY` record for that symbol holder under the promoter's action id; an explicit parse upgrades an `UNPARSED_PURPOSE` record. `reprocess` re-promotes batches with open identity / visibility findings that are still staged (others stay open, listed as `batch_not_staged` [X141]) and re-runs the named gap rules CA12, CA13, X140. Known-defect rules (D-2) are still not built |
 | D-5 | Historical index-membership backfill source | Snapshot-forward only [L1] |

@@ -291,7 +291,16 @@ def add_price_columns(con, rows: list[dict], as_of: date, exchange: str, factors
 def refresh_breadth(con, as_of: date) -> None:
     """Market breadth for `as_of` from the stored rows of the day (Nifty 500 members) [G208]; runs inside the
     materialize transaction after the day's rows are written, so a full or incremental run leaves it consistent."""
-    con.execute("DELETE FROM market_breadth WHERE as_of_date = ?", [as_of])
+    refresh_breadth_days(con, [as_of])
+
+
+def refresh_breadth_days(con, days) -> None:
+    """`refresh_breadth` for each of `days`, in two statements (a full run publishes many days per transaction)."""
+    days = sorted(set(days))
+    if not days:
+        return
+    only = "as_of_date >= ? AND as_of_date <= ? AND as_of_date IN (SELECT unnest(CAST(? AS DATE[])))"
+    con.execute("DELETE FROM market_breadth WHERE " + only, [days[0], days[-1], days])
     con.execute(
         """INSERT INTO market_breadth
            SELECT as_of_date, 'NIFTY 500', count(*),
@@ -302,6 +311,8 @@ def refresh_breadth(con, as_of: date) -> None:
                   count(*) FILTER (WHERE return_1d > 0), count(*) FILTER (WHERE return_1d < 0),
                   count(*) FILTER (WHERE return_1d = 0),
                   count(*) FILTER (WHERE return_1d > 0) / nullif(count(*) FILTER (WHERE return_1d < 0), 0)
-           FROM features_daily WHERE as_of_date = ? AND in_nifty500 GROUP BY as_of_date""",  # DAILY columns
-        [as_of],
+           FROM features_daily WHERE """  # DAILY columns
+        + only
+        + " AND in_nifty500 GROUP BY as_of_date",
+        [days[0], days[-1], days],
     )

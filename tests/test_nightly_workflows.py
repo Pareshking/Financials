@@ -18,7 +18,6 @@ from financials.sources import ROOT
 from financials.staging import stage_classification
 
 WORKFLOWS = ROOT / ".github" / "workflows"
-NIGHTLY_CRON = "30 16 * * *"  # 22:00 IST = 16:30 UTC (GitHub cron is UTC)
 
 
 def _load(name: str) -> dict:
@@ -35,11 +34,10 @@ def _cli_commands(text: str) -> list[str]:
     return re.findall(r"-m financials (?:--data-dir \S+ )?([a-z][a-z-]+)", text)
 
 
-def test_nightly_workflows_parse_and_run_at_22_00_ist_with_manual_dispatch():
+def test_nightly_workflows_parse_and_run_only_on_manual_dispatch():
     for name in ("nightly-tests.yml", "nightly-pipeline.yml"):
         doc = _load(name)
-        assert doc["on"]["schedule"] == [{"cron": NIGHTLY_CRON}], name
-        assert "workflow_dispatch" in doc["on"], name
+        assert list(doc["on"]) == ["workflow_dispatch"], name  # owner 2026-11-23: no schedule (manual only)
         assert doc["permissions"] == {"contents": "read"}, name  # nothing can be pushed back
         for job in doc["jobs"].values():
             assert job["timeout-minutes"] > 0
@@ -77,7 +75,14 @@ def test_no_workflow_commits_pushes_or_uploads_data():
             for step in job["steps"]:
                 if str(step.get("uses", "")).startswith("actions/upload-artifact"):
                     target = step["with"]["path"]
-                    assert target == "${{ runner.temp }}/nightly-log/nightly-pipeline.log", target
+                    # Owner decision P (2026-11-17): exchange files fetched by a probe may be uploaded as artifacts;
+                    # the database, Parquet and data/ never are (checked above and below).
+                    assert target in (
+                        "${{ runner.temp }}/nightly-log/nightly-pipeline.log",
+                        "bse_probe/",
+                        "bse_fetch/",
+                        "nse_fetch/",
+                    ), target  # bse_fetch/: the BSE runner ledger (A17); nse_fetch/: an NSE runner vault (import-vault)
                     assert "data" not in target.replace("nightly", ""), target
         code = re.sub(r"(^|\s)#.*$", "", text, flags=re.M)  # comments may explain; code never names data/
         assert not re.search(r"(^|[\s\"'=/])data/", code, re.M), path.name

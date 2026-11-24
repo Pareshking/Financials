@@ -1,0 +1,83 @@
+name: bse-fetch
+
+# BSE side of the Permitted members of rule U1-P (owner 2026-11-17), on GitHub-hosted runners with the ported BSE
+# client (financials.fetch.bse: plain requests with BSE's headers, 2-3 s apart, in-page XHR only after a refusal).
+# By hand only: the scrip codes come from `python -m financials --data-dir <dir> bse-members` on the owner's machine.
+# X353: `shards` runners each take one shard of the scrips (`--shard K/N`; the group lists in shard 0 only), each at
+# the same 2-3 s pace; `window` limits results and shareholding XBRL to files created on or after `since` (a weekly
+# run: `since` 8 days back, window true). Each runner's ledger (bytes as sent + one JSON line per answer) is a workflow
+# artifact `bse-fetch-<k>` for 1 day (the repository is public); `import-bse` then vaults and stages each one on the
+# owner's machine and `promote` promotes them. No database here.
+# A push of this file runs it once with the defaults (scrip 500488): GitHub registers a dispatch-only workflow for the
+# API only after it has run, and that run also fetches every group's list of securities (ISIN <-> code, rule BSE1).
+on:
+  workflow_dispatch:
+    inputs:
+      scrips:
+        description: "comma-separated BSE scrip codes (bse-members)"
+        default: "500488"
+      since:
+        description: "announcements from (YYYY-MM-DD)"
+        default: "2026-10-01"
+      only:
+        description: "all, or results (only the results XBRL listing and files, X265)"
+        default: "all"
+      window:
+        description: "true: results and shareholding XBRL only if created on or after since (X353)"
+        default: "false"
+      shards:
+        description: "number of runners (X353; 1..8)"
+        default: "1"
+  push:
+    paths:
+      - ".github/workflows/bse-fetch.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      n: ${{ steps.plan.outputs.n }}
+      shards: ${{ steps.plan.outputs.shards }}
+    steps:
+      - id: plan
+        run: |
+          python3 -c "import json, sys; n = int(sys.argv[1]); assert 1 <= n <= 8, n; print(f'n={n}'); print('shards=' + json.dumps(list(range(n))))" "$SHARDS" >> "$GITHUB_OUTPUT"
+        env:
+          SHARDS: ${{ inputs.shards || '1' }}
+
+  fetch:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ fromJSON(needs.plan.outputs.n) }}
+      matrix:
+        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -e ".[bse]"
+      - run: |
+          python scripts/bse_fetch.py --scrips "$SCRIPS" --since "$SINCE" --only "$ONLY" --shard "$SHARD/$N" \
+            $( [ "$WINDOW" = "true" ] && echo --window ) --out bse_fetch
+        env:
+          SCRIPS: ${{ inputs.scrips || '500488' }}
+          SINCE: ${{ inputs.since || '2026-10-01' }}
+          ONLY: ${{ inputs.only || 'all' }}
+          WINDOW: ${{ inputs.window || 'false' }}
+          SHARD: ${{ matrix.shard }}
+          N: ${{ needs.plan.outputs.n }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bse-fetch-${{ matrix.shard }}
+          path: bse_fetch/
+          retention-days: 1
+          if-no-files-found: warn

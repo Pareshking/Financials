@@ -20,6 +20,7 @@ Evidence (docs/references.md SHP1-SHP15):
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
@@ -84,6 +85,9 @@ PUBLIC_HOLDER_AXES = {
     "DetailsOfSharesHeldByResidentIndividualShareholdersHoldingNominalShareCapitalInExcessOfRsTwoLakhAxis": (
         "RESIDENT_INDIVIDUALS_ABOVE_2L"
     ),
+    # Non-institutions "Others (specify)": trusts, LLPs, clearing members... Its 'More than 1 percentage' rows name
+    # trusts that hold the company's own shares (treasury shares, X213); 'Category' rows are sub-totals (skipped).
+    "DetailsOfSharesHeldByOtherNonInstitutionsAxis": "OTHER_NON_INSTITUTIONS",
 }
 SUBTOTAL_FLAG = "WhetherACategoryOrMoreThan1PercentageOfShareholding"  # "Category" rows are sub-totals
 HOLDER_NAME, HOLDER_SHARES, HOLDER_PCT = (
@@ -130,7 +134,12 @@ HUNDRED = Decimal(100)
 
 
 def shp_instance(data: bytes) -> tuple[Instance, bool]:
-    """parse_instance with rule SHP16: only a 2022-09-30 SHP instance may leave exactly `OneD` / `OneI` undeclared."""
+    """parse_instance with rule SHP16: only a 2022-09-30 SHP instance may leave exactly `OneD` / `OneI` undeclared.
+    A BSE inline XBRL file [X170] is read through the instance it denotes (parsers.ixbrl); the vault keeps the HTML."""
+    from financials.parsers.ixbrl import inline_to_instance, is_inline
+
+    if is_inline(data):
+        data = inline_to_instance(data)
     try:
         return parse_instance(data), False
     except ParseError:
@@ -138,6 +147,20 @@ def shp_instance(data: bytes) -> tuple[Instance, bool]:
             raise
     inst = parse_instance(data, undeclared_entity_contexts=SHP16_CONTEXTS)
     return inst, True
+
+
+EXCHANGE_SPECIFIC_RULE = "SHP_EXCHANGE_SPECIFIC_TAXONOMY"
+EXCHANGE_SPECIFIC_NS = re.compile(
+    r"^https?://www\.sebi\.gov\.in/xbrl/SHP_Exchange_Specific/\d{4}-\d{2}-\d{2}/in-capmkt$"
+)
+
+
+def exchange_specific_ns(inst: Instance) -> str | None:
+    """SHP_EXCHANGE_SPECIFIC_TAXONOMY [X154]: a listed stock exchange (BSE Ltd, Q1 FY26-Q1 FY27) files its Reg. 31
+    pattern on SEBI's `SHP_Exchange_Specific/<date>/in-capmkt` taxonomy. Its CategoryOfShareholdersAxis members,
+    measures and Details axes carry the same local names as `in-bse-shp` (plus trading-member categories that no
+    mapping reads), and the parser reads local names, so the same rules apply, including the exact SHP8 identity."""
+    return next((u for u in inst.namespaces.values() if EXCHANGE_SPECIFIC_NS.match(u)), None)
 
 
 def _bool(text: str | None) -> bool | None:
@@ -191,10 +214,17 @@ def _event_date(inst: Instance, date_of_report: date):
     return None
 
 
+IXBRL_RULE = "IXBRL_INLINE_SHP"  # X170: BSE inline XBRL read as the instance it denotes
+
+
 def parse_shareholding(data: bytes) -> ParsedShareholding:
+    from financials.parsers.ixbrl import IXBRL1_RULE, is_inline
+
+    inline = is_inline(data)
     inst, shp16 = shp_instance(data)
     out = ParsedShareholding()
     ns = next((u for u in inst.namespaces.values() if SHP_NS_FRAGMENT in u and u.endswith("/in-bse-shp")), None)
+    exchange_specific = ns is None and (ns := exchange_specific_ns(inst)) is not None
     if ns is None:
         out.issues.append(ShpIssue("PARSE", "UNKNOWN_TAXONOMY", {"namespaces": sorted(inst.namespaces.values())}))
         return out
@@ -211,10 +241,13 @@ def parse_shareholding(data: bytes) -> ParsedShareholding:
         "stated_isin": isin,
         "stated_symbol": inst.first_text("Symbol"),
         "stated_scrip_code": inst.first_text("ScripCode"),
+        "company_name": inst.first_text("NameOfTheCompany"),  # X88 name test (X156)
         "has_partly_paid": _bool(inst.first_text("WhetherTheListedEntityHasIssuedAnyPartlyPaidUpShares")),
         "promoter_pledge_flag": flags["pledged"],
-        "rules_applied": [SHP16_RULE] if shp16 else [],
+        "rules_applied": ([SHP16_RULE] if shp16 else []) + ([IXBRL_RULE, IXBRL1_RULE] if inline else []),
     }
+    if exchange_specific:
+        out.meta["rules_applied"].append(EXCHANGE_SPECIFIC_RULE)
     event_date = _event_date(inst, as_of_date)
     if event_date is not None:
         as_of_date = out.meta["as_of_date"] = event_date

@@ -1,11 +1,19 @@
 name: ci
 
+# Owner 2026-11-23 (fewer CI runs): a push to a PR branch ran this twice (push + pull_request). Now: pull_request
+# for PR branches, push only on main; a newer push to the same ref cancels the older run.
 on:
   push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:

@@ -51,6 +51,7 @@ from financials.fundamentals import (
     quarters_available_since,
     safe_div,
 )
+from financials.run_memo import by_visibility
 from financials.scope import MIN_TRADE_DATE
 
 # ── columns (schema order: `-- batch D (ownership / hidden gems)` in db/schema.sql) ─────────────────────────────────
@@ -231,6 +232,7 @@ def period_values(book, end: date, b: dict) -> dict:
 # ── stage 2: batched reads and per-row columns ────────────────────────────────────────────────────────────────────
 
 
+@by_visibility  # read once per visibility interval of an incremental run (run_memo)
 def ownership_inputs(con, as_of_ts: datetime, entities=None) -> dict[str, dict]:
     """Per entity: {"dates": {rank: as_of_date}, "cats": {rank: {category: (pct, holders)}}, "members": {member:
     pct}} for the five latest visible Reg. 31 patterns (latest visible revision per as-of date, as features._preload)
@@ -419,9 +421,10 @@ def signal_columns(row: dict, g: dict | None, industry: str | None, curated: dic
                               UNDER_OWNED_PROMOTER_MIN), None if row.get("promoter_pledge_pct") is None
                               else row["promoter_pledge_pct"] == 0)  # fmt: skip
     out["cash_conversion_ok"] = _ge(row.get("cfo_to_ebitda"), CASH_CONVERSION_MIN)
-    out["capex_pay_off_signal"] = _and(_ge(row.get("cwip_to_gross_block"), CAPEX_CWIP_MIN),
-                                       _ge(row.get("capex_to_depreciation"), CAPEX_TO_DEP_MIN),
-                                       _le(row.get("debt_to_equity"), CAPEX_DE_MAX))  # fmt: skip
+    # industrial signal: NULL for lenders and insurers (lending NBFCs carry a debt / equity since X228)
+    out["capex_pay_off_signal"] = None if financial else _and(_ge(row.get("cwip_to_gross_block"), CAPEX_CWIP_MIN),
+                                                              _ge(row.get("capex_to_depreciation"), CAPEX_TO_DEP_MIN),
+                                                              _le(row.get("debt_to_equity"), CAPEX_DE_MAX))  # fmt: skip
     out["forensic_clean"] = forensic_clean({**row, **out})
     return out
 
@@ -445,8 +448,11 @@ def forensic_clean(r: dict) -> bool | None:
     return not any(fails)
 
 
-def add_columns(con, rows: list[dict], as_of: date, as_of_ts: datetime, fundamentals: dict, entities=None) -> None:
-    """The features.compute_rows hook: ownership, signals and the day's cross-section, in place (batched reads)."""
+def add_columns(con, rows: list[dict], as_of: date, as_of_ts: datetime, fundamentals: dict, entities=None,
+                cross: bool = True) -> None:  # fmt: skip
+    """The features.compute_rows hook: ownership, signals and the day's cross-section, in place (batched reads).
+    `cross=False`: no cross-section (the caller publishes whole days, whose refresh recomputes it from the stored
+    rows: features._materialize_batched)."""
     secs = None if entities is None else {r["security_id"] for r in rows}
     own = ownership_inputs(con, as_of_ts, entities)
     ind = industries(con, as_of, secs)
@@ -456,7 +462,8 @@ def add_columns(con, rows: list[dict], as_of: date, as_of_ts: datetime, fundamen
         row.update(ownership_columns(row, own.get(row["entity_id"])))
         g = (fundamentals.get(row["entity_id"]) or {}).get("_gems")
         row.update(signal_columns(row, g, ind.get(row["security_id"]), curated, medians.get(row["security_id"])))
-    cross_section(rows)
+    if cross:
+        cross_section(rows)
 
 
 # ── stage 3: cross-section of one as-of date ──────────────────────────────────────────────────────────────────────
@@ -605,31 +612,37 @@ _ARROW_TYPES = {"magic_formula_rank": "int32", "hats_passed": "int32", "market_c
 
 def refresh_cross_section(con, as_of: date) -> None:
     """Recompute CROSS_COLUMNS for every stored row of `as_of` (inside the materialize transaction, after the day's
-    rows are written): one read of the history view, one UPDATE of features_daily (CROSS_COLUMNS are DAILY columns,
-    tests/test_features_store.py) through Arrow."""
+    rows are written)."""
+    refresh_cross_sections(con, [as_of])
+
+
+def refresh_cross_sections(con, days) -> None:
+    """Recompute CROSS_COLUMNS for every stored row of each of `days`, each day's cross-section from that day's rows
+    alone, in security order (inside the materialize transaction, after the days' rows are written): one read of the
+    history view, one UPDATE of features_daily (CROSS_COLUMNS are DAILY columns, tests/test_features_store.py)
+    through Arrow, for all the days (a full run publishes many days per transaction, features.materialize_days)."""
     import pyarrow as pa
 
-    from financials.db import fetch_dicts
+    from financials.features_store import stored_days
 
-    rows = fetch_dicts(con, f"SELECT {', '.join(CROSS_INPUTS)} FROM screener_features_history WHERE as_of_date = ? "
-                       "ORDER BY security_id",
-                       [as_of])  # fmt: skip
+    rows = []
+    for day, day_rows in stored_days(con, CROSS_INPUTS, days):
+        cross_section(day_rows)
+        rows += [{**r, "as_of_date": day} for r in day_rows]
     if not rows:
         return
-    cross_section(rows)
     types = {"int32": pa.int32(), "float64": pa.float64(), "decimal": pa.decimal128(24, 2)}
-    fields = [pa.field("security_id", pa.string())] + [
+    fields = [pa.field("as_of_date", pa.date32()), pa.field("security_id", pa.string())] + [
         pa.field(c, types[_ARROW_TYPES[c]] if c in _ARROW_TYPES else pa.bool_()) for c in CROSS_COLUMNS
     ]
-    table = pa.Table.from_pylist([{c: r[c] for c in ("security_id", *CROSS_COLUMNS)} for r in rows],
+    table = pa.Table.from_pylist([{c: r[c] for c in ("as_of_date", "security_id", *CROSS_COLUMNS)} for r in rows],
                                  schema=pa.schema(fields))  # fmt: skip
     con.register("_gems_cross", table)
     try:
         sets = ", ".join(f"{c} = s.{c}" for c in CROSS_COLUMNS)
         con.execute(
             f"UPDATE features_daily h SET {sets} FROM _gems_cross s "  # DAILY columns (features_store)
-            "WHERE h.as_of_date = ? AND h.security_id = s.security_id",
-            [as_of],
+            "WHERE h.as_of_date = s.as_of_date AND h.security_id = s.security_id"
         )
     finally:
         con.unregister("_gems_cross")

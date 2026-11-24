@@ -1,10 +1,8 @@
-# Nightly offline test run (docs/architecture.md §13): the same jobs as ci.yml (lint + 6 test shards), every day at 22:00 IST
-# (16:30 UTC; GitHub cron is always UTC) on a GitHub-hosted runner. Offline: no test touches the network or data/.
+# Offline test run (docs/architecture.md §13): the same jobs as ci.yml (lint + 6 test shards) on a GitHub-hosted runner.
+# Manual only (owner 2026-11-23): ci.yml already tests every change; a nightly run re-tested an unchanged main.
 name: nightly-tests
 
 on:
-  schedule:
-    - cron: "30 16 * * *"  # 22:00 IST
   workflow_dispatch:
 
 permissions:

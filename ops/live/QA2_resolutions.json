@@ -1,0 +1,178 @@
+[
+ {
+  "ids": [
+   "q_56174a4775d21e385216fd1e"
+  ],
+  "bucket": "restated by another filing",
+  "symbol": "20MICRONS",
+  "note": "Owner decision 2026-11-14 (X86: an unrecoverable split is withheld per filing, never replaced by PAT) [QA2]: 20MICRONS CONSOLIDATED 2024-04-01..2025-03-31: AR_XBRL_20MICRONS_13012026101736.xml files owners 623,763,000 + NCI 1,084,000 against PAT 636,110,000 (no named rule recovers it; the filing's split stays withheld). The same period is stated consistently by the results filing INTEGRATED_FILING_INDAS_1448986_23052025060630_WEB.xml (visible 2025-05-23): owners 623,763,000 + NCI 1,084,000 = PAT 624,846,000; readers take that owners' figure for the period from its visibility (FactBook.coalesced uses a filed owners' value of any visible filing; the marker only blocks the fallback to PAT). 2 other filing(s) state the same split."
+ },
+ {
+  "ids": [
+   "q_381ba1f233318dcdab7db761"
+  ],
+  "bucket": "restated by another filing",
+  "symbol": "DEVX",
+  "note": "Owner decision 2026-11-14 (X86: an unrecoverable split is withheld per filing, never replaced by PAT) [QA2]: DEVX CONSOLIDATED 2025-04-01..2026-03-31: AR_XBRL_DEVX_23102026124903.xml files owners 88,046,000 + NCI 375,000 against PAT 88,046,000 (no named rule recovers it; the filing's split stays withheld). The same period is stated consistently by the results filing INTEGRATED_FILING_INDAS_1669560_19052026080247_WEB.xml (visible 2026-05-19): owners 88,046,000 + NCI 375,000 = PAT 88,421,000; readers take that owners' figure for the period from its visibility (FactBook.coalesced uses a filed owners' value of any visible filing; the marker only blocks the fallback to PAT)."
+ },
+ {
+  "ids": [
+   "q_8d5f71b5cb62b525aedec153"
+  ],
+  "bucket": "restated by another filing",
+  "symbol": "GOLDIAM",
+  "note": "Owner decision 2026-11-14 (X86: an unrecoverable split is withheld per filing, never replaced by PAT) [QA2]: GOLDIAM CONSOLIDATED 2024-04-01..2025-03-31: INTEGRATED_FILING_INDAS_1451463_26052025071700_WEB.xml files owners 0 + NCI -780,000 against PAT 1,171,049,000 (no named rule recovers it; the filing's split stays withheld). The same period is stated consistently by the Reg. 34 annual report AR_XBRL_GOLDIAM_25102025175029.xml (visible 2025-10-25): owners 1,170,269,000 + NCI 780,000 = PAT 1,171,049,000; readers take that owners' figure for the period from its visibility (FactBook.coalesced uses a filed owners' value of any visible filing; the marker only blocks the fallback to PAT)."
+ },
+ {
+  "ids": [
+   "q_dba678bb0a5e8b5c818c0134"
+  ],
+  "bucket": "restated by another filing",
+  "symbol": "JISLJALEQS",
+  "note": "Owner decision 2026-11-14 (X86: an unrecoverable split is withheld per filing, never replaced by PAT) [QA2]: JISLJALEQS CONSOLIDATED 2024-04-01..2025-03-31: INTEGRATED_FILING_INDAS_1462031_02062025122717_WEB.xml files owners 335,400,000 + NCI -78,500,000 against PAT 219,300,000 (no named rule recovers it; the filing's split stays withheld). The same period is stated consistently by the results filing INTEGRATED_FILING_INDAS_1743730_22102026122058_WEB.xml (visible 2026-10-22): owners 335,400,000 + NCI -78,500,000 = PAT 256,900,000; readers take that owners' figure for the period from its visibility (FactBook.coalesced uses a filed owners' value of any visible filing; the marker only blocks the fallback to PAT). 2 other filing(s) state the same split."
+ },
+ {
+  "ids": [
+   "q_247702b7191da99cbc16c1f8"
+  ],
+  "bucket": "restated by another filing",
+  "symbol": "JISLJALEQS",
+  "note": "Owner decision 2026-11-14 (X86: an unrecoverable split is withheld per filing, never replaced by PAT) [QA2]: JISLJALEQS CONSOLIDATED 2025-01-01..2025-03-31: INTEGRATED_FILING_INDAS_1462031_02062025122717_WEB.xml files owners 289,100,000 + NCI -10,500,000 against PAT 281,800,000 (no named rule recovers it; the filing's split stays withheld). The same period is stated consistently by the results filing INTEGRATED_FILING_INDAS_1743730_22102026122058_WEB.xml (visible 2026-10-22): owners 289,100,000 + NCI -10,500,000 = PAT 278,600,000; readers take that owners' figure for the period from its visibility (FactBook.coalesced uses a filed owners' value of any visible filing; the marker only blocks the fallback to PAT)."
+ },
+ {
+  "ids": [
+   "q_66b0db20bd35c0ce3fa506af"
+  ],
+  "bucket": "restated by another filing",
+  "symbol": "KAMATHOTEL",
+  "note": "Owner decision 2026-11-14 (X86: an unrecoverable split is withheld per filing, never replaced by PAT) [QA2]: KAMATHOTEL CONSOLIDATED 2025-04-01..2025-06-30: INTEGRATED_FILING_INDAS_1499549_31072025072441_WEB.xml files owners 36,384,000 + NCI 5,918,000 against PAT 42,781,000 (no named rule recovers it; the filing's split stays withheld). The same period is stated consistently by the results filing INTEGRATED_FILING_INDAS_1719054_29082026020446_WEB.xml (visible 2026-08-29): owners 36,384,000 + NCI 5,918,000 = PAT 42,302,000; readers take that owners' figure for the period from its visibility (FactBook.coalesced uses a filed owners' value of any visible filing; the marker only blocks the fallback to PAT). 1 other filing(s) state the same split."
+ },
+ {
+  "ids": [
+   "q_1fdb4579b7bb612c19a796ef"
+  ],
+  "bucket": "restated by another filing",
+  "symbol": "KPEL",
+  "note": "Owner decision 2026-11-14 (X86: an unrecoverable split is withheld per filing, never replaced by PAT) [QA2]: KPEL CONSOLIDATED 2024-04-01..2025-03-31: AR_XBRL_KPEL_15012026115054.xml files owners 1,151,921,000 + NCI -77,000 against PAT 1,153,255,000 (no named rule recovers it; the filing's split stays withheld). The same period is stated consistently by the results filing INTEGRATED_FILING_INDAS_1439393_14052025114954_WEB.xml (visible 2025-05-14): owners 1,153,332,000 + NCI -77,000 = PAT 1,153,255,000; readers take that owners' figure for the period from its visibility (FactBook.coalesced uses a filed owners' value of any visible filing; the marker only blocks the fallback to PAT)."
+ },
+ {
+  "ids": [
+   "q_c314702b745ae4ab9dc13812"
+  ],
+  "bucket": "restated by another filing",
+  "symbol": "KRISHIVAL",
+  "note": "Owner decision 2026-11-14 (X86: an unrecoverable split is withheld per filing, never replaced by PAT) [QA2]: KRISHIVAL CONSOLIDATED 2025-04-01..2025-09-30: INTEGRATED_FILING_INDAS_1572460_12112025061356_WEB.xml files owners 100,560,000 + NCI 3,011,000 against PAT 102,022,000 (no named rule recovers it; the filing's split stays withheld). The same period is stated consistently by the results filing INTEGRATED_FILING_INDAS_1648148_09042026051514_WEB.xml (visible 2026-04-09): owners 99,015,000 + NCI 3,011,000 = PAT 102,022,000; readers take that owners' figure for the period from its visibility (FactBook.coalesced uses a filed owners' value of any visible filing; the marker only blocks the fallback to PAT)."
+ },
+ {
+  "ids": [
+   "q_83267536724b370849852858"
+  ],
+  "bucket": "restated by another filing",
+  "symbol": "LINC",
+  "note": "Owner decision 2026-11-14 (X86: an unrecoverable split is withheld per filing, never replaced by PAT) [QA2]: LINC CONSOLIDATED 2024-04-01..2025-03-31: AR_XBRL_LINC_16102026144507.xml files owners 376,043,000 + NCI -3,105,000 against PAT 377,337,000 (no named rule recovers it; the filing's split stays withheld). The same period is stated consistently by the results filing INTEGRATED_FILING_INDAS_1433610_07052025115153_WEB.xml (visible 2025-05-07): owners 380,442,000 + NCI -3,105,000 = PAT 377,337,000; readers take that owners' figure for the period from its visibility (FactBook.coalesced uses a filed owners' value of any visible filing; the marker only blocks the fallback to PAT). 1 other filing(s) state the same split."
+ },
+ {
+  "ids": [
+   "q_3b28dbbf5603ef04a8f7a2a4"
+  ],
+  "bucket": "restated by another filing",
+  "symbol": "LINC",
+  "note": "Owner decision 2026-11-14 (X86: an unrecoverable split is withheld per filing, never replaced by PAT) [QA2]: LINC CONSOLIDATED 2025-04-01..2026-03-31: AR_XBRL_LINC_16102026144507.xml files owners 321,012,000 + NCI 1,707,000 against PAT 329,135,000 (no named rule recovers it; the filing's split stays withheld). The same period is stated consistently by the results filing INTEGRATED_FILING_INDAS_1691382_13072026034108_WEB.xml (visible 2026-07-13): owners 327,428,000 + NCI 1,707,000 = PAT 329,135,000; readers take that owners' figure for the period from its visibility (FactBook.coalesced uses a filed owners' value of any visible filing; the marker only blocks the fallback to PAT). 1 other filing(s) state the same split."
+ },
+ {
+  "ids": [
+   "q_c4b133d4fd0f39832c8496e2"
+  ],
+  "bucket": "restated by another filing",
+  "symbol": "MOLDTECH",
+  "note": "Owner decision 2026-11-14 (X86: an unrecoverable split is withheld per filing, never replaced by PAT) [QA2]: MOLDTECH CONSOLIDATED 2024-04-01..2025-03-31: AR_XBRL_MOLDTECH_05022026145448.xml files owners -64,753,729 + NCI 0 against PAT 121,678,044 (no named rule recovers it; the filing's split stays withheld). The same period is stated consistently by the results filing INTEGRATED_FILING_INDAS_1458143_29052025094153_WEB.xml (visible 2025-05-29): owners 121,678,000 + NCI 0 = PAT 121,678,000; readers take that owners' figure for the period from its visibility (FactBook.coalesced uses a filed owners' value of any visible filing; the marker only blocks the fallback to PAT)."
+ },
+ {
+  "ids": [
+   "q_420b5a0bd5ceecb445ba14fc"
+  ],
+  "bucket": "restated by another filing",
+  "symbol": "MOLDTECH",
+  "note": "Owner decision 2026-11-14 (X86: an unrecoverable split is withheld per filing, never replaced by PAT) [QA2]: MOLDTECH CONSOLIDATED 2026-01-01..2026-03-31: INTEGRATED_FILING_INDAS_1735961_12102026013355_WEB.xml files owners -27,026,000 + NCI 0 against PAT 22,835,000 (no named rule recovers it; the filing's split stays withheld). The same period is stated consistently by the results filing INTEGRATED_FILING_INDAS_1667459_14052026111018_WEB.xml (visible 2026-05-14): owners 22,835,000 + NCI 0 = PAT 22,835,000; readers take that owners' figure for the period from its visibility (FactBook.coalesced uses a filed owners' value of any visible filing; the marker only blocks the fallback to PAT)."
+ },
+ {
+  "ids": [
+   "q_5cc9abff7ae77c87c3e18252"
+  ],
+  "bucket": "restated by another filing",
+  "symbol": "NAZARA",
+  "note": "Owner decision 2026-11-14 (X86: an unrecoverable split is withheld per filing, never replaced by PAT) [QA2]: NAZARA CONSOLIDATED 2024-04-01..2025-03-31: INTEGRATED_FILING_INDAS_1465176_10062025054850_WEB.xml files owners 869,200,000 + NCI -243,900,000 against PAT 509,600,000 (no named rule recovers it; the filing's split stays withheld). The same period is stated consistently by the Reg. 34 annual report AR_XBRL_NAZARA_16112026123324.xml (visible 2026-11-16): owners 758,200,000 + NCI -248,600,000 = PAT 509,600,000; readers take that owners' figure for the period from its visibility (FactBook.coalesced uses a filed owners' value of any visible filing; the marker only blocks the fallback to PAT). 1 other filing(s) state the same split."
+ },
+ {
+  "ids": [
+   "q_45cbc4edb566d6a4e4635df8"
+  ],
+  "bucket": "restated by another filing",
+  "symbol": "NAZARA",
+  "note": "Owner decision 2026-11-14 (X86: an unrecoverable split is withheld per filing, never replaced by PAT) [QA2]: NAZARA CONSOLIDATED 2024-04-01..2025-03-31: INTEGRATED_FILING_INDAS_1451577_26052025075229_WEB.xml files owners 869,200,000 + NCI -243,900,000 against PAT 509,600,000 (no named rule recovers it; the filing's split stays withheld). The same period is stated consistently by the Reg. 34 annual report AR_XBRL_NAZARA_16112026123324.xml (visible 2026-11-16): owners 758,200,000 + NCI -248,600,000 = PAT 509,600,000; readers take that owners' figure for the period from its visibility (FactBook.coalesced uses a filed owners' value of any visible filing; the marker only blocks the fallback to PAT). 1 other filing(s) state the same split."
+ },
+ {
+  "ids": [
+   "q_c4a1bf15626a2d81542802e9"
+  ],
+  "bucket": "restated by another filing",
+  "symbol": "NAZARA",
+  "note": "Owner decision 2026-11-14 (X86: an unrecoverable split is withheld per filing, never replaced by PAT) [QA2]: NAZARA CONSOLIDATED 2025-04-01..2026-03-31: INTEGRATED_FILING_INDAS_1666284_12052026113715_WEB.xml files owners 809,200,000 + NCI -139,000,000 against PAT 819,400,000 (no named rule recovers it; the filing's split stays withheld). The same period is stated consistently by the Reg. 34 annual report AR_XBRL_NAZARA_16112026123324.xml (visible 2026-11-16): owners 958,500,000 + NCI -139,100,000 = PAT 819,400,000; readers take that owners' figure for the period from its visibility (FactBook.coalesced uses a filed owners' value of any visible filing; the marker only blocks the fallback to PAT)."
+ },
+ {
+  "ids": [
+   "q_a0e58b38ae11d83b9edadbdf"
+  ],
+  "bucket": "restated by another filing",
+  "symbol": "NAZARA",
+  "note": "Owner decision 2026-11-14 (X86: an unrecoverable split is withheld per filing, never replaced by PAT) [QA2]: NAZARA CONSOLIDATED 2025-04-01..2026-03-31: INTEGRATED_FILING_INDAS_1740461_16102026080647_WEB.xml files owners 809,200,000 + NCI -139,000,000 against PAT -232,400,000 (no named rule recovers it; the filing's split stays withheld). The same period is stated consistently by the Reg. 34 annual report AR_XBRL_NAZARA_16112026123324.xml (visible 2026-11-16): owners 958,500,000 + NCI -139,100,000 = PAT 819,400,000; readers take that owners' figure for the period from its visibility (FactBook.coalesced uses a filed owners' value of any visible filing; the marker only blocks the fallback to PAT)."
+ },
+ {
+  "ids": [
+   "q_24b0c0570e773e9142b14e62"
+  ],
+  "bucket": "restated by another filing",
+  "symbol": "OMINFRAL",
+  "note": "Owner decision 2026-11-14 (X86: an unrecoverable split is withheld per filing, never replaced by PAT) [QA2]: OMINFRAL CONSOLIDATED 2024-04-01..2025-03-31: AR_XBRL_OMINFRAL_31012026162517.xml files owners 341,019,442 + NCI 0 against PAT 359,079,595 (no named rule recovers it; the filing's split stays withheld). The same period is stated consistently by the results filing INTEGRATED_FILING_INDAS_1460736_30052025095646_WEB.xml (visible 2025-05-30): owners 359,020,000 + NCI 59,000 = PAT 359,079,000; readers take that owners' figure for the period from its visibility (FactBook.coalesced uses a filed owners' value of any visible filing; the marker only blocks the fallback to PAT)."
+ },
+ {
+  "ids": [
+   "q_535fc3cd12af525a2b6ac916"
+  ],
+  "bucket": "restated by another filing",
+  "symbol": "REFEX",
+  "note": "Owner decision 2026-11-14 (X86: an unrecoverable split is withheld per filing, never replaced by PAT) [QA2]: REFEX CONSOLIDATED 2024-04-01..2025-03-31: AR_XBRL_REFEX_25092026163627.xml files owners 1,575,832,000 + NCI -6,531,000 against PAT 1,583,835,000 (no named rule recovers it; the filing's split stays withheld). The same period is stated consistently by the results filing INTEGRATED_FILING_INDAS_1423524_23042025102002_WEB.xml (visible 2025-04-23): owners 1,587,783,000 + NCI -3,948,000 = PAT 1,583,835,000; readers take that owners' figure for the period from its visibility (FactBook.coalesced uses a filed owners' value of any visible filing; the marker only blocks the fallback to PAT). 1 other filing(s) state the same split."
+ },
+ {
+  "ids": [
+   "q_0080b8a0f78205542eed97ea"
+  ],
+  "bucket": "restated by another filing",
+  "symbol": "RSWM",
+  "note": "Owner decision 2026-11-14 (X86: an unrecoverable split is withheld per filing, never replaced by PAT) [QA2]: RSWM CONSOLIDATED 2024-04-01..2025-03-31: AR_XBRL_RSWM_18092026172518.xml files owners -2,014,000 + NCI 0 against PAT -400,268,000 (no named rule recovers it; the filing's split stays withheld). The same period is stated consistently by the Reg. 34 annual report AR_XBRL_RSWM_01102025112339.xml (visible 2025-10-01): owners -400,268,000 + NCI 0 = PAT -400,268,000; readers take that owners' figure for the period from its visibility (FactBook.coalesced uses a filed owners' value of any visible filing; the marker only blocks the fallback to PAT)."
+ },
+ {
+  "ids": [
+   "q_eb7ea5bfe1b19873e9024b15"
+  ],
+  "bucket": "restated by another filing",
+  "symbol": "SARVESHWAR",
+  "note": "Owner decision 2026-11-14 (X86: an unrecoverable split is withheld per filing, never replaced by PAT) [QA2]: SARVESHWAR CONSOLIDATED 2024-04-01..2025-03-31: AR_XBRL_SARVESHWAR_29012026164152.xml files owners 271,140,000 + NCI 242,000 against PAT 269,188,000 (no named rule recovers it; the filing's split stays withheld). The same period is stated consistently by the results filing INTEGRATED_FILING_INDAS_1461760_31052025061133_WEB.xml (visible 2025-05-31): owners 268,946,000 + NCI 242,000 = PAT 269,188,000; readers take that owners' figure for the period from its visibility (FactBook.coalesced uses a filed owners' value of any visible filing; the marker only blocks the fallback to PAT). 1 other filing(s) state the same split."
+ },
+ {
+  "ids": [
+   "q_50e77748839a5ceca317da16"
+  ],
+  "bucket": "restated by another filing",
+  "symbol": "XTGLOBAL",
+  "note": "Owner decision 2026-11-14 (X86: an unrecoverable split is withheld per filing, never replaced by PAT) [QA2]: XTGLOBAL CONSOLIDATED 2024-04-01..2025-03-31: AR_XBRL_XTGLOBAL_13012026131111.xml files owners 88,201,000 + NCI 7,631,000 against PAT 99,116,000 (no named rule recovers it; the filing's split stays withheld). The same period is stated consistently by the results filing INTEGRATED_FILING_INDAS_1461197_31052025122727_WEB.xml (visible 2025-05-30): owners 91,484,400 + NCI 7,630,600 = PAT 99,115,000; readers take that owners' figure for the period from its visibility (FactBook.coalesced uses a filed owners' value of any visible filing; the marker only blocks the fallback to PAT)."
+ },
+ {
+  "ids": [
+   "q_ac845ae58d612e323b762ada"
+  ],
+  "bucket": "restated by another filing",
+  "symbol": "YATRA",
+  "note": "Owner decision 2026-11-14 (X86: an unrecoverable split is withheld per filing, never replaced by PAT) [QA2]: YATRA CONSOLIDATED 2025-04-01..2026-03-31: INTEGRATED_FILING_INDAS_1735217_09102026073824_WEB.xml files owners 486,100,000 + NCI 0 against PAT 468,100,000 (no named rule recovers it; the filing's split stays withheld). The same period is stated consistently by the results filing INTEGRATED_FILING_INDAS_1671879_23052026034917_WEB.xml (visible 2026-05-22): owners 468,100,000 + NCI 0 = PAT 468,100,000; readers take that owners' figure for the period from its visibility (FactBook.coalesced uses a filed owners' value of any visible filing; the marker only blocks the fallback to PAT)."
+ }
+]

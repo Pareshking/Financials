@@ -19,11 +19,12 @@ in fact_observations beside quarterly ones and load_factbook picks the latest vi
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import re
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from financials.parsers import ParseError, canonical_archive_url
@@ -42,6 +43,7 @@ from financials.parsers.indas_corp import (
     _check_eps,
     _check_identities,
     enrich_line_items,
+    first_period_months,
     map_line_items,
     period_months,
     preserve_withheld,
@@ -67,6 +69,11 @@ ANNUAL_DURATION_TAGS: dict[str, tuple[str, str]] = {
     "PowerAndFuel": ("power_and_fuel", "INR"),
     "CostFreight": ("freight", "INR"),
     "AdvertisingPromotionalExpenses": ("advertising_promotion", "INR"),
+    # E&P companies' face-of-P&L cost line (ONGC, IOC); elsewhere a note inside other expenses [X153].
+    "ExpenditureOnProductionTransportationAndOtherExpenditurePertainingToExplorationAndProductionActivities": (
+        "ep_expenditure",
+        "INR",
+    ),
     # Investments bought/sold (CF sub-rows, 8/13 and 6/13 filings) [X74]
     "OtherCashPaymentsToAcquireEquityOrDebtInstrumentsOfOtherEntitiesClassifiedAsInvestingActivities": (
         "investments_purchased",
@@ -122,6 +129,15 @@ ANNUAL_LABEL_RULES = (
      "OtherNoncurrentAssetsOthers", "right_of_use_assets", re.compile(r"^\s*right[\s-]*of[\s-]*use", re.I)),
 )  # fmt: skip
 
+# LevelOfRoundingUsedInFinancialStatements values outside ROUNDING_UNITS that name one of its units. The MCA
+# taxonomy enumeration is Actual, Thousands, Lakhs, Millions, Crores, Billions; "Actual" = amounts in rupees [X150].
+ANNUAL_ROUNDING_ALIASES = {"Actual": "Rupees"}
+ACTUAL_ROUNDING_RULE = "ACTUAL_ROUNDING_IS_RUPEES"
+UNDECLARED_PRE_CUTOFF_RULE = "UNDECLARED_PRE_CUTOFF_CONTEXT"
+IRREGULAR_STUB_RULE = "IRREGULAR_COMPARATIVE_STUB"
+FIRST_PERIOD_RULE = "FIRST_PERIOD_LONG"  # X337
+PRE_CUTOFF_PERIOD_RULE = "PRE_CUTOFF_DECLARED_PERIOD_IGNORED"  # X338
+
 CRITICAL = ("revenue_from_operations", "total_income", "total_expenses", "pbt", "pat", "total_assets", "total_equity")
 
 
@@ -167,10 +183,23 @@ def parse_reg34_annual(data: bytes, file_name: str | None = None) -> ParsedResul
     preserve_withheld(inst, result, durations=set(result.meta["in_scope_periods"]),
                       instants=set(result.meta["in_scope_instants"]))  # fmt: skip
     enrich_line_items(result)
+    _first_period_months(result)
     if result.issues:
         return result
     _identities(result)
     return result
+
+
+def _first_period_months(result: ParsedResults) -> None:
+    """X337: every duration fact of a FIRST_PERIOD_LONG period carries its 13..18 months (whole-month
+    `period_months` is None for a period starting mid-month)."""
+    first = set(result.meta.get("first_periods") or ())
+    if first:
+        result.facts[:] = [
+            dataclasses.replace(f, period_months=first_period_months(f.period_start, f.period_end))
+            if f.period_type == "DURATION" and (f.period_start, f.period_end) in first else f
+            for f in result.facts
+        ]  # fmt: skip
 
 
 def _meta(inst: Instance, result: ParsedResults, file_name: str | None) -> None:
@@ -186,6 +215,10 @@ def _meta(inst: Instance, result: ParsedResults, file_name: str | None) -> None:
         result.issues.append(
             Issue("PARSE", "MISSING_META" if not scope_text else "UNKNOWN_SCOPE", {"scope": scope_text})
         )
+    rules: list[str] = []
+    if rounding in ANNUAL_ROUNDING_ALIASES:  # ACTUAL_ROUNDING_IS_RUPEES [X150]
+        rounding = ANNUAL_ROUNDING_ALIASES[rounding]
+        rules.append(ACTUAL_ROUNDING_RULE)
     if rounding not in ROUNDING_UNITS:
         result.issues.append(Issue("PARSE", "UNKNOWN_ROUNDING", {"value": rounding}))
 
@@ -197,30 +230,43 @@ def _meta(inst: Instance, result: ParsedResults, file_name: str | None) -> None:
             continue
         if f.name in ("DateOfStartOfReportingPeriod", "DateOfEndOfReportingPeriod"):
             declared[f.context_id][f.name] = date.fromisoformat(f.value_text.strip())
-    periods = set()
+    periods, irregular, first, conflicts = set(), set(), set(), []
     for cid, d in declared.items():
         c = inst.contexts[cid]
         start, end = d.get("DateOfStartOfReportingPeriod"), d.get("DateOfEndOfReportingPeriod")
         if (start, end) != (c.start, c.end):  # never trust context dates blindly (invariant 6)
-            result.issues.append(
-                Issue(
-                    "PERIOD",
-                    "CONTEXT_CONFLICT",
-                    {"context_id": cid, "context": [str(c.start), str(c.end)], "declared": [str(start), str(end)]},
-                )
-            )
+            conflicts.append({"context_id": cid, "context": [str(c.start), str(c.end)],
+                              "declared": [str(start), str(end)]})  # fmt: skip
             continue
         months = period_months(start, end)
+        if months is None and first_period_months(start, end) is not None:
+            first.add((start, end))  # FIRST_PERIOD_LONG [X337]: a regular, one-off period
+            periods.add((start, end))
+            continue
         if months is None or not 1 <= months <= 18:
-            result.issues.append(Issue("PERIOD", "IRREGULAR_PERIOD", {"dates": [str(start), str(end)]}))
+            irregular.add((start, end))
             continue
         periods.add((start, end))
+    stubs = _comparative_stubs(irregular, periods)  # IRREGULAR_COMPARATIVE_STUB [X152]
+    ignored = _pre_cutoff_comparatives(irregular - stubs, conflicts, periods)  # X338
+    for x in conflicts:
+        if x["context_id"] not in ignored["context_ids"]:
+            result.issues.append(Issue("PERIOD", "CONTEXT_CONFLICT", x))
+    for start, end in sorted(irregular - stubs - ignored["periods"]):
+        result.issues.append(Issue("PERIOD", "IRREGULAR_PERIOD", {"dates": [str(start), str(end)]}))
+    if stubs:
+        rules.append(IRREGULAR_STUB_RULE)
+    if first:
+        rules.append(FIRST_PERIOD_RULE)
+    if ignored["context_ids"] or ignored["periods"]:
+        rules.append(PRE_CUTOFF_PERIOD_RULE)
     if not periods:
         result.issues.append(Issue("PERIOD", "NO_DECLARED_PERIOD", {}))
         return
     fy_start, fy_end = max(periods, key=lambda p: p[1])
     in_scope = sorted(p for p in periods if p[1] >= MIN_PERIOD_END_DATE)
-    instants = sorted({p[1] for p in in_scope})
+    # A stub's end is a balance-sheet date like any other; only its (irregular) duration facts are dropped.
+    instants = sorted({p[1] for p in in_scope} | {p[1] for p in stubs if p[1] >= MIN_PERIOD_END_DATE})
     qualified = (
         text("WhetherAuditorsReportHasBeenQualifiedOrHasAnyReservationsOrContainsAdverseRemarks") or ""
     ).lower()
@@ -233,6 +279,8 @@ def _meta(inst: Instance, result: ParsedResults, file_name: str | None) -> None:
         quarter_period=(fy_start, fy_end),  # used by the shared identity checks
         ytd_period=(fy_start, fy_end),
         declared_periods=sorted(periods),
+        stub_periods=sorted(stubs),
+        first_periods=sorted(first),
         in_scope_periods=in_scope,
         in_scope_instants=instants,
         reporting_quarter=None,
@@ -249,13 +297,43 @@ def _meta(inst: Instance, result: ParsedResults, file_name: str | None) -> None:
         interest_recd_cfo_class=None,
         ignored_pre_cutoff_facts=0,
         warnings=[],
-        rules_applied=[],
+        rules_applied=rules,
     )
+
+
+def _pre_cutoff_comparatives(irregular: set, conflicts: list[dict], regular: set) -> dict:
+    """PRE_CUTOFF_DECLARED_PERIOD_IGNORED [X338]: a declared comparative period that is irregular, or whose declared
+    dates disagree with its context's, is out of scope when both its declared and its context dates end before
+    MIN_PERIOD_END_DATE (C9, invariant 14) and the filing declares a regular in-scope period ending later. Nothing of
+    it would be parsed anyway, so it no longer blocks the filing: BLUSPRING's carve-out comparative 2023-04-01..
+    2024-02-10 (an X152 stub once its first period is regular), TRANSRAILL FY25's comparative declared 2023-01-04..
+    2024-03-31 for context D_01042023_31032024 (day and month swapped). Its facts then fall under X151 (undeclared
+    pre-cutoff context) or X152; an in-scope irregular or conflicting period still quarantines the filing."""
+    out: dict = {"periods": set(), "context_ids": set()}
+    if not any(p[1] >= MIN_PERIOD_END_DATE for p in regular):
+        return out
+    out["periods"] = {p for p in irregular if p[1] < MIN_PERIOD_END_DATE}
+    for x in conflicts:
+        ends = [x["context"][1], x["declared"][1]]
+        if all(e != "None" and date.fromisoformat(e) < MIN_PERIOD_END_DATE for e in ends):
+            out["context_ids"].add(x["context_id"])
+    return out
+
+
+def _comparative_stubs(irregular: set, regular: set) -> set:
+    """IRREGULAR_COMPARATIVE_STUB [X152]: the comparative column of a company's second annual report is its first
+    financial period, from incorporation to the first year end (ITC Hotels 2023-07-28..2024-03-31, Tata Motors CV
+    2024-06-23..2025-03-31, Siemens Energy India 2024-02-07..2024-09-30). Such a period cannot be compared or summed
+    with anything (invariant 6), so its duration facts are dropped; the filing's regular current year is kept. A stub
+    qualifies only when it ends exactly the day before a regular declared period starts and ends before it. An
+    irregular period that is the latest (or only) period still quarantines the filing (IRREGULAR_PERIOD)."""
+    return {s for s in irregular if any(r[0] == s[1] + timedelta(days=1) and s[1] < r[1] for r in regular)}
 
 
 def _map(inst: Instance, result: ParsedResults) -> None:
     periods = set(result.meta["in_scope_periods"])
     all_periods = set(result.meta["declared_periods"])
+    stubs = set(result.meta["stub_periods"])
     instants = set(result.meta["in_scope_instants"])
     durations = {**DURATION_TAGS, **ANNUAL_DURATION_TAGS}
     instant_tags = {**INSTANT_TAGS, **ANNUAL_INSTANT_TAGS}
@@ -280,6 +358,15 @@ def _map(inst: Instance, result: ParsedResults) -> None:
             if mapping is None:
                 continue
             p = (c.start, c.end)
+            if p in stubs:
+                result.meta["ignored_stub_facts"] = result.meta.get("ignored_stub_facts", 0) + 1
+                continue
+            if p not in all_periods and _undeclared_pre_cutoff(p, all_periods):
+                # UNDECLARED_PRE_CUTOFF_CONTEXT [X151]
+                result.meta["ignored_pre_cutoff_facts"] += 1
+                if UNDECLARED_PRE_CUTOFF_RULE not in result.meta["rules_applied"]:
+                    result.meta["rules_applied"].append(UNDECLARED_PRE_CUTOFF_RULE)
+                continue
             if p not in all_periods:
                 result.issues.append(
                     Issue(
@@ -303,6 +390,17 @@ def _map(inst: Instance, result: ParsedResults) -> None:
         )
         if not has:
             result.issues.append(Issue("PARSE", "MISSING_CRITICAL", {"tag": t}))
+
+
+def _undeclared_pre_cutoff(p: tuple[date, date], declared: set) -> bool:
+    """UNDECLARED_PRE_CUTOFF_CONTEXT [X151]: a duration context that no DateOfStart/EndOfReportingPeriod declares,
+    ending before MIN_PERIOD_END_DATE and on or before the start of every declared period (the year before the
+    comparative: LTTS, Marico, Oberoi Realty FY25 and Alok Industries FY26 tag IncomeTaxesPaidRefund for it), is out
+    of scope (C9, invariant 14) and ignored like any pre-cutoff fact. Any other undeclared context still conflicts."""
+    start, end = p
+    if start is None or end is None or end >= MIN_PERIOD_END_DATE or not declared:
+        return False
+    return all(end < d[0] for d in declared)
 
 
 def _add(result: ParsedResults, seen: dict, cf: CanonicalFact) -> None:

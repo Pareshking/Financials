@@ -225,11 +225,12 @@ def extend_synthetic(path: Path, n_secs: int, start: date, end: date, seed: int 
     return out
 
 
-def run_synthetic(db: Path, work: Path, n_secs: int, legacy_days: int = 3) -> dict:
+def run_synthetic(db: Path, work: Path, n_secs: int, legacy_days: int = 3, incremental=None) -> dict:
     """Materialise every day of the fixture market extended with `n_secs` synthetic histories (2024-10-01 to
     2026-11-11): one full run on the run-level path (per-day timings), then the per-day legacy path
     (FINANCIALS_MATERIALIZE_LEGACY=1) for `legacy_days` days spread over the history on a copy holding the same
-    earlier days (each rewrites one day of a copy that holds the run's history)."""
+    earlier days (each rewrites one day of a copy that holds the run's history). `incremental` = (entities,
+    days): then the incremental scenarios of `run_incremental` on the materialised history (section 7)."""
     from financials import features, features_store
     from financials.price_history import LEGACY_ENV
 
@@ -246,8 +247,20 @@ def run_synthetic(db: Path, work: Path, n_secs: int, legacy_days: int = 3) -> di
     n_secs = con.execute("SELECT count(DISTINCT security_id) FROM ohlcv WHERE trade_date = ?", [days[0]]).fetchone()[0]
     con.close()
     shutil.copy(path, work / "synthetic_legacy.duckdb")
-    con = connect(path)
+    shutil.copy(path, work / "synthetic_daybyday.duckdb")
     res: dict = {"secs": n_secs, "requested": requested, "days": len(days), "per_day": []}
+    # The full run as `materialize --from/--to` makes it: batched (features._materialize_batched).
+    con = connect(path)
+    t0 = time.perf_counter()
+    with features.materialize_run(con, days) as prices:
+        out = features.materialize_days(con, days, prices=prices)
+    if len(out) != len(days) or any(r.status != "PROMOTED" for r in out):
+        raise RuntimeError(f"batched run: {out[-1]}")
+    res["batched_s"] = time.perf_counter() - t0
+    res["batch_days"] = features.FULL_RUN_BATCH_DAYS
+    con.close()
+    # The same run day by day (one transaction a day, no full-run memo): the per-day timings.
+    con = connect(work / "synthetic_daybyday.duckdb")
     t0 = time.perf_counter()
     with features.materialize_run(con, days) as prices:
         res["load_s"] = time.perf_counter() - t0
@@ -261,6 +274,7 @@ def run_synthetic(db: Path, work: Path, n_secs: int, legacy_days: int = 3) -> di
     res["total_s"] = time.perf_counter() - t0
     res["rss_mb"] = _rss_mb()
     con.close()
+    (work / "synthetic_daybyday.duckdb").unlink()
     # The legacy path on a few days, each on a database holding every earlier materialised day (as in a run).
     sample = [days[int(i * (len(days) - 1) / max(1, legacy_days - 1))] for i in range(legacy_days)]
     res["legacy"] = []
@@ -281,7 +295,52 @@ def run_synthetic(db: Path, work: Path, n_secs: int, legacy_days: int = 3) -> di
         fast_s = next(s for x, s, _ in res["per_day"] if x == d)
         res["legacy"].append((d, r.rows, legacy_s, fast_s))
     lcon.close()
+    if incremental:
+        res["incremental"] = run_incremental(path, *incremental)
     return res
+
+
+def run_incremental(path: Path, n_entities: int, n_days: int) -> list[dict]:
+    """`materialize --incremental` on the fully materialised synthetic history (architecture §11.10): `n_entities`
+    dirty entities over the last `n_days` materialised days, twice. First the markers of a change that changed none
+    of their rows (a re-parse, a BSE mirror of a filing): every day recomputes the entities' rows and compares them
+    with the stored ones. Then a real change: an accepted 1:2 split of each entity's security on the first of those
+    days (marked by the market-state diff, as a promoted corporate-action batch does), so every day from it is
+    recomputed and published (G5, G4, write, cross-section)."""
+    from financials import dirty
+    from financials.features import materialize_incremental
+
+    con = connect(path)
+    days = [d for (d,) in con.execute("SELECT DISTINCT as_of_date FROM features_daily ORDER BY 1").fetchall()]
+    start = days[-min(n_days, len(days))]
+    picked = con.execute(
+        "SELECT entity_id, min(security_id) FROM features_daily WHERE as_of_date = ? GROUP BY 1 ORDER BY 1 LIMIT ?",
+        [start, n_entities],
+    ).fetchall()
+    out = []
+    for kind in ("unchanged", "split"):
+        con.execute("DELETE FROM materialize_dirty")
+        if kind == "unchanged":
+            dirty.mark_entities(con, [e for e, _ in picked], start, "BENCH")
+        else:
+            before = dirty.market_state(con)
+            fid = con.execute("SELECT min(filing_id) FROM filings").fetchone()[0]
+            for ent, sec in picked:
+                con.execute(
+                    "INSERT INTO corp_actions (action_id, entity_id, security_id, action_type, ex_date, price_factor, "
+                    "eps_factor, status, source_filing_id, decided_at) VALUES (?, ?, ?, 'SPLIT', ?, 0.5, 0.5, "
+                    "'VERIFIED', ?, ?)",
+                    [f"bench-inc-{sec}", ent, sec, start, fid, start],
+                )
+            dirty.mark_market_changes(con, before, "BENCH")
+        t = time.perf_counter()
+        r = materialize_incremental(con)
+        s = time.perf_counter() - t
+        published = sum(d.status == "PROMOTED" for d in r.days)
+        out.append({"kind": kind, "entities": len(picked), "days": len(r.days), "published": published,
+                    "status": r.status, "s": s})  # fmt: skip
+    con.close()
+    return out
 
 
 def _rss_mb() -> float:
@@ -367,11 +426,14 @@ def render(res: dict) -> str:
             f"The fixture market plus random-walk histories for {syn['secs']:,} securities (every security of the "
             f"2025-09-19 fixture day, up to N) on every weekday from 2024-10-01 (accepted splits, holes, Nifty 500 "
             f"closes; `bench.extend_synthetic`): {syn['days']} days, "
-            f"one `materialize --from/--to` run on the run-level path (§11.11). Price history read in "
-            f"{syn['load_s']:.1f} s; **whole run {syn['total_s'] / 60:.1f} min** "
-            f"({syn['total_s'] / syn['days']:.2f} s a day on average), peak RSS {syn['rss_mb']:,.0f} MB.",
+            f"one `materialize --from/--to` run (§11.11). **Batched full run** (`materialize_days`, what the CLI "
+            f"runs: up to {syn.get('batch_days', '?')} days per transaction, the full-run visibility memo and "
+            f"slices): **{syn.get('batched_s', 0) / 60:.1f} min** ({syn.get('batched_s', 0) / syn['days']:.2f} s a "
+            f"day). The same run day by day (`batch_days=1`, one transaction a day): **{syn['total_s'] / 60:.1f} "
+            f"min** ({syn['total_s'] / syn['days']:.2f} s a day; price history read in {syn['load_s']:.1f} s), "
+            f"peak RSS {syn['rss_mb']:,.0f} MB. Both leave identical tables (tests/test_materialize_batched.py).",
             "",
-            "| Day | Rows | Run-level path s (materialize incl. gates and write) |",
+            "| Day | Rows | Day-by-day s (materialize incl. gates and write) |",
             "|---|---|---|",
         ]
         lines += [f"| {d} | {n:,} | {t:.2f} |" for d, t, n in q]
@@ -384,6 +446,24 @@ def render(res: dict) -> str:
             "|---|---|---|---|---|",
         ]
         lines += [f"| {d} | {n:,} | {lt:.2f} | {ft:.2f} | {lt / ft:.1f}x |" for d, n, lt, ft in syn["legacy"]]
+    inc = (syn or {}).get("incremental")
+    if inc:
+        lines += [
+            "",
+            "## 7. Incremental runs over the synthetic history (`--incremental-entities N --incremental-days D`)",
+            "",
+            "`materialize --incremental` on the history of section 6 (architecture §11.10): N dirty entities over the "
+            "last D materialised days. *unchanged*: markers whose change left their rows as they were (a re-parse, "
+            "a BSE mirror of a filing): each day recomputes the entities' rows through the run's slices and "
+            "visibility memo and compares them with the stored rows; nothing is published. *split*: an accepted "
+            "1:2 split of each entity's security on the first of those days, so every day from it is published "
+            "(G5, G4, write, cross-section of the whole day).",
+            "",
+            "| Scenario | Dirty entities | Days | Days published | Status | Run s | s / day |",
+            "|---|---|---|---|---|---|---|",
+        ]
+        lines += [f"| {x['kind']} | {x['entities']} | {x['days']} | {x['published']} | {x['status']} | {x['s']:.1f} "
+                  f"| {x['s'] / max(1, x['days']):.3f} |" for x in inc]  # fmt: skip
     lines += ["", "Regression guards with generous margins live in `tests/test_benchmarks.py`.", ""]
     return "\n".join(lines)
 
@@ -400,11 +480,19 @@ def main(argv: list[str] | None = None) -> int:
         help="also time a full run over N synthetic 2-year histories (section 6; N=3000: ~30 min)",
     )
     p.add_argument("--legacy-days", type=int, default=3, help="days timed on the legacy path in section 6")
+    p.add_argument("--incremental-entities", type=int, default=50, help="dirty entities in section 7 (--synthetic)")
+    p.add_argument("--incremental-days", type=int, default=363, help="materialised days they span in section 7")
     args = p.parse_args(argv)
     with tempfile.TemporaryDirectory() as tmp:
         res = run(args.fixtures, Path(tmp))
         if args.synthetic:
-            res["synthetic"] = run_synthetic(Path(tmp) / "market.duckdb", Path(tmp), args.synthetic, args.legacy_days)
+            res["synthetic"] = run_synthetic(
+                Path(tmp) / "market.duckdb",
+                Path(tmp),
+                args.synthetic,
+                args.legacy_days,
+                (args.incremental_entities, args.incremental_days),
+            )
         text = render(res)
     if args.out:
         args.out.write_text(text, encoding="utf-8")

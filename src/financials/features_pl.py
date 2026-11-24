@@ -146,9 +146,10 @@ def _index(rows) -> dict[tuple[str, str], dict]:
     return out
 
 
-def prefetch(con, as_of: datetime, entities=None) -> None:
-    """One pass for every entity of a materialisation day (benchmarks: never a per-entity query on the hot path)."""
-    _PREFETCH[(id(con), as_of)] = _index(_visibility_rows(con, as_of, entities))
+def prefetch(con, as_of: datetime, entities=None, *, key=None) -> None:
+    """One pass for every entity of a materialisation day (benchmarks: never a per-entity query on the hot path).
+    `key`: the connection the readers will look it up with (default `con`)."""
+    _PREFETCH[(id(con if key is None else key), as_of)] = _index(_visibility_rows(con, as_of, entities))
 
 
 def clear(con, as_of: datetime) -> None:
@@ -182,6 +183,14 @@ def _derive(book: FactBook) -> None:
     ebitda = {p: v + fin[p] + dep[p] - oth[p] for p, v in pbeit.items() if p in fin and p in dep and p in oth}
     book.durations[EBITDA] = ebitda
     book.durations[EBIT] = {p: v - dep[p] for p, v in ebitda.items()}
+    # X325: the same lines from as-filed inputs where a withholding rule removed one (flagged with its code)
+    ex_key = book.coalesced("excise_duty", None)
+    book.withhold_combined(REV_OPS, ("revenue_from_operations", ex_key),
+                           lambda v: v["revenue_from_operations"] - v[ex_key])  # fmt: skip
+    parts = ("profit_before_exceptional_and_tax", "finance_costs", "depreciation_amortisation", "other_income")
+    book.withhold_combined(EBITDA, parts, lambda v: v[parts[0]] + v[parts[1]] + v[parts[2]] - v[parts[3]])
+    book.withhold_combined(EBIT, (EBITDA, "depreciation_amortisation"),
+                           lambda v: v[EBITDA] - v["depreciation_amortisation"])  # fmt: skip
 
 
 def sales_tag(book: FactBook) -> str:

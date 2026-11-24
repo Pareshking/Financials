@@ -8,10 +8,10 @@
 # writer and a second run would fail on the file lock.
 name: nightly-pipeline
 
+# Manual only (owner 2026-11-23): no self-hosted runner is registered, so scheduled runs waited a day and were cancelled.
+# The daily and weekly runs are scheduled tasks of the cloud session instead. Re-add a schedule only with a runner.
 on:
-  schedule:
-    - cron: "30 16 * * *"  # 22:00 IST (16:30 UTC); run-day without --date takes today's IST date
-  workflow_dispatch:
+  workflow_dispatch:  # run-day without --date takes today's IST date
 
 permissions:
   contents: read

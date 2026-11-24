@@ -1,0 +1,1720 @@
+[
+ {
+  "ids": [
+   "q_2e71f05ac140e5c133a9001c",
+   "q_e377b15b7ea502b0abdea94e"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. LUMAXIND STANDALONE AR_XBRL_LUMAXIND_25092026171844.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_cf_statement 2025-03-31 1,242.48 -> 5.42 Cr; cff 2025-03-31 634.98 -> 59.83 Cr; cfi 2025-03-31 326.12 -> -286.02 Cr; cfo 2025-03-31 250.18 -> 200.40 Cr; net_cash_flow 2025-03-31 1,211.28 -> -25.79 Cr; net_cash_flow_after_fx 2025-03-31 1,211.28 -> -25.79 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_a7d908ea60396a24f0f85151",
+   "q_afde71e7a56161c8ee0f87b2"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class FX_EFFECT_RECLASSIFIED (X307) accepted like X233; the check keeps running. NEULANDLAB CONSOLIDATED AR_XBRL_NEULANDLAB_31082026083851.xml: an amount moved between the net change and the exchange-difference line below it; the net change after that line, PAT and total equity agree. Lines: cfo 2025-03-31 317.38 -> 317.40 Cr; fx_effect_on_cash 2025-03-31 0.17 -> 0.15 Cr; net_cash_flow 2025-03-31 44.19 -> 44.21 Cr",
+  "bucket": "restated X307 OLD"
+ },
+ {
+  "ids": [
+   "q_ce3c7650f85bbb875c71ca6f",
+   "q_f28ac22b3be15319db7263f7"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. VINDHYATEL CONSOLIDATED AR_XBRL_VINDHYATEL_01092026190759.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_and_equivalents 2025-03-31 96.17 -> 85.67 Cr; cash_cf_statement 2025-03-31 96.17 -> 85.67 Cr; cfi 2025-03-31 5.59 -> -4.92 Cr; net_cash_flow 2025-03-31 -56.60 -> -67.11 Cr; net_cash_flow_after_fx 2025-03-31 -56.60 -> -67.11 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_c4909997ae49558ea2c3183c",
+   "q_a436c5fdc0661a6408c24af6"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. JAGSNPHARM STANDALONE AR_XBRL_JAGSNPHARM_29102026130813.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_and_equivalents 2025-03-31 11.22 -> 11.03 Cr; cash_cf_statement 2025-03-31 11.22 -> 11.03 Cr; cfo 2025-03-31 55.30 -> 55.11 Cr; net_cash_flow 2025-03-31 -1.54 -> -1.73 Cr; net_cash_flow_after_fx 2025-03-31 -1.54 -> -1.73 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_067958379f8365ac7a9c685e",
+   "q_6bbbabc8422886c68cf6ab1b"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. LUMAXIND CONSOLIDATED AR_XBRL_LUMAXIND_25092026172006.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_cf_statement 2025-03-31 1,317.25 -> 9.09 Cr; cff 2025-03-31 636.60 -> 58.84 Cr; cfi 2025-03-31 333.05 -> -293.26 Cr; cfo 2025-03-31 316.08 -> 211.99 Cr; net_cash_flow 2025-03-31 1,285.74 -> -22.42 Cr; net_cash_flow_after_fx 2025-03-31 1,285.74 -> -22.42 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_3730e39ef55db0b2e13f0a44",
+   "q_0d0e0c04495bb596d2a93318"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. CLEAN CONSOLIDATED AR_XBRL_CLEAN_13102026190105.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_and_equivalents 2025-03-31 20.03 -> 19.53 Cr; cash_cf_statement 2025-03-31 20.03 -> 19.53 Cr; cfi 2025-03-31 -151.75 -> -152.25 Cr; net_cash_flow 2025-03-31 9.58 -> 9.08 Cr; net_cash_flow_after_fx 2025-03-31 9.59 -> 9.09 Cr",
+  "bucket": "restated X306 OLD"
+ },
+ {
+  "ids": [
+   "q_1850b2a6eb223f1ff6ebff0c",
+   "q_b8253a3213266af60ceee177"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class FX_EFFECT_RECLASSIFIED (X307) accepted like X233; the check keeps running. MAXHEALTH CONSOLIDATED AR_XBRL_MAXHEALTH_31082026124016.xml: an amount moved between the net change and the exchange-difference line below it; the net change after that line, PAT and total equity agree. Lines: cff 2025-03-31 -163.46 -> -163.16 Cr; cfi 2025-03-31 -1,614.23 -> -1,610.69 Cr; cfo 2025-03-31 1,459.31 -> 1,437.96 Cr; fx_effect_on_cash 2025-03-31 0.12 -> 17.63 Cr; net_cash_flow 2025-03-31 -318.38 -> -335.89 Cr",
+  "bucket": "restated X307 OLD"
+ },
+ {
+  "ids": [
+   "q_de1514a73290d86a843d3ed7",
+   "q_f7e7baf972bb9bdbd41847de"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class FX_EFFECT_RECLASSIFIED (X307) accepted like X233; the check keeps running. POLYMED CONSOLIDATED AR_XBRL_POLYMED_03102026150158.xml: an amount moved between the net change and the exchange-difference line below it; the net change after that line, PAT and total equity agree. Lines: cfi 2025-03-31 -1,194.28 -> -1,187.18 Cr; cfo 2025-03-31 240.42 -> 233.05 Cr; fx_effect_on_cash 2025-03-31 0.00 -> 0.27 Cr; net_cash_flow 2025-03-31 -3.35 -> -3.63 Cr",
+  "bucket": "restated X307 OLD"
+ },
+ {
+  "ids": [
+   "q_8fcc8281b36ff34816e9ea15",
+   "q_21ab22f367ac2e337b00b71f"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. IPL STANDALONE AR_XBRL_IPL_23102026163958.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_and_equivalents 2025-03-31 32.73 -> 12.13 Cr; cash_cf_statement 2025-03-31 33.21 -> 12.13 Cr; cff 2025-03-31 24.32 -> 19.48 Cr; cfi 2025-03-31 -4.63 -> -16.02 Cr; cfo 2025-03-31 5.97 -> 1.60 Cr; net_cash_flow 2025-03-31 25.66 -> 5.06 Cr; net_cash_flow_after_fx 2025-03-31 25.66 -> 5.06 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_0cb10371fa85121b07a93096",
+   "q_99ead494a0d4134a8182eb04"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class FX_EFFECT_RECLASSIFIED (X307) accepted like X233; the check keeps running. VHLTD CONSOLIDATED AR_XBRL_VHLTD_21102026181610.xml: an amount moved between the net change and the exchange-difference line below it; the net change after that line, PAT and total equity agree. Lines: cff 2025-03-31 20.28 -> -82.89 Cr; fx_effect_on_cash 2025-03-31 0.00 -> 103.17 Cr; net_cash_flow 2025-03-31 -20.95 -> -124.11 Cr",
+  "bucket": "restated X307 NEW"
+ },
+ {
+  "ids": [
+   "q_5d9ae7b619aed60721e3dd35",
+   "q_05ac8e08e26c34382d0ece8b"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. STERTOOLS STANDALONE AR_XBRL_STERTOOLS_12102026100959.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_and_equivalents 2025-03-31 6.52 -> 6.68 Cr; cash_cf_statement 2025-03-31 6.52 -> 6.68 Cr; cfo 2025-03-31 90.36 -> 90.52 Cr; net_cash_flow 2025-03-31 -1.17 -> -1.01 Cr; net_cash_flow_after_fx 2025-03-31 -1.17 -> -1.01 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_4242fbd190832fa6927813e1",
+   "q_6256217533f1a590253249e7"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. KRBL CONSOLIDATED AR_XBRL_KRBL_04112026122037.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_cf_statement 2025-03-31 210.71 -> 154.09 Cr; cff 2025-03-31 -251.67 -> -282.97 Cr; cfi 2025-03-31 -523.15 -> -548.50 Cr; cfo 2025-03-31 960.72 -> 960.75 Cr; net_cash_flow 2025-03-31 185.90 -> 129.28 Cr; net_cash_flow_after_fx 2025-03-31 185.90 -> 129.28 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_8ab4abe0c8ffb850ea557a90",
+   "q_c4eb41d762b5a230ef4f3647"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class FX_EFFECT_RECLASSIFIED (X307) accepted like X233; the check keeps running. RITES CONSOLIDATED AR_XBRL_RITES_21102026163153.xml: an amount moved between the net change and the exchange-difference line below it; the net change after that line, PAT and total equity agree. Lines: cff 2025-03-31 -390.30 -> -404.52 Cr; fx_effect_on_cash 2025-03-31 -0.05 -> 14.17 Cr; net_cash_flow 2025-03-31 27.29 -> 13.07 Cr",
+  "bucket": "restated X307 OLD"
+ },
+ {
+  "ids": [
+   "q_789dee855ea3f9ceb47290b7",
+   "q_e8ccaa3b5dfa0c1777f2be75"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. KFINTECH STANDALONE AR_XBRL_KFINTECH_21082026202209.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_and_equivalents 2025-03-31 22.78 -> 15.60 Cr; cash_cf_statement 2025-03-31 22.78 -> 15.60 Cr; cfi 2025-03-31 -322.56 -> -329.74 Cr; net_cash_flow 2025-03-31 -23.86 -> -31.04 Cr; net_cash_flow_after_fx 2025-03-31 -23.86 -> -31.04 Cr",
+  "bucket": "restated X306 OLD"
+ },
+ {
+  "ids": [
+   "q_4174e26f05d8677b5e6f464c",
+   "q_76b2585233e816d2120335c9"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class FX_EFFECT_RECLASSIFIED (X307) accepted like X233; the check keeps running. VOLTAS CONSOLIDATED AR_XBRL_VOLTAS_09082026021806.xml: an amount moved between the net change and the exchange-difference line below it; the net change after that line, PAT and total equity agree. Lines: cfo 2025-03-31 -224.11 -> -225.15 Cr; fx_effect_on_cash 2025-03-31 -0.52 -> 0.52 Cr; net_cash_flow 2025-03-31 -165.88 -> -166.92 Cr",
+  "bucket": "restated X307 OLD"
+ },
+ {
+  "ids": [
+   "q_313d9a9cfaacc6f44c859b40",
+   "q_66ddd78255a2a8d2d16d914f"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. MOTILALOFS CONSOLIDATED AR_XBRL_MOTILALOFS_12082026105613.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_cf_statement 2025-03-31 6,168.14 -> 6,600.23 Cr; cff 2025-03-31 745.14 -> 1,177.10 Cr; cfo 2025-03-31 1,214.61 -> 1,214.74 Cr; net_cash_flow 2025-03-31 882.47 -> 1,314.56 Cr; net_cash_flow_after_fx 2025-03-31 882.47 -> 1,314.56 Cr",
+  "bucket": "restated X306 OLD"
+ },
+ {
+  "ids": [
+   "q_a32ed721e4548a8792c19b06",
+   "q_578cecb77ee6c19c4d85b9c3"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class FX_EFFECT_RECLASSIFIED (X307) accepted like X233; the check keeps running. SUPREMEIND STANDALONE AR_XBRL_SUPREMEIND_15092026105901.xml: an amount moved between the net change and the exchange-difference line below it; the net change after that line, PAT and total equity agree. Lines: cfo 2025-03-31 1,003.90 -> 996.56 Cr; net_cash_flow 2025-03-31 -226.86 -> -234.20 Cr",
+  "bucket": "restated X307 OLD"
+ },
+ {
+  "ids": [
+   "q_d608e300f17857e096cb57e4",
+   "q_e169412178f42ef0e77addc5"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. REFEX STANDALONE AR_XBRL_REFEX_25092026163808.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_and_equivalents 2025-03-31 263.93 -> 263.81 Cr; cash_cf_statement 2025-03-31 263.93 -> 263.81 Cr; cfi 2025-03-31 -74.32 -> -82.24 Cr; cfo 2025-03-31 -262.25 -> -254.46 Cr; net_cash_flow 2025-03-31 231.03 -> 230.91 Cr; net_cash_flow_after_fx 2025-03-31 231.03 -> 230.91 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_400834d67bf3ad09aaf7f5ed",
+   "q_d37068421eeb95f81b43931e"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. SKYGOLD STANDALONE AR_XBRL_SKYGOLD_17102026113710.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_cf_statement 2025-03-31 -7.72 -> 7.62 Cr; cff 2025-03-31 410.15 -> 409.40 Cr; cfo 2025-03-31 -126.18 -> -110.09 Cr; net_cash_flow 2025-03-31 -21.08 -> -5.74 Cr; net_cash_flow_after_fx 2025-03-31 -21.08 -> -5.74 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_3597182a4009d0abda18672d",
+   "q_d0aafb44fe33a4cd2c4b0be5"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class FX_EFFECT_RECLASSIFIED (X307) accepted like X233; the check keeps running. SUPREMEIND CONSOLIDATED AR_XBRL_SUPREMEIND_15092026105933.xml: an amount moved between the net change and the exchange-difference line below it; the net change after that line, PAT and total equity agree. Lines: cfo 2025-03-31 1,003.72 -> 996.38 Cr; net_cash_flow 2025-03-31 -227.05 -> -234.39 Cr",
+  "bucket": "restated X307 OLD"
+ },
+ {
+  "ids": [
+   "q_d692ad1aa21ea0d82d3c80c9",
+   "q_8bbf716f67f1258a4e0fcd35"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class FX_EFFECT_RECLASSIFIED (X307) accepted like X233; the check keeps running. VOLTAS STANDALONE AR_XBRL_VOLTAS_09082026020931.xml: an amount moved between the net change and the exchange-difference line below it; the net change after that line, PAT and total equity agree. Lines: cfo 2025-03-31 23.67 -> 22.63 Cr; fx_effect_on_cash 2025-03-31 -0.52 -> 0.52 Cr; net_cash_flow 2025-03-31 -20.43 -> -21.47 Cr",
+  "bucket": "restated X307 OLD"
+ },
+ {
+  "ids": [
+   "q_a08366a7eb00508a67a47330",
+   "q_4799656dff3ff7481e87c900"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. GRINFRA STANDALONE AR_XBRL_GRINFRA_22082026213404.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_and_equivalents 2025-03-31 433.55 -> 423.27 Cr; cash_cf_statement 2025-03-31 433.55 -> 423.27 Cr; cff 2025-03-31 -437.44 -> -427.16 Cr; cfi 2025-03-31 -256.61 -> -266.88 Cr; cfo 2025-03-31 868.19 -> 857.92 Cr; net_cash_flow 2025-03-31 174.15 -> 163.88 Cr; net_cash_flow_after_fx 2025-03-31 174.15 -> 163.88 Cr",
+  "bucket": "restated X306 OLD"
+ },
+ {
+  "ids": [
+   "q_896a4f98ad7bc08146f8865a",
+   "q_6d2aa978e8b20fe1aaf4773a"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. IPL CONSOLIDATED AR_XBRL_IPL_23102026164211.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_and_equivalents 2025-03-31 32.96 -> 12.36 Cr; cash_cf_statement 2025-03-31 32.96 -> 12.36 Cr; cfi 2025-03-31 0.65 -> -19.96 Cr; net_cash_flow 2025-03-31 22.56 -> 1.97 Cr; net_cash_flow_after_fx 2025-03-31 22.57 -> 1.97 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_ffd442fa2737cc4db5daeb1b",
+   "q_14e23e33ba59c22dffce131d"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. SIGNPOST STANDALONE AR_XBRL_SIGNPOST_22102026181903.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_and_equivalents 2025-03-31 2.05 -> 12.94 Cr; cash_cf_statement 2025-03-31 2.05 -> 12.94 Cr; cfi 2025-03-31 -38.85 -> -27.96 Cr; net_cash_flow 2025-03-31 -5.99 -> 4.91 Cr; net_cash_flow_after_fx 2025-03-31 -5.99 -> 4.91 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_74fa3010a7d848dea7b1b2e1",
+   "q_29e08071192b564d35f248ea"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. KFINTECH CONSOLIDATED AR_XBRL_KFINTECH_21082026202302.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_and_equivalents 2025-03-31 38.16 -> 30.98 Cr; cash_cf_statement 2025-03-31 38.16 -> 30.98 Cr; cfi 2025-03-31 -322.64 -> -329.83 Cr; net_cash_flow 2025-03-31 -19.07 -> -26.26 Cr; net_cash_flow_after_fx 2025-03-31 -18.24 -> -25.42 Cr",
+  "bucket": "restated X306 OLD"
+ },
+ {
+  "ids": [
+   "q_c1d311f2342137e129577414",
+   "q_3a5608002e7f268cadb3419c"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class FX_EFFECT_RECLASSIFIED (X307) accepted like X233; the check keeps running. SIS CONSOLIDATED AR_XBRL_SIS_04082026222023.xml: an amount moved between the net change and the exchange-difference line below it; the net change after that line, PAT and total equity agree. Lines: cfo 2025-03-31 742.29 -> 740.70 Cr; net_cash_flow 2025-03-31 253.51 -> 251.92 Cr",
+  "bucket": "restated X307 NEW"
+ },
+ {
+  "ids": [
+   "q_7858074a45563b3a9a72d9a1",
+   "q_2ab30406c3cdfdb26ecbe79c"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. ELDEHSG CONSOLIDATED AR_XBRL_ELDEHSG_19102026173638.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_and_equivalents 2025-03-31 119.91 -> 113.00 Cr; cash_cf_statement 2025-03-31 119.91 -> 113.00 Cr; cfo 2025-03-31 -6.94 -> -13.85 Cr; net_cash_flow 2025-03-31 21.19 -> 14.28 Cr; net_cash_flow_after_fx 2025-03-31 21.19 -> 14.28 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_215b423b55d3f04a0dea62dc",
+   "q_bcf07924ce96535862a12067"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class FX_EFFECT_RECLASSIFIED (X307) accepted like X233; the check keeps running. SYNGENE CONSOLIDATED AR_XBRL_SYNGENE_27082026215549.xml: an amount moved between the net change and the exchange-difference line below it; the net change after that line, PAT and total equity agree. Lines: cfo 2025-03-31 1,167.80 -> 1,167.60 Cr; fx_effect_on_cash 2025-03-31 0.00 -> 0.20 Cr; net_cash_flow 2025-03-31 281.40 -> 281.20 Cr",
+  "bucket": "restated X307 OLD"
+ },
+ {
+  "ids": [
+   "q_c3a2c01618c82a00547d5b28",
+   "q_1a1ad9453afd7aba3b5927e5"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class FX_EFFECT_RECLASSIFIED (X307) accepted like X233; the check keeps running. UPL CONSOLIDATED AR_XBRL_UPL_01092026204217.xml: an amount moved between the net change and the exchange-difference line below it; the net change after that line, PAT and total equity agree. Lines: cfo 2025-03-31 10,074.00 -> 10,151.00 Cr; fx_effect_on_cash 2025-03-31 94.00 -> 17.00 Cr; net_cash_flow 2025-03-31 3,441.00 -> 3,518.00 Cr",
+  "bucket": "restated X307 OLD"
+ },
+ {
+  "ids": [
+   "q_d5ca520787bc5b5ece960ad0",
+   "q_2eb1b257b438fc795c8741e8"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. IRCTC STANDALONE AR_XBRL_IRCTC_27102026172237.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_and_equivalents 2025-03-31 375.79 -> 370.62 Cr; cash_cf_statement 2025-03-31 375.79 -> 370.62 Cr; cfi 2025-03-31 -239.48 -> -244.65 Cr; net_cash_flow 2025-03-31 -315.55 -> -320.72 Cr; net_cash_flow_after_fx 2025-03-31 -315.55 -> -320.72 Cr",
+  "bucket": "restated X306 OLD"
+ },
+ {
+  "ids": [
+   "q_9f620bb374b0e9a10908062d",
+   "q_c9e20f099c2c244af15b5eb3"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class FX_EFFECT_RECLASSIFIED (X307) accepted like X233; the check keeps running. ENTERO CONSOLIDATED AR_XBRL_ENTERO_28092026112909.xml: an amount moved between the net change and the exchange-difference line below it; the net change after that line, PAT and total equity agree. Lines: cfi 2025-03-31 219.80 -> 232.16 Cr; net_cash_flow 2025-03-31 69.27 -> 81.63 Cr",
+  "bucket": "restated X307 NEW"
+ },
+ {
+  "ids": [
+   "q_aca59ec259b403ad0c2babe9",
+   "q_98e48666244164082620544a"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. SIGNPOST CONSOLIDATED AR_XBRL_SIGNPOST_22102026181950.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_and_equivalents 2025-03-31 2.22 -> 13.11 Cr; cash_cf_statement 2025-03-31 2.22 -> 13.11 Cr; cfi 2025-03-31 -37.90 -> -27.01 Cr; net_cash_flow 2025-03-31 -5.86 -> 5.03 Cr; net_cash_flow_after_fx 2025-03-31 -5.86 -> 5.03 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_e35eab9cccf0d402fde4da27",
+   "q_db40afec6c7ac3bac306486d"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class FX_EFFECT_RECLASSIFIED (X307) accepted like X233; the check keeps running. NEULANDLAB STANDALONE AR_XBRL_NEULANDLAB_31082026083806.xml: an amount moved between the net change and the exchange-difference line below it; the net change after that line, PAT and total equity agree. Lines: cfo 2025-03-31 317.49 -> 317.51 Cr; fx_effect_on_cash 2025-03-31 0.00 -> -0.02 Cr; net_cash_flow 2025-03-31 44.31 -> 44.33 Cr",
+  "bucket": "restated X307 OLD"
+ },
+ {
+  "ids": [
+   "q_a7d35504d28380fca9e56a28",
+   "q_971066e2e2e2ecb94bf2d751"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. PAYTM CONSOLIDATED AR_XBRL_PAYTM_14102026204130.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_cf_statement 2025-03-31 2,076.90 -> 2,072.00 Cr; cff 2025-03-31 -47.90 -> -53.00 Cr; net_cash_flow 2025-03-31 -2,212.10 -> -2,217.00 Cr; net_cash_flow_after_fx 2025-03-31 -2,200.30 -> -2,205.00 Cr",
+  "bucket": "restated X306 OLD"
+ },
+ {
+  "ids": [
+   "q_c32ad52a7c02794310b08987",
+   "q_f128e7f46ec6a6730d17798a"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. SUBEXLTD CONSOLIDATED AR_XBRL_SUBEXLTD_08092026111238.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_and_equivalents 2025-03-31 52.36 -> 50.64 Cr; cash_cf_statement 2025-03-31 52.36 -> 50.64 Cr; cfi 2025-03-31 -14.97 -> -16.44 Cr; cfo 2025-03-31 9.75 -> 9.50 Cr; net_cash_flow 2025-03-31 -17.27 -> -18.99 Cr; net_cash_flow_after_fx 2025-03-31 -16.87 -> -18.59 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_7027fa86e94f487625ec9587",
+   "q_f3b340fb9e174a79f66f5c5f"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class FX_EFFECT_RECLASSIFIED (X307) accepted like X233; the check keeps running. DLF CONSOLIDATED AR_XBRL_DLF_21082026175115.xml: an amount moved between the net change and the exchange-difference line below it; the net change after that line, PAT and total equity agree. Lines: cff 2025-03-31 -2,334.50 -> -2,402.56 Cr; fx_effect_on_cash 2025-03-31 0.00 -> 68.06 Cr; net_cash_flow 2025-03-31 -642.32 -> -710.38 Cr",
+  "bucket": "restated X307 OLD"
+ },
+ {
+  "ids": [
+   "q_5302da78b7689311553e3455",
+   "q_973c5dc53dc8a4f3fa1e43f7"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class FX_EFFECT_RECLASSIFIED (X307) accepted like X233; the check keeps running. RITES STANDALONE AR_XBRL_RITES_21102026163109.xml: an amount moved between the net change and the exchange-difference line below it; the net change after that line, PAT and total equity agree. Lines: cff 2025-03-31 -348.48 -> -362.69 Cr; fx_effect_on_cash 2025-03-31 -0.05 -> 14.16 Cr; net_cash_flow 2025-03-31 12.75 -> -1.46 Cr",
+  "bucket": "restated X307 OLD"
+ },
+ {
+  "ids": [
+   "q_cd6b9c939422969e397d1fe5",
+   "q_6ef419c540807a7dc5a90ccd"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. 20MICRONS CONSOLIDATED AR_XBRL_20MICRONS_07092026102206.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_cf_statement 2025-03-31 32.42 -> 31.30 Cr; cff 2025-03-31 14.02 -> 9.61 Cr; cfi 2025-03-31 -63.26 -> -58.85 Cr; cfo 2025-03-31 32.91 -> 31.79 Cr; net_cash_flow 2025-03-31 -16.32 -> -17.45 Cr; net_cash_flow_after_fx 2025-03-31 -16.32 -> -17.45 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_51440ddd12d75f3469733afb",
+   "q_264e5adcc94f800332678a15"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. RESPONIND CONSOLIDATED AR_XBRL_RESPONIND_06102026165112.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_and_equivalents 2025-03-31 7.51 -> 7.60 Cr; cash_cf_statement 2025-03-31 7.51 -> 7.60 Cr; cfi 2025-03-31 -102.50 -> -102.41 Cr; net_cash_flow 2025-03-31 -8.88 -> -8.79 Cr; net_cash_flow_after_fx 2025-03-31 -8.88 -> -8.79 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_af3d5a801dc689a8e885bf70",
+   "q_12dadf43800e1b5b5a05f472"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. STERTOOLS CONSOLIDATED AR_XBRL_STERTOOLS_12102026101058.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_and_equivalents 2025-03-31 23.50 -> 23.66 Cr; cash_cf_statement 2025-03-31 23.50 -> 23.66 Cr; cff 2025-03-31 0.09 -> 0.29 Cr; cfo 2025-03-31 123.53 -> 123.50 Cr; net_cash_flow 2025-03-31 -1.10 -> -0.94 Cr; net_cash_flow_after_fx 2025-03-31 -1.10 -> -0.94 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_4bb923724bace43601781a8c",
+   "q_7ab7751f3d544c58efa6b9aa"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. DCXINDIA STANDALONE AR_XBRL_DCXINDIA_04112026122738.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_cf_statement 2025-03-31 912.68 -> 131.61 Cr; cfo 2025-03-31 443.60 -> -337.48 Cr; net_cash_flow 2025-03-31 77.92 -> -703.15 Cr; net_cash_flow_after_fx 2025-03-31 77.92 -> -703.15 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_8fe84670e1882b745baa367e",
+   "q_c3f751c3175e7f5f04a1e8ef"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class FX_EFFECT_RECLASSIFIED (X307) accepted like X233; the check keeps running. DYNPRO STANDALONE AR_XBRL_DYNPRO_12102026173410.xml: an amount moved between the net change and the exchange-difference line below it; the net change after that line, PAT and total equity agree. Lines: cfo 2025-03-31 28.38 -> 30.37 Cr; net_cash_flow 2025-03-31 -1.75 -> 0.23 Cr",
+  "bucket": "restated X307 NEW"
+ },
+ {
+  "ids": [
+   "q_4b405568a4ec00cf02145af2",
+   "q_a96590efed54a1c14cb01626"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. ITC CONSOLIDATED AR_XBRL_ITC_20082026185833.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_cf_statement 2025-03-31 790.40 -> 622.38 Cr; cff 2025-03-31 -17,037.40 -> -17,237.14 Cr; cfi 2025-03-31 -395.82 -> -364.10 Cr; net_cash_flow 2025-03-31 193.82 -> 25.80 Cr; net_cash_flow_after_fx 2025-03-31 193.82 -> 25.80 Cr",
+  "bucket": "restated X306 OLD"
+ },
+ {
+  "ids": [
+   "q_c3e9ce523fd2e55139b86fe0",
+   "q_803e2313cf596de443bbaeca"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. DATAMATICS CONSOLIDATED AR_XBRL_DATAMATICS_19102026180926.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_cf_statement 2025-03-31 192.76 -> 217.64 Cr; cfi 2025-03-31 -249.23 -> -224.35 Cr; net_cash_flow 2025-03-31 93.40 -> 118.28 Cr; net_cash_flow_after_fx 2025-03-31 93.40 -> 118.28 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_21341df12693afd0add8d803",
+   "q_8636eaeb4103b69b6f8cfd57"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class FX_EFFECT_RECLASSIFIED (X307) accepted like X233; the check keeps running. KIRLPNU CONSOLIDATED AR_XBRL_KIRLPNU_19082026192059.xml: an amount moved between the net change and the exchange-difference line below it; the net change after that line, PAT and total equity agree. Lines: cff 2025-03-31 -45.95 -> -45.75 Cr; cfo 2025-03-31 214.97 -> 215.22 Cr; fx_effect_on_cash 2025-03-31 0.22 -> -0.22 Cr; net_cash_flow 2025-03-31 13.63 -> 14.07 Cr",
+  "bucket": "restated X307 NEW"
+ },
+ {
+  "ids": [
+   "q_a39a471bb7d80294b5496cfb",
+   "q_d79e63e36b832a5442264045"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. EMSLIMITED STANDALONE AR_XBRL_EMSLIMITED_17102026171801.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_cf_statement 2025-03-31 216.76 -> 90.95 Cr; cff 2025-03-31 -9.77 -> -0.30 Cr; cfi 2025-03-31 4.84 -> 20.42 Cr; cfo 2025-03-31 186.66 -> 35.79 Cr; net_cash_flow 2025-03-31 181.73 -> 55.92 Cr; net_cash_flow_after_fx 2025-03-31 181.73 -> 55.92 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_b41d3fba901d417191a1ba87",
+   "q_1c397baecbb91f4fb79cf9bc"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class FX_EFFECT_RECLASSIFIED (X307) accepted like X233; the check keeps running. INSPIRISYS CONSOLIDATED AR_XBRL_INSPIRISYS_27072026170158.xml: an amount moved between the net change and the exchange-difference line below it; the net change after that line, PAT and total equity agree. Lines: cff 2025-03-31 -15.24 -> -15.03 Cr; fx_effect_on_cash 2025-03-31 0.14 -> -0.07 Cr; net_cash_flow 2025-03-31 -22.40 -> -22.19 Cr",
+  "bucket": "restated X307 NEW"
+ },
+ {
+  "ids": [
+   "q_4dbef1afc81b84cf8898cc5f",
+   "q_85e9d9b14500d6829d47963c"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. TANLA STANDALONE AR_XBRL_TANLA_18082026182051.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_cf_statement 2025-03-31 89.33 -> 70.36 Cr; cfi 2025-03-31 137.80 -> 118.83 Cr; net_cash_flow 2025-03-31 26.02 -> 7.04 Cr; net_cash_flow_after_fx 2025-03-31 26.02 -> 7.04 Cr",
+  "bucket": "restated X306 OLD"
+ },
+ {
+  "ids": [
+   "q_f863b250f19174c50f4080b7",
+   "q_094c60856bf26765a30cde86"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. DCXINDIA CONSOLIDATED AR_XBRL_DCXINDIA_04112026122808.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_cf_statement 2025-03-31 1,003.50 -> 193.83 Cr; cfo 2025-03-31 495.90 -> -313.77 Cr; net_cash_flow 2025-03-31 162.67 -> -647.00 Cr; net_cash_flow_after_fx 2025-03-31 162.67 -> -647.00 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_2e1eb46757d2e909bdda6609",
+   "q_9014a9a95f45d50ee40840a0"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class FX_EFFECT_RECLASSIFIED (X307) accepted like X233; the check keeps running. NAVA STANDALONE AR_XBRL_NAVA_23092026175038.xml: an amount moved between the net change and the exchange-difference line below it; the net change after that line, PAT and total equity agree. Lines: cfo 2025-03-31 216.24 -> 213.64 Cr; fx_effect_on_cash 2025-03-31 0.00 -> 2.60 Cr; net_cash_flow 2025-03-31 -0.00 -> -2.61 Cr",
+  "bucket": "restated X307 OLD"
+ },
+ {
+  "ids": [
+   "q_ee69686d4f9045ac33e75646",
+   "q_946cda8da7d7f86b8a48f925"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. REFEX CONSOLIDATED AR_XBRL_REFEX_25092026163845.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_and_equivalents 2025-03-31 281.62 -> 281.49 Cr; cash_cf_statement 2025-03-31 281.62 -> 281.50 Cr; cff 2025-03-31 603.05 -> 601.60 Cr; cfi 2025-03-31 -89.70 -> -104.68 Cr; cfo 2025-03-31 -264.81 -> -248.50 Cr; net_cash_flow 2025-03-31 248.54 -> 248.42 Cr; net_cash_flow_after_fx 2025-03-31 248.54 -> 248.42 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_a577c39aa89dfb8bf5838516",
+   "q_75a7493e1600bd2487c48b2b"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. BHAGCHEM CONSOLIDATED AR_XBRL_BHAGCHEM_31082026120221.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_and_equivalents 2025-03-31 28.80 -> 28.23 Cr; cash_cf_statement 2025-03-31 28.80 -> 28.23 Cr; cfi 2025-03-31 -199.99 -> -200.56 Cr; net_cash_flow 2025-03-31 18.87 -> 18.30 Cr; net_cash_flow_after_fx 2025-03-31 18.87 -> 18.30 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_1b98d910c98b1a1bb384133b",
+   "q_234614be2bb72e99dcba97b4"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. GRINFRA CONSOLIDATED AR_XBRL_GRINFRA_22082026213448.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_and_equivalents 2025-03-31 659.49 -> 649.22 Cr; cash_cf_statement 2025-03-31 659.49 -> 649.22 Cr; cff 2025-03-31 1,724.47 -> 1,734.74 Cr; cfi 2025-03-31 432.74 -> 422.47 Cr; cfo 2025-03-31 -2,031.59 -> -2,041.87 Cr; net_cash_flow 2025-03-31 125.62 -> 115.34 Cr; net_cash_flow_after_fx 2025-03-31 125.62 -> 115.34 Cr",
+  "bucket": "restated X306 OLD"
+ },
+ {
+  "ids": [
+   "q_a32154e9fbedf7751ac5eab9",
+   "q_889ad836cc59c0f52a3918ad"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. SHK CONSOLIDATED AR_XBRL_SHK_29082026152235.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_cf_statement 2025-03-31 15.70 -> 20.26 Cr; cfi 2025-03-31 -72.28 -> -67.72 Cr; net_cash_flow 2025-03-31 42.75 -> 47.31 Cr; net_cash_flow_after_fx 2025-03-31 41.00 -> 45.56 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_5ae1f85bf59986a4173c7cc9",
+   "q_bac92ccac44a3d2f9137d370"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. RAYMONDLSL CONSOLIDATED AR_XBRL_RAYMONDLSL_31082026180002.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_cf_statement 2025-03-31 263.46 -> 264.56 Cr; cff 2025-03-31 58.46 -> 61.23 Cr; cfi 2025-03-31 -280.59 -> -311.50 Cr; cfo 2025-03-31 404.30 -> 433.54 Cr; net_cash_flow 2025-03-31 182.17 -> 183.27 Cr; net_cash_flow_after_fx 2025-03-31 182.17 -> 183.27 Cr",
+  "bucket": "restated X306 OLD"
+ },
+ {
+  "ids": [
+   "q_2f5887a3f05bcd30db9b4b21",
+   "q_81d6dd72673a9be4bc85f875"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class FX_EFFECT_RECLASSIFIED (X307) accepted like X233; the check keeps running. ELECON CONSOLIDATED AR_XBRL_ELECON_23072026161408.xml: an amount moved between the net change and the exchange-difference line below it; the net change after that line, PAT and total equity agree. Lines: cfo 2025-03-31 432.30 -> 425.41 Cr; fx_effect_on_cash 2025-03-31 0.00 -> 6.89 Cr; net_cash_flow 2025-03-31 49.16 -> 42.27 Cr",
+  "bucket": "restated X307 OLD"
+ },
+ {
+  "ids": [
+   "q_9d7fd66fca53c2259e5896af",
+   "q_836500bb9a353e176d364ddf"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. TANLA CONSOLIDATED AR_XBRL_TANLA_18082026182325.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_cf_statement 2025-03-31 880.66 -> 501.50 Cr; cfi 2025-03-31 -220.30 -> -599.46 Cr; net_cash_flow 2025-03-31 213.57 -> -165.59 Cr; net_cash_flow_after_fx 2025-03-31 213.57 -> -165.59 Cr",
+  "bucket": "restated X306 OLD"
+ },
+ {
+  "ids": [
+   "q_bdd3cedd755fd3cd13707b91",
+   "q_70d5012bdbdf40369f04a711"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class FX_EFFECT_RECLASSIFIED (X307) accepted like X233; the check keeps running. VENTIVE CONSOLIDATED AR_XBRL_VENTIVE_25092026133443.xml: an amount moved between the net change and the exchange-difference line below it; the net change after that line, PAT and total equity agree. Lines: cfi 2025-03-31 -1,666.44 -> -2,035.39 Cr; fx_effect_on_cash 2025-03-31 4.97 -> 373.92 Cr; net_cash_flow 2025-03-31 374.58 -> 5.63 Cr",
+  "bucket": "restated X307 OLD"
+ },
+ {
+  "ids": [
+   "q_ec412ae84794a370ffc30029",
+   "q_82362294cea1b78324306733"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. VINDHYATEL STANDALONE AR_XBRL_VINDHYATEL_01092026190709.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_and_equivalents 2025-03-31 95.44 -> 85.01 Cr; cash_cf_statement 2025-03-31 95.44 -> 85.01 Cr; cfi 2025-03-31 4.97 -> -5.47 Cr; net_cash_flow 2025-03-31 -57.16 -> -67.60 Cr; net_cash_flow_after_fx 2025-03-31 -57.16 -> -67.60 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_cd11267facb1efce3d5551e5",
+   "q_5c2c6d604f0749ccb51831f8"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. RESPONIND STANDALONE AR_XBRL_RESPONIND_06102026165034.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_and_equivalents 2025-03-31 1.13 -> 1.22 Cr; cash_cf_statement 2025-03-31 1.13 -> 1.22 Cr; cfi 2025-03-31 -52.67 -> -43.39 Cr; cfo 2025-03-31 19.39 -> 10.19 Cr; net_cash_flow 2025-03-31 -2.49 -> -2.40 Cr; net_cash_flow_after_fx 2025-03-31 -2.49 -> -2.40 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_8dfd611e0ac10a03527fe084",
+   "q_e2bd836353a35297cdfdc84a"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class FX_EFFECT_RECLASSIFIED (X307) accepted like X233; the check keeps running. XPROINDIA CONSOLIDATED AR_XBRL_XPROINDIA_05092026105445.xml: an amount moved between the net change and the exchange-difference line below it; the net change after that line, PAT and total equity agree. Lines: cfo 2025-03-31 12.75 -> 12.81 Cr; fx_effect_on_cash 2025-03-31 0.00 -> -0.05 Cr; net_cash_flow 2025-03-31 102.19 -> 102.24 Cr",
+  "bucket": "restated X307 NEW"
+ },
+ {
+  "ids": [
+   "q_f773ea44e05a8b849b4320c7",
+   "q_153907766641ee6607917d0e"
+  ],
+  "note": "Owner decision 2026-11-18 (delegated, QF4): X182 class RESTATED, sub-class CASH_EQUIVALENTS_RECLASSIFIED (X306) accepted like X233; the check keeps running. BHAGCHEM STANDALONE AR_XBRL_BHAGCHEM_31082026115921.xml: the comparative's cash and cash equivalents were redefined and the net change moved by the same amount; PAT, total equity and total assets agree. Lines: cash_and_equivalents 2025-03-31 16.12 -> 15.55 Cr; cash_cf_statement 2025-03-31 16.12 -> 15.55 Cr; cfi 2025-03-31 -249.65 -> -250.22 Cr; net_cash_flow 2025-03-31 9.40 -> 8.83 Cr; net_cash_flow_after_fx 2025-03-31 9.40 -> 8.83 Cr",
+  "bucket": "restated X306 NEW"
+ },
+ {
+  "ids": [
+   "q_de7831129fcc534a48210782"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: amalgamation of the wholly owned subsidiary Milk Mantra Dairy, comparative restated. HATSUN STANDALONE AR_XBRL_HATSUN_26102026100001.xml, element DisclosureOfSubclassificationAndNotesOnLiabilitiesAndAssetsExplanatory: \"Accordingly, the Company has given effect to the merger/amalgamation in the financial statements during the year ended March 31, 2026, and restated the financial information for the previous year ended March 31, 2025, as if the merger/amalgamation had occurred from the date when the control was acquired, i.e.\". FY25 as stored -> as restated: net_cash_flow 2025-03-31 -0.67 -> 3.75 Cr; pat 2025-03-31 285.44 -> 278.81 Cr; total_assets 2025-03-31 4,831.61 -> 4,864.90 Cr; total_equity 2025-03-31 1,724.21 -> 1,717.56 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_920610bd2e24e803493c2d55"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: amalgamations under common control (Ind AS 103 Appendix C), comparative restated. LUMAXTECH STANDALONE AR_XBRL_LUMAXTECH_25092026171555.xml, element DisclosureInAuditorsReportExplanatory: \"The Company has accounted for these amalgamations in accordance with Appendix C \"Business combinations of entities under common control\" of Ind AS 103 \"Business Combinations\" as specified in the respective schemes approved by NCLT and, accordingly, the comparative financial information for the prior year ended March 31, 2025, have been restated from the beginning of the prior year.\". FY25 as stored -> as restated: net_cash_flow 2025-03-31 -7.06 -> 38.25 Cr; pat 2025-03-31 73.94 -> 171.71 Cr; total_assets 2025-03-31 1,397.57 -> 2,494.30 Cr; total_equity 2025-03-31 714.96 -> 990.56 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_7a3e1cab1d96e5989718f4d6"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: amalgamation under common control, comparative restated. SEQUENT CONSOLIDATED AR_XBRL_VIYASH_11092026122348.xml, element DisclosureOfBusinessCombinationsExplanatory: \"Comparative financial information in the financial statements of the Amalgamated Company have been restated for the accounting impact of the merger of the Amalgamating Company, as stated above, as if the merger had occurred from the beginning of the comparative period presented.\". FY25 as stored -> as restated: net_cash_flow 2025-03-31 -2.15 -> -15.38 Cr; pat 2025-03-31 32.26 -> 15.77 Cr; pat_owners 2025-03-31 21.88 -> 23.22 Cr; total_assets 2025-03-31 1,601.95 -> 4,132.27 Cr; total_equity 2025-03-31 770.36 -> 2,564.94 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_746d09816ac67e32f825b5f0"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: amalgamation under common control, comparative restated. SEQUENT STANDALONE AR_XBRL_VIYASH_11092026122220.xml, element DisclosureOfBusinessCombinationsExplanatory: \"Comparative financial information in the financial statements of the Amalgamated Company have been restated for the accounting impact of the merger of the Amalgamating Company 1, as stated above, as if the merger had occurred from the beginning of the comparative period presented.\". FY25 as stored -> as restated: net_cash_flow 2025-03-31 -0.90 -> -26.85 Cr; pat 2025-03-31 15.80 -> 58.49 Cr; total_assets 2025-03-31 1,222.20 -> 3,519.73 Cr; total_equity 2025-03-31 1,142.65 -> 2,908.41 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_76b4e66af54abcf28c5f850b"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: the company's reconciliation of reported and restated FY25 (PAT 24,600.40 -> 24,999.83 lakh). ICIL CONSOLIDATED AR_XBRL_ICIL_12102026111219.xml, element DisclosureOfBusinessCombinationsExplanatory: \"in Lakhs Particulars Year Ended 31-03-2025 Reported Restated Cost of Material Consumed 1,76,957.67 1,76,615.14 Depreciation and Amortisation Expense 11,657.52 11,593.26 Profit before Tax 33,357.94 33,764.73 Deferred Tax 707.96 715.32 Profit for the year 24,600.40 24,999.83 Other Comprehensive Income/(Loss) (net of tax) (1,392.34) (1,386.82) Total Comprehensive Income 23,208.06 23,613.01 EPS (Basic and Diluted) 12....\". FY25 as stored -> as restated: pat 2025-03-31 246.00 -> 250.00 Cr; total_assets 2025-03-31 4,259.62 -> 4,254.99 Cr; total_equity 2025-03-31 2,277.58 -> 2,281.62 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_1d88c43ffeff294ff3ba13d3"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: scheme of arrangement with Enviro Tech Ventures, comparative restated. JKPAPER CONSOLIDATED AR_XBRL_JKPAPER_01102026223629.xml, element DisclosureInAuditorsReportExplanatory: \"Our opinion on the Statement is not modified in respect of above matters with respect to our reliance on the work done and the reports of the other auditors C) In accordance with the Scheme as referred to in Note no. 50 to the consolidated financial statements, the comparative financial information for the year ended March 31, 2025 have been restated to include the financial statements and information of the Envir...\". FY25 as stored -> as restated: net_cash_flow 2025-03-31 -35.94 -> -40.27 Cr; pat 2025-03-31 412.11 -> 409.77 Cr; pat_owners 2025-03-31 409.82 -> 408.79 Cr; total_assets 2025-03-31 9,547.61 -> 9,405.70 Cr; total_equity 2025-03-31 5,655.39 -> 5,593.32 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_df709ad1f1ac12b24a993579"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: scheme of arrangement with Enviro Tech Ventures, comparative restated. JKPAPER STANDALONE AR_XBRL_JKPAPER_01102026223544.xml, element DisclosureInAuditorsReportExplanatory: \"Other Matters In accordance with the Scheme as referred to in Note no. 46 to the standalone financial statement, the comparative financial information for the year ended March 31, 2025 have been restated to include the financial results and information of the Enviro Tech Ventures Limited (Transferor / Demerged Company / ETVL) which reflect total assets of Rs. 173 crores as at March 31, 2025, total revenue of Rs. 1...\". FY25 as stored -> as restated: net_cash_flow 2025-03-31 -50.53 -> -48.54 Cr; pat 2025-03-31 365.25 -> 369.89 Cr; total_assets 2025-03-31 7,824.92 -> 8,042.04 Cr; total_equity 2025-03-31 4,837.94 -> 4,830.99 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_cbafc6d26ddb2cc14159ac9d",
+   "q_c05378348bae92ca080295ac"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: amalgamation of Kurlon Enterprise under common control (pooling of interests). SFL CONSOLIDATED AR_XBRL_SFL_18082026154156.xml, element DisclosureOfAdditionalBalanceSheetNotesExplanatory: \"As a result, the transaction has been accounted in accordance with “Pooling of Interest Method” laid down by Appendix C (Business Combinations of Entities under Common Control) of Indian Accounting Standard 103 (Ind AS 103), notified under the Companies’ Act, 2013.\". FY25 as stored -> as restated: pat 2025-03-31 96.70 -> 90.09 Cr; pat_owners 2025-03-31 96.09 -> 89.35 Cr; total_assets 2025-03-31 5,467.14 -> 5,367.59 Cr; total_equity 2025-03-31 3,095.59 -> 3,024.15 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_c78eed3a02b12a5d16077afc",
+   "q_4c6f375e67840805cbd64b5e"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: amalgamation of Kurlon Enterprise under common control (pooling of interests). SFL STANDALONE AR_XBRL_SFL_18082026154053.xml, element DisclosureOfBusinessCombinationsExplanatory: \"As a result, the transaction has been accounted in accordance with “Pooling of Interest Method” laid down by Appendix C (Business Combinations of Entities under Common Control) of Indian Accounting Standard 103 (Ind AS 103), notified under the Companies’ Act, 2013.\". FY25 as stored -> as restated: net_cash_flow 2025-03-31 10.03 -> 13.07 Cr; pat 2025-03-31 112.09 -> 92.70 Cr; total_assets 2025-03-31 4,389.65 -> 4,470.28 Cr; total_equity 2025-03-31 2,793.73 -> 2,776.41 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_b2827ff237cce963bda600c7"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: scheme of arrangement, comparative restated. DEEPINDS STANDALONE AR_XBRL_DEEPINDS_06102026115214.xml, element DisclosureInAuditorsReportExplanatory: \"Accordingly, the comparative figures for the previous period/year have been restated and/or reclassified, wherever necessary, to give effect to the Scheme and to ensure comparability with the current year presentation.\". FY25 as stored -> as restated: net_cash_flow 2025-03-31 -18.22 -> -18.21 Cr; pat 2025-03-31 130.34 -> -115.43 Cr; total_assets 2025-03-31 1,820.02 -> 2,033.21 Cr; total_equity 2025-03-31 1,371.09 -> 1,585.04 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_8ffd4dbec864cd30b631be1c"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: amalgamation of the wholly owned subsidiary Kolte-Patil Integrated Townships, comparative restated. KOLTEPATIL STANDALONE AR_XBRL_KOLTEPATIL_26082026104754.xml, element DisclosureInAuditorsReportExplanatory: \"Emphasis of Matter The comparative financial information of the Company as at and for the year ended March 31, 2025, included in these standalone financial statements has been restated to give effect to the adjustments arising from the amalgamation of a wholly owned subsidiary of the Company, Kolte-Patil Integrated Townships Limited (“KPIT”) with the Company, as fully described in the Note 49 to the standalone fin...\". FY25 as stored -> as restated: net_cash_flow 2025-03-31 -125.61 -> -132.55 Cr; pat 2025-03-31 68.62 -> 114.65 Cr; total_assets 2025-03-31 3,296.87 -> 5,065.11 Cr; total_equity 2025-03-31 806.55 -> 812.89 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_c186fcc6bb494afc9eda372f"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: Ind AS 8 prior period restatement of tax balances (note 65). MHRIL CONSOLIDATED AR_XBRL_MHRIL_18082026191428.xml, element DisclosureOfAdditionalBalanceSheetNotesExplanatory: \"65 - Prior period restatement As part of the Holding Company’s reconciliation process of tax balances, deductible and taxable differences with Income Tax returns, the Company identified certain deductions, which were claimed in excess in prior years.\". FY25 as stored -> as restated: total_assets 2025-03-31 10,614.34 -> 10,585.09 Cr; total_equity 2025-03-31 788.74 -> 709.80 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_bcb48f93aab4d68297919c0a"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: Ind AS 8 prior period restatement of tax balances (note 60). MHRIL STANDALONE AR_XBRL_MHRIL_18082026191045.xml, element DisclosureOfAdditionalBalanceSheetNotesExplanatory: \"60 - Prior period restatement As part of the Company’s reconciliation process of tax balances, deductible and taxable differences with Income Tax returns, the Company identified certain deductions, which were claimed in excess in prior years.\". FY25 as stored -> as restated: total_assets 2025-03-31 8,165.40 -> 8,136.15 Cr; total_equity 2025-03-31 1,288.20 -> 1,209.27 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_4784c390bb8adef12916d352"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: demerger, comparative restated. DALMIASUG STANDALONE AR_XBRL_DALMIASUG_31082026132042.xml, element DisclosureInAuditorsReportExplanatory: \"Comparative figures for the previous period's have been restated for the accounting impact of the demerger.\". FY25 as stored -> as restated: net_cash_flow 2025-03-31 -137.30 -> -182.31 Cr; pat 2025-03-31 386.75 -> 365.50 Cr; total_assets 2025-03-31 4,863.45 -> 4,648.45 Cr; total_equity 2025-03-31 3,234.51 -> 3,063.21 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_a8dceafa60c84a5bc419b27b"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: demerger of the GRC and SOC undertakings into the company, comparative restated. PROTEAN STANDALONE AR_XBRL_PROTEAN_22102026173851.xml, element DisclosureInAuditorsReportExplanatory: \"The previous year's figures and the net equity as at 1 April 2024 of the Company have also been restated to include the figures of the demerged undertakings. b.\". FY25 as stored -> as restated: pat 2025-03-31 94.21 -> 92.58 Cr; total_assets 2025-03-31 1,312.54 -> 1,314.05 Cr; total_equity 2025-03-31 1,004.62 -> 1,003.51 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_e5861f5c664a7a0b4c4165d8"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: change in accounting policy (raw-material valuation on weighted average), comparative restated. SPORTKING STANDALONE AR_XBRL_SPORTKING_10102026093725.xml, element DisclosureOfSummaryOfSignificantAccountingPoliciesExplanatory: \"Consequent to the change in accounting policy, the amounts for comparative figures for previous periods have been restated with the impact of such change in accounting policy as disclosed in note 62.\". FY25 as stored -> as restated: pat 2025-03-31 109.25 -> 113.15 Cr; total_assets 2025-03-31 1,774.82 -> 1,775.91 Cr; total_equity 2025-03-31 1,005.82 -> 1,006.91 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_a1ae0bd63043bfb2b9df074d"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: scheme of arrangement (demerger) and discontinued fuel-station segment, comparative restated. ALLCARGO STANDALONE AR_XBRL_ALLCARGO_26102026173907.xml, element DisclosureOfAdditionalBalanceSheetNotesExplanatory: \"Accordingly, the amounts pertaining to fuel stations segment have been disclosed under \"Discontinued Operations\" in the financial statements, and the corresponding figures for previous periods have been restated.\". FY25 as stored -> as restated: net_cash_flow 2025-03-31 27.49 -> -13.00 Cr; pat 2025-03-31 81.88 -> 76.00 Cr; total_assets 2025-03-31 2,245.73 -> 1,739.00 Cr; total_equity 2025-03-31 1,103.49 -> 564.00 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_025353dca7403220bf9539c7"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: scheme of arrangement (demerger), comparative restated. ALLCARGO CONSOLIDATED AR_XBRL_ALLCARGO_26102026173948.xml, element DisclosureInAuditorsReportExplanatory: \"October 01, 2023 instead of the effective date of the Scheme and restated the comparative information.\". FY25 as stored -> as restated: net_cash_flow 2025-03-31 155.63 -> -14.00 Cr; pat 2025-03-31 49.18 -> 65.00 Cr; total_assets 2025-03-31 7,598.99 -> 1,741.00 Cr; total_equity 2025-03-31 2,640.34 -> 562.00 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_005674f04fc2c8bc1c92d668"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: composite scheme of arrangement (NCLT), financial statements restated. ASIANTILES STANDALONE AR_XBRL_ASIANTILES_07102026173617.xml, element DisclosureInBoardOfDirectorsReportExplanatory: \"Subsequently, pursuant to the applicability of the Composite Scheme of Arrangement (Scheme-I), the financial statements of the Company were restated.\". FY25 as stored -> as restated: pat 2025-03-31 27.27 -> 11.88 Cr; total_assets 2025-03-31 1,855.29 -> 1,983.02 Cr; total_equity 2025-03-31 1,374.98 -> 1,504.01 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_3ebee7f721ed6ca25e7e29d1"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: composite scheme of arrangement sanctioned by NCLT on 12-Jun-2025, comparative restated. ASIANTILES CONSOLIDATED AR_XBRL_ASIANTILES_07102026173732.xml, element DisclosureOfBusinessCombinationsExplanatory: \"5 Goodwill (Rs. in Lakhs) Particulars Goodwill on Consolidation Cost / Deemed cost As at 01 April, 2024 (Restated) 10,964.24 Additions - Deductions - As at 31 March, 2025 (Restated) 10,964.24 Additions - Deductions - As at 31 March, 2026 10,964.24 Accumulated Depreciation As at 01 April, 2024 (Restated) - Depreciation for the year - Deductions - As at 31 March, 2025 (Restated) - Depreciation for the year - Deducti...\". FY25 as stored -> as restated: net_cash_flow 2025-03-31 -8.20 -> -8.39 Cr; pat 2025-03-31 20.55 -> 9.88 Cr; pat_owners 2025-03-31 27.54 -> 10.48 Cr; total_assets 2025-03-31 2,097.81 -> 2,415.15 Cr; total_equity 2025-03-31 1,377.17 -> 1,522.31 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_6a05f8e7ba8837f1be1d884c",
+   "q_dfdb5d0ef659328fe68b4918"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: merger, comparative restated. YATRA STANDALONE AR_XBRL_YATRA_14102026190837.xml, element DisclosureOfBusinessCombinationsExplanatory: \"Further, comparative financial information has been restated for the accounting impact of the merger as if the amalgamation had occurred from the beginning of the comparative period presented.\". FY25 as stored -> as restated: net_cash_flow 2025-03-31 -82.65 -> -95.92 Cr; pat 2025-03-31 17.48 -> 27.62 Cr; total_assets 2025-03-31 1,077.50 -> 1,202.90 Cr; total_equity 2025-03-31 716.67 -> 732.90 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_4a749a24cb294ea9791b4da9"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: amalgamation, previous year restated. HIL STANDALONE AR_XBRL_BIRLANU_02092026103535.xml, element DisclosureInAuditorsReportExplanatory: \"Accordingly, the amounts relating to the year ended 31 March 2026 include the impact of the business combination for the entire year and the corresponding amounts for the previous year ended 31 March 2025 have been restated by the Company after recognising the effect of the amalgamation as above.\". FY25 as stored -> as restated: net_cash_flow 2025-03-31 -65.83 -> -65.61 Cr; pat 2025-03-31 90.96 -> 53.59 Cr; total_assets 2025-03-31 2,029.34 -> 2,162.08 Cr; total_equity 2025-03-31 1,267.60 -> 1,229.99 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_622eeb3323fda37acdd7c4df"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: scheme of arrangement, comparative restated. AWHCL STANDALONE AR_XBRL_AWHCL_18092026220405.xml, element DisclosureOfBusinessCombinationsExplanatory: \"The Scheme has accordingly been given effect to in the standalone financial statements, pursuant to which the comparative financial information for the year ended 31 March 2025 has been restated.\". FY25 as stored -> as restated: net_cash_flow 2025-03-31 24.55 -> 25.30 Cr; pat 2025-03-31 24.19 -> 37.04 Cr; total_assets 2025-03-31 282.34 -> 824.26 Cr; total_equity 2025-03-31 236.82 -> 358.40 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_7d869769b93f16cda2ee505d"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: merger under the approved scheme, comparative restated / recast. KECL STANDALONE AR_XBRL_KECL_16092026101922.xml, element DisclosureInAuditorsReportExplanatory: \"Accordingly, the accompanying Standalone Ind AS financial statements include the effect of the aforesaid merger and the comparative financial information, wherever applicable, has been restated/recast in accordance with the approved Scheme and applicable accounting standards.\". FY25 as stored -> as restated: net_cash_flow 2025-03-31 0.37 -> 0.46 Cr; pat 2025-03-31 17.25 -> 7.16 Cr; total_assets 2025-03-31 622.55 -> 612.06 Cr; total_equity 2025-03-31 151.32 -> 125.73 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_b3444fa6faaa3c1d5391e1be"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: amalgamation, comparative restated from the beginning of the previous year. NDTV STANDALONE AR_XBRL_NDTV_24072026192845.xml, element DisclosureInAuditorsReportExplanatory: \"Accordingly, the comparative financial information has been restated to give effect to the amalgamation from the beginning of the previous year.\". FY25 as stored -> as restated: pat 2025-03-31 -199.79 -> -222.14 Cr; total_assets 2025-03-31 924.25 -> 601.00 Cr; total_equity 2025-03-31 166.30 -> -111.22 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_f399487ed9ae65a96768a224"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: scheme under Ind AS 103 Appendix C, 2024-25 restated. TVSELECT STANDALONE AR_XBRL_TVSELECT_10092026111221.xml, element DisclosureOfSummaryOfSignificantAccountingPoliciesExplanatory: \"Accordingly, the financial statements for 2024–25 and 2025– 26, including the corresponding previous year numbers, have been restated to give effect to the Scheme from the appointed date, in accordance with Appendix C of Ind AS 103 on Business Combinations. 3) Critical accounting judgements, key sources of estimation uncertainty and applicability of new accounting standards a) Use of estimates The preparation of f...\". FY25 as stored -> as restated: net_cash_flow 2025-03-31 0.89 -> -0.42 Cr; pat 2025-03-31 -3.80 -> -3.88 Cr; total_assets 2025-03-31 260.70 -> 262.18 Cr; total_equity 2025-03-31 92.94 -> 94.41 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_b80f6fe8deeaca9636d24e8d"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: scheme given effect from 1-Apr-2024, comparative restated. LYKALABS STANDALONE AR_XBRL_LYKALABS_16092026104435.xml, element DisclosureInAuditorsReportExplanatory: \"Accordingly, the Company has given effect to the Scheme from the beginning of the preceding period presented, i.e., April 1, 2024, and the comparative figures for the year ended March 31, 2025 have been restated.\". FY25 as stored -> as restated: net_cash_flow 2025-03-31 -4.57 -> -4.59 Cr; pat 2025-03-31 8.23 -> 7.92 Cr; total_assets 2025-03-31 205.58 -> 192.68 Cr; total_equity 2025-03-31 134.94 -> 121.60 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_69a5f2ea336226ed7439fa54"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement: scheme of arrangement demerging the trading business, reconciliation of reported and restated FY25. SHANKARA STANDALONE AR_XBRL_SHANKARA_09082026022251.xml, element footnote: \"Reconciliation of Reported and Restated Standalone Statement of Cash Flows for the year ended 31st March 2025 pursuant to Scheme of Arrangement [\"Scheme\"] (Rupees in Crores) Particulars As at 31-03-2025 (A) Transfer on account of Demerger Note No. 59 (B) As at March 31, 2025 (Restated) (A+B) Cashflows from / (used in) Operating Activities 83.11 (84.82) (1.71) Cashflows from / (used in) Investing Activities (18.39)...\". FY25 as stored -> as restated: net_cash_flow 2025-03-31 -6.18 -> -0.62 Cr; pat 2025-03-31 73.02 -> -5.18 Cr; total_assets 2025-03-31 1,468.64 -> 219.41 Cr; total_equity 2025-03-31 667.06 -> 210.00 Cr. The stored FY25 figures stay (X100 results first); the check keeps running.",
+  "bucket": "restated cause NEW"
+ },
+ {
+  "ids": [
+   "q_b77f94eb81695d051edf22b6"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: immaterial re-statement of the comparative (re-rounding / regrouping): every differing bottom line within Rs 10 lakh and within 0.1% of the line (net cash flow: within Rs 10 lakh). GLOBAL STANDALONE AR_XBRL_GLOBAL_24082026180457.xml: pat 2025-03-31 25.19 -> 25.20 Cr. The stored FY25 figures stay; the check keeps running.",
+  "bucket": "restated immaterial NEW"
+ },
+ {
+  "ids": [
+   "q_3baa852f4859641d2291f3c9",
+   "q_bbe4a54861bff66079c17f70"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: immaterial re-statement of the comparative (re-rounding / regrouping): every differing bottom line within Rs 10 lakh and within 0.1% of the line (net cash flow: within Rs 10 lakh). SWANDEF CONSOLIDATED AR_XBRL_SWANDEF_01102026193317.xml: pat 2025-03-31 -181.05 -> -181.04 Cr. The stored FY25 figures stay; the check keeps running.",
+  "bucket": "restated immaterial NEW"
+ },
+ {
+  "ids": [
+   "q_9ac08017e1972f83d4597efc"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: immaterial re-statement of the comparative (re-rounding / regrouping): every differing bottom line within Rs 10 lakh and within 0.1% of the line (net cash flow: within Rs 10 lakh). UFLEX CONSOLIDATED AR_XBRL_UFLEX_28082026101139.xml: pat 2025-03-31 142.32 -> 142.36 Cr. The stored FY25 figures stay; the check keeps running.",
+  "bucket": "restated immaterial NEW"
+ },
+ {
+  "ids": [
+   "q_bc8628b1286ce51c6e1a0b70"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: immaterial re-statement of the comparative (re-rounding / regrouping): every differing bottom line within Rs 10 lakh and within 0.1% of the line (net cash flow: within Rs 10 lakh). VRLLOG STANDALONE AR_XBRL_VRLLOG_29082026102923.xml: pat 2025-03-31 182.93 -> 182.92 Cr. The stored FY25 figures stay; the check keeps running.",
+  "bucket": "restated immaterial NEW"
+ },
+ {
+  "ids": [
+   "q_68ce3cf969bf9ee66b74e457"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: immaterial re-statement of the comparative (re-rounding / regrouping): every differing bottom line within Rs 10 lakh and within 0.1% of the line (net cash flow: within Rs 10 lakh). BANCOINDIA CONSOLIDATED AR_XBRL_BANCOINDIA_10102026161419.xml: total_equity 2025-03-31 1,302.84 -> 1,302.83 Cr. The stored FY25 figures stay; the check keeps running.",
+  "bucket": "restated immaterial NEW"
+ },
+ {
+  "ids": [
+   "q_fbe6f9ff28ddfe8dc258920d"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: immaterial re-statement of the comparative (re-rounding / regrouping): every differing bottom line within Rs 10 lakh and within 0.1% of the line (net cash flow: within Rs 10 lakh). NDL STANDALONE AR_XBRL_NDL_04112026171433.xml: pat 2025-03-31 33.48 -> 33.45 Cr; total_equity 2025-03-31 618.82 -> 618.79 Cr. The stored FY25 figures stay; the check keeps running.",
+  "bucket": "restated immaterial NEW"
+ },
+ {
+  "ids": [
+   "q_5ca21fd2aefc8d329dc02c83"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: immaterial re-statement of the comparative (re-rounding / regrouping): every differing bottom line within Rs 10 lakh and within 0.1% of the line (net cash flow: within Rs 10 lakh). BANCOINDIA STANDALONE AR_XBRL_BANCOINDIA_10102026161305.xml: net_cash_flow 2025-03-31 1.31 -> 1.32 Cr; net_cash_flow_after_fx 2025-03-31 1.31 -> 1.32 Cr; total_equity 2025-03-31 850.60 -> 850.59 Cr. The stored FY25 figures stay; the check keeps running.",
+  "bucket": "restated immaterial NEW"
+ },
+ {
+  "ids": [
+   "q_608b670b28e6ec7b3f399dc1"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_TI_22102026143520.xml states total_income CONSOLIDATED FY = 5,273.66 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1676953_29052026100037_WEB.xml; the filed quarters sum to 5,348.68 Cr (+1.4%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_25272eae9c3279f5af4c5e67"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_TI_22102026143520.xml states revenue_from_operations CONSOLIDATED FY = 5,247.58 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1676953_29052026100037_WEB.xml; the filed quarters sum to 5,322.59 Cr (+1.4%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_c0bdc81eceff38935313d40e"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_TI_22102026143427.xml states revenue_from_operations STANDALONE FY = 5,247.57 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1676950_29052026095815_WEB.xml; the filed quarters sum to 5,322.59 Cr (+1.4%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_3e9064212197a1fd0581e4a6"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_TI_22102026143427.xml states total_income STANDALONE FY = 5,272.60 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1676950_29052026095815_WEB.xml; the filed quarters sum to 5,347.61 Cr (+1.4%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_4d10da76b41457159e575e37"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_VIYASH_11092026122348.xml states pat CONSOLIDATED FY = 224.65 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1669663_19052026101914_WEB.xml; the filed quarters sum to 152.07 Cr (-32.3%): a quarter as filed is not restated to the audited year. The annual states the cause: amalgamation under common control, comparative restated (DisclosureOfBusinessCombinationsExplanatory: \"Comparative financial information in the financial statements of the Amalgamated Company have been restated for the accounting impact of the merger of the Amalgamating Company, as stated above, as if the merger had occurred from the beginning of the comparative period presented.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_66f1433b224bdfb9b216f427"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_VIYASH_11092026122348.xml states revenue_from_operations CONSOLIDATED FY = 3,420.31 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1669663_19052026101914_WEB.xml; the filed quarters sum to 2,643.78 Cr (-22.7%): a quarter as filed is not restated to the audited year. The annual states the cause: amalgamation under common control, comparative restated (DisclosureOfBusinessCombinationsExplanatory: \"Comparative financial information in the financial statements of the Amalgamated Company have been restated for the accounting impact of the merger of the Amalgamating Company, as stated above, as if the merger had occurred from the beginning of the comparative period presented.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_9c42e03806fb7d682c0ca818"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_VIYASH_11092026122348.xml states pat_owners CONSOLIDATED FY = 177.28 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1669663_19052026101914_WEB.xml; the filed quarters sum to 119.60 Cr (-32.5%): a quarter as filed is not restated to the audited year. The annual states the cause: amalgamation under common control, comparative restated (DisclosureOfBusinessCombinationsExplanatory: \"Comparative financial information in the financial statements of the Amalgamated Company have been restated for the accounting impact of the merger of the Amalgamating Company, as stated above, as if the merger had occurred from the beginning of the comparative period presented.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_dcc3fc0e49c33af8950bb6a9"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_VIYASH_11092026122348.xml states pbt_incl_jv CONSOLIDATED FY = 349.02 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1669663_19052026101914_WEB.xml; the filed quarters sum to 250.99 Cr (-28.1%): a quarter as filed is not restated to the audited year. The annual states the cause: amalgamation under common control, comparative restated (DisclosureOfBusinessCombinationsExplanatory: \"Comparative financial information in the financial statements of the Amalgamated Company have been restated for the accounting impact of the merger of the Amalgamating Company, as stated above, as if the merger had occurred from the beginning of the comparative period presented.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_8234f789ecbb50ec9cc5dc84"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_VIYASH_11092026122348.xml states total_income CONSOLIDATED FY = 3,463.86 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1669663_19052026101914_WEB.xml; the filed quarters sum to 2,679.70 Cr (-22.6%): a quarter as filed is not restated to the audited year. The annual states the cause: amalgamation under common control, comparative restated (DisclosureOfBusinessCombinationsExplanatory: \"Comparative financial information in the financial statements of the Amalgamated Company have been restated for the accounting impact of the merger of the Amalgamating Company, as stated above, as if the merger had occurred from the beginning of the comparative period presented.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_bd6b68f50ee14b24cd9547bf"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_VIYASH_11092026122220.xml states revenue_from_operations STANDALONE FY = 1,382.06 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1669661_19052026101834_WEB.xml; the filed quarters sum to 789.23 Cr (-42.9%): a quarter as filed is not restated to the audited year. The annual states the cause: amalgamation under common control, comparative restated (DisclosureOfBusinessCombinationsExplanatory: \"Comparative financial information in the financial statements of the Amalgamated Company have been restated for the accounting impact of the merger of the Amalgamating Company 1, as stated above, as if the merger had occurred from the beginning of the comparative period presented.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_1a97b7049f711a93f774af14"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_VIYASH_11092026122220.xml states pat STANDALONE FY = 75.87 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1669661_19052026101834_WEB.xml; the filed quarters sum to 42.18 Cr (-44.4%): a quarter as filed is not restated to the audited year. The annual states the cause: amalgamation under common control, comparative restated (DisclosureOfBusinessCombinationsExplanatory: \"Comparative financial information in the financial statements of the Amalgamated Company have been restated for the accounting impact of the merger of the Amalgamating Company 1, as stated above, as if the merger had occurred from the beginning of the comparative period presented.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_d69cec00f7cd0f1e8da3559b"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_VIYASH_11092026122220.xml states total_income STANDALONE FY = 1,448.32 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1669661_19052026101834_WEB.xml; the filed quarters sum to 848.50 Cr (-41.4%): a quarter as filed is not restated to the audited year. The annual states the cause: amalgamation under common control, comparative restated (DisclosureOfBusinessCombinationsExplanatory: \"Comparative financial information in the financial statements of the Amalgamated Company have been restated for the accounting impact of the merger of the Amalgamating Company 1, as stated above, as if the merger had occurred from the beginning of the comparative period presented.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_0aed8df74e73b97ca92a0a55"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_VIYASH_11092026122220.xml states pbt_incl_jv STANDALONE FY = 116.22 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1669661_19052026101834_WEB.xml; the filed quarters sum to 68.48 Cr (-41.1%): a quarter as filed is not restated to the audited year. The annual states the cause: amalgamation under common control, comparative restated (DisclosureOfBusinessCombinationsExplanatory: \"Comparative financial information in the financial statements of the Amalgamated Company have been restated for the accounting impact of the merger of the Amalgamating Company 1, as stated above, as if the merger had occurred from the beginning of the comparative period presented.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_14f9e5ecc10527187498b50a"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_AARTIPHARM_19102026111903.xml states pbt_incl_jv STANDALONE FY = 234.24 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1672801_25052026100954_WEB.xml; the filed quarters sum to 250.04 Cr (+6.7%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_bf4ac1adad329dbed859c872"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_AARTIPHARM_19102026111903.xml states pat STANDALONE FY = 176.20 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1672801_25052026100954_WEB.xml; the filed quarters sum to 188.03 Cr (+6.7%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_44b7679daf3135bca388d5a0"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_AARTIPHARM_19102026111934.xml states pat CONSOLIDATED FY = 174.71 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1672803_25052026101039_WEB.xml; the filed quarters sum to 186.50 Cr (+6.8%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_9c612b2db809efea67e05997"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_JKPAPER_01102026223629.xml states pbt_incl_jv CONSOLIDATED FY = 364.48 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1668962_18052026083325_WEB.xml; the filed quarters sum to 370.51 Cr (+1.2%): a quarter as filed is not restated to the audited year. The annual states the cause: scheme of arrangement with Enviro Tech Ventures, comparative restated (DisclosureInAuditorsReportExplanatory: \"Our opinion on the Statement is not modified in respect of above matters with respect to our reliance on the work done and the reports of the other auditors C) In accordance with the Scheme as referred to in Note no. 50 to the consolidated financial statements, the comparative financial information for the year ende...\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_d4e8732cc0980475026f7f81"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_JKPAPER_01102026223629.xml states revenue_from_operations CONSOLIDATED FY = 7,076.03 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1668962_18052026083325_WEB.xml; the filed quarters sum to 7,151.64 Cr (+1.1%): a quarter as filed is not restated to the audited year. The annual states the cause: scheme of arrangement with Enviro Tech Ventures, comparative restated (DisclosureInAuditorsReportExplanatory: \"Our opinion on the Statement is not modified in respect of above matters with respect to our reliance on the work done and the reports of the other auditors C) In accordance with the Scheme as referred to in Note no. 50 to the consolidated financial statements, the comparative financial information for the year ende...\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_6b0e8b7f08b30bbb99437ba7"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_JKPAPER_01102026223629.xml states total_income CONSOLIDATED FY = 7,136.09 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1668962_18052026083325_WEB.xml; the filed quarters sum to 7,217.61 Cr (+1.1%): a quarter as filed is not restated to the audited year. The annual states the cause: scheme of arrangement with Enviro Tech Ventures, comparative restated (DisclosureInAuditorsReportExplanatory: \"Our opinion on the Statement is not modified in respect of above matters with respect to our reliance on the work done and the reports of the other auditors C) In accordance with the Scheme as referred to in Note no. 50 to the consolidated financial statements, the comparative financial information for the year ende...\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_e18317362f453c14989c28b0"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_JKPAPER_01102026223629.xml states pat CONSOLIDATED FY = 273.50 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1668962_18052026083325_WEB.xml; the filed quarters sum to 280.53 Cr (+2.6%): a quarter as filed is not restated to the audited year. The annual states the cause: scheme of arrangement with Enviro Tech Ventures, comparative restated (DisclosureInAuditorsReportExplanatory: \"Our opinion on the Statement is not modified in respect of above matters with respect to our reliance on the work done and the reports of the other auditors C) In accordance with the Scheme as referred to in Note no. 50 to the consolidated financial statements, the comparative financial information for the year ende...\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_400d253310906b01fb5d4ccc"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_JKPAPER_01102026223629.xml states pat_owners CONSOLIDATED FY = 265.84 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1668962_18052026083325_WEB.xml; the filed quarters sum to 275.36 Cr (+3.6%): a quarter as filed is not restated to the audited year. The annual states the cause: scheme of arrangement with Enviro Tech Ventures, comparative restated (DisclosureInAuditorsReportExplanatory: \"Our opinion on the Statement is not modified in respect of above matters with respect to our reliance on the work done and the reports of the other auditors C) In accordance with the Scheme as referred to in Note no. 50 to the consolidated financial statements, the comparative financial information for the year ende...\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_e72d9f61ed0afc04e400444b"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_JKPAPER_01102026223544.xml states total_income STANDALONE FY = 6,685.68 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1668961_18052026083318_WEB.xml; the filed quarters sum to 5,987.84 Cr (-10.4%): a quarter as filed is not restated to the audited year. The annual states the cause: scheme of arrangement with Enviro Tech Ventures, comparative restated (DisclosureInAuditorsReportExplanatory: \"Other Matters In accordance with the Scheme as referred to in Note no. 46 to the standalone financial statement, the comparative financial information for the year ended March 31, 2025 have been restated to include the financial results and information of the Enviro Tech Ventures Limited (Transferor / Demerged Compa...\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_46a3c196936056844f938931"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_JKPAPER_01102026223544.xml states pbt_incl_jv STANDALONE FY = 320.41 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1668961_18052026083318_WEB.xml; the filed quarters sum to 296.08 Cr (-7.6%): a quarter as filed is not restated to the audited year. The annual states the cause: scheme of arrangement with Enviro Tech Ventures, comparative restated (DisclosureInAuditorsReportExplanatory: \"Other Matters In accordance with the Scheme as referred to in Note no. 46 to the standalone financial statement, the comparative financial information for the year ended March 31, 2025 have been restated to include the financial results and information of the Enviro Tech Ventures Limited (Transferor / Demerged Compa...\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_b5bd0020c45058ca7495eaea"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_JKPAPER_01102026223544.xml states pat STANDALONE FY = 241.02 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1668961_18052026083318_WEB.xml; the filed quarters sum to 224.34 Cr (-6.9%): a quarter as filed is not restated to the audited year. The annual states the cause: scheme of arrangement with Enviro Tech Ventures, comparative restated (DisclosureInAuditorsReportExplanatory: \"Other Matters In accordance with the Scheme as referred to in Note no. 46 to the standalone financial statement, the comparative financial information for the year ended March 31, 2025 have been restated to include the financial results and information of the Enviro Tech Ventures Limited (Transferor / Demerged Compa...\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_271e0d8e2a3583ceeeb79264"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_JKPAPER_01102026223544.xml states revenue_from_operations STANDALONE FY = 6,631.70 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1668961_18052026083318_WEB.xml; the filed quarters sum to 5,931.14 Cr (-10.6%): a quarter as filed is not restated to the audited year. The annual states the cause: scheme of arrangement with Enviro Tech Ventures, comparative restated (DisclosureInAuditorsReportExplanatory: \"Other Matters In accordance with the Scheme as referred to in Note no. 46 to the standalone financial statement, the comparative financial information for the year ended March 31, 2025 have been restated to include the financial results and information of the Enviro Tech Ventures Limited (Transferor / Demerged Compa...\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_6f998bd7398605e5d0fd494d"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_SFL_18082026154053.xml states revenue_from_operations STANDALONE FY = 2,962.27 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1667317_14052026075116_WEB.xml; the filed quarters sum to 3,024.23 Cr (+2.1%): a quarter as filed is not restated to the audited year. The annual states the cause: amalgamation of Kurlon Enterprise under common control (pooling of interests) (DisclosureOfBusinessCombinationsExplanatory: \"As a result, the transaction has been accounted in accordance with “Pooling of Interest Method” laid down by Appendix C (Business Combinations of Entities under Common Control) of Indian Accounting Standard 103 (Ind AS 103), notified under the Companies’ Act, 2013.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_d7def95eb7724b55f1f47a21"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_SFL_18082026154053.xml states total_income STANDALONE FY = 3,002.59 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1667317_14052026075116_WEB.xml; the filed quarters sum to 3,065.99 Cr (+2.1%): a quarter as filed is not restated to the audited year. The annual states the cause: amalgamation of Kurlon Enterprise under common control (pooling of interests) (DisclosureOfBusinessCombinationsExplanatory: \"As a result, the transaction has been accounted in accordance with “Pooling of Interest Method” laid down by Appendix C (Business Combinations of Entities under Common Control) of Indian Accounting Standard 103 (Ind AS 103), notified under the Companies’ Act, 2013.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_6eb30fbe7ca2ba1747d4edbc"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_SFL_18082026154053.xml states pat STANDALONE FY = 130.57 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1667317_14052026075116_WEB.xml; the filed quarters sum to 143.97 Cr (+10.3%): a quarter as filed is not restated to the audited year. The annual states the cause: amalgamation of Kurlon Enterprise under common control (pooling of interests) (DisclosureOfBusinessCombinationsExplanatory: \"As a result, the transaction has been accounted in accordance with “Pooling of Interest Method” laid down by Appendix C (Business Combinations of Entities under Common Control) of Indian Accounting Standard 103 (Ind AS 103), notified under the Companies’ Act, 2013.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_f04c8b555d0ceaf33d25d52f"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_SFL_18082026154053.xml states pbt_incl_jv STANDALONE FY = 164.67 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1667317_14052026075116_WEB.xml; the filed quarters sum to 181.05 Cr (+9.9%): a quarter as filed is not restated to the audited year. The annual states the cause: amalgamation of Kurlon Enterprise under common control (pooling of interests) (DisclosureOfBusinessCombinationsExplanatory: \"As a result, the transaction has been accounted in accordance with “Pooling of Interest Method” laid down by Appendix C (Business Combinations of Entities under Common Control) of Indian Accounting Standard 103 (Ind AS 103), notified under the Companies’ Act, 2013.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_1359cbc52ff8d297ece0e9b3"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_TEXRAIL_19102026202032.xml states pbt_incl_jv STANDALONE FY = 271.03 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1666194_12052026082812_WEB.xml; the filed quarters sum to 263.91 Cr (-2.6%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_94febafa727f6f941572f8b8"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_TEXRAIL_19102026202032.xml states revenue_from_operations STANDALONE FY = 4,371.40 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1666194_12052026082812_WEB.xml; the filed quarters sum to 4,268.14 Cr (-2.4%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_1dc8230ab8e6da90f5dddb2e"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_TEXRAIL_19102026202032.xml states total_income STANDALONE FY = 4,422.90 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1666194_12052026082812_WEB.xml; the filed quarters sum to 4,323.51 Cr (-2.2%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_b4921187ba6673dbac0ccb69"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_TEXRAIL_19102026202032.xml states pat STANDALONE FY = 187.00 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1666194_12052026082812_WEB.xml; the filed quarters sum to 182.70 Cr (-2.3%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_36c3971363d46721ba86acf5"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_SAATVIKGL_23102026163652.xml states pat CONSOLIDATED FY = 357.12 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1670261_20052026085400_WEB.xml; the filed quarters sum to 361.20 Cr (+1.1%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_7da70f584667f6d0b95debcd"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_SAATVIKGL_23102026163652.xml states pbt_incl_jv CONSOLIDATED FY = 441.65 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1670261_20052026085400_WEB.xml; the filed quarters sum to 446.52 Cr (+1.1%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_06c3c52159dcc7f05da65914"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_MOIL_17102026103635.xml states revenue_from_operations STANDALONE FY = 1,472.84 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1661469_29042026072618_WEB.xml; the filed quarters sum to 1,500.51 Cr (+1.9%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_5325a700b112f7705e6c9d43"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_MOIL_17102026103635.xml states total_income STANDALONE FY = 1,565.88 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1661469_29042026072618_WEB.xml; the filed quarters sum to 1,593.56 Cr (+1.8%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_501df474f62ac61dcf2cada2"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_KOLTEPATIL_26082026104754.xml states pbt_incl_jv STANDALONE FY = 8.62 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1671729_22052026084123_WEB.xml; the filed quarters sum to 0.86 Cr (-90.0%): a quarter as filed is not restated to the audited year. The annual states the cause: amalgamation of the wholly owned subsidiary Kolte-Patil Integrated Townships, comparative restated (DisclosureInAuditorsReportExplanatory: \"Emphasis of Matter The comparative financial information of the Company as at and for the year ended March 31, 2025, included in these standalone financial statements has been restated to give effect to the adjustments arising from the amalgamation of a wholly owned subsidiary of the Company, Kolte-Patil Integrated ...\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_4a6a06e708ecf06aafed54ed"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_KOLTEPATIL_26082026104754.xml states pat STANDALONE FY = -1.97 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1671729_22052026084123_WEB.xml; the filed quarters sum to -8.52 Cr (-332.5%): a quarter as filed is not restated to the audited year. The annual states the cause: amalgamation of the wholly owned subsidiary Kolte-Patil Integrated Townships, comparative restated (DisclosureInAuditorsReportExplanatory: \"Emphasis of Matter The comparative financial information of the Company as at and for the year ended March 31, 2025, included in these standalone financial statements has been restated to give effect to the adjustments arising from the amalgamation of a wholly owned subsidiary of the Company, Kolte-Patil Integrated ...\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_38276acf2609cb174ccb5f3c"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_KOLTEPATIL_26082026104754.xml states total_income STANDALONE FY = 761.86 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1671729_22052026084123_WEB.xml; the filed quarters sum to 747.58 Cr (-1.9%): a quarter as filed is not restated to the audited year. The annual states the cause: amalgamation of the wholly owned subsidiary Kolte-Patil Integrated Townships, comparative restated (DisclosureInAuditorsReportExplanatory: \"Emphasis of Matter The comparative financial information of the Company as at and for the year ended March 31, 2025, included in these standalone financial statements has been restated to give effect to the adjustments arising from the amalgamation of a wholly owned subsidiary of the Company, Kolte-Patil Integrated ...\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_0dd984c3e41829be9fa186d2"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_STYRENIX_24092026192911.xml states pbt_incl_jv CONSOLIDATED FY = 223.25 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1668369_16052026062727_WEB.xml; the filed quarters sum to 226.87 Cr (+1.6%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_d89c961b87e568964d85124a"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_STYRENIX_24092026192911.xml states pat CONSOLIDATED FY = 182.85 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1668369_16052026062727_WEB.xml; the filed quarters sum to 186.46 Cr (+2.0%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_2f23672a9f566c2cdc59ddf3"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_BALMLAWRIE_15102026173606.xml states pat CONSOLIDATED FY = 270.32 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1668487_17052026062430_WEB.xml; the filed quarters sum to 253.61 Cr (-6.2%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_1d995450eb2c849288d48fd3"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_RAMCOIND_16092026170653.xml states revenue_from_operations STANDALONE FY = 1,443.50 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1673937_27052026041955_WEB.xml; the filed quarters sum to 1,434.05 Cr (-0.7%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_47ee98d0c29c662ff03eb9f2"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_RAMCOIND_16092026170653.xml states total_income STANDALONE FY = 1,493.93 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1673937_27052026041955_WEB.xml; the filed quarters sum to 1,484.48 Cr (-0.6%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_5148513cdb1e5a5b735189d6"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_RAMCOIND_16092026170739.xml states revenue_from_operations CONSOLIDATED FY = 1,792.22 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1673938_27052026042012_WEB.xml; the filed quarters sum to 1,782.77 Cr (-0.5%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_18a1d351d1cce17e61ef7658"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_RAMCOIND_16092026170739.xml states total_income CONSOLIDATED FY = 1,807.26 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1673938_27052026042012_WEB.xml; the filed quarters sum to 1,797.81 Cr (-0.5%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_6395eae15c79210d79eac65a"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_GANDHAR_09102026170559.xml states revenue_from_operations STANDALONE FY = 3,422.56 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1703089_28072026045822_WEB.xml; the filed quarters sum to 3,404.69 Cr (-0.5%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_9378cd0c3b944aab0a88fffb"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_GANDHAR_09102026170559.xml states total_income STANDALONE FY = 3,444.00 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1703089_28072026045822_WEB.xml; the filed quarters sum to 3,426.12 Cr (-0.5%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_fd86d600599c343c9414389b"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_MENONBE_06092026134349.xml states pbt_incl_jv STANDALONE FY = 43.06 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1667270_14052026072308_WEB.xml; the filed quarters sum to 40.17 Cr (-6.7%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_cc7c2095cd693ab5e96b08b6"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_MENONBE_06092026134349.xml states pat STANDALONE FY = 32.63 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1667270_14052026072308_WEB.xml; the filed quarters sum to 29.74 Cr (-8.9%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_c91b1674d5103416d11ea7f1"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_ASIANENE_26102026182600.xml states pat CONSOLIDATED FY = 51.84 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1669548_19052026074928_WEB.xml; the filed quarters sum to 52.78 Cr (+1.8%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_7f61d148dffb1403a2fcf77f"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_ASIANTILES_07102026173732.xml states revenue_from_operations CONSOLIDATED FY = 1,858.06 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1677587_30052026053323_WEB.xml; the filed quarters sum to 1,757.60 Cr (-5.4%): a quarter as filed is not restated to the audited year. The annual states the cause: composite scheme of arrangement sanctioned by NCLT on 12-Jun-2025, comparative restated (DisclosureOfBusinessCombinationsExplanatory: \"5 Goodwill (Rs. in Lakhs) Particulars Goodwill on Consolidation Cost / Deemed cost As at 01 April, 2024 (Restated) 10,964.24 Additions - Deductions - As at 31 March, 2025 (Restated) 10,964.24 Additions - Deductions - As at 31 March, 2026 10,964.24 Accumulated Depreciation As at 01 April, 2024 (Restated) - Depreciati...\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_102d06b91046bc2bcfaaf325"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_ASIANTILES_07102026173732.xml states total_income CONSOLIDATED FY = 1,874.88 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1677587_30052026053323_WEB.xml; the filed quarters sum to 1,772.55 Cr (-5.5%): a quarter as filed is not restated to the audited year. The annual states the cause: composite scheme of arrangement sanctioned by NCLT on 12-Jun-2025, comparative restated (DisclosureOfBusinessCombinationsExplanatory: \"5 Goodwill (Rs. in Lakhs) Particulars Goodwill on Consolidation Cost / Deemed cost As at 01 April, 2024 (Restated) 10,964.24 Additions - Deductions - As at 31 March, 2025 (Restated) 10,964.24 Additions - Deductions - As at 31 March, 2026 10,964.24 Accumulated Depreciation As at 01 April, 2024 (Restated) - Depreciati...\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_eb15aefadca94d0ea67028ed"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_ASIANTILES_07102026173732.xml states pat_owners CONSOLIDATED FY = 20.87 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1677587_30052026053323_WEB.xml; the filed quarters sum to 11.94 Cr (-42.8%): a quarter as filed is not restated to the audited year. The annual states the cause: composite scheme of arrangement sanctioned by NCLT on 12-Jun-2025, comparative restated (DisclosureOfBusinessCombinationsExplanatory: \"5 Goodwill (Rs. in Lakhs) Particulars Goodwill on Consolidation Cost / Deemed cost As at 01 April, 2024 (Restated) 10,964.24 Additions - Deductions - As at 31 March, 2025 (Restated) 10,964.24 Additions - Deductions - As at 31 March, 2026 10,964.24 Accumulated Depreciation As at 01 April, 2024 (Restated) - Depreciati...\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_02087bd97646c3b9568dd18d"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_ASIANTILES_07102026173732.xml states pat CONSOLIDATED FY = 18.74 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1677587_30052026053323_WEB.xml; the filed quarters sum to 9.81 Cr (-47.7%): a quarter as filed is not restated to the audited year. The annual states the cause: composite scheme of arrangement sanctioned by NCLT on 12-Jun-2025, comparative restated (DisclosureOfBusinessCombinationsExplanatory: \"5 Goodwill (Rs. in Lakhs) Particulars Goodwill on Consolidation Cost / Deemed cost As at 01 April, 2024 (Restated) 10,964.24 Additions - Deductions - As at 31 March, 2025 (Restated) 10,964.24 Additions - Deductions - As at 31 March, 2026 10,964.24 Accumulated Depreciation As at 01 April, 2024 (Restated) - Depreciati...\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_90c3204620b4b77c042ef537"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_ASIANTILES_07102026173732.xml states pbt_incl_jv CONSOLIDATED FY = 21.72 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1677587_30052026053323_WEB.xml; the filed quarters sum to 9.84 Cr (-54.6%): a quarter as filed is not restated to the audited year. The annual states the cause: composite scheme of arrangement sanctioned by NCLT on 12-Jun-2025, comparative restated (DisclosureOfBusinessCombinationsExplanatory: \"5 Goodwill (Rs. in Lakhs) Particulars Goodwill on Consolidation Cost / Deemed cost As at 01 April, 2024 (Restated) 10,964.24 Additions - Deductions - As at 31 March, 2025 (Restated) 10,964.24 Additions - Deductions - As at 31 March, 2026 10,964.24 Accumulated Depreciation As at 01 April, 2024 (Restated) - Depreciati...\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_55c3a2eca015d35e9b959fce"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_YATRA_14102026190837.xml states revenue_from_operations STANDALONE FY = 635.65 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1671878_23052026034605_WEB.xml; the filed quarters sum to 601.69 Cr (-5.3%): a quarter as filed is not restated to the audited year. The annual states the cause: merger, comparative restated (DisclosureOfBusinessCombinationsExplanatory: \"Further, comparative financial information has been restated for the accounting impact of the merger as if the amalgamation had occurred from the beginning of the comparative period presented.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_c05622f921b2f9e9b73be3db"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_YATRA_14102026190837.xml states pbt_incl_jv STANDALONE FY = 37.63 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1671878_23052026034605_WEB.xml; the filed quarters sum to 32.78 Cr (-12.9%): a quarter as filed is not restated to the audited year. The annual states the cause: merger, comparative restated (DisclosureOfBusinessCombinationsExplanatory: \"Further, comparative financial information has been restated for the accounting impact of the merger as if the amalgamation had occurred from the beginning of the comparative period presented.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_39fcf23401dec8f42ab9e697"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_YATRA_14102026190837.xml states pat STANDALONE FY = 37.96 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1671878_23052026034605_WEB.xml; the filed quarters sum to 32.86 Cr (-13.4%): a quarter as filed is not restated to the audited year. The annual states the cause: merger, comparative restated (DisclosureOfBusinessCombinationsExplanatory: \"Further, comparative financial information has been restated for the accounting impact of the merger as if the amalgamation had occurred from the beginning of the comparative period presented.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_b6e6227f1004de04c5620f77"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_YATRA_14102026190837.xml states total_income STANDALONE FY = 665.86 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1671878_23052026034605_WEB.xml; the filed quarters sum to 631.52 Cr (-5.2%): a quarter as filed is not restated to the audited year. The annual states the cause: merger, comparative restated (DisclosureOfBusinessCombinationsExplanatory: \"Further, comparative financial information has been restated for the accounting impact of the merger as if the amalgamation had occurred from the beginning of the comparative period presented.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_cc06f3958f1b4333b3077990"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_STEL_24102026184832.xml states pat STANDALONE FY = 19.86 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1674637_27052026113320_WEB.xml; the filed quarters sum to 20.11 Cr (+1.2%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_a2d8e524890e8b6f4edb26f9"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_STEL_24102026184832.xml states revenue_from_operations STANDALONE FY = 27.43 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1674637_27052026113320_WEB.xml; the filed quarters sum to 26.73 Cr (-2.6%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_a208e2fc516c2253a5e2725b"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_STEL_24102026184801.xml states revenue_from_operations CONSOLIDATED FY = 27.43 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1674642_27052026114753_WEB.xml; the filed quarters sum to 26.73 Cr (-2.6%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_bcd60a8abfac45ed449c35d7"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_STEL_24102026184801.xml states pat CONSOLIDATED FY = 19.85 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1674642_27052026114753_WEB.xml; the filed quarters sum to 20.09 Cr (+1.2%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_f6bf3812aaebcedce7888337"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_ATULAUTO_17102026181803.xml states revenue_from_operations STANDALONE FY = 785.77 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1668317_16052026040816_WEB.xml; the filed quarters sum to 762.42 Cr (-3.0%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_3858ab9b5d7f8d1c2e21a999"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_ATULAUTO_17102026181803.xml states pbt_incl_jv STANDALONE FY = 71.71 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1668317_16052026040816_WEB.xml; the filed quarters sum to 69.85 Cr (-2.6%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_5290300d36129581b9d5c4f9"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_ATULAUTO_17102026181803.xml states total_income STANDALONE FY = 794.65 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1668317_16052026040816_WEB.xml; the filed quarters sum to 770.10 Cr (-2.9%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_180ae9d3a9296b68a177d706"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_ATULAUTO_17102026181803.xml states pat STANDALONE FY = 53.71 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1668317_16052026040816_WEB.xml; the filed quarters sum to 52.33 Cr (-2.6%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_9ba1cd96714541e02967831a"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_SEJALLTD_20082026103603.xml states revenue_from_operations STANDALONE FY = 110.63 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1659056_26042026124812_WEB.xml; the filed quarters sum to 162.24 Cr (+46.6%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_60b479c384544f68ae6deca2"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_SEJALLTD_20082026103603.xml states pat STANDALONE FY = -1.93 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1659056_26042026124812_WEB.xml; the filed quarters sum to -2.46 Cr (-27.1%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_589012d6e3f1f19afaefc734"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_SEJALLTD_20082026103603.xml states pbt_incl_jv STANDALONE FY = -1.93 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1659056_26042026124812_WEB.xml; the filed quarters sum to -2.46 Cr (-27.1%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_9e83e58671ada1a872da6ba9"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_SEJALLTD_20082026103603.xml states total_income STANDALONE FY = 125.27 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1659056_26042026124812_WEB.xml; the filed quarters sum to 183.33 Cr (+46.4%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_dbf21bca7bfe5de9bdd79771"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_CENTRUM_08092026221357.xml states revenue_from_operations CONSOLIDATED FY = 3,762.97 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1670910_21052026080256_WEB.xml; the filed quarters sum to 3,577.26 Cr (-4.9%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_5774a990cb45fa0c359ea659"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_BIRLANU_02092026103535.xml states total_income STANDALONE FY = 2,511.44 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1666174_12052026080524_WEB.xml; the filed quarters sum to 2,446.19 Cr (-2.6%): a quarter as filed is not restated to the audited year. The annual states the cause: amalgamation, previous year restated (DisclosureInAuditorsReportExplanatory: \"Accordingly, the amounts relating to the year ended 31 March 2026 include the impact of the business combination for the entire year and the corresponding amounts for the previous year ended 31 March 2025 have been restated by the Company after recognising the effect of the amalgamation as above.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_0585cd3db1d7dbae5c0f611c"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_BIRLANU_02092026103535.xml states pat STANDALONE FY = -14.05 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1666174_12052026080524_WEB.xml; the filed quarters sum to 10.89 Cr (+177.6%): a quarter as filed is not restated to the audited year. The annual states the cause: amalgamation, previous year restated (DisclosureInAuditorsReportExplanatory: \"Accordingly, the amounts relating to the year ended 31 March 2026 include the impact of the business combination for the entire year and the corresponding amounts for the previous year ended 31 March 2025 have been restated by the Company after recognising the effect of the amalgamation as above.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_b870097a8c24d1de1078348a"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_BIRLANU_02092026103535.xml states pbt_incl_jv STANDALONE FY = -12.64 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1666174_12052026080524_WEB.xml; the filed quarters sum to 19.69 Cr (+255.8%): a quarter as filed is not restated to the audited year. The annual states the cause: amalgamation, previous year restated (DisclosureInAuditorsReportExplanatory: \"Accordingly, the amounts relating to the year ended 31 March 2026 include the impact of the business combination for the entire year and the corresponding amounts for the previous year ended 31 March 2025 have been restated by the Company after recognising the effect of the amalgamation as above.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_d22d3468ec0725e184733068"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_BIRLANU_02092026103535.xml states revenue_from_operations STANDALONE FY = 2,426.53 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1666174_12052026080524_WEB.xml; the filed quarters sum to 2,360.93 Cr (-2.7%): a quarter as filed is not restated to the audited year. The annual states the cause: amalgamation, previous year restated (DisclosureInAuditorsReportExplanatory: \"Accordingly, the amounts relating to the year ended 31 March 2026 include the impact of the business combination for the entire year and the corresponding amounts for the previous year ended 31 March 2025 have been restated by the Company after recognising the effect of the amalgamation as above.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_e52c8d60d89fc06774384fc4"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_SUBEXLTD_08092026111040.xml states pat STANDALONE FY = 5.86 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1666321_13052026111455_WEB.xml; the filed quarters sum to 6.17 Cr (+5.3%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_c315e16b0d1144485acd9384"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_AWHCL_18092026220405.xml states total_income STANDALONE FY = 652.93 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1676890_29052026092620_WEB.xml; the filed quarters sum to 368.71 Cr (-43.5%): a quarter as filed is not restated to the audited year. The annual states the cause: scheme of arrangement, comparative restated (DisclosureOfBusinessCombinationsExplanatory: \"The Scheme has accordingly been given effect to in the standalone financial statements, pursuant to which the comparative financial information for the year ended 31 March 2025 has been restated.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_3f93b66e83e97818f654be09"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_AWHCL_18092026220405.xml states pat STANDALONE FY = 11.39 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1676890_29052026092620_WEB.xml; the filed quarters sum to 12.25 Cr (+7.5%): a quarter as filed is not restated to the audited year. The annual states the cause: scheme of arrangement, comparative restated (DisclosureOfBusinessCombinationsExplanatory: \"The Scheme has accordingly been given effect to in the standalone financial statements, pursuant to which the comparative financial information for the year ended 31 March 2025 has been restated.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_44377692ffd753953052c5a0"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_AWHCL_18092026220405.xml states revenue_from_operations STANDALONE FY = 640.45 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1676890_29052026092620_WEB.xml; the filed quarters sum to 355.03 Cr (-44.6%): a quarter as filed is not restated to the audited year. The annual states the cause: scheme of arrangement, comparative restated (DisclosureOfBusinessCombinationsExplanatory: \"The Scheme has accordingly been given effect to in the standalone financial statements, pursuant to which the comparative financial information for the year ended 31 March 2025 has been restated.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_8d196ec754d1f02760ea56ff"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_AWHCL_18092026220405.xml states pbt_incl_jv STANDALONE FY = 14.23 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1676890_29052026092620_WEB.xml; the filed quarters sum to 15.51 Cr (+9.0%): a quarter as filed is not restated to the audited year. The annual states the cause: scheme of arrangement, comparative restated (DisclosureOfBusinessCombinationsExplanatory: \"The Scheme has accordingly been given effect to in the standalone financial statements, pursuant to which the comparative financial information for the year ended 31 March 2025 has been restated.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_647512683bbe271324622682"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_KECL_16092026102013.xml states pat CONSOLIDATED FY = 8.38 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1673581_26052026093759_WEB.xml; the filed quarters sum to 13.87 Cr (+65.5%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_7ca99510c9a52f89bdc2896d"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_KECL_16092026102013.xml states pbt_incl_jv CONSOLIDATED FY = 8.69 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1673581_26052026093759_WEB.xml; the filed quarters sum to 14.17 Cr (+63.2%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_0151254bc1ba10473689268f"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_KECL_16092026101922.xml states pbt_incl_jv STANDALONE FY = 8.76 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1673582_26052026093804_WEB.xml; the filed quarters sum to 11.07 Cr (+26.5%): a quarter as filed is not restated to the audited year. The annual states the cause: merger under the approved scheme, comparative restated / recast (DisclosureInAuditorsReportExplanatory: \"Accordingly, the accompanying Standalone Ind AS financial statements include the effect of the aforesaid merger and the comparative financial information, wherever applicable, has been restated/recast in accordance with the approved Scheme and applicable accounting standards.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_5fd69f65a1bd56140d8b2547"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_KECL_16092026101922.xml states pat STANDALONE FY = 8.45 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1673582_26052026093804_WEB.xml; the filed quarters sum to 10.77 Cr (+27.5%): a quarter as filed is not restated to the audited year. The annual states the cause: merger under the approved scheme, comparative restated / recast (DisclosureInAuditorsReportExplanatory: \"Accordingly, the accompanying Standalone Ind AS financial statements include the effect of the aforesaid merger and the comparative financial information, wherever applicable, has been restated/recast in accordance with the approved Scheme and applicable accounting standards.\"). X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual +cause"
+ },
+ {
+  "ids": [
+   "q_b97a4f76c8aa883e9697b620"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_ADSL_20102026121401.xml states pat_owners CONSOLIDATED FY = 28.81 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1671090_21052026114751_WEB.xml; the filed quarters sum to 35.74 Cr (+24.0%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_7e4a22da83016923890cb93c"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_ADSL_20102026121401.xml states pat CONSOLIDATED FY = 35.52 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1671090_21052026114751_WEB.xml; the filed quarters sum to 40.35 Cr (+13.5%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_b28baebd4aa980d34eb39f4e"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_URJA_30092026125922.xml states pat CONSOLIDATED FY = 1.35 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1725637_19092026124921_WEB.xml; the filed quarters sum to 1.99 Cr (+47.4%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_39d32261cdf8195d451096ea"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_URJA_30092026125843.xml states pat STANDALONE FY = 1.91 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1725635_19092026124314_WEB.xml; the filed quarters sum to 2.55 Cr (+33.5%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_cfeba290dbc0bd8d7cdbc2eb"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_MEDICAMEQ_16112026162355.xml states pat_owners CONSOLIDATED FY = 9.64 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1673886_27052026034631_WEB.xml; the filed quarters sum to 10.86 Cr (+12.7%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_7f57ad1a3952a550a66176b1"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_DJML_17082026182230.xml states pat CONSOLIDATED FY = 10.91 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1670356_20052026105922_WEB.xml; the filed quarters sum to 11.39 Cr (+4.5%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_36bbd29bac616e55e3215644"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_DJML_17082026182203.xml states pat STANDALONE FY = 10.04 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1670355_20052026105917_WEB.xml; the filed quarters sum to 10.49 Cr (+4.5%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_68e3cdd016288c3774ff7dd3"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_RPPINFRA_24102026173516.xml states pat CONSOLIDATED FY = 7.45 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1676968_29052026101216_WEB.xml; the filed quarters sum to 12.21 Cr (+63.9%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_f0b86c07c96d68fbaa64ccb0"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_RPPINFRA_24102026173516.xml states pbt_incl_jv CONSOLIDATED FY = 10.74 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1676968_29052026101216_WEB.xml; the filed quarters sum to 15.50 Cr (+44.3%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_03a789dcd781d868e7a36aa0"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_PAVNAIND_16102026151039.xml states pat CONSOLIDATED FY = 5.29 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1675407_28052026090243_WEB.xml; the filed quarters sum to 5.39 Cr (+1.8%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_e7fa48884466f7428f6980a1"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_GSLSU_17102026153425.xml states pat STANDALONE FY = 7.61 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1672623_25052026073255_WEB.xml; the filed quarters sum to 8.08 Cr (+6.1%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_65f4aa45ee15b99e98efbf85"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_RSSOFTWARE_27082026151952.xml states total_income STANDALONE FY = 25.45 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1664391_07052026030312_WEB.xml; the filed quarters sum to 23.69 Cr (-6.9%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_82c09261e0ff93fb616939e1"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_RSSOFTWARE_27082026151952.xml states pat STANDALONE FY = -29.93 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1664391_07052026030312_WEB.xml; the filed quarters sum to -40.22 Cr (-34.4%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_6509bc29628fcfb0579e9223"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_RSSOFTWARE_27082026151952.xml states revenue_from_operations STANDALONE FY = 25.14 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1664391_07052026030312_WEB.xml; the filed quarters sum to 23.31 Cr (-7.3%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_1f4cc8d4e5adc62f3c0f0bcc"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: the audited FY 2026 figure is confirmed by a second filing: the Reg. 34 annual report AR_XBRL_RSSOFTWARE_27082026151952.xml states pbt_incl_jv STANDALONE FY = -29.93 Cr, equal to the FY YTD of the results INTEGRATED_FILING_INDAS_1664391_07052026030312_WEB.xml; the filed quarters sum to -40.22 Cr (-34.4%): a quarter as filed is not restated to the audited year. X106 TTM across the break uses the audited FY YTD; quarters stay as filed.",
+  "bucket": "ytd FY confirmed by annual"
+ },
+ {
+  "ids": [
+   "q_5a2fb4c4dc6ddb1b30d8dc03"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation under common control, comparative restated; FY26 annual report AR_XBRL_VIYASH_11092026122348.xml (DisclosureOfBusinessCombinationsExplanatory): \"Comparative financial information in the financial statements of the Amalgamated Company have been restated for the accounting impact of the merger of the Amalgamating Company, as stated above, as if the merger had occurred from the beginning of the comparative period presented.\". SEQUENT CONSOLIDATED pat YTD 2025-04-01..2025-12-31 158.27 Cr vs filed quarters 85.69 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_e6586173997a2cc30d0b3205"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation under common control, comparative restated; FY26 annual report AR_XBRL_VIYASH_11092026122348.xml (DisclosureOfBusinessCombinationsExplanatory): \"Comparative financial information in the financial statements of the Amalgamated Company have been restated for the accounting impact of the merger of the Amalgamating Company, as stated above, as if the merger had occurred from the beginning of the comparative period presented.\". SEQUENT CONSOLIDATED total_income YTD 2025-04-01..2025-12-31 2,527.98 Cr vs filed quarters 1,743.82 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_784b75f24bbf80c7808a6679"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation under common control, comparative restated; FY26 annual report AR_XBRL_VIYASH_11092026122348.xml (DisclosureOfBusinessCombinationsExplanatory): \"Comparative financial information in the financial statements of the Amalgamated Company have been restated for the accounting impact of the merger of the Amalgamating Company, as stated above, as if the merger had occurred from the beginning of the comparative period presented.\". SEQUENT CONSOLIDATED revenue_from_operations YTD 2025-04-01..2025-12-31 2,500.35 Cr vs filed quarters 1,723.82 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_039655cc6db18f2656d5aefd"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation under common control, comparative restated; FY26 annual report AR_XBRL_VIYASH_11092026122348.xml (DisclosureOfBusinessCombinationsExplanatory): \"Comparative financial information in the financial statements of the Amalgamated Company have been restated for the accounting impact of the merger of the Amalgamating Company, as stated above, as if the merger had occurred from the beginning of the comparative period presented.\". SEQUENT CONSOLIDATED pbt_incl_jv YTD 2025-04-01..2025-12-31 223.78 Cr vs filed quarters 125.75 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_2faedcc3c128cde13c0fb739"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation under common control, comparative restated; FY26 annual report AR_XBRL_VIYASH_11092026122348.xml (DisclosureOfBusinessCombinationsExplanatory): \"Comparative financial information in the financial statements of the Amalgamated Company have been restated for the accounting impact of the merger of the Amalgamating Company, as stated above, as if the merger had occurred from the beginning of the comparative period presented.\". SEQUENT CONSOLIDATED pat_owners YTD 2025-04-01..2025-12-31 125.17 Cr vs filed quarters 67.49 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_702f66d6ed014f573d03e777"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation under common control, comparative restated; FY26 annual report AR_XBRL_VIYASH_11092026122220.xml (DisclosureOfBusinessCombinationsExplanatory): \"Comparative financial information in the financial statements of the Amalgamated Company have been restated for the accounting impact of the merger of the Amalgamating Company 1, as stated above, as if the merger had occurred from the beginning of the comparative period presented.\". SEQUENT STANDALONE total_income YTD 2025-04-01..2025-12-31 1,056.08 Cr vs filed quarters 456.26 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_609226a586d26695daa10cf0"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation under common control, comparative restated; FY26 annual report AR_XBRL_VIYASH_11092026122220.xml (DisclosureOfBusinessCombinationsExplanatory): \"Comparative financial information in the financial statements of the Amalgamated Company have been restated for the accounting impact of the merger of the Amalgamating Company 1, as stated above, as if the merger had occurred from the beginning of the comparative period presented.\". SEQUENT STANDALONE pat YTD 2025-04-01..2025-12-31 40.06 Cr vs filed quarters 6.37 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_595446922eafe8aea6199915"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation under common control, comparative restated; FY26 annual report AR_XBRL_VIYASH_11092026122220.xml (DisclosureOfBusinessCombinationsExplanatory): \"Comparative financial information in the financial statements of the Amalgamated Company have been restated for the accounting impact of the merger of the Amalgamating Company 1, as stated above, as if the merger had occurred from the beginning of the comparative period presented.\". SEQUENT STANDALONE revenue_from_operations YTD 2025-04-01..2025-12-31 1,009.57 Cr vs filed quarters 416.74 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_6c0b1f9a3f5d11dba9b5839e"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation under common control, comparative restated; FY26 annual report AR_XBRL_VIYASH_11092026122220.xml (DisclosureOfBusinessCombinationsExplanatory): \"Comparative financial information in the financial statements of the Amalgamated Company have been restated for the accounting impact of the merger of the Amalgamating Company 1, as stated above, as if the merger had occurred from the beginning of the comparative period presented.\". SEQUENT STANDALONE pbt_incl_jv YTD 2025-04-01..2025-12-31 67.47 Cr vs filed quarters 19.73 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_ab236937d4bd1fdb793323fb"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation of Kurlon Enterprise under common control (pooling of interests); FY26 annual report AR_XBRL_SFL_18082026154053.xml (DisclosureOfBusinessCombinationsExplanatory): \"As a result, the transaction has been accounted in accordance with “Pooling of Interest Method” laid down by Appendix C (Business Combinations of Entities under Common Control) of Indian Accounting Standard 103 (Ind AS 103), notified under the Companies’ Act, 2013.\". SFL STANDALONE pbt_incl_jv YTD 2025-04-01..2025-09-30 23.87 Cr vs filed quarters 40.25 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_fe0cdc8db1db27e7b069b34f"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation of Kurlon Enterprise under common control (pooling of interests); FY26 annual report AR_XBRL_SFL_18082026154053.xml (DisclosureOfBusinessCombinationsExplanatory): \"As a result, the transaction has been accounted in accordance with “Pooling of Interest Method” laid down by Appendix C (Business Combinations of Entities under Common Control) of Indian Accounting Standard 103 (Ind AS 103), notified under the Companies’ Act, 2013.\". SFL STANDALONE pat YTD 2025-04-01..2025-09-30 16.35 Cr vs filed quarters 29.75 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_576a319d70054d7860a331c7"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation of Kurlon Enterprise under common control (pooling of interests); FY26 annual report AR_XBRL_SFL_18082026154053.xml (DisclosureOfBusinessCombinationsExplanatory): \"As a result, the transaction has been accounted in accordance with “Pooling of Interest Method” laid down by Appendix C (Business Combinations of Entities under Common Control) of Indian Accounting Standard 103 (Ind AS 103), notified under the Companies’ Act, 2013.\". SFL STANDALONE total_income YTD 2025-04-01..2025-09-30 1,317.47 Cr vs filed quarters 1,380.87 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_0ce5910f10d410eb42def63b"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation of Kurlon Enterprise under common control (pooling of interests); FY26 annual report AR_XBRL_SFL_18082026154053.xml (DisclosureOfBusinessCombinationsExplanatory): \"As a result, the transaction has been accounted in accordance with “Pooling of Interest Method” laid down by Appendix C (Business Combinations of Entities under Common Control) of Indian Accounting Standard 103 (Ind AS 103), notified under the Companies’ Act, 2013.\". SFL STANDALONE revenue_from_operations YTD 2025-04-01..2025-09-30 1,301.43 Cr vs filed quarters 1,363.39 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_d4600a3bec23cd87e8237188"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation of Kurlon Enterprise under common control (pooling of interests); FY26 annual report AR_XBRL_SFL_18082026154053.xml (DisclosureOfBusinessCombinationsExplanatory): \"As a result, the transaction has been accounted in accordance with “Pooling of Interest Method” laid down by Appendix C (Business Combinations of Entities under Common Control) of Indian Accounting Standard 103 (Ind AS 103), notified under the Companies’ Act, 2013.\". SFL STANDALONE pbt_incl_jv YTD 2025-04-01..2025-12-31 74.31 Cr vs filed quarters 90.69 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_db2ce71f44b73b11cb8173f4"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation of Kurlon Enterprise under common control (pooling of interests); FY26 annual report AR_XBRL_SFL_18082026154053.xml (DisclosureOfBusinessCombinationsExplanatory): \"As a result, the transaction has been accounted in accordance with “Pooling of Interest Method” laid down by Appendix C (Business Combinations of Entities under Common Control) of Indian Accounting Standard 103 (Ind AS 103), notified under the Companies’ Act, 2013.\". SFL STANDALONE total_income YTD 2025-04-01..2025-12-31 2,167.28 Cr vs filed quarters 2,230.68 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_e5c4dbb801c35652d32e8573"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation of Kurlon Enterprise under common control (pooling of interests); FY26 annual report AR_XBRL_SFL_18082026154053.xml (DisclosureOfBusinessCombinationsExplanatory): \"As a result, the transaction has been accounted in accordance with “Pooling of Interest Method” laid down by Appendix C (Business Combinations of Entities under Common Control) of Indian Accounting Standard 103 (Ind AS 103), notified under the Companies’ Act, 2013.\". SFL STANDALONE pat YTD 2025-04-01..2025-12-31 55.05 Cr vs filed quarters 68.45 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_bfeaa54563a4cf7a082da4af"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation of Kurlon Enterprise under common control (pooling of interests); FY26 annual report AR_XBRL_SFL_18082026154053.xml (DisclosureOfBusinessCombinationsExplanatory): \"As a result, the transaction has been accounted in accordance with “Pooling of Interest Method” laid down by Appendix C (Business Combinations of Entities under Common Control) of Indian Accounting Standard 103 (Ind AS 103), notified under the Companies’ Act, 2013.\". SFL STANDALONE revenue_from_operations YTD 2025-04-01..2025-12-31 2,143.07 Cr vs filed quarters 2,205.03 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_91bb8dd753efab9e860cbbed"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation of the wholly owned subsidiary Kolte-Patil Integrated Townships, comparative restated; FY26 annual report AR_XBRL_KOLTEPATIL_26082026104754.xml (DisclosureInAuditorsReportExplanatory): \"Emphasis of Matter The comparative financial information of the Company as at and for the year ended March 31, 2025, included in these standalone financial statements has been restated to give effect to the adjustments arising from the amalgamation of a wholly owned subsidiary of the Company, Kolte-Patil Integrated ...\". KOLTEPATIL STANDALONE total_income YTD 2025-04-01..2025-09-30 221.99 Cr vs filed quarters 207.71 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_dbfeb4c41d66976921c899f8"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation of the wholly owned subsidiary Kolte-Patil Integrated Townships, comparative restated; FY26 annual report AR_XBRL_KOLTEPATIL_26082026104754.xml (DisclosureInAuditorsReportExplanatory): \"Emphasis of Matter The comparative financial information of the Company as at and for the year ended March 31, 2025, included in these standalone financial statements has been restated to give effect to the adjustments arising from the amalgamation of a wholly owned subsidiary of the Company, Kolte-Patil Integrated ...\". KOLTEPATIL STANDALONE pbt_incl_jv YTD 2025-04-01..2025-09-30 -29.06 Cr vs filed quarters -36.82 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_685fd6422ac8ca8193f0ba93"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation of the wholly owned subsidiary Kolte-Patil Integrated Townships, comparative restated; FY26 annual report AR_XBRL_KOLTEPATIL_26082026104754.xml (DisclosureInAuditorsReportExplanatory): \"Emphasis of Matter The comparative financial information of the Company as at and for the year ended March 31, 2025, included in these standalone financial statements has been restated to give effect to the adjustments arising from the amalgamation of a wholly owned subsidiary of the Company, Kolte-Patil Integrated ...\". KOLTEPATIL STANDALONE pat YTD 2025-04-01..2025-09-30 -21.41 Cr vs filed quarters -27.96 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_4f4eee4e14c776d75034fe45"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation of the wholly owned subsidiary Kolte-Patil Integrated Townships, comparative restated; FY26 annual report AR_XBRL_KOLTEPATIL_26082026104754.xml (DisclosureInAuditorsReportExplanatory): \"Emphasis of Matter The comparative financial information of the Company as at and for the year ended March 31, 2025, included in these standalone financial statements has been restated to give effect to the adjustments arising from the amalgamation of a wholly owned subsidiary of the Company, Kolte-Patil Integrated ...\". KOLTEPATIL STANDALONE revenue_from_operations YTD 2025-04-01..2025-09-30 172.83 Cr vs filed quarters 168.01 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_338c5a7cba3a53ce981b2207"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation of the wholly owned subsidiary Kolte-Patil Integrated Townships, comparative restated; FY26 annual report AR_XBRL_KOLTEPATIL_26082026104754.xml (DisclosureInAuditorsReportExplanatory): \"Emphasis of Matter The comparative financial information of the Company as at and for the year ended March 31, 2025, included in these standalone financial statements has been restated to give effect to the adjustments arising from the amalgamation of a wholly owned subsidiary of the Company, Kolte-Patil Integrated ...\". KOLTEPATIL STANDALONE pbt_incl_jv YTD 2025-04-01..2025-12-31 0.68 Cr vs filed quarters -7.08 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_8ca4b63f81d3db667190bf79"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation of the wholly owned subsidiary Kolte-Patil Integrated Townships, comparative restated; FY26 annual report AR_XBRL_KOLTEPATIL_26082026104754.xml (DisclosureInAuditorsReportExplanatory): \"Emphasis of Matter The comparative financial information of the Company as at and for the year ended March 31, 2025, included in these standalone financial statements has been restated to give effect to the adjustments arising from the amalgamation of a wholly owned subsidiary of the Company, Kolte-Patil Integrated ...\". KOLTEPATIL STANDALONE pat YTD 2025-04-01..2025-12-31 -1.07 Cr vs filed quarters -7.62 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_88ee3d6cae20806276e4d796"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation of the wholly owned subsidiary Kolte-Patil Integrated Townships, comparative restated; FY26 annual report AR_XBRL_KOLTEPATIL_26082026104754.xml (DisclosureInAuditorsReportExplanatory): \"Emphasis of Matter The comparative financial information of the Company as at and for the year ended March 31, 2025, included in these standalone financial statements has been restated to give effect to the adjustments arising from the amalgamation of a wholly owned subsidiary of the Company, Kolte-Patil Integrated ...\". KOLTEPATIL STANDALONE total_income YTD 2025-04-01..2025-12-31 502.37 Cr vs filed quarters 488.09 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_cd767a1cb53914d04b93f445"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: amalgamation of the wholly owned subsidiary Kolte-Patil Integrated Townships, comparative restated; FY26 annual report AR_XBRL_KOLTEPATIL_26082026104754.xml (DisclosureInAuditorsReportExplanatory): \"Emphasis of Matter The comparative financial information of the Company as at and for the year ended March 31, 2025, included in these standalone financial statements has been restated to give effect to the adjustments arising from the amalgamation of a wholly owned subsidiary of the Company, Kolte-Patil Integrated ...\". KOLTEPATIL STANDALONE revenue_from_operations YTD 2025-04-01..2025-12-31 422.00 Cr vs filed quarters 417.18 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_9c6df4309021f55fa8bf0181"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: merger, comparative restated; FY26 annual report AR_XBRL_YATRA_14102026190837.xml (DisclosureOfBusinessCombinationsExplanatory): \"Further, comparative financial information has been restated for the accounting impact of the merger as if the amalgamation had occurred from the beginning of the comparative period presented.\". YATRA STANDALONE pbt_incl_jv YTD 2025-04-01..2025-09-30 19.18 Cr vs filed quarters 14.33 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_b18f03f116563237e601c333"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: merger, comparative restated; FY26 annual report AR_XBRL_YATRA_14102026190837.xml (DisclosureOfBusinessCombinationsExplanatory): \"Further, comparative financial information has been restated for the accounting impact of the merger as if the amalgamation had occurred from the beginning of the comparative period presented.\". YATRA STANDALONE revenue_from_operations YTD 2025-04-01..2025-09-30 343.20 Cr vs filed quarters 309.24 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_cb3b5eb8921e32872cef3eac"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: merger, comparative restated; FY26 annual report AR_XBRL_YATRA_14102026190837.xml (DisclosureOfBusinessCombinationsExplanatory): \"Further, comparative financial information has been restated for the accounting impact of the merger as if the amalgamation had occurred from the beginning of the comparative period presented.\". YATRA STANDALONE total_income YTD 2025-04-01..2025-12-31 506.79 Cr vs filed quarters 472.45 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_86080e32f3913eb4ae9ccacc"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: merger, comparative restated; FY26 annual report AR_XBRL_YATRA_14102026190837.xml (DisclosureOfBusinessCombinationsExplanatory): \"Further, comparative financial information has been restated for the accounting impact of the merger as if the amalgamation had occurred from the beginning of the comparative period presented.\". YATRA STANDALONE pat YTD 2025-04-01..2025-12-31 24.23 Cr vs filed quarters 19.34 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_336c57e730a2acd7093f8beb"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: merger, comparative restated; FY26 annual report AR_XBRL_YATRA_14102026190837.xml (DisclosureOfBusinessCombinationsExplanatory): \"Further, comparative financial information has been restated for the accounting impact of the merger as if the amalgamation had occurred from the beginning of the comparative period presented.\". YATRA STANDALONE pat YTD 2025-04-01..2025-09-30 19.39 Cr vs filed quarters 14.50 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_f60f3131d944c781e6a1c092"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: merger, comparative restated; FY26 annual report AR_XBRL_YATRA_14102026190837.xml (DisclosureOfBusinessCombinationsExplanatory): \"Further, comparative financial information has been restated for the accounting impact of the merger as if the amalgamation had occurred from the beginning of the comparative period presented.\". YATRA STANDALONE revenue_from_operations YTD 2025-04-01..2025-12-31 487.71 Cr vs filed quarters 453.75 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_00f071ce03f15f64f0a7aaad"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: merger, comparative restated; FY26 annual report AR_XBRL_YATRA_14102026190837.xml (DisclosureOfBusinessCombinationsExplanatory): \"Further, comparative financial information has been restated for the accounting impact of the merger as if the amalgamation had occurred from the beginning of the comparative period presented.\". YATRA STANDALONE total_income YTD 2025-04-01..2025-09-30 356.32 Cr vs filed quarters 321.98 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_b52eca4c8a91534d3d552b30"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: merger, comparative restated; FY26 annual report AR_XBRL_YATRA_14102026190837.xml (DisclosureOfBusinessCombinationsExplanatory): \"Further, comparative financial information has been restated for the accounting impact of the merger as if the amalgamation had occurred from the beginning of the comparative period presented.\". YATRA STANDALONE pbt_incl_jv YTD 2025-04-01..2025-12-31 23.96 Cr vs filed quarters 19.11 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_3041d48bbcc6425341e61f7c"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: scheme of arrangement, comparative restated; FY26 annual report AR_XBRL_AWHCL_18092026220405.xml (DisclosureOfBusinessCombinationsExplanatory): \"The Scheme has accordingly been given effect to in the standalone financial statements, pursuant to which the comparative financial information for the year ended 31 March 2025 has been restated.\". AWHCL STANDALONE revenue_from_operations YTD 2025-04-01..2025-12-31 471.88 Cr vs filed quarters 186.47 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_06be53a5ad0803a7e1ec02f1"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: scheme of arrangement, comparative restated; FY26 annual report AR_XBRL_AWHCL_18092026220405.xml (DisclosureOfBusinessCombinationsExplanatory): \"The Scheme has accordingly been given effect to in the standalone financial statements, pursuant to which the comparative financial information for the year ended 31 March 2025 has been restated.\". AWHCL STANDALONE pbt_incl_jv YTD 2025-04-01..2025-12-31 5.52 Cr vs filed quarters 6.81 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_41e19ac5174dd4a2fd8575fc"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: scheme of arrangement, comparative restated; FY26 annual report AR_XBRL_AWHCL_18092026220405.xml (DisclosureOfBusinessCombinationsExplanatory): \"The Scheme has accordingly been given effect to in the standalone financial statements, pursuant to which the comparative financial information for the year ended 31 March 2025 has been restated.\". AWHCL STANDALONE total_income YTD 2025-04-01..2025-12-31 479.38 Cr vs filed quarters 195.15 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ },
+ {
+  "ids": [
+   "q_d87bf254d7d6bb789a0cfaeb"
+  ],
+  "note": "Owner decision A (2026-11-15, delegated) precedent, XBRL evidence [QF4]: company restatement during FY26: scheme of arrangement, comparative restated; FY26 annual report AR_XBRL_AWHCL_18092026220405.xml (DisclosureOfBusinessCombinationsExplanatory): \"The Scheme has accordingly been given effect to in the standalone financial statements, pursuant to which the comparative financial information for the year ended 31 March 2025 has been restated.\". AWHCL STANDALONE pat YTD 2025-04-01..2025-12-31 4.02 Cr vs filed quarters 4.88 Cr: quarters filed before the scheme took effect are not restated. X106 TTM uses the company's latest YTD.",
+  "bucket": "ytd merger during FY26"
+ }
+]

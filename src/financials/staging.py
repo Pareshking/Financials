@@ -12,6 +12,7 @@ import json
 import os
 import shutil
 import tempfile
+import threading
 from dataclasses import asdict
 from datetime import datetime, time
 from pathlib import Path
@@ -71,7 +72,8 @@ CREATE TABLE stg_related_parties (
 );
 CREATE TABLE stg_reg23_rpt (
     filing_id VARCHAR NOT NULL, parser_version VARCHAR NOT NULL, scope VARCHAR NOT NULL, row_member VARCHAR NOT NULL,
-    period_start DATE NOT NULL, period_end DATE NOT NULL, period_months INTEGER, listed_party_name VARCHAR,
+    period_start DATE NOT NULL, period_end DATE NOT NULL, period_months INTEGER, disclosure_start DATE,
+    disclosure_months INTEGER, listed_party_name VARCHAR,
     counterparty_name VARCHAR NOT NULL, counterparty_pan VARCHAR, relationship VARCHAR, type_as_filed VARCHAR,
     txn_type VARCHAR NOT NULL, details VARCHAR, approval_remarks VARCHAR, terms VARCHAR,
     amount_inr DECIMAL(20,2) NOT NULL, approved_value_inr DECIMAL(20,2), ratified_value_inr DECIMAL(20,2),
@@ -99,7 +101,7 @@ CREATE TABLE stg_corp_actions (
     symbol VARCHAR NOT NULL, series VARCHAR NOT NULL, isin VARCHAR NOT NULL, ex_date DATE NOT NULL,
     record_date DATE, face_value DECIMAL(18,4), subject VARCHAR NOT NULL, parse_status VARCHAR NOT NULL,
     parse_reason VARCHAR, action_type VARCHAR, ratio_num DECIMAL(18,6), ratio_den DECIMAL(18,6),
-    issue_price DECIMAL(18,4), cash_per_share DECIMAL(18,4),
+    issue_price DECIMAL(18,4), cash_per_share DECIMAL(18,4), issue_price_floor DECIMAL(18,4),
     PRIMARY KEY (filing_id, seq, component)
 );
 CREATE TABLE stg_holidays (
@@ -109,7 +111,7 @@ CREATE TABLE stg_holidays (
 CREATE TABLE stg_shp_meta (
     filing_id VARCHAR PRIMARY KEY, parser_version VARCHAR NOT NULL, as_of_date DATE NOT NULL,
     stated_isin VARCHAR NOT NULL, stated_symbol VARCHAR, has_partly_paid BOOLEAN, promoter_pledge_flag BOOLEAN,
-    promoter_pledged_shares BIGINT, promoter_encumbered_shares BIGINT, rules_applied VARCHAR
+    promoter_pledged_shares BIGINT, promoter_encumbered_shares BIGINT, rules_applied VARCHAR, company_name VARCHAR
 );
 CREATE TABLE stg_shp_line_items (
     filing_id VARCHAR NOT NULL, category_member VARCHAR NOT NULL, element VARCHAR NOT NULL,
@@ -155,6 +157,9 @@ TABLE_ORDER = (
     "raw_equity_master",
     "raw_results_listing",
     "raw_quote_classification",
+    "raw_nse_mcap",
+    "raw_price_band_hits",
+    "raw_bse_securities",
     "stg_holidays",
     "stg_shp_meta",
     "stg_shp_categories",
@@ -184,6 +189,32 @@ def _filing_row(f: Filing) -> dict[str, Any]:
     return asdict(f)
 
 
+_LOCAL = threading.local()
+
+
+def _staging_connection():
+    """X347 STAGING_CONNECTION_REUSE: one in-memory DuckDB with the schema per thread and process, reused by every
+    batch. Applying schema.sql to a fresh database took 450-840 ms of each batch (2,649 batches of one import-vault:
+    the bulk of its minutes); a batch now inserts and copies inside a transaction that is rolled back, so every
+    batch still starts from empty tables with the same types, keys and foreign keys."""
+    held = getattr(_LOCAL, "con", None)
+    if held is not None and held[0] == os.getpid():
+        return held[1]
+    con = connect()
+    apply_schema(con)
+    con.execute(STAGING_SCHEMA)
+    _LOCAL.con = (os.getpid(), con)
+    return con
+
+
+def _release(con) -> None:
+    try:
+        con.execute("ROLLBACK")
+    except Exception:  # a connection that cannot roll back is not reused
+        _LOCAL.con = None
+        con.close()
+
+
 def write_stage(
     stage_root: Path,
     job: str,
@@ -203,18 +234,19 @@ def write_stage(
     final.parent.mkdir(parents=True, exist_ok=True)
     tmp = Path(tempfile.mkdtemp(dir=final.parent, prefix=f".{run_id}-"))
     try:
-        con = connect()
-        apply_schema(con)
-        con.execute(STAGING_SCHEMA)
-        counts = {}
-        for name in TABLE_ORDER:
-            rows = tables.get(name) or []
-            if not rows:
-                continue
-            insert_rows(con, name, rows)
-            con.execute(f"COPY {name} TO '{(tmp / (name + '.parquet')).as_posix()}' (FORMAT PARQUET)")
-            counts[name] = len(rows)
-        con.close()
+        con = _staging_connection()
+        con.execute("BEGIN")
+        try:
+            counts = {}
+            for name in TABLE_ORDER:
+                rows = tables.get(name) or []
+                if not rows:
+                    continue
+                insert_rows(con, name, rows)
+                con.execute(f"COPY {name} TO '{(tmp / (name + '.parquet')).as_posix()}' (FORMAT PARQUET)")
+                counts[name] = len(rows)
+        finally:
+            _release(con)  # the batch's rows never outlive it: the next batch starts from empty tables
         manifest = {"job": job, "run_id": run_id, "tables": counts, **(extra or {})}
         (tmp / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
         os.replace(tmp, final)
@@ -324,8 +356,12 @@ def stage_results_xbrl(
     run_suffix: str | None = None,
 ) -> Path:
     """Vault + parse one quarterly results XBRL. Parse problems are staged as issues, not raised.
-    `run_suffix` (restage) gives a re-parse its own batch, promoted as a new parser_version."""
-    blob = vault.put(data, ext="xml", media_type="application/xml", fetched_at=fetched_at)
+    `run_suffix` (restage) gives a re-parse its own batch, promoted as a new parser_version. A BSE inline XBRL file
+    [X265] is vaulted as the HTML it is and parsed as the instance it denotes."""
+    from financials.parsers.ixbrl import is_inline
+
+    ext, media = ("html", "text/html") if is_inline(data) else ("xml", "application/xml")
+    blob = vault.put(data, ext=ext, media_type=media, fetched_at=fetched_at)
     filing = make_filing(
         blob,
         exchange=exchange,
@@ -634,7 +670,14 @@ def stage_corp_actions(
             "parse_status": r.parse_status,
             "parse_reason": r.parse_reason,
         }
-        empty = {"action_type": None, "ratio_num": None, "ratio_den": None, "issue_price": None, "cash_per_share": None}
+        empty = {
+            "action_type": None,
+            "ratio_num": None,
+            "ratio_den": None,
+            "issue_price": None,
+            "cash_per_share": None,
+            "issue_price_floor": None,
+        }
         if not r.components:
             rows.append(
                 {**base, "component": 0, **empty, "action_type": "UNKNOWN" if r.parse_status == "UNPARSED" else None}
@@ -649,6 +692,7 @@ def stage_corp_actions(
                     "ratio_den": c.ratio_den,
                     "issue_price": c.issue_price,
                     "cash_per_share": c.cash_per_share,
+                    "issue_price_floor": c.issue_price_floor,
                 }
             )
     return write_stage(
@@ -738,9 +782,11 @@ def stage_shareholding(
     """Vault + parse one Reg. 31 shareholding XBRL. Broadcast time comes from the NSE master JSON.
     `run_suffix` (restage) gives a re-parse its own batch next to the first one, so it promotes as a new
     parser_version instead of being taken for the batch already promoted."""
+    from financials.parsers.ixbrl import is_inline
     from financials.parsers.shareholding import shp_instance
 
-    blob = vault.put(data, ext="xml", media_type="application/xml", fetched_at=fetched_at)
+    ext, media = ("html", "text/html") if is_inline(data) else ("xml", "application/xml")  # BSE inline XBRL [X170]
+    blob = vault.put(data, ext=ext, media_type=media, fetched_at=fetched_at)
     filing = make_filing(
         blob,
         exchange=exchange,
@@ -811,6 +857,7 @@ def shareholding_tables(fid: str, inst, data: bytes) -> dict[str, list[dict[str,
             "promoter_pledged_shares": _int_or_none(m["promoter_pledged_shares"]),
             "promoter_encumbered_shares": _int_or_none(m["promoter_encumbered_shares"]),
             "rules_applied": ",".join(m["rules_applied"]) or None,
+            "company_name": m.get("company_name"),
         }
     ]
     tables["stg_shp_line_items"] = [
@@ -981,6 +1028,53 @@ def stage_index_closes(vault: Vault, stage_root: Path, *, data: bytes, source_ur
     )  # fmt: skip
 
 
+def stage_mcap_day(vault: Vault, stage_root: Path, *, data: bytes, source_url: str, fetched_at: datetime) -> Path:
+    """Vault one PRddmmyy.zip and parse its mcap file [X130-X133]. The blob is the whole zip (the evidence); the batch
+    is filed under the file's own trade date, visible at the end of that IST day (as the bhavcopy: EOD_RULE)."""
+    from financials.parsers.pr_bands import parse_price_band_hits
+    from financials.parsers.pr_mcap import parse_pr_mcap
+
+    rows = parse_pr_mcap(data)
+    bands = parse_price_band_hits(data)  # X359: the same zip's price-band file
+    day = rows[0].trade_date
+    blob = vault.put(data, ext="zip", media_type="application/zip", fetched_at=fetched_at)
+    filing = make_filing(blob, exchange="NSE", category="PR_MCAP", source_url=source_url, fetched_at=fetched_at,
+                         broadcast_ts=ist_to_utc(day, time(23, 59, 59)), broadcast_ts_source="EOD_RULE")  # fmt: skip
+    return write_stage(
+        stage_root, "mcap_day", f"{day:%Y%m%d}-{blob.sha256[:12]}",
+        {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)],
+         "raw_nse_mcap": [{**asdict(r), "filing_id": filing.filing_id} for r in rows],
+         "raw_price_band_hits": [{**asdict(r), "filing_id": filing.filing_id} for r in bands]},
+        extra={"trade_date": day.isoformat()},
+    )  # fmt: skip
+
+
+def stage_price_bands(
+    vault: Vault, stage_root: Path, *, data: bytes, source_url: str, fetched_at: datetime, broadcast_ts: datetime
+) -> Path:
+    """Backfill [X359]: the price-band file of a PR zip already promoted for its mcap file (same blob, same filing)."""
+    from financials.parsers.pr_bands import parse_price_band_hits
+
+    bands = parse_price_band_hits(data)
+    blob = vault.put(data, ext="zip", media_type="application/zip", fetched_at=fetched_at)
+    filing = make_filing(
+        blob,
+        exchange="NSE",
+        category="PR_MCAP",
+        source_url=source_url,
+        fetched_at=fetched_at,
+        broadcast_ts=broadcast_ts,
+        broadcast_ts_source="EOD_RULE",
+    )
+    day = broadcast_ts.date() if not bands else bands[0].trade_date
+    return write_stage(
+        stage_root, "price_bands", f"{day:%Y%m%d}-{blob.sha256[:12]}",
+        {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)],
+         "raw_price_band_hits": [{**asdict(r), "filing_id": filing.filing_id} for r in bands]},
+        extra={"trade_date": day.isoformat(), "filing_id": filing.filing_id},
+    )  # fmt: skip
+
+
 def stage_equity_master(vault: Vault, stage_root: Path, *, data: bytes, source_url: str, fetched_at: datetime) -> Path:
     """Vault + parse EQUITY_L.csv [IDX10]; the snapshot date is the IST date of the fetch."""
     from financials.parsers.indices import parse_equity_master
@@ -995,6 +1089,24 @@ def stage_equity_master(vault: Vault, stage_root: Path, *, data: bytes, source_u
         {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)],
          "raw_equity_master": [{**asdict(r), "filing_id": filing.filing_id, "snapshot_date": snap} for r in rows]},
         extra={"snapshot_date": snap.isoformat()},
+    )  # fmt: skip
+
+
+def stage_bse_securities(vault: Vault, stage_root: Path, *, data: bytes, source_url: str, fetched_at: datetime) -> Path:
+    """Vault + parse one BSE list-of-securities answer [A17, X169] (exchange BSE); observed on the IST fetch date."""
+    from financials.parsers.bse_securities import parse_list_securities
+    from financials.timeutil import utc_to_ist_date
+
+    rows = parse_list_securities(data)
+    blob = vault.put(data, ext="json", media_type="application/json", fetched_at=fetched_at)
+    filing = make_filing(blob, exchange="BSE", category="BSE_LIST_SECURITIES", source_url=source_url,
+                         fetched_at=fetched_at)  # fmt: skip
+    observed = utc_to_ist_date(fetched_at)
+    return write_stage(
+        stage_root, "bse_securities", f"{observed:%Y%m%d}-{blob.sha256[:12]}",
+        {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)],
+         "raw_bse_securities": [{**asdict(r), "filing_id": filing.filing_id, "observed_date": observed} for r in rows]},
+        extra={"snapshot_date": observed.isoformat()},
     )  # fmt: skip
 
 

@@ -17,7 +17,7 @@ from datetime import date, datetime
 
 import pyarrow.parquet as pq
 import pytest
-from conftest import FETCHED_AT, build_full_market
+from conftest import FETCHED_AT, full_market_copy
 
 from _fixture_helpers import XBRL_DIR
 from financials import features, features_store, storage
@@ -41,15 +41,14 @@ TABLES = {
 
 @pytest.fixture(scope="module")
 def base(tmp_path_factory):
-    root = tmp_path_factory.mktemp("storage_base")
-    m = build_full_market(root)
+    m = full_market_copy(tmp_path_factory)
     for name, ts in ((CUMMINS_AR, datetime(2026, 9, 4, 6, 5)), (CUMMINS_Q, datetime(2026, 11, 4, 5, 28))):
         r = promote(m.con, stage_results_xbrl(m.vault, m.stage_root, data=(XBRL_DIR / name).read_bytes(),
                                               source_url=ARCHIVE + name, fetched_at=FETCHED_AT, broadcast_ts=ts,
                                               broadcast_ts_source="API_FIELD"))  # fmt: skip
         assert r.status == "PROMOTED", r
     m.con.close()
-    return root
+    return m.stage_root.parent
 
 
 @pytest.fixture(autouse=True)

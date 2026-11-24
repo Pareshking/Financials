@@ -214,6 +214,8 @@ INDAS_DURATION = {
             "Commission": "commission",
             "OtherInsuranceServiceExpenses": "other_insurance_service_expenses",
             "AdjustmentForInsuranceAcquisitionCashFlowAmortisation": "acquisition_cash_flow_amortisation",
+            # Allocation adjustments filed as one more service-expense line (Niva Bupa Q2 FY27) [X155]
+            "OtherAdjustments": "insurance_service_other_adjustments",
             "InsuranceServiceExpenses": "insurance_service_expenses",
             "NetIncomeExpensesFromReinsuranceContracts": "net_reinsurance_result",
             "InsuranceServiceResult": "insurance_service_result",
@@ -392,6 +394,7 @@ def indas_identities(result: ParsedResults) -> None:
                 "commission",
                 "other_insurance_service_expenses",
                 "acquisition_cash_flow_amortisation",
+                "insurance_service_other_adjustments",  # absent = 0, like every part [X155]
             ),
             "insurance_service_expenses",
             p,

@@ -316,7 +316,8 @@ def test_rows_on_the_full_market(full_market):
             if r[ratio] is not None:
                 assert r[ratio] == pytest.approx(float(r[f"{ratio}_numerator"] / r[f"{ratio}_denominator"])), ratio
     assert elin["rpt_to_sales"] == pytest.approx(float(Q("891230000") / Q("2895440000")))
-    assert elin["litigations_90d"] == 0 and elin["rf_litigation_90d"] is False
+    # X361: this market has no announcements-RSS capture, so no 90-day Reg. 30 window is observed: NULL, never 0
+    assert elin["litigations_90d"] is None and elin["rf_litigation_90d"] is None
     assert elin["volume_median_90d"] is not None
     con = connect()
     apply_schema(con)

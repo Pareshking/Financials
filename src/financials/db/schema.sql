@@ -143,6 +143,24 @@ CREATE TABLE IF NOT EXISTS raw_equity_master (
     PRIMARY KEY (filing_id, symbol, series)
 );
 
+-- BSE list of securities (ListofScripData, one BSE group per filing) [A17, X169]: identifiers as sent; observed on the
+-- IST date of the fetch. Source of rule BSE1 (ISIN -> security_identifier_history.bse_scrip_code). L1, append-only.
+CREATE TABLE IF NOT EXISTS raw_bse_securities (
+    filing_id      VARCHAR NOT NULL REFERENCES filings(filing_id),
+    observed_date  DATE    NOT NULL,
+    scrip_code     VARCHAR NOT NULL,
+    isin           VARCHAR NOT NULL,
+    ticker         VARCHAR NOT NULL,
+    bse_group      VARCHAR NOT NULL,
+    status         VARCHAR NOT NULL,
+    segment        VARCHAR NOT NULL,
+    name           VARCHAR NOT NULL,
+    issuer_name    VARCHAR,
+    face_value     DECIMAL(18,4),
+    market_cap_inr DECIMAL(20,2),            -- Mktcap (Rs crore, as filed) x 1e7, exact
+    PRIMARY KEY (filing_id, scrip_code)
+);
+
 -- One row per Integrated Filing listing row (api/integrated-filing-results, vaulted as RESULTS_LISTING) [A7, X83].
 -- `creation_Date` is on every row; `broadcast_Date` is null on revised rows. Times are UTC (listing is IST).
 CREATE TABLE IF NOT EXISTS raw_results_listing (
@@ -389,7 +407,8 @@ CREATE TABLE IF NOT EXISTS corp_actions (
     coa_pct           DOUBLE,                                         -- never written: entity_lineage.coa_pct
     source_filing_id  VARCHAR NOT NULL REFERENCES filings(filing_id),
     recorded_at       TIMESTAMP,                 -- when the ledger first held the action (system time)
-    decided_at        TIMESTAMP                  -- when status last changed (verification / manual resolution)
+    decided_at        TIMESTAMP,                 -- when status last changed (verification / manual resolution)
+    issue_price_floor DECIMAL(18,4)              -- RIGHTS without a stated price: face value, a legal floor (X355)
 );
 
 -- Directed corporate lineage (G37, architecture §11.7). Read as "child RELATION parent":
@@ -487,7 +506,7 @@ CREATE TABLE IF NOT EXISTS features_daily (
     price_date          DATE,                -- last bar on/before as_of_date
     close               DECIMAL(18,4),
     shares              BIGINT,
-    shares_source       VARCHAR,             -- REG31 | PAID_UP
+    shares_source       VARCHAR,             -- REG31 | ISSUE_SIZE (rule SHARES_REG31_OUTLIER, X221) | PAID_UP
     market_cap          DECIMAL(24,2),
     enterprise_value    DECIMAL(24,2),
     pe                  DOUBLE,
@@ -538,7 +557,11 @@ CREATE TABLE IF NOT EXISTS features_daily (
     kmp_resignations_90d INTEGER,            -- KMP / director cessations by resignation [E5]
     auditor_resignations_90d INTEGER,        -- auditor cessations by resignation [E5]
     fraud_or_default_90d INTEGER,            -- fraud / default disclosures [E7]
-    penalties_90d       INTEGER,             -- NULL: no penalty / regulatory-action event observed (UNVERIFIED) [E7]
+    penalties_90d       INTEGER,             -- fines / penalties imposed (AIATOP, X360) [E12]; NULL outside the RSS capture (X361)
+    penalty_amount_90d  DECIMAL(24,2),       -- sum of their AmountOfFineOrPenalty (rupees) [E12]
+    regulatory_actions_90d INTEGER,          -- every action taken or initiated, sub-para 20 [E12]
+    acquisitions_90d    INTEGER,             -- Reg. 30 acquisitions + to-be-incorporated companies [E13]
+    acquisition_value_90d DECIMAL(24,2),     -- sum of their cash consideration (rupees) [E13]
     vnb_margin          DOUBLE,              -- supplemental_kpis (life insurers), latest period visible at as-of
     embedded_value      DECIMAL(24,2),       -- supplemental_kpis, rupees
     ape_growth          DOUBLE,              -- supplemental_kpis
@@ -583,6 +606,9 @@ CREATE TABLE IF NOT EXISTS features_daily (
     rs_nifty500_12m     DOUBLE,              -- 252 bars
     beta_1y_nifty500    DOUBLE,              -- OLS beta of daily log returns vs Nifty 500, 252 returns
     turnover_median_20d DECIMAL(24,2),       -- median daily traded value (TtlTrfVal), 20 bars, rupees
+    band_hit_days_20d      INTEGER,          -- sessions touching the price band, last 20 (PR-zip bh file, X359)
+    upper_circuit_days_20d INTEGER,          -- touched the upper band and closed at the high, last 20
+    lower_circuit_days_20d INTEGER,          -- touched the lower band and closed at the low, last 20
     deliv_pct           DOUBLE,              -- today's deliv_qty / volume (fraction) [P16]
     deliv_pct_avg_20d   DOUBLE,              -- mean daily delivery fraction, 20 bars
     vwap                DECIMAL(18,4),       -- today's turnover / volume (= AVG_PRICE) [P16]
@@ -740,6 +766,12 @@ CREATE TABLE IF NOT EXISTS features_daily (
     has_dvr_shares                           BOOLEAN,         -- equity shares with differential voting rights
     has_sbo                                  BOOLEAN,         -- any significant beneficial owner
     is_psu                                   BOOLEAN,         -- public sector undertaking
+    -- X325 (rule SHOW_AND_FLAG, owner decision V): data-quality flags of the row (DAILY: open findings are read
+    -- with today's resolution state, outside the fundamentals-cache key). dq_flags = sorted comma-separated codes
+    -- (ATTRIBUTION_AS_FILED, ATTRIBUTION_PAT_LESS_NCI, YTD_AS_FILED, TAX_COPY_AS_FILED, TTM_MISFILED_YTD, TTM_MIXED_BASIS,
+    -- OPEN_FINDING:<reason>, PRICE_GAP_UNRESOLVED), NULL when none; dq_suspect = any flag.
+    dq_suspect                               BOOLEAN,
+    dq_flags                                 VARCHAR,
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -1172,6 +1204,7 @@ CREATE TABLE IF NOT EXISTS features_events (
     emphasis_of_matter                       BOOLEAN,         -- informational
     audit_opinion_quarterly                  VARCHAR,         -- latest results filing stating an opinion
     audit_opinion_quarter_end                DATE,
+    roe_screener                             DOUBLE,          -- Screener ROE: last FY owners' PAT / avg owners' equity [X227]
     PRIMARY KEY (security_id, valid_from_date)
 );
 
@@ -1184,7 +1217,7 @@ CREATE TABLE IF NOT EXISTS screener_features (
     price_date          DATE,                -- last bar on/before as_of_date
     close               DECIMAL(18,4),
     shares              BIGINT,
-    shares_source       VARCHAR,             -- REG31 | PAID_UP
+    shares_source       VARCHAR,             -- REG31 | ISSUE_SIZE (rule SHARES_REG31_OUTLIER, X221) | PAID_UP
     market_cap          DECIMAL(24,2),
     enterprise_value    DECIMAL(24,2),
     sales_ttm           DECIMAL(24,2),
@@ -1312,7 +1345,11 @@ CREATE TABLE IF NOT EXISTS screener_features (
     kmp_resignations_90d INTEGER,            -- KMP / director cessations by resignation [E5]
     auditor_resignations_90d INTEGER,        -- auditor cessations by resignation [E5]
     fraud_or_default_90d INTEGER,            -- fraud / default disclosures [E7]
-    penalties_90d       INTEGER,             -- NULL: no penalty / regulatory-action event observed (UNVERIFIED) [E7]
+    penalties_90d       INTEGER,             -- fines / penalties imposed (AIATOP, X360) [E12]; NULL outside the RSS capture (X361)
+    penalty_amount_90d  DECIMAL(24,2),       -- sum of their AmountOfFineOrPenalty (rupees) [E12]
+    regulatory_actions_90d INTEGER,          -- every action taken or initiated, sub-para 20 [E12]
+    acquisitions_90d    INTEGER,             -- Reg. 30 acquisitions + to-be-incorporated companies [E13]
+    acquisition_value_90d DECIMAL(24,2),     -- sum of their cash consideration (rupees) [E13]
     roce_screener       DOUBLE,              -- Screener export: (PBT + Interest) x 2 / (opening + closing capital) [S22]
     debtor_days         DOUBLE,              -- Screener export: closing debtors / (sales / 365) [S22]
     inventory_turnover  DOUBLE,              -- Screener export: sales / closing inventory [S22]
@@ -1370,6 +1407,9 @@ CREATE TABLE IF NOT EXISTS screener_features (
     rs_nifty500_12m     DOUBLE,              -- 252 bars
     beta_1y_nifty500    DOUBLE,              -- OLS beta of daily log returns vs Nifty 500, 252 returns
     turnover_median_20d DECIMAL(24,2),       -- median daily traded value (TtlTrfVal), 20 bars, rupees
+    band_hit_days_20d      INTEGER,          -- sessions touching the price band, last 20 (PR-zip bh file, X359)
+    upper_circuit_days_20d INTEGER,          -- touched the upper band and closed at the high, last 20
+    lower_circuit_days_20d INTEGER,          -- touched the lower band and closed at the low, last 20
     deliv_pct           DOUBLE,              -- today's deliv_qty / volume (fraction) [P16]
     deliv_pct_avg_20d   DOUBLE,              -- mean daily delivery fraction, 20 bars
     vwap                DECIMAL(18,4),       -- today's turnover / volume (= AVG_PRICE) [P16]
@@ -1862,6 +1902,13 @@ CREATE TABLE IF NOT EXISTS screener_features (
     emphasis_of_matter                       BOOLEAN,         -- informational
     audit_opinion_quarterly                  VARCHAR,         -- latest results filing stating an opinion
     audit_opinion_quarter_end                DATE,
+    roe_screener                             DOUBLE,          -- Screener ROE: last FY owners' PAT / avg owners' equity [X227]
+    -- X325 (rule SHOW_AND_FLAG, owner decision V): data-quality flags of the row (DAILY: open findings are read
+    -- with today's resolution state, outside the fundamentals-cache key). dq_flags = sorted comma-separated codes
+    -- (ATTRIBUTION_AS_FILED, ATTRIBUTION_PAT_LESS_NCI, YTD_AS_FILED, TAX_COPY_AS_FILED, TTM_MISFILED_YTD, TTM_MIXED_BASIS,
+    -- OPEN_FINDING:<reason>, PRICE_GAP_UNRESOLVED), NULL when none; dq_suspect = any flag.
+    dq_suspect                               BOOLEAN,
+    dq_flags                                 VARCHAR,
     PRIMARY KEY (as_of_date, security_id)
 );
 
@@ -1969,6 +2016,16 @@ CREATE TABLE IF NOT EXISTS materialize_dirty (
     created_at  TIMESTAMP NOT NULL
 );
 
+-- X325 (rule SHOW_AND_FLAG): the open entity findings the materialised OPEN_FINDING flags reflect (dirty.py). A
+-- finding opened or resolved by any writer differs from this set; `materialize --incremental` marks its entity
+-- from the finding's period end and stores the current set once the run has succeeded (a full run from the first
+-- materialised day to the last stores it too).
+CREATE TABLE IF NOT EXISTS features_dq_findings (
+    quarantine_id VARCHAR PRIMARY KEY,
+    entity_id     VARCHAR NOT NULL,
+    period_end    DATE                       -- the finding's period end (window anchor); NULL when it names none
+);
+
 -- Reader version of each materialised day (features.FEATURES_VERSION); `materialize --incremental` refuses when
 -- any materialised day was built by another version (or by code that predates this table).
 CREATE TABLE IF NOT EXISTS features_meta (
@@ -2069,18 +2126,22 @@ CREATE TABLE IF NOT EXISTS related_party_transactions (
 );
 -- Reg. 23(9) related-party transactions per counterparty from the Integrated Filing (Governance) section [X19, X115]:
 -- one row per typed RelatedPartyTransactionAxis member of a standalone Q2 / Q4 results filing, promoted with it and
--- by `backfill-rpt`. A separate table from the annual schedule on purpose: the period is the filing's reporting-period
--- context as tagged, and whether the amounts cover that quarter or the Reg. 23(9) half-year is UNVERIFIED (R13), so
--- these rows never feed a ratio or a feature column (features_rpt reads related_party_transactions only).
+-- by `backfill-rpt`. A separate table from the annual schedule on purpose: the tagged context is the filing's quarter,
+-- the amounts cover the Reg. 23(9) half-year (disclosure_start / disclosure_months, X160), and a few filers put
+-- financial-year-to-date amounts in the Q4 filing without saying so (X161), so these rows never feed a ratio or a
+-- feature column (features_rpt reads related_party_transactions only). prune-versions keeps the latest version.
 CREATE TABLE IF NOT EXISTS reg23_related_party_transactions (
     filing_id           VARCHAR NOT NULL REFERENCES filings(filing_id),
     parser_version      VARCHAR NOT NULL,        -- parsers.reg23_rpt.REG23_PARSER_VERSION
     entity_id           VARCHAR NOT NULL REFERENCES entity_master(entity_id),   -- the filer
     scope               VARCHAR NOT NULL,
     row_member          VARCHAR NOT NULL,        -- typed RelatedPartyTransactionAxis member as filed
-    period_start        DATE NOT NULL,           -- the duration context as tagged (see R13)
+    period_start        DATE NOT NULL,           -- the duration context as tagged: the filing's quarter, not the disclosure
     period_end          DATE NOT NULL,           -- = the filing's declared period end
-    period_months       INTEGER,
+    period_months       INTEGER,                 -- of the tagged context
+    disclosure_start    DATE,                    -- the period the amounts cover: the Reg. 23(9) half-year ending on
+    disclosure_months   INTEGER,                 -- period_end (HALF_YEAR_RULE, X160; NULL only on reg23-1 rows). A few
+                                                 -- filers put FY-to-date in Q4 (X161), undetectable inside the filing
     listed_party_name   VARCHAR,                 -- the listed entity or subsidiary entering into the transaction
     counterparty_name   VARCHAR NOT NULL,
     counterparty_pan    VARCHAR,                 -- NULL when masked ("******")
@@ -2098,6 +2159,37 @@ CREATE TABLE IF NOT EXISTS reg23_related_party_transactions (
     visible_from_ts     TIMESTAMP NOT NULL,
     PRIMARY KEY (filing_id, parser_version, row_member)
 );
+-- Which period a filing's Reg. 23(9) amounts cover, checked across filings (rule RPT_BALANCE_ROLL, X358;
+-- financials.rpt_periods, `rpt-periods`): HALF_YEAR (format D, X160), TWELVE_MONTHS (financial year to date in Q4,
+-- X161), UNDETERMINED (the balances do not tell) or NO_HISTORY (no filing six or twelve months earlier). Derived and
+-- deterministic: rewritten per rule_version. A reader takes the amounts' window from here, never from the context.
+CREATE TABLE IF NOT EXISTS reg23_period_basis (
+    filing_id               VARCHAR NOT NULL REFERENCES filings(filing_id),
+    rule_version            VARCHAR NOT NULL,
+    entity_id               VARCHAR NOT NULL REFERENCES entity_master(entity_id),
+    scope                   VARCHAR NOT NULL,
+    period_end              DATE NOT NULL,
+    basis                   VARCHAR NOT NULL,
+    disclosure_start        DATE NOT NULL,
+    disclosure_months       INTEGER NOT NULL,
+    pairs_compared          INTEGER NOT NULL,    -- counterparty x type pairs whose two earlier closings differ
+    pairs_from_half_year    INTEGER NOT NULL,    -- opening = closing of the filing six months earlier
+    pairs_from_year         INTEGER NOT NULL,    -- opening = closing of the filing twelve months earlier
+    half_year_ago_filing_id VARCHAR,
+    year_ago_filing_id      VARCHAR,
+    visible_from_ts         TIMESTAMP NOT NULL,  -- the filing's: the earlier filings are the ones visible by then
+    PRIMARY KEY (filing_id, rule_version)
+);
+-- Half-yearly (or, for financial-year-to-date filers, twelve-month) related-party amounts per filing and type, only
+-- where the balance roll settled the window (X358). The versions are the current REG23_PARSER_VERSION and
+-- RPT_PERIOD_RULE_VERSION (tests/test_x358_rpt_periods.py pins them). PIT readers filter visible_from_ts <= as-of.
+CREATE OR REPLACE VIEW rpt_half_year AS
+SELECT r.entity_id, r.scope, r.filing_id, b.basis, b.disclosure_start, r.period_end AS disclosure_end,
+       b.disclosure_months, r.txn_type, count(*) AS rows, sum(r.amount_inr) AS amount_inr, b.visible_from_ts
+FROM reg23_related_party_transactions r
+JOIN reg23_period_basis b ON b.filing_id = r.filing_id AND b.rule_version = 'rpt-period-1'
+WHERE r.parser_version = 'reg23-2' AND b.basis IN ('HALF_YEAR', 'TWELVE_MONTHS')
+GROUP BY ALL;
 -- Audit-opinion flags per results / annual filing (parsers/audit_report.py, owner decision 2026-11-17) [X121-X124]:
 -- derived from the auditor's report text (Reg. 34 `DisclosureInAuditorsReportExplanatory`, read whole from the vault
 -- blob) and the Integrated Filing audit fields, never from the checkbox, which is recorded next to it
@@ -2179,6 +2271,60 @@ CREATE TABLE IF NOT EXISTS disclosure_facts (
     CHECK ((value_text IS NULL) = (text_sha256 IS NOT NULL)),
     CHECK ((text_sha256 IS NULL) = (text_len IS NULL) AND (text_sha256 IS NULL) = (text_snippet IS NULL))
 );
+
+-- ── market-cap universe (owner 2026-11-17): NSE PRddmmyy.zip mcap file and the sticky Rs 500 Cr membership ──────
+-- L1, append-only: one row per security row of mcapddmmyyyy.csv inside PRddmmyy.zip [X130-X133], exactly as sent
+-- (symbol / series as printed, no ISIN in the file). issue_size is NSE's share count for the row (exact integer);
+-- market_cap_inr is as filed (issue_size x a price within 2 paise of `close`, X132). The summary rows are checked
+-- by the parser and not stored.
+CREATE TABLE IF NOT EXISTS raw_nse_mcap (
+    filing_id        VARCHAR NOT NULL REFERENCES filings(filing_id),
+    exchange         VARCHAR NOT NULL,
+    trade_date       DATE    NOT NULL,
+    symbol           VARCHAR NOT NULL,
+    series           VARCHAR NOT NULL,
+    security_name    VARCHAR NOT NULL,
+    category         VARCHAR NOT NULL,          -- Listed | Permitted
+    last_trade_date  DATE,                      -- NULL = "Not Traded"
+    face_value       DECIMAL(18,4) NOT NULL,
+    issue_size       BIGINT  NOT NULL,
+    close            DECIMAL(18,4) NOT NULL,    -- "Close Price/Paid up value(Rs.)"
+    market_cap_inr   DECIMAL(20,2) NOT NULL,
+    PRIMARY KEY (filing_id, symbol, series)
+);
+
+-- NSE PR-zip price-band file bhddmmyy(yy).csv [X359]: the securities that touched their price band that day, H
+-- (upper) or L (lower), every series, as filed. Raw, append-only; read by features_bands (circuit days).
+CREATE TABLE IF NOT EXISTS raw_price_band_hits (
+    filing_id        VARCHAR NOT NULL REFERENCES filings(filing_id),
+    exchange         VARCHAR NOT NULL,
+    trade_date       DATE    NOT NULL,
+    symbol           VARCHAR NOT NULL,
+    series           VARCHAR NOT NULL,
+    security_name    VARCHAR NOT NULL,
+    band             VARCHAR NOT NULL,          -- H | L
+    PRIMARY KEY (filing_id, symbol, series, band)
+);
+
+-- L2: point-in-time, sticky universe membership (financials.universe, rule U1 [X134]). One row per security and
+-- universe; members never leave. PIT read: joined_date <= as_of (and visible_from_ts <= as_of_ts).
+CREATE TABLE IF NOT EXISTS universe_membership (
+    universe            VARCHAR NOT NULL,       -- MCAP500
+    security_id         VARCHAR NOT NULL REFERENCES securities(security_id),
+    entity_id           VARCHAR NOT NULL REFERENCES entity_master(entity_id),
+    joined_date         DATE    NOT NULL,
+    reason              VARCHAR NOT NULL,       -- SEED_EXISTING | MCAP_GE_500CR
+    rule_version        VARCHAR NOT NULL,
+    symbol              VARCHAR NOT NULL,       -- as on joined_date
+    series              VARCHAR NOT NULL,
+    market_cap_inr      DECIMAL(20,2),          -- the qualifying mcap-file value; NULL for SEED_EXISTING
+    evidence_filing_id  VARCHAR REFERENCES filings(filing_id),  -- the mcap file; NULL for SEED_EXISTING
+    visible_from_ts     TIMESTAMP NOT NULL,
+    recorded_at         TIMESTAMP NOT NULL,
+    listing_category    VARCHAR,                -- the qualifying row's Category (Listed | Permitted); NULL for SEED_EXISTING
+    PRIMARY KEY (universe, security_id),
+    CHECK (reason IN ('SEED_EXISTING', 'MCAP_GE_500CR'))
+);
 -- ── Views ──────────────────────────────────────────────────────────────
 -- Everything below VIEWS_MARKER runs after the column upgrade (db.apply_schema), so a view may name columns that an
 -- existing database gains in the same run. Views hold no data; CREATE OR REPLACE keeps them at this definition.
@@ -2209,7 +2355,8 @@ SELECT d.as_of_date, d.security_id, d.entity_id, d.symbol, d.series, d.price_dat
        e.esop_adj_fcf, e.liquid_cash, d.promoter_holding_pct, d.promoter_pledge_pct, d.promoter_encumbered_pct, d.fii_holding_pct,
        d.fpi_holding_pct, d.dii_holding_pct, d.public_holding_pct, d.non_promoter_non_public_pct, d.fii_dii_qoq_change_pct, e.capex_to_depreciation,
        e.cwip_to_gross_block, e.rote, e.rnd_and_royalty_intensity, e.contingent_liabilities_to_net_worth, e.annual_fy_end, d.order_wins_90d,
-       d.order_value_90d, d.kmp_resignations_90d, d.auditor_resignations_90d, d.fraud_or_default_90d, d.penalties_90d, e.roce_screener,
+       d.order_value_90d, d.kmp_resignations_90d, d.auditor_resignations_90d, d.fraud_or_default_90d, d.penalties_90d,
+       d.penalty_amount_90d, d.regulatory_actions_90d, d.acquisitions_90d, d.acquisition_value_90d, e.roce_screener,
        e.debtor_days, e.inventory_turnover, e.working_capital, e.inventory_days, e.days_payable, e.cash_conversion_cycle,
        e.working_capital_days, d.vnb_margin, d.embedded_value, d.ape_growth, d.gov, d.take_rate,
        d.contribution_margin, d.nrr, d.cac_payback, e.sales_growth_qoq_pct, e.profit_growth_qoq_pct, e.npm_pct,
@@ -2218,7 +2365,8 @@ SELECT d.as_of_date, d.security_id, d.entity_id, d.symbol, d.series, d.price_dat
        d.volume_1w_avg, d.volume_1m_avg, d.volume_1y_avg, d.high_52w, d.low_52w, d.dist_52w_low,
        d.high_since_data_start, d.low_since_data_start, d.dma50, d.dma200, d.dma50_prev, d.dma200_prev,
        d.rsi_14, d.rsi_14_prev, d.macd, d.macd_signal, d.macd_prev, d.macd_signal_prev,
-       d.atr_14_pct, d.rs_nifty500_3m, d.rs_nifty500_6m, d.rs_nifty500_12m, d.beta_1y_nifty500, d.turnover_median_20d,
+       d.atr_14_pct, d.rs_nifty500_3m, d.rs_nifty500_6m, d.rs_nifty500_12m, d.beta_1y_nifty500, d.turnover_median_20d, d.band_hit_days_20d, d.upper_circuit_days_20d,
+       d.lower_circuit_days_20d,
        d.deliv_pct, d.deliv_pct_avg_20d, d.vwap, d.vwap_20d, e.sales_latest_quarter, e.sales_preceding_quarter,
        e.sales_preceding_year_quarter, e.operating_profit_latest_quarter, e.operating_profit_preceding_quarter, e.operating_profit_preceding_year_quarter, e.other_income_latest_quarter, e.other_income_preceding_quarter,
        e.other_income_preceding_year_quarter, e.depreciation_latest_quarter, e.depreciation_preceding_quarter, e.depreciation_preceding_year_quarter, e.ebit_latest_quarter, e.ebit_preceding_quarter,
@@ -2299,7 +2447,7 @@ SELECT d.as_of_date, d.security_id, d.entity_id, d.symbol, d.series, d.price_dat
        d.has_partly_paid, d.has_locked_in, d.has_dvr_shares, d.has_sbo, d.is_psu, e.subsidiary_fy_end,
        e.parent_profit_share, e.largest_subsidiary_profit_share, e.largest_subsidiary_name, e.consolidated_entities_count,
        e.audit_opinion, e.audit_opinion_fy_end, e.audit_opinion_conflict, e.going_concern_uncertainty, e.emphasis_of_matter,
-       e.audit_opinion_quarterly, e.audit_opinion_quarter_end
+       e.audit_opinion_quarterly, e.audit_opinion_quarter_end, e.roe_screener, d.dq_suspect, d.dq_flags
 FROM features_daily d
 LEFT JOIN features_events e ON e.security_id = d.security_id AND e.valid_from_date <= d.as_of_date
      AND d.as_of_date < coalesce(e.valid_to_date, DATE '9999-12-31');  -- open interval; an OR here is ~400x slower

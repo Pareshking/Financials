@@ -314,6 +314,9 @@ Inspected for Batch 10 but not committed: the other Reg. 30 files listed in docs
 
 | File | Why it is here | Source URL | SHA-256 |
 |---|---|---|---|
+| `corp_actions/nse_corporateActions_equities_30-03-2025_28-04-2025.json` | Vault blob, unmodified: GATECHDVR / GATECH `Rights 51:82 @ Premium Rs 0/-` (face value 1, ex 28-Apr-2025; cum close 0.88, issue price 1 above it: rule RIGHTS_AT_OR_ABOVE_MARKET, X356) | `https://www.nseindia.com/api/corporates-corporateActions?index=equities&from_date=30-03-2025&to_date=28-04-2025` | `24c88c2501cdc243fb22be4ddd1e5698e2aebfe53531a642c957c8c50e584b4d` |
+| `corp_actions/nse_corporateActions_equities_23-02-2026_24-03-2026.json` | Vault blob, unmodified: 5PAISA `Rights 1:2 @ Premium Rs 290/-` (face value 10, issue price 300, ex 17-Mar-2026; cum close 292.55: X356) | `https://www.nseindia.com/api/corporates-corporateActions?index=equities&from_date=23-02-2026&to_date=24-03-2026` | `de568326ae0a46e9d78691d348b3884c8dfcc274d208d28c0901e2737d24507a` |
+| `corp_actions/nse_corporateActions_equities_16-11-2026_15-12-2026.json` | Daily run 2026-11-23 (vault blob, unmodified): PRAXIS `Rights 5:9` with no issue price, face value 5, ex 18-Nov-2026 (rule RIGHTS_PRICE_UNSTATED, X355); also priced rights SMLMAH, BONLON | `https://www.nseindia.in/api/corporates-corporateActions?index=equities&from_date=16-11-2026&to_date=15-12-2026` | `514b110ff841b6afe7bb40dcad37e216afdfe89c039c8236c3efaa973a6a393b` |
 | `corp_actions/nse_corporateActions_equities_21-09-2026_20-10-2026.json` | Live backfill 2026-11-14: real purpose texts for the CA11 rules (AGM/EGM, dividend combinations, typos, rights, consolidation) | `https://www.nseindia.com/api/corporates-corporateActions?index=equities&from_date=21-09-2026&to_date=20-10-2026` | `f8f4f3579e96ded9f28f619cbfb77244e46a924db2114ffbea0a3de5c2f31a1e` |
 | `corp_actions/nse_corporateActions_equities_21-10-2026_19-11-2026.json` | Live backfill 2026-11-14: real purpose texts for the CA11 rules (AGM/EGM, dividend combinations, typos, rights, consolidation) | `https://www.nseindia.com/api/corporates-corporateActions?index=equities&from_date=21-10-2026&to_date=19-11-2026` | `bae33f29505b1a10dd0b491f6987ca8e7fdf88d8398fc57a0facffb6b51f25f4` |
 | `corp_actions/nse_corporateActions_equities_22-08-2026_20-09-2026.json` | Live backfill 2026-11-14: real purpose texts for the CA11 rules (AGM/EGM, dividend combinations, typos, rights, consolidation) | `https://www.nseindia.com/api/corporates-corporateActions?index=equities&from_date=22-08-2026&to_date=20-09-2026` | `ab35203e01caec033676887db0fd9e6358a34c6e39d6f7158adf33b4742dabe7` |
@@ -370,6 +373,55 @@ Inspected for Batch 10 but not committed: the other Reg. 30 files listed in docs
 | `xbrl/INTEGRATED_FILING_INDAS_1758732_14112026091104_WEB.xml` | X124 results DISCLAIMER: ASHOKLEY Q2 FY27 consolidated. `OpinionOfAuditors` / type "Disclaimer of opinion" (fetched 2026-11-15T04:48:56Z) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1758732_14112026091104_WEB.xml` | `7fbef8eed0143862320faf3418ca67b2c6bbaac1d5ae3f072f84e24c0099184b` |
 | `xbrl/INTEGRATED_FILING_INDAS_1449896_24052025124314_WEB.xml` | X124 results DISCLAIMER: RELINFRA Q4 FY25 consolidated. Two disclaimer qualifications, "Repetitive" (fetched 2026-11-14T04:29:17Z) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1449896_24052025124314_WEB.xml` | `9f4012ed1483c48c8f9ff19a6485067d35052fbd6ece1e6522fe714cf672ce59` |
 | `xbrl/INTEGRATED_FILING_INDAS_1672152_23052026112720_WEB.xml` | X124 results DISCLAIMER: RELINFRA Q4 FY26 consolidated. Three qualifications (two disclaimers, one qualified); `OpinionOfAuditors` "Disclaimer of opinion" (fetched 2026-11-14T04:29:03Z) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1672152_23052026112720_WEB.xml` | `034f29ecb3a2b64601c4ab73e997ab2dc50afe9f2fdf99fcb30bb96574ca3bb4` |
+
+## Reg. 23(9) disclosure period (copied 2026-11-17 from the local vault blob, gunzipped, sha256 verified; SEBI circular fetched 2026-11-17)
+
+| File | Why it is here | Source URL | SHA-256 |
+|---|---|---|---|
+| `rpt_half_year/INTEGRATED_FILING_INDAS_1432801_07052025030105_WEB.xml` | X358: POLYMED Q4 FY25 standalone Integrated Filing (vault blob, unmodified): closing balances at 2025-03-31, the year-earlier side of the balance roll for Q4 FY26 | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1432801_07052025030105_WEB.xml` | `e22bee4e9f96cf05aba3b934a2c7695a7c0fb0595e5b7ed44abad6df0182d6cc` |
+| `rpt_half_year/INTEGRATED_FILING_INDAS_1569348_08112025095047_WEB.xml` | X160: POLYMED Q2 FY26 standalone Integrated Filing, Reg. 23(9) rows on the Jul-Sep context (fetched 2026-11-14T04:25:10Z) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1569348_08112025095047_WEB.xml` | `a1af1006aa32b970376b2fda6173e8b5f8547dfe5a564675a8749eff35839998` |
+| `rpt_half_year/INTEGRATED_FILING_INDAS_1672831_25052026105506_WEB.xml` | X160: POLYMED Q4 FY26 standalone, Jan-Mar context; Q2 + Q4 amounts = the FY26 Ind AS 24 schedule, Q4 opening = Q2 closing (fetched 2026-11-14T04:25:06Z) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1672831_25052026105506_WEB.xml` | `fc19a4137d3540c71b38e5d580a8661c5f975845cb7c6b46510d06f6fc1b4be1` |
+| `rpt_half_year/AR_XBRL_POLYMED_03102026150104.xml` | X160: POLYMED FY26 standalone Reg. 34 annual (Ind AS 24 schedule, Lakhs) (fetched 2026-11-14T04:25:23Z) | `https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_POLYMED_03102026150104.xml` | `016bb4831450ac91ae7a135606b7033a7d0b774acb85e206b8cc0a257a248104` |
+| `rpt_half_year/INTEGRATED_FILING_INDAS_1503459_05082025091749_WEB.xml` | X160: CASTROLIND (calendar financial year) Q2 FY25 standalone Integrated Filing, Apr-Jun context (fetched 2026-11-14T03:28:13Z) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1503459_05082025091749_WEB.xml` | `938f3f4cb2200078896db19cffd8db4294b642a9e8edc5f2a6c23cf252253155` |
+| `rpt_half_year/INTEGRATED_FILING_INDAS_1617588_03022026083116_WEB.xml` | X160: CASTROLIND Q4 (Oct-Dec 2025 context) standalone; Jun + Dec amounts = the calendar-2025 Ind AS 24 schedule (fetched 2026-11-14T03:28:11Z) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1617588_03022026083116_WEB.xml` | `0d4239f7a81d5288a4c905787c70fa2461f4aa01203ba068afbf658fdfcd782a` |
+| `rpt_half_year/AR_XBRL_CASTROLIND_28042026134722.xml` | X160: CASTROLIND year to 2025-12-31 standalone Reg. 34 annual (Crores) (fetched 2026-11-14T03:28:27Z) | `https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_CASTROLIND_28042026134722.xml` | `68f9137bb5bb74a8fd5dc5710bf922bf02bbb9f5ce4ebaa993f7090f538f73af` |
+| `rpt_half_year/INTEGRATED_FILING_INDAS_1453034_27052025055732_WEB.xml` | X161: EIDPARRY Q4 FY25 standalone Integrated Filing (closing balances at 2025-03-31) (fetched 2026-11-14T03:37:43Z) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1453034_27052025055732_WEB.xml` | `83843265468722be3b617f6d443b6c1c383016cf68df044d32aa51ad2c0de768` |
+| `rpt_half_year/INTEGRATED_FILING_INDAS_1571468_11112025064700_WEB.xml` | X161: EIDPARRY Q2 FY26 standalone Integrated Filing (fetched 2026-11-14T03:37:37Z) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1571468_11112025064700_WEB.xml` | `62e4e8fe8a3aa1e823149ca0518115a6d21c39fb6e2127017055092e6ac80bfd` |
+| `rpt_half_year/INTEGRATED_FILING_INDAS_1673448_26052026074140_WEB.xml` | X161: EIDPARRY Q4 FY26 standalone, Jan-Mar context: amounts are the whole FY26 and the opening balances are those of 2025-03-31 (fetched 2026-11-14T03:37:29Z) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1673448_26052026074140_WEB.xml` | `5a8c10e43e5946c81a58263b0028d8c8abe9a7ac2b7c62db957c26a4c827cf8f` |
+| `rpt_half_year/AR_XBRL_EIDPARRY_07092026144251.xml` | X161: EIDPARRY FY26 standalone Reg. 34 annual (Ind AS 24 schedule, Lakhs) (fetched 2026-11-14T03:37:47Z) | `https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_EIDPARRY_07092026144251.xml` | `45874b420acf09033d58cd34feacaf330cef4d1c172503c7e06c810b8940b8af` |
+| `circulars/sebi_cir_2024_185.pdf` | X160: SEBI circular SEBI/HO/CFD/CFD-PoD-2/CIR/P/2024/185 (31 Dec 2024), Annexure 1 Integrated Filing (Financial) format D (Reg. 23(9) related-party transactions), notes 1 and 4; NSE copy saved as `NEW SEBI_0.pdf`, renamed only (fetched 2026-11-17) | `https://nsearchives.nseindia.com/web/sites/default/files/inline-files/NEW%20SEBI_0.pdf` | `e23830379fdeb1557ea3afa9a3f60d5b0f11bf48dcb619a649190db4bd5cb6a1` |
+| `circulars/sebi_cir_2024_185.txt` | DERIVED: `pdftotext -layout circulars/sebi_cir_2024_185.pdf` (poppler 24.02) | `3720faec1b5e7607dab41315063765bc03b833c94b2b22eb1928b69f58e54b66` |
+
+## Quarantine rules X150-X155 (copied 2026-11-17 from the local vault blob, gunzipped, sha256 verified)
+
+| File | Why it is here | Source URL | SHA-256 |
+|---|---|---|---|
+| `xbrl/AR_XBRL_CHOICEIN_28102025170241.xml` | X150 ACTUAL_ROUNDING_IS_RUPEES: Choice International FY25 standalone Reg. 34 annual, `LevelOfRoundingUsedInFinancialStatements` = Actual (fetched 2026-11-14T03:31:30Z) | `https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_CHOICEIN_28102025170241.xml` | `30a97af5994b4df7871f4b2542cf217cfaeefdf4d82b0e69c41d5a2e852bd548` |
+| `xbrl/AR_XBRL_ALOKINDS_14082026191942.xml` | X151 UNDECLARED_PRE_CUTOFF_CONTEXT: Alok Industries FY26 consolidated; IncomeTaxesPaidRefund in undeclared `D2024` (fetched 2026-11-14T03:07:07Z) | `https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_ALOKINDS_14082026191942.xml` | `777947d020faa78dcebeac4da8d5cd7090ddaba7d746306e3b2d3262d02a7134` |
+| `xbrl/AR_XBRL_ENRIN_13032026115920.xml` | X152 IRREGULAR_COMPARATIVE_STUB: Siemens Energy India FY25 (Oct-Sep) standalone; comparative 2024-02-07..2024-09-30 (fetched 2026-11-14T03:39:22Z) | `https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_ENRIN_13032026115920.xml` | `90af8b194308d17a8ac14e7b9bb0b317cb190f5c9f0b1b27804c277b7f9469b0` |
+| `xbrl/AR_XBRL_ABLBL_01122025184209.xml` | X152 negative case: Aditya Birla Lifestyle Brands FY25 standalone; only period 2024-04-09..2025-03-31, stays IRREGULAR_PERIOD (fetched 2026-11-14T03:03:35Z) | `https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_ABLBL_01122025184209.xml` | `4979ff0bd5c9600635b033ea77ac3c5d4fb69dc099d150072c374fe2b4536df0` |
+| `xbrl/AR_XBRL_PREMIERENE_28012026112034.xml` | X153 EP_EXPENDITURE_FACE_LINE: Premier Energies FY25 standalone; EXPENSE_COMPONENTS gap 622,640,000 = the filed E&P expenditure element (fetched 2026-11-14T04:26:19Z) | `https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_PREMIERENE_28012026112034.xml` | `23800016ae75a17076fa72136d9ffdae06178d23e88c299a88930958d7570d72` |
+| `xbrl/SHP_1652898_17042026122104_WEB.xml` | X154 SHP_EXCHANGE_SPECIFIC_TAXONOMY: BSE Ltd Reg. 31 as of 2026-03-31 on `SHP_Exchange_Specific/2025-10-31` (fetched 2026-11-14T03:27:49Z) | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_1652898_17042026122104_WEB.xml` | `faca330e11042cff491ab53028b94bf153ccbb4fb602b058cdcc47d43110f4db` |
+| `xbrl/SHP_13769_15072025060551_WEB.xml` | X154: BSE Ltd Reg. 31 as of 2025-06-30 on `SHP_Exchange_Specific/2025-05-31`; trading members as non-promoter non-public, percent points (fetched 2026-11-14T03:27:53Z) | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_13769_15072025060551_WEB.xml` | `3432d6cebd98de02466ceb5285c0a6799c2d630dcce9569132bf7a18f4442a4c` |
+| `xbrl/IF_INS_COM_IND_AS_19757_WebXMLFile_20261104_181240292.xml` | X155: Niva Bupa Q2 FY27 standalone Ind AS insurance Integrated Filing; `OtherAdjustments` inside insurance service expenses (fetched 2026-11-14T04:18:59Z) | `https://nsearchives.nseindia.com/corporate/xbrl/IF_INS_COM_IND_AS_19757_WebXMLFile_20261104_181240292.xml` | `3d75086dedbdd71d8365adf2f4be51faffd02b319ef56d9b8195ea01fab79405` |
+| `xbrl/SHP_1697747_21072026110424_WEB.xml` | X156: KIMS Reg. 31 as of 2026-06-30 stating ISIN INE007C01025 (KIMS is INE967H01025); resolved by the X88 name test once the SHP parser passes NameOfTheCompany (fetched 2026-11-14T04:08:24Z) | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_1697747_21072026110424_WEB.xml` | `9811034d0a377dc5dbe4c0c8ee88b4e9fa13a78502d1a4acf132e265be346aa8` |
+| `xbrl/INTEGRATED_FILING_INDAS_1502813_05082025045022_WEB.xml` | X171 SC0: United Polyfab Gujarat (UNITEDPOLY, INE368U01029) Integrated Filing with `ScripCode` 000000 (fetched 2026-11-17T07:07:23Z on a runner) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1502813_05082025045022_WEB.xml` | `45d2ed8f8f97ef37a4d222e9d540392b6eaa284da8dc164573b12e9b2c2407f2` |
+## QA X180-X182 annual checks (copied 2026-11-17 from the local vault blob, gunzipped, sha256 verified)
+
+Kept in `annual_checks/`, outside `xbrl/`, so the end-to-end fixture market and its pinned counts do not see them.
+Read by `tests/test_x180_annual_checks.py` (X181).
+
+| File | Why it is here | Source URL | SHA-256 |
+|---|---|---|---|
+| `annual_checks/INTEGRATED_FILING_INDAS_1426806_28042025073334_WEB.xml` | X181: GREENPLY Q4 FY25 standalone results. `FaceValueOfEquityShareCapital` 10 with paid-up 124,873,000: paid-up / face = 12,487,300 shares, 10x off | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1426806_28042025073334_WEB.xml` | `d69085d72a03656b59eb2c47b85406fb610a5e9786acd961a00f2511a8e023cc` |
+| `annual_checks/AR_XBRL_GREENPLY_24092025103040.xml` | X181: GREENPLY FY25 standalone Reg. 34 annual. `NumberOfSharesPaidUp` 124,873,295 at 31-Mar-2025 | `https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_GREENPLY_24092025103040.xml` | `b65488a3f0f05e6ea9b6c0b92e0380245cf9c664d677c3df3bf1d99c1524230a` |
+| `annual_checks/SHP_198395_1419898_19042025033622_WEB.xml` | X181: GREENPLY Reg. 31 shareholding as of 31-Mar-2025, total 124,873,295 shares (= the annual count) | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_198395_1419898_19042025033622_WEB.xml` | `dc519708ed76e862ea9b0ae21a992fd49209237b4914a0811448ffb2c2d163b9` |
+## Ratio rules, NEW members (QR; copied 2026-11-17 from the local vault blob, gunzipped, sha256 verified)
+
+| File | Why it is here | Source URL | SHA-256 |
+|---|---|---|---|
+| `ratio_rules/INTEGRATED_FILING_INDAS_1649412_11042026052716_WEB.xml` | X194: AQYLON (formerly SABTNL) Q4 FY26 standalone Integrated Filing. Capital employed at 31-Mar-2026 = 25.37 − 31.05 + 4.24 + 13.81 = 12.37 Cr; FY26 PBT 7.42 Cr, finance costs 2.80 Cr | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1649412_11042026052716_WEB.xml` | `2605d730644e9612b99c0c20e7ab6ae4d55595f2fccd46240d7ced8f3f9264fd` |
+| `ratio_rules/INTEGRATED_FILING_INDAS_1454104_28052025103044_WEB.xml` | X194: the same company's Q4 FY25 standalone filing: capital employed at 31-Mar-2025 = 25.37 − 36.81 + 0 + 0 = −11.44 Cr (both borrowings lines filed as nil) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1454104_28052025103044_WEB.xml` | `97e6d65028f35ffb7aa75254052627af746234c67848189a16f1afdce29d791b` |
 
 ## Screener goldens (local only, not committed)
 
@@ -434,3 +486,410 @@ warm-up, 1.5 s apart). URL: `https://www.nseindia.com/api/NextApi/apiClient/GetQ
 | `classification/GetQuoteApi_getSymbolData_TCS.json` | TCS, INE467B01029 | Information Technology / Information Technology / IT - Software / Computers - Software & Consulting | `b41b0ebba524f5534a267243d8f91e4aaa7bc9a40fcdbe8e7337a8a2109a81df` |
 | `classification/GetQuoteApi_getSymbolData_HDFCBANK.json` | HDFCBANK, INE040A01034 | Financial Services / Financial Services / Banks / Private Sector Bank | `aba013aa625e0dc3776a753946b9587efb9e4dcf971567af5830cd934b4e72e9` |
 | `classification/GetQuoteApi_getSymbolData_M_M.json` | M&M, INE101A01026 | Consumer Discretionary / Automobile and Auto Components / Automobiles / Passenger Cars & Utility Vehicles | `9ad18793098f4a29b454ff8a7e08337c505ef32a427298841526ef5ab1e293bf` |
+
+## NSE daily PR zip (market-cap file; fetched 2026-11-17, one request each, >= 1.2 s apart)
+
+`PRddmmyy.zip` from `https://nsearchives.nseindia.com/archives/equities/bhavcopy/pr/` (HTTP 200, curl with a browser
+User-Agent, no warm-up). Read by `tests/test_mcap_universe.py` [X130-X134]. 114 further zips (every week end
+2024-10-04 .. 2026-11-08 and six quarter ends) were fetched for the live analysis and are not committed.
+
+| File | Why it is here | Source URL | SHA-256 |
+|---|---|---|---|
+| `pr_zip/PR011024.zip` | First in-scope trading day (C9); member `MCAP01102024.csv` (upper case); RELIANCE before its 1:1 bonus, ADANIPOWER before its 1:5 split; ELIN Issue Size = X114 FY25 issued | `https://nsearchives.nseindia.com/archives/equities/bhavcopy/pr/PR011024.zip` | `45bf29c9ff8eb49fe4e79c624c260b60e7c23c523c8d17496becf6871aa85956` |
+| `pr_zip/PR300625.zip` | Mid-2025 quarter end: same header and layout | `https://nsearchives.nseindia.com/archives/equities/bhavcopy/pr/PR300625.zip` | `68212caa54a45112b30b2adb85e20ce86dce48807efce25c9be792d58946b6e3` |
+| `pr_zip/PR300926.zip` | Quarter end of the ELIN Reg. 31 fixture (`xbrl/SHP_1739151_15102026054406_WEB.xml`): Issue Size = Reg. 31 total | `https://nsearchives.nseindia.com/archives/equities/bhavcopy/pr/PR300926.zip` | `d82bcd64f2f0b78540dd40b705c9f8297485e13622def4f6f83b6a1a97223307` |
+| `pr_zip/PR120126.zip` | X359: PR zip of 12-Jan-2026 (vault blob, unmodified): its price-band file bh12012026.csv holds the header only, on a normal trading day (other days 200-305 rows); treated as not loaded | `https://nsearchives.nseindia.com/archives/equities/bhavcopy/pr/PR120126.zip` | `1a55e277e89de62296ae3d5612435181784b7034f8cd98c28165b33a8a016657` |
+| `pr_zip/PR131126.zip` | Latest file; member `mcap13112026.csv` (lower case), 14 members | `https://nsearchives.nseindia.com/archives/equities/bhavcopy/pr/PR131126.zip` | `c0eebe6666cd64ea4096be7589c740e050f189289f2760a5ac66c60146ec6377` |
+
+## Permitted securities and BSE (owner 2026-11-17; X165-X168, A16-A18)
+
+NSE listings fetched 2026-11-17 from the container (financials.fetch.http, >= 1.5 s apart), saved unmodified. BSE bhavcopy fetched 2026-11-17 by plain HTTP from the container; a GitHub runner fetched byte-identical bytes the same day (probe run 1). Files under `bse/` other than the bhavcopy are copied unmodified from the owner's repository `Pareshking/NSE-BSE-Insider-Tracker` (`tests/fixtures/bse/`, read-only clone 2026-11-17); that repository describes them as real BSE answers fetched 12-13 Oct 2026 and **trimmed** there (subsets of rows; the JSON announcements file is the `Table` row list only), so their bytes are not BSE's answer as sent; the SHP files are one filing each, gzip-compressed there.
+
+| File | Why it is here | Source URL | SHA-256 |
+|---|---|---|---|
+| `discovery/nse_integrated-filing-results_equities_ABBOTINDIA_20261117.json` | X166: Integrated Filing listing of a `Permitted` security (ABBOTINDIA) | `https://www.nseindia.com/api/integrated-filing-results?index=equities&symbol=ABBOTINDIA` | `085a784f77c3484bd864a2b83e4600fb3b86143c056484cd966d769aa50c4c10` |
+| `discovery/nse_annual-reports-xbrl_equities_ABBOTINDIA_20261117.json` | X166: Reg. 34 annual XBRL listing of a `Permitted` security (ABBOTINDIA) | `https://www.nseindia.com/api/annual-reports-xbrl?index=equities&symbol=ABBOTINDIA` | `8fe32e407a1038ee38753b70e5374b3a46d6ae9d5f16cd5b73c53abaca8f5ed0` |
+| `discovery/nse_corporate-share-holdings-master_equities_ABBOTINDIA_20261117.json` | X166: shareholding master of a `Permitted` security (ABBOTINDIA) | `https://www.nseindia.com/api/corporate-share-holdings-master?index=equities&symbol=ABBOTINDIA` | `4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945` |
+| `discovery/nse_integrated-filing-results_equities_MCX_20261117.json` | X166: Integrated Filing listing of a `Permitted` security (MCX) | `https://www.nseindia.com/api/integrated-filing-results?index=equities&symbol=MCX` | `085a784f77c3484bd864a2b83e4600fb3b86143c056484cd966d769aa50c4c10` |
+| `discovery/nse_annual-reports-xbrl_equities_MCX_20261117.json` | X166: Reg. 34 annual XBRL listing of a `Permitted` security (MCX) | `https://www.nseindia.com/api/annual-reports-xbrl?index=equities&symbol=MCX` | `8fe32e407a1038ee38753b70e5374b3a46d6ae9d5f16cd5b73c53abaca8f5ed0` |
+| `discovery/nse_corporate-share-holdings-master_equities_MCX_20261117.json` | X166: shareholding master of a `Permitted` security (MCX) | `https://www.nseindia.com/api/corporate-share-holdings-master?index=equities&symbol=MCX` | `4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945` |
+| `discovery/nse_integrated-filing-results_equities_BAYERCROP_20261117.json` | X166: Integrated Filing listing of a `Permitted` security (BAYERCROP) | `https://www.nseindia.com/api/integrated-filing-results?index=equities&symbol=BAYERCROP` | `085a784f77c3484bd864a2b83e4600fb3b86143c056484cd966d769aa50c4c10` |
+| `discovery/nse_annual-reports-xbrl_equities_BAYERCROP_20261117.json` | X166: Reg. 34 annual XBRL listing of a `Permitted` security (BAYERCROP) | `https://www.nseindia.com/api/annual-reports-xbrl?index=equities&symbol=BAYERCROP` | `8fe32e407a1038ee38753b70e5374b3a46d6ae9d5f16cd5b73c53abaca8f5ed0` |
+| `discovery/nse_corporate-share-holdings-master_equities_BAYERCROP_20261117.json` | X166: shareholding master of a `Permitted` security (BAYERCROP) | `https://www.nseindia.com/api/corporate-share-holdings-master?index=equities&symbol=BAYERCROP` | `4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945` |
+| `discovery/nse_integrated-filing-results_equities_HAWKINCOOK_20261117.json` | X166: Integrated Filing listing of a `Permitted` security (HAWKINCOOK) | `https://www.nseindia.com/api/integrated-filing-results?index=equities&symbol=HAWKINCOOK` | `085a784f77c3484bd864a2b83e4600fb3b86143c056484cd966d769aa50c4c10` |
+| `discovery/nse_annual-reports-xbrl_equities_HAWKINCOOK_20261117.json` | X166: Reg. 34 annual XBRL listing of a `Permitted` security (HAWKINCOOK) | `https://www.nseindia.com/api/annual-reports-xbrl?index=equities&symbol=HAWKINCOOK` | `8fe32e407a1038ee38753b70e5374b3a46d6ae9d5f16cd5b73c53abaca8f5ed0` |
+| `discovery/nse_corporate-share-holdings-master_equities_HAWKINCOOK_20261117.json` | X166: shareholding master of a `Permitted` security (HAWKINCOOK) | `https://www.nseindia.com/api/corporate-share-holdings-master?index=equities&symbol=HAWKINCOOK` | `4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945` |
+| `discovery/nse_integrated-filing-results_equities_GOODYEAR_20261117.json` | X166: Integrated Filing listing of a `Permitted` security (GOODYEAR) | `https://www.nseindia.com/api/integrated-filing-results?index=equities&symbol=GOODYEAR` | `53574ed3b5e0e1c6c33eac0399277efecea8f3401201db315635d6abf4c5ae5b` |
+| `discovery/nse_annual-reports-xbrl_equities_GOODYEAR_20261117.json` | X166: Reg. 34 annual XBRL listing of a `Permitted` security (GOODYEAR) | `https://www.nseindia.com/api/annual-reports-xbrl?index=equities&symbol=GOODYEAR` | `8fe32e407a1038ee38753b70e5374b3a46d6ae9d5f16cd5b73c53abaca8f5ed0` |
+| `discovery/nse_corporate-share-holdings-master_equities_GOODYEAR_20261117.json` | X166: shareholding master of a `Permitted` security (GOODYEAR) | `https://www.nseindia.com/api/corporate-share-holdings-master?index=equities&symbol=GOODYEAR` | `4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945` |
+| `bse/BhavCopy_BSE_CM_0_0_0_20261113_F_0000.CSV` | X165: BSE equity UDiFF bhavcopy, FinInstrmId = BSE scrip code, ISIN per row (5,141 rows) | `https://www.bseindia.com/download/BhavCopy/Equity/BhavCopy_BSE_CM_0_0_0_20261113_F_0000.CSV` | `3151fc64585f9071603ca55373017d60ad05a243e77ab62fc69df2d01ec8dda9` |
+| `bse/announcements.json` | A17: announcements rows (68, one per category / subcategory of 12 Oct 2026; trimmed in the source repo) | `https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=N&strCat=-1&strPrevDate=20261012&strScrip=&strSearch=P&strToDate=20261012&strType=C&subcategory=-1` (source repo `tests/fixtures/bse/announcements.json`) | `99ccb4572bcaa2754b026ba210a0e0a1427932a3085fb324d4f96b7e67017ef5` |
+| `bse/shareholding_listing_20261012.json` | A17: shareholding filings list (15 rows, trimmed in the source repo) | `https://api.bseindia.com/BseIndiaAPI/api/Corp_Shareholding_ng/w?scripcode=&flag=<n>&indtype=` (source repo `tests/fixtures/bse/shareholding_listing_20261012.json`) | `9ea4243d2bfde1981df095920975bf012890bded9e808790af71ce00d7bfe41b` |
+| `bse/shp_500014_20260930.html.gz` | A17 / X167: one shareholding filing's inline XBRL (gzip of the HTML), SEBI `in-bse-shp` 2025-10-31 taxonomy | `https://www.bseindia.com/XBRLFILES/SHPXBRLDataXML/500014_1210202623725_SP.html` (source repo `tests/fixtures/bse/shp_500014_20260930.html.gz`) | `4c9cde765d2e922547ffca2dfa9ee5aec11878ee4342f3f8ee0b3ce0fa3ff7cc` |
+| `bse/shp_542117_20260930.html.gz` | A17 / X167: one shareholding filing's inline XBRL (gzip of the HTML), SEBI `in-bse-shp` 2025-10-31 taxonomy | `https://www.bseindia.com/XBRLFILES/SHPXBRLDataXML/542117_12102026224350_SP.html` (source repo `tests/fixtures/bse/shp_542117_20260930.html.gz`) | `fe0b329250a377c70aa956ac5a0d76090191123cd6340674c9d78986f3aecff2` |
+| `bse/shp_542910_20260930.html.gz` | A17 / X167: one shareholding filing's inline XBRL (gzip of the HTML), SEBI `in-bse-shp` 2025-10-31 taxonomy | `https://www.bseindia.com/XBRLFILES/SHPXBRLDataXML/542910_12102026182749_SP.html` (source repo `tests/fixtures/bse/shp_542910_20260930.html.gz`) | `a72a2205c4af08297a4abb4e87dfa543e7f7a7a179d9aad6c206761631a00aff` |
+| `bse/bse_ListofScripData_GroupA_20261117.json` | X169 / A18: BSE list of securities, group A (705 rows), probe run 2 on a GitHub runner (run 44029015234), plain requests with the ported headers; ledger blob saved unmodified | `https://api.bseindia.com/BseIndiaAPI/api/ListofScripData/w?scripcode=&Group=A&industry=&segment=Equity&status=Active` | `b6847c4e156b90720981ee3397f76d744a69768ac25371b7acefc3f561a7e9bd` |
+| `bse/bse_ListofScripData_A_500488_20261117.json` | A18 / X169: list of securities narrowed to scrip 500488 (one row); probe run 3 on a GitHub runner (run 44030916910, 2026-11-17, plain requests with the ported headers); ledger blob saved unmodified | `https://api.bseindia.com/BseIndiaAPI/api/ListofScripData/w?scripcode=500488&Group=A&industry=&segment=Equity&status=Active` | `18e4ed666d920f6baf16a51c05572efc8788e3c65d07385feb0a3604d0995195` |
+| `bse/bse_AnnSubCategoryGetData_500488_20261015_20261117.json` | A18 / X168: ABBOTINDIA announcements 15 Oct-17 Nov 2026, every category (4 rows, ROWCNT 4); probe run 3 on a GitHub runner (run 44030916910, 2026-11-17, plain requests with the ported headers); ledger blob saved unmodified | `https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=1&strCat=-1&strPrevDate=20261015&strScrip=500488&strSearch=P&strToDate=20261117&strType=C&subcategory=-1` | `467e7191109f82599c6db8ea0b5b99c5be25e981d90d7e9b3aa88acd70c121a1` |
+| `bse/bse_AnnSubCategoryGetData_all_20261113_p1.json` | A18 / X168: every company's announcements of 13 Nov 2026, page 1 (50 rows, ROWCNT 2,704), the source client's exact call; probe run 3 on a GitHub runner (run 44030916910, 2026-11-17, plain requests with the ported headers); ledger blob saved unmodified | `https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=1&strCat=-1&strPrevDate=20261113&strScrip=&strSearch=P&strToDate=20261113&strType=C&subcategory=-1` | `0d2dab29f25d5cd22dedabadd8ba3445a6188900f90b2120e2d2743022d41211` |
+| `bse/AttachLive_e334e776-71a5-4afd-adf3-ad10a11505cf.pdf` | A18 / X168: the attachment of ABBOTINDIA's Q2 FY27 'Result' announcement (PDF, size = Fld_Attachsize); probe run 3 on a GitHub runner (run 44030916910, 2026-11-17, plain requests with the ported headers); ledger blob saved unmodified | `https://www.bseindia.com/xml-data/corpfiling/AttachLive/e334e776-71a5-4afd-adf3-ad10a11505cf.pdf` | `cd242440c638091ce9ab73d010e2120c6d3e3908d73c79f69411dc0c17d6b6d6` |
+| `bse/bse_Corp_Shareholding_ng_500488_flag6_20261117.json` | A18: shareholding filings of 500488 for the last year (flag 6, 4 rows, inline-XBRL links, broadcast `D`); probe run 3 on a GitHub runner (run 44030916910, 2026-11-17, plain requests with the ported headers); ledger blob saved unmodified | `https://api.bseindia.com/BseIndiaAPI/api/Corp_Shareholding_ng/w?scripcode=500488&flag=6&indtype=` | `5bcdd4441c9e53d6c8d86aff5dc9c9357b040de27bfe268c1ce7ff38e9a3809c` |
+| `bse/500488_14102026161949_SP.html` | X170: ABBOTINDIA Reg. 31 pattern as of 30 Sep 2026, BSE inline XBRL (707 nonFraction + 64 nonNumeric facts), as sent (not gzipped); probe run 3 on a GitHub runner (run 44030916910, 2026-11-17, plain requests with the ported headers); ledger blob saved unmodified | `https://www.bseindia.com/XBRLFILES/SHPXBRLDataXML/500488_14102026161949_SP.html` | `13ef8060c804e9c5a8ce77370bd7e44c7e280aa2530259b75362f66b70293093` |
+
+## BSE list rule BSE2 (2026-11-17, runner ledger of bse-fetch run 44125439750, bytes as sent, sha256 verified)
+
+| File | Why it is here | Source URL | SHA-256 |
+|---|---|---|---|
+| `bse/bse_ListofScripData_GroupY_20261117.json` | X200 BSE2: BSE group Y list of securities, 2 rows, ISIN "" (A D S Diagnostics 523031) and "NA" (Pushpsons 531562) (fetched 2026-11-17T16:26:51Z on a runner) | `https://api.bseindia.com/BseIndiaAPI/api/ListofScripData/w?scripcode=&Group=Y&industry=&segment=Equity&status=Active` | `401abd920ffafe870716707ddb6883d60a5c1be5e491e21468816397990396e5` |
+## QY: YTD context copying the quarter (copied 2026-11-17 from the local vault blob, gunzipped, sha256 verified)
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `ytd_copy/INTEGRATED_FILING_INDAS_1624500_12022026071533_WEB.xml` | Ajax Engineering Q3 FY26 standalone: the Apr-Dec 2025 context repeats the Oct-Dec values to the rupee (revenue 4,335.48 Mn, PAT 382.41 Mn) (X173) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1624500_12022026071533_WEB.xml` | `e79b8dca9f3d341d3da59bf8181c1f6b72defb1360b9cc97d1f17c0cdfac991f` |
+| `ytd_copy/INTEGRATED_FILING_INDAS_1501178_02082025064022_WEB.xml` | Ajax Engineering Q1 FY26 standalone: revenue 4,665.15 Mn, the earlier quarter that proves the 9M a copy (X173) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1501178_02082025064022_WEB.xml` | `70274f378369b27f7a4d3a72e10080c3035af7d5a5fb2346fefe11ea39e810a5` |
+| `ytd_copy/INTEGRATED_FILING_INDAS_1573866_13112025063241_WEB.xml` | Ajax Engineering Q2 FY26 standalone: revenue 4,448.10 Mn and a genuine H1 YTD the rule leaves alone (X173) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1573866_13112025063241_WEB.xml` | `51643f65a7b2479351e9c40db18e2063d64ec4c54f6c5c16556ea53fcf9a2e23` |
+## QC: universe expansion audit (share cross-check, attribution; X187-X189)
+
+Copied byte-for-byte from the vault (gunzip only; sha256 equals the blob sha256) on 2026-11-17. Kept in
+`xbrl_qc/` so the end-to-end fixture glob (`xbrl/*.xml`) and its pinned counts are unchanged.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `xbrl_qc/SHP_1743042_21102026043910_WEB.xml` | BLSE Reg. 31 30-Sep-2026 (90,856,485 shares) [X187] | https://nsearchives.nseindia.com/corporate/xbrl/SHP_1743042_21102026043910_WEB.xml | `ceb6aa4553bf90fbd611186ca623ed81cb914fcbe7758acf58558c3443bc1fff` |
+| `xbrl_qc/INTEGRATED_FILING_INDAS_1751399_02112026072220_WEB.xml` | BLSE Q2 FY27 standalone, face value Rs 5 after the 6-Oct-2026 split [X187] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1751399_02112026072220_WEB.xml | `d7018cf50fa835c5bb0d6842248a8137c77187d6c7c63fc0f5cbbf97b35d1ded` |
+| `xbrl_qc/SHP_1740781_17102026035440_WEB.xml` | KKCL Reg. 31 30-Sep-2026 (61,625,185) [X188] | https://nsearchives.nseindia.com/corporate/xbrl/SHP_1740781_17102026035440_WEB.xml | `3d1c8daf6d98eaa394c7da1b7c3f477db17621073e18033e7181fe6acbf279a9` |
+| `xbrl_qc/INTEGRATED_FILING_INDAS_1751446_02112026075601_WEB.xml` | KKCL Q2 FY27 results [X188] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1751446_02112026075601_WEB.xml | `6707fd7195b417b06adde86d67f318a406922965f76d05d6a5587687a01702fe` |
+| `xbrl_qc/INTEGRATED_FILING_INDAS_1751447_02112026075620_WEB.xml` | KKCL Q2 FY27 results, whole crores, paid-up 62 Cr [X188] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1751447_02112026075620_WEB.xml | `98a4990209db5204dad1eb1fd69613a646ed22a0aca5f6eaedd701b7d7810d07` |
+| `xbrl_qc/SHP_1702639_28072026113716_WEB.xml` | ATLANTAELE Reg. 31 30-Jun-2026 [X188] | https://nsearchives.nseindia.com/corporate/xbrl/SHP_1702639_28072026113716_WEB.xml | `80f3fcfc9381c0ec143414e9f6063083c7a2f42e7f38ce4dde4c82576f0bc7b1` |
+| `xbrl_qc/INTEGRATED_FILING_INDAS_1697896_21072026124625_WEB.xml` | ATLANTAELE Q1 FY27 standalone, paid-up capital tagged 0 [X188] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1697896_21072026124625_WEB.xml | `ea5e534ecd1712cea0e580e2dbc33066b1ccbb0ecf6e932d438f27ccc0ff2161` |
+| `xbrl_qc/INTEGRATED_FILING_INDAS_1454124_28052025104806_WEB.xml` | DPSCLTD Q4 FY25 consolidated, owners = PAT before JV share, NCI 0 [X189] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1454124_28052025104806_WEB.xml | `124ef7afb9eefa407153204f6cd39dc9363577df356305d4149598b69b8874ce` |
+| `xbrl_qc/INTEGRATED_FILING_INDAS_1667760_15052026050235_WEB.xml` | GOKULAGRO Q4 FY26 consolidated, owners = PAT before associates, NCI 0 [X189] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1667760_15052026050235_WEB.xml | `e8e80236ea0ce67ceedc30845bcbb24ab1841780230bbd5d0967e2cd15fa729a` |
+
+## QY2: LevelOfRounding slip of one filing (X201; copied 2026-11-17 from the local vault blob, gunzipped, sha256 verified)
+
+Kept in `level_slip/` so the end-to-end fixture glob (`xbrl/*.xml`) and its pinned counts are unchanged.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `level_slip/INTEGRATED_FILING_INDAS_1705022_30072026030857_WEB.xml` | IMPAL Q1 FY27 standalone declares `Lakhs`, values typed in crores: total income 24,396,000, paid-up 1,248,000 (X201 slip, factor 100) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1705022_30072026030857_WEB.xml` | `cb847c05bfdc629bdeb8e3c92705cb0beed010b23f7404851c6a94c2b570a967` |
+| `level_slip/INTEGRATED_FILING_INDAS_1748931_29102026045421_WEB.xml` | IMPAL Q2 FY27 standalone `Crores`: H1 total income 4,825,900,000 = Q2 2,386,300,000 + 243.96 Cr; paid-up 124,800,000 (X201 neighbour) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1748931_29102026045421_WEB.xml` | `54701505dc14e9a9c40c98f4c287e7598eb075e1f7545fb1d19f1fcd415f7c33` |
+| `level_slip/SHP_1697471_20072026072756_WEB.xml` | IMPAL Reg. 31 30-Jun-2026: 12,480,000 shares (x Rs 10 = the Q2 paid-up) (X201) | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_1697471_20072026072756_WEB.xml` | `1d1d069bd061fb15243cf31813d979812dbf7739f525f50a26464e522012cf23` |
+| `level_slip/INTEGRATED_FILING_INDAS_1507427_08082025074055_WEB.xml` | Mamata Machinery Q1 FY26 standalone declares `Millions`, values typed in lakhs: revenue 2,757,910,000, paid-up 2,460,780,000 (X201 slip, factor 0.1) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1507427_08082025074055_WEB.xml` | `95d97d72dc73e31e7acf5422d19205430514efca251fc17bf2ccb3257146df5c` |
+| `level_slip/INTEGRATED_FILING_INDAS_1569007_08112025020703_WEB.xml` | Mamata Machinery Q2 FY26 standalone `Lakhs`: H1 revenue 679,399,000 = Q2 403,608,000 + Q1 275,791,000 (the filed 2,757,910,000 / 10); paid-up 246,078,000 (X201 neighbour) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1569007_08112025020703_WEB.xml` | `bd20546f372527550fa0a9fe5fb27541939bf9ca2e02ff8b194413a2793fdf79` |
+| `level_slip/SHP_1583648_08122025123811_WEB.xml` | Mamata Machinery Reg. 31 30-Jun-2025: 24,607,800 shares (X201) | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_1583648_08122025123811_WEB.xml` | `d8813e70aa6ea4621d45b53e9dca3ffd2f945957acd3f6d909515ec6080ff66e` |
+| `level_slip/INTEGRATED_FILING_INDAS_1609342_23012026054425_WEB.xml` | Gandhar Oil Q3 FY26 standalone `Crores` after `Millions`: a permanent, genuine unit change (paid-up 195,800,000 = SHP shares x Rs 2), not rescaled (X201 negative) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1609342_23012026054425_WEB.xml` | `f4515786f0d03b207902023a7777fbe6c32514fd6dcf6dd8e3fe71c2ae7eb5d0` |
+| `level_slip/INTEGRATED_FILING_INDAS_1572275_12112025050504_WEB.xml` | Gandhar Oil Q2 FY26 standalone `Millions` (X201 negative) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1572275_12112025050504_WEB.xml` | `d7f5e250e831e9d1714af1bb1c80fd52d14f6d353163c7e9310439d6b54a23f3` |
+| `level_slip/SHP_1605763_20012026045734_WEB.xml` | Gandhar Oil Reg. 31 31-Dec-2025: 97,879,530 shares (X201 negative) | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_1605763_20012026045734_WEB.xml` | `187af37eab86435acc12b62c22dcc57f70126e72ea8523cb6d5770604841062f` |
+
+## QC2: universe expansion, NEW entities (share cross-check, attribution by EPS; X211-X214)
+
+Copied byte-for-byte from the vault (gunzip only; sha256 equals the blob sha256) on 2026-11-17. Kept in
+`xbrl_qc2/` so the end-to-end fixture glob (`xbrl/*.xml`) and its pinned counts are unchanged.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `xbrl_qc2/INTEGRATED_FILING_INDAS_1743401_21102026064421_WEB.xml` | BLSE Q4 FY25 consolidated re-sent 21-Oct-2026 after the 6-Oct-2026 split, face value Rs 10, 90,856,500 shares [X211] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1743401_21102026064421_WEB.xml | `3a533267606d9b84d852af2ea412c3be2443d14a21063d3cdaaca356adc21665` |
+| `xbrl_qc2/SHP_197284_1415020_15042025053836_WEB.xml` | BLSE Reg. 31 31-Mar-2025 (90,856,485) [X211] | https://nsearchives.nseindia.com/corporate/xbrl/SHP_197284_1415020_15042025053836_WEB.xml | `a98ea7769d95d2ac1c39eca73906f3e122769324bc3cde17a3da14e684dd4afa` |
+| `xbrl_qc2/INTEGRATED_FILING_INDAS_1510694_13082025021504_WEB.xml` | Selan Q1 FY26 standalone, paid-up 35.16 Cr after the allotment at the results meeting of 12-Aug-2025 [X212] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1510694_13082025021504_WEB.xml | `658290cee769512f36882beb91c148af45360d88279411394236c4984ed1f2a9` |
+| `xbrl_qc2/SHP_1485504_17072025045200_WEB.xml` | Selan Reg. 31 30-Jun-2025 (15,200,000) [X212] | https://nsearchives.nseindia.com/corporate/xbrl/SHP_1485504_17072025045200_WEB.xml | `60779ceaac2e8b49e19067fc0ebec3e7e7f2b705908def03868ece34be5ce204` |
+| `xbrl_qc2/SHP_1515913_21082025073534_WEB.xml` | Selan Reg. 31 dated on the allotment 12-Aug-2025 (35,162,358; SHP17) [X212] | https://nsearchives.nseindia.com/corporate/xbrl/SHP_1515913_21082025073534_WEB.xml | `c59fad8baf26fa92c9d290e0711f2f6d7c3701f0a59555d55c22d95aea6fa645` |
+| `xbrl_qc2/INTEGRATED_FILING_INDAS_1757893_13112026081803_WEB.xml` | Davangere Sugar Q2 FY27 standalone, 1,695,896,000 shares of Re 1 = NSE Issue Size of 13-Nov-2026 [X212] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1757893_13112026081803_WEB.xml | `18f2ad4eb9bde76dcdb9af0e5ea08987a81ba7a46f20225656b26fecfa6f487e` |
+| `xbrl_qc2/SHP_1742915_21102026035238_WEB.xml` | Davangere Sugar Reg. 31 30-Sep-2026 (1,429,990,798) [X212] | https://nsearchives.nseindia.com/corporate/xbrl/SHP_1742915_21102026035238_WEB.xml | `43613006dc749da95763f82611f3cf6efe2d7c9d5cc13c840a28161d26074513` |
+| `xbrl_qc2/INTEGRATED_FILING_INDAS_1449578_23052025092633_WEB.xml` | Digispice Q4 FY25 standalone, paid-up 62.2665 Cr / Rs 3 net of trust-held shares [X213] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1449578_23052025092633_WEB.xml | `ece98a7171f74129a7a95406bb6593dbde4b38a019c25c1857876af05e96463e` |
+| `xbrl_qc2/SHP_198927_1422138_21042025100818_WEB.xml` | Digispice Reg. 31 31-Mar-2025 (233,623,106; two trusts named under non-institutions "Others") [X213] | https://nsearchives.nseindia.com/corporate/xbrl/SHP_198927_1422138_21042025100818_WEB.xml | `2b9be41f2598dfe79f535ae8cfe07099369f06cd34f96f9cd0b577feb2d93abc` |
+| `xbrl_qc2/INTEGRATED_FILING_INDAS_1567276_06112025071457_WEB.xml` | Ajmera Realty Q2 FY26 consolidated, owners filed 0, NCI 87 lakh [X214] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1567276_06112025071457_WEB.xml | `eef2b9cf9600479a26dbebfd928a801ba00a7857c29772555182b35a1a7519f0` |
+| `xbrl_qc2/INTEGRATED_FILING_INDAS_1598932_12012026052921_WEB.xml` | Bajaj Indef Q2 FY26 consolidated re-filing, owners 0, NCI +3.5 lakh (PDF (3.50)) [X214] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1598932_12012026052921_WEB.xml | `cf608c041bffdc6fe9e83835aa44aa0e7cf72b7006beb6ed154742e85f8bf091` |
+| `xbrl_qc2/INTEGRATED_FILING_INDAS_1439263_14052025102806_WEB.xml` | Nilkamal Q4 FY25 consolidated, owners agree with EPS, PAT line does not [X214] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1439263_14052025102806_WEB.xml | `af47cff30b663b9c941e25d6c0a184b41ded9df163afbe6b7162a7f3fc0658fb` |
+
+## QS: rule SHARES_REG31_OUTLIER (X221; copied 2026-11-18 from the local vault blob, gunzipped, sha256 verified)
+
+Read by `tests/test_x221_reg31_outlier.py`. The PR zip is the vault blob as fetched (stored uncompressed).
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `shares_outlier/SHP_1696707_20072026025841_WEB.xml` | MBLINFRA Reg. 31 30-Jun-2026: TOTAL 155,879,256 shares (the outlier against results and NSE until the 30-Sep-2026 listing) | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_1696707_20072026025841_WEB.xml` | `ea538ab6ccb2b81c9374d92b17f0d558715e71de29be55dfa4e91fa87dbc38ea` |
+| `shares_outlier/INTEGRATED_FILING_INDAS_1700387_23072026082824_WEB.xml` | MBLINFRA Q1 FY27 standalone results: paid-up 152.53 Cr of Rs 10 = 152,530,000 shares | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1700387_23072026082824_WEB.xml` | `18732b9de8e373b347a75b2970c8cb3ee3418de5da5aad35c7d1f69e8a46df77` |
+| `shares_outlier/SHP_1739920_16102026040314_WEB.xml` | HMT Reg. 31 30-Sep-2026: TOTAL 1,204,091,640 shares (all three counts differ) | `https://nsearchives.nseindia.com/corporate/xbrl/SHP_1739920_16102026040314_WEB.xml` | `51ddf496191c356069e49066182b6360c0cdcc6ffd447fba3710d98bc0f08b45` |
+| `shares_outlier/INTEGRATED_FILING_INDAS_1755096_06112026073646_WEB.xml` | HMT Q2 FY27 standalone results: paid-up 355.60 Cr of Rs 10 = 355,600,000 shares | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1755096_06112026073646_WEB.xml` | `0a03f319fdd01e21b7e35985d9c163ce3be4fb7c93585dab403458a65a98c155` |
+| `pr_zip/PR250926.zip` | PR zip of 25-Sep-2026: MBLINFRA Issue Size 152,529,256 (= results paid-up / face, Reg. 31 the outlier; 155,879,256 in `PR300926.zip`) | `https://nsearchives.nseindia.com/archives/equities/bhavcopy/pr/PR250926.zip` | `03c07898138cb6b62ccef18f902cd14b397bae2f68996cc726fb0a2889f560af` |
+
+## QF3: rule YTD_MISFILED_NO_BRIDGE (X226; copied 2026-11-18 from the local vault blob, gunzipped, sha256 verified)
+
+Read by `tests/test_x226_misfiled_ytd.py`. Kept in `ytd_misfiled/` so the end-to-end fixture glob (`xbrl/*.xml`) and
+its pinned counts are unchanged.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `ytd_misfiled/INTEGRATED_FILING_INDAS_1510585_12082025093306_WEB.xml` | NAZARA Q1 FY26 consolidated: PAT 51.34 Cr (X226) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1510585_12082025093306_WEB.xml` | `2204d8f72d79b15a241e780b01f12f7b8d95c3526ee27d259989a37045554837` |
+| `ytd_misfiled/INTEGRATED_FILING_INDAS_1573094_12112025104605_WEB.xml` | NAZARA Q2 FY26 consolidated: Q2 PAT -33.93 Cr, H1 17.41 Cr (X226) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1573094_12112025104605_WEB.xml` | `22a1fb19f599d2dcbf3e021f06f212667ddc8e702d4a8b6647371ab27b96c18c` |
+| `ytd_misfiled/INTEGRATED_FILING_INDAS_1617405_03022026063441_WEB.xml` | NAZARA Q3 FY26 consolidated: Q3 PAT 8.84 Cr (X226) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1617405_03022026063441_WEB.xml` | `f419fadd37dab4168eecdcba2e0279c67b2d4887079d1dd7cc73898c9fd9a0f5` |
+| `ytd_misfiled/INTEGRATED_FILING_INDAS_1666284_12052026113715_WEB.xml` | NAZARA Q4 FY26 consolidated results: Q4 PAT 55.70 Cr, FY 81.94 Cr (= the quarters) (X226) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1666284_12052026113715_WEB.xml` | `d627c73986bb20deb727de87547a5904b151f405de567a990806c83fe7085932` |
+| `ytd_misfiled/INTEGRATED_FILING_INDAS_1740461_16102026080647_WEB.xml` | NAZARA Q4 FY26 consolidated results re-sent 16-Oct-2026: Q4 PAT 55.70 Cr and PBT unchanged, FY PAT -23.24 Cr (the mis-filed YTD) (X226) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1740461_16102026080647_WEB.xml` | `abd86bca94deb64fe69bb5b6abad36b1869633782e326b672adafbf08266681e` |
+| `ytd_misfiled/INTEGRATED_FILING_INDAS_1707299_03082026104926_WEB.xml` | NAZARA Q1 FY27 consolidated: PAT -82.47 Cr (X226) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1707299_03082026104926_WEB.xml` | `509f9341b7c1c69f86a5faac28dd1840c8029cdca9f56ea9ec8100287f37a605` |
+| `ytd_misfiled/INTEGRATED_FILING_INDAS_1746358_26102026114756_WEB.xml` | NAZARA Q2 FY27 consolidated: Q2 PAT 35.36 Cr, H1 -47.11 Cr; the TTM row of X226 | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1746358_26102026114756_WEB.xml` | `e565fcdb853c9b660d49a3746687cf51723fad5c109f75bfcbd39a96abfb7ec4` |
+| `ytd_misfiled/AR_XBRL_NAZARA_16112026123324.xml` | NAZARA FY26 Reg. 34 annual report (16-Nov-2026), consolidated FY PAT 81.94 Cr: the later filing that agrees with the quarters (X226) | `https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_NAZARA_16112026123324.xml` | `65c9d0e765c889dea9ed1c8fc9e94d70f45555b1ddd6dbf39a7e87073ad31623` |
+| `ytd_misfiled/INTEGRATED_FILING_INDAS_1510310_12082025074319_WEB.xml` | Aarti Pharmalabs Q1 FY26 consolidated: PAT 49.50 Cr (X226) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1510310_12082025074319_WEB.xml` | `d7b5907de385febaecb7ff50a2a9bbf49e98d8cd16b65ab20e153b5faa75fb06` |
+| `ytd_misfiled/INTEGRATED_FILING_INDAS_1569445_09112025092410_WEB.xml` | Aarti Pharmalabs Q2 FY26 consolidated: Q2 PAT 27.92 Cr, H1 filed -44.18 Cr (X226 PAT_SIGN_FLIP) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1569445_09112025092410_WEB.xml` | `534c6703650892fc39d47f2ff1f4b003ebcaf068aaca1903e11e0d918cf6c706` |
+| `ytd_misfiled/INTEGRATED_FILING_INDAS_1622052_09022026083722_WEB.xml` | Aarti Pharmalabs Q3 FY26 consolidated: 9M PAT = Q1 + Q2 + Q3 (X226 NEXT_YTD_AGREES) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1622052_09022026083722_WEB.xml` | `77a635c217e481590ad0331dded32faeacf0fbf6ff7627fc6e572d9faac7324c` |
+
+## QP3: annual prior-year check, rule X201 on annuals (X235) and RESTATED sub-classes (X233-X234); copied 2026-11-18 from the local vault blob, gunzipped, sha256 verified
+
+Read by `tests/test_x233_x235_annual_prior_year.py`. Kept in `level_slip_annual/` and `annual_restated/` so the
+end-to-end fixture glob (`xbrl/*.xml`) and its pinned counts are unchanged.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `level_slip_annual/AR_XBRL_TDPOWERSYS_28082026104939.xml` | TD Power Systems FY26 consolidated Reg. 34 annual, `LevelOfRounding` Rupees with every amount typed in lakhs (revenue 185,623.38; equity capital 3,124.30) [X235] | https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_TDPOWERSYS_28082026104939.xml | `33a28c51ef6de47c7db43d44f2f6b4d70b5cc0cf6499f89d060306d1fd07902f` |
+| `level_slip_annual/INTEGRATED_FILING_INDAS_1436604_12052025072108_WEB.xml` | TD Power Systems Q4 FY25 consolidated results (`Lakhs`): FY25 revenue 12,787,617,000, the stored side [X235] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1436604_12052025072108_WEB.xml | `3715019460f4505e46fbb787c0fadf31fbd919acf9797f3052cd48fecddfae30` |
+| `level_slip_annual/INTEGRATED_FILING_INDAS_1667244_14052026070419_WEB.xml` | TD Power Systems Q4 FY26 consolidated results (`Lakhs`): neighbour paid-up capital and face value Rs 2 [X235] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1667244_14052026070419_WEB.xml | `29c430a507b72492f90ebd5145d71c4ee097c7f9e1054af351b43eef1496894f` |
+| `level_slip_annual/SHP_1649607_13042026124938_WEB.xml` | TD Power Systems Reg. 31 31-Mar-2026 (156,214,830 shares) [X235] | https://nsearchives.nseindia.com/corporate/xbrl/SHP_1649607_13042026124938_WEB.xml | `8501c5e5123cd995d6be1f4891645388c022263938f6b7fe6c0373ae6369eca3` |
+| `annual_restated/AR_XBRL_VINCOFE_11112026131428.xml` | Vintage Coffee FY26 consolidated annual: FY25 cash flows moved between activities, PAT / equity / net cash flow agree [X233] | https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_VINCOFE_11112026131428.xml | `783c944d38ba1e609332c8517a34fadf26b0f79dd0087fb42ee3e0e1578e22ac` |
+| `annual_restated/INTEGRATED_FILING_INDAS_1433394_07052025082905_WEB.xml` | Vintage Coffee Q4 FY25 consolidated results (CFO -25.7608 Cr) [X233] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1433394_07052025082905_WEB.xml | `04a5c59061412c9c375b79de2bfdfdb8d73207ba445c697d9a4c2073d6b39b59` |
+| `annual_restated/AR_XBRL_BASF_10092026090839.xml` | BASF India FY26 consolidated annual: FY25 re-presented for a discontinued operation (profit -4.80 Cr), PAT 479.06 Cr unchanged [X234] | https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_BASF_10092026090839.xml | `425ddd623b4c881991bf52ad557a300c2e750b8273a223aca6a33ab90d48529d` |
+| `annual_restated/INTEGRATED_FILING_INDAS_1439467_15052025103557_WEB.xml` | BASF India Q4 FY25 consolidated results (revenue 15,339.45 Cr total income, no discontinued operation) [X234] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1439467_15052025103557_WEB.xml | `36e224498cd760908c7469821745d60422d0bae8624f319ec964c0c8e0ada9ec` |
+
+## QB6: BSE CorpXbrlGen with Bsenewid and Scripcode (X246; bse-reach mode xbrl5, run 44262396799 on a GitHub runner, 2026-11-18, plain requests with the ported headers; ledger blobs saved unmodified)
+
+Read by `tests/test_bse.py`.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `bse/CorpXbrlGen_500488_6fa639f3-1cba-42e1-a341-ab46e27899e6.xml` | X246: ABBOTINDIA's Q2 FY27 'Result' announcement (the NEWSID of `bse/bse_AnnSubCategoryGetData_500488_20261015_20261117.json`) as BSE's announcement XBRL, namespace `in-bse-co` 2017-06-21 (4,306 bytes, `text/xml`): ScripCode 500488, CategoryOfAnnouncement `Results`, TypeOfAnnouncement `Outcome`, ResultType `standalone`, AttachmentURL of `bse/AttachLive_e334e776-71a5-4afd-adf3-ad10a11505cf.pdf`; no financial statement facts | `https://www.bseindia.com/Msource/90D/CorpXbrlGen.aspx?Bsenewid=6fa639f3-1cba-42e1-a341-ab46e27899e6&Scripcode=500488` | `73e1cc11f8401f1e6f61af03ccb512abd2ec09840c6ddbf2ee9f722008e8001f` |
+| `bse/CorpXbrlGen_590041_287a3321-71de-4a52-9089-083b8e94337f.html` | X246: the 21-byte `text/html` answer `Invalid Input Details` (same bytes for 544416 / NEWSID a114c4a1-7e95-42e0-93a2-2c61a9fa5142) | `https://www.bseindia.com/Msource/90D/CorpXbrlGen.aspx?Bsenewid=287a3321-71de-4a52-9089-083b8e94337f&Scripcode=590041` | `d236166591c9192fbdd94d7f4d01bd15e4ec2000d9b34bfe00c822add1a2c1ce` |
+| `bse/beta_Comp_Resultsnew_expandable0_20261118.html` | X248: BSE's legacy ASP.NET results page on the beta host as first loaded (GET, 51,674 bytes, CRLF): form fields with two `name` attributes per control (`ctl00$ContentPlaceHolder1$broadcastdd` / `broadcast6`, `...$btnSubmit` / `submt6`), broadcast options 1-7, period options ALL / 3 / 2 / 1, results grid `ContentPlaceHolder1_gvData` whose Std / Con XBRL links are `__doPostBack` targets `...$gvData$ctl02$lnkXML` / `$lnkConXML` | `https://beta.bseindia.com/corporates/Comp_Resultsnew.aspx?expandable=0` | `e911d6242a002a310e339089674c0ab52f15dfbc9280ba9f23fc99e0491b5e35` |
+
+## QD: rule X250 (reconciling lines filed as segment members); copied 2026-11-18 from the local vault blob, gunzipped, sha256 verified
+
+Read by `tests/test_x250_segment_labels.py`. Kept in `segments_qd/` so the end-to-end fixture glob (`xbrl/*.xml`)
+and its pinned counts are unchanged.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `segments_qd/INTEGRATED_FILING_BANKING_1749476_29102026095319_WEB.xml` | Suryoday Small Finance Bank Q2 FY27 (Lakhs): `ReportableSegments5Member` labelled "Unallocated" next to four business segments [X250] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_BANKING_1749476_29102026095319_WEB.xml | `f08f4f2436b5f53943f60f68ac00c2e17bb2f90c7d2a0841516a4bb53bc71784` |
+| `segments_qd/INTEGRATED_FILING_INDAS_1753986_05112026065300_WEB.xml` | SGLTL Q2 FY27: `ReportableSegments3Member` labelled "Eliminations", segment revenue -128,990,000 [X250] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1753986_05112026065300_WEB.xml | `2f8171264bf4a535b10ddd9a2593ac56980f8333009581ff805cd7419cae90b8` |
+
+## QB7: BSE results XBRL (X247, X265; bse-reach mode xbrl6, run 44271899335 on a GitHub runner, 2026-11-18, plain requests with the ported headers; ledger blobs saved unmodified, sha256 = the ledger's; the NSE counterpart copied from the local vault blob, gunzipped, sha256 verified)
+
+Read by `tests/test_bse_results_ixbrl.py`. Kept in `bse/` so the end-to-end fixture glob (`xbrl/*.xml`) and its
+pinned counts are unchanged.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `bse/bse_Corp_GetFINANCE_DRDOWN_ng_flag1_20261118.json` | X247: the comp_resultsnew broadcast-period list: FlagDur 1 Today, 2 Last 1 Week, 3 Last 15 Days, 4 Last 1 month, 5 Last 3 month, 6 Last 1 year, 7 Beyond last 1 year | `https://api.bseindia.com/BseIndiaAPI/api/Corp_GetFINANCE_DRDOWN_ng/w?flag=1` | `2bd88fd94819b32da36d98422b631165c672300af8adb45bdaed1c85063c1841` |
+| `bse/bse_Corp_GetFINANCE_DRDOWN_ng_flag3_20261118.json` | X247: result periods HFQ 3 Quarterly, 2 Yearly, 1 Half Yearly | `https://api.bseindia.com/BseIndiaAPI/api/Corp_GetFINANCE_DRDOWN_ng/w?flag=3` | `49d7715591166ceae9709b67b616007cb8c1919927ae5c1fc8d3889e6e372ee8` |
+| `bse/bse_Corp_FinanceResult_ng_new_500488_flagdur6_20261118.json` | X247 / X265: ABBOTINDIA's results over the last year, 7 rows (SQ / SH 2026-27 .. DQ / DN 2025-26), 4 distinct standalone `XMLName` files, `Consol_XMLName` null, `Fld_CreateDate` IST | `https://api.bseindia.com/BseIndiaAPI/api/Corp_FinanceResult_ng_new/w?SCRIP_CD=500488&FlagDur=6&HFQ=&ISUBGROUP_CODE=&segment=C` | `ddcf8d96c088b89555ddaec9108e40af8565455beece3d8dd4447c643f11e7ed` |
+| `bse/bse_Corp_FinanceResult_ng_new_all_flagdur1_20261118.json` | X247 / X265: every company's results of 18-Nov-2026 (SCRIP_CD blank, FlagDur 1): 4 rows of 544111 (PARKHOTELS) and 544477 (HILINFRA), with `Consol_XMLName` | `https://api.bseindia.com/BseIndiaAPI/api/Corp_FinanceResult_ng_new/w?SCRIP_CD=&FlagDur=1&HFQ=&ISUBGROUP_CODE=&segment=C` | `8116820f4a3eba70a387beb07a268bfa28aced1a9d45b9f79d73fe1c2b040718` |
+| `bse/Integrated_Finance_Ind_As_500488_511202619052_IFIndAs.html` | X265: ABBOTINDIA (a Permitted member, no NSE XBRL) Q2 FY27 standalone results as inline XBRL (540,012 bytes, `text/html`): `in-capmkt` 2026-01-31 Integrated Finance Ind AS, 402 `ix:nonFraction` (scale 7, `ixt3:numdotdecimalin`, sign `-`) and 297 `ix:nonNumeric`, Symbol `NOTLISTED` | `https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_500488_511202619052_IFIndAs.html` | `47fd4cc3e3f259809a06e22a2dbf897387ca432350b1f8aeb729c6ae29dbaf5e` |
+| `bse/Integrated_Finance_Ind_As_544111_18112026133342_IFIndAs.html` | X265 / R20: PARKHOTELS Q4 FY26 consolidated as BSE's inline XBRL (281,294 bytes), re-uploaded 18-Nov-2026 with LevelOfRounding `Crores` and a revised balance sheet | `https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_544111_18112026133342_IFIndAs.html` | `6f0dddbba91946f62fced9e7865e4ab4163f36a4f157a7c1b69cc5eac3faade9` |
+| `bse/INTEGRATED_FILING_INDAS_1673679_27052026125706_WEB.xml` | X265 / R20: the NSE XML of the same company, period and scope (filed 26-May-2026, LevelOfRounding `Lakhs` on crore figures: the X201 slip, corrected x 100) | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1673679_27052026125706_WEB.xml` | `e74210e7a24509dd9539277168656b6b8fcc17d792b788fcf6ea93b0e35bc110` |
+
+## QT: rule X273 (fixed-asset lines of a year end from one filing, owner decision T); copied 2026-11-18 from the local vault blob, gunzipped, sha256 verified
+
+Read by `tests/test_x273_fixed_assets.py`. Kept in `fixed_assets/` so the end-to-end fixture glob (`xbrl/*.xml`) and
+its pinned counts are unchanged. Decision U (X274) reuses the QP3 `annual_restated/` pairs (no new file).
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `fixed_assets/INTEGRATED_FILING_INDAS_1670964_21052026084421_WEB.xml` | FSN E-Commerce (NYKAA) Q4 FY26 consolidated results: PPE 299.97 Cr, right-of-use assets 461.47 Cr as a labelled other non-current asset [X273] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1670964_21052026084421_WEB.xml | `b9acf086fe7731138585e2b47f68a47b792eab0cc30e0bf50650f9f82eb2c777` |
+| `fixed_assets/AR_XBRL_NYKAA_23092026220941.xml` | NYKAA FY26 consolidated Reg. 34 annual: PPE 761.44 Cr including right-of-use assets, no separate line [X273] | https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_NYKAA_23092026220941.xml | `4a4ba20a1e231fe34dc16553e6d4c02b544e7c64d2fddccb1f48fab52f227dd3` |
+| `fixed_assets/INTEGRATED_FILING_INDAS_1752762_04112026053637_WEB.xml` | NYKAA Q2 FY27 consolidated results: PPE 306.53 Cr, right-of-use 496.47 Cr (the neighbouring half-year) [X273] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1752762_04112026053637_WEB.xml | `4fe1d98c814a9d04c9c929041c256cfa7b28f246f481ff35aa2fc9279a112373` |
+| `fixed_assets/INTEGRATED_FILING_INDAS_1668105_15052026092506_WEB.xml` | MPS Ltd (MPSLTD) Q4 FY26 consolidated results: goodwill 376.32 Cr, other intangibles 138.86 Cr [X273] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1668105_15052026092506_WEB.xml | `6d22eb0e46f3b8e8dca2a19be56f8d19a93ebbe65340918c5eb6bddc58904d03` |
+| `fixed_assets/AR_XBRL_MPSLTD_01102026192529.xml` | MPSLTD FY26 consolidated Reg. 34 annual: other intangibles 494.10 Cr (class "Others" 439.54 Cr), no goodwill element [X273] | https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_MPSLTD_01102026192529.xml | `a8756e09f71d986402a995cfb5503d02f98f8b2d95d144050a7ab728fde8bd7a` |
+| `fixed_assets/INTEGRATED_FILING_INDAS_1752323_03112026100325_WEB.xml` | MPSLTD Q2 FY27 consolidated results: goodwill 381.68 Cr, other intangibles 129.37 Cr (the neighbouring half-year) [X273] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1752323_03112026100325_WEB.xml | `7888ed7f1cb5052710022fda794c95eb4cd09aa12dbf5a5e35fcefacfcadbc8b` |
+
+## R20 pair (2026-11-18, HILINFRA 544477 Q2 FY27 consolidated; BSE from bse-fetch run 44289837326, NSE from the vault)
+
+| File | Why it is here | Source URL | SHA-256 |
+|---|---|---|---|
+| `bse/Integrated_Finance_Ind_As_544477_14112026175059_IFIndAs.html` | X266 R20: BSE inline XBRL of the same upload as the NSE XML below (17:50:59 IST) | `https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_544477_14112026175059_IFIndAs.html` | `7cf9950794ef40db7033a5322ee92e173d2d4df8aee4959d11c32444aa5571c4` |
+| `bse/INTEGRATED_FILING_INDAS_1758435_14112026055150_WEB.xml` | X266 R20: NSE XML of the same upload (17:51:50 IST), gunzipped vault blob | `https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1758435_14112026055150_WEB.xml` | `4aa398ec87578ee68d32bdd20c1e73bb79a6c9c81261d3c33a1254f869319a66` |
+
+## QB8: BSE results inline XBRL quarantined by batch 1 of the BSE results fetch (X280-X283; vault blobs of the bse-fetch runner ledger, imported unmodified, plain `.html` in the vault, sha256 verified = blob)
+
+Read by `tests/test_qb8_bse_ixbrl_rules.py`. Kept in `bse/` so the end-to-end fixture glob (`xbrl/*.xml`) and its
+pinned counts are unchanged.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `bse/Integrated_Finance_Ind_As_523862_1411202516851_IFIndAs.html` | X280: Q2 FY26 consolidated (523862), `WhetherCashFlowStatementIsApplicableOnCompany` displayed `true` under `ixt2:booleantrue` (153 batch-1 files failed on this element) | `https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_523862_1411202516851_IFIndAs.html` | `3b7024ca22e9e72b344799d39566e7ad6828123e33bbcd0577d440f14f4f27fa` |
+| `bse/Integrated_Finance_Ind_As_539607_132202620589_IFIndAs.html` | X280: Q3 FY26 consolidated (539607), `DeclarationPursuantToClauseDOfSubRegulation3OfRegulation33OfSEBILODRRegulation2015` displayed `false` under `ixt2:booleantrue` | `https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_539607_132202620589_IFIndAs.html` | `75dca24dbfe294da722163e3270160e9d707af07e655f48e4498d63f95b91fba` |
+| `bse/Integrated_Finance_Ind_As_513536_128202520028_IFIndAs.html` | X281 / X283: Q1 FY26 consolidated (513536), 6 unclosed `<BR>` inside the notes text block (not well-formed XHTML), reporting period displayed but not tagged | `https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_513536_128202520028_IFIndAs.html` | `6509895a1b5fc83ecc45425ecc086cd0b030c9c62705853076420623b8a5dfd8` |
+| `bse/Integrated_Finance_Ind_As_539607_25112025201023_IFIndAs.html` | X282: Q2 FY26 standalone (539607), the empty "additional disclosure of related party transactions" table opens `<thead>` and closes it with `</tbody>` | `https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_539607_25112025201023_IFIndAs.html` | `2362afd3acdd78c8d585e52ed33ffa598806ddf42dea4e2541f0241ce52b9c25` |
+| `bse/Integrated_Finance_Ind_As_504731_88202519641_IFIndAs.html` | X283: Q1 FY26 consolidated (504731), well-formed, reporting period displayed as plain text only (NO_DECLARED_PERIOD at 0.10.7) | `https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_504731_88202519641_IFIndAs.html` | `60bba0bba0737afac7eabbb407932e17ae9d16db4311012e9589b4aa8898382e` |
+
+## QP4: the last BSE results inline XBRL files still INVALID_XBRL (X285-X287; files of the bse-fetch runner ledgers, unmodified, sha256 verified = ledger / vault blob)
+
+Read by `tests/test_qp4_bse_ixbrl_repairs.py`. Kept in `bse/` so the end-to-end fixture glob and its pinned counts are
+unchanged.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `bse/Integrated_Finance_Ind_As_539469_1422026194048_IFIndAs.html` | X285: Q3 FY26 consolidated (539469 Panorama Studios), OCR'd notes text block with a bare `<` ("re<lassified"): not well-formed (invalid token) | `https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_539469_1422026194048_IFIndAs.html` | `f3b7ca98e23ad2008c9168c83953f5b66245f113a7024fda26817cf91d279774` |
+| `bse/IFOtherthan_538668_1482025163259_IFOtherthan.html` | X286: Q1 FY26 (538668) on the OtherThanBank template, segment table rows without `</tr>` before the next row (mismatched tag) | `https://www.bseindia.com/XBRLFILES/IFOtherthanDuplicateUploadDocument/IFOtherthan_538668_1482025163259_IFOtherthan.html` | `3a79de3ff9574ee059a8d101c8b143cfe97b186bafd8987e0615852a92eaa604` |
+| `bse/Integrated_Finance_Ind_As_538668_141120252067_IFIndAs.html` | X287: Q2 FY26 consolidated (538668), the empty "Audit qualification" table left open before the next `<h2>` (mismatched tag) | `https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_538668_141120252067_IFIndAs.html` | `935f5a350ff068d9bfea3eb53c9204405f132296fb62cfcfc188276d6ca34134` |
+
+## QD2: rule X293 (owners' quarter covered by the owners' own YTD takes no PAT fallback); copied 2026-11-18 from the local vault blob, gunzipped, sha256 verified
+
+Read by `tests/test_x293_owners_from_ytd.py`. Kept in `owners_ytd/` so the end-to-end fixture glob (`xbrl/*.xml`) and
+its pinned counts are unchanged.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `owners_ytd/INTEGRATED_FILING_INDAS_1711189_10082026062233_WEB.xml` | Lumax Auto Technologies (LUMAXTECH) Q1 FY27 consolidated results: PAT 98.6365 Cr, no ProfitOrLossAttributableToOwnersOfParent (only the comprehensive-income split) [X293] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1711189_10082026062233_WEB.xml | `1bb5ab346ddfb1378c66f37050f63beea9689db5b24f0a63d6820ad5261171af` |
+| `owners_ytd/INTEGRATED_FILING_INDAS_1745364_24102026044213_WEB.xml` | LUMAXTECH Q2 FY27 consolidated results: owners' profit Q2 105.50894 Cr and H1 192.14884 Cr (the owners' YTD covering Q1) [X293] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1745364_24102026044213_WEB.xml | `9b23c2e7389d00e1e486d1e4750c2bae30ac77d5e72e02e451c5ac178d48e4fc` |
+
+## QE: rule X300 (operating lines of a restated TTM window bridge through the YTD); copied 2026-11-18 from the local vault blob, gunzipped, sha256 verified
+
+Read by `tests/test_x300_operating_lines_bridge.py`. Kept in `operating_bridge/` so the end-to-end fixture glob
+(`xbrl/*.xml`) and its pinned counts are unchanged. Polyplex Corporation (POLYPLEX) consolidated results, FY26 and H1 FY27.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `operating_bridge/INTEGRATED_FILING_INDAS_1510629_12082025102624_WEB.xml` | POLYPLEX Q1 FY26 consolidated results: other income 29.79 Cr (a quarter of the FY26 YTD identity) [X300] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1510629_12082025102624_WEB.xml | `fb4d593f49c5fe91f458adcd8c788fd7b71ac2e72aa0404ae912cc25f88a8ce5` |
+| `operating_bridge/INTEGRATED_FILING_INDAS_1574410_13112025092200_WEB.xml` | POLYPLEX Q2 FY26 consolidated: Q2 other income 22.77 Cr, H1 FY26 50.08 Cr (Q1 + Q2 = 52.56) [X300] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1574410_13112025092200_WEB.xml | `e22e2b194953721551c63356e9f5e78768390b489148b3059711273429be0334` |
+| `operating_bridge/INTEGRATED_FILING_INDAS_1625677_13022026082321_WEB.xml` | POLYPLEX Q3 FY26 consolidated: Q3 other income 27.26 Cr, 9M 70.64 Cr (quarters 79.82) [X300] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1625677_13022026082321_WEB.xml | `15dda4fcedba16734a45b50d062d8c7cd299af04c5b95fb17b2a7e204c62090e` |
+| `operating_bridge/INTEGRATED_FILING_INDAS_1672109_23052026084256_WEB.xml` | POLYPLEX Q4 FY26 consolidated: Q4 other income 61.86 Cr, FY26 87.57 Cr (quarters 141.68); FY26 total income breaks the YTD identity (guarded tag, X106) [X300] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1672109_23052026084256_WEB.xml | `4c7db2b28bac3f69ac2679d2a7dc5be81debf752f1f8829293265a40d8c2b0f9` |
+| `operating_bridge/INTEGRATED_FILING_INDAS_1712085_11082026071859_WEB.xml` | POLYPLEX Q1 FY27 consolidated: other income 25.47 Cr [X300] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1712085_11082026071859_WEB.xml | `c9d27d66662e937a262c0fc41725dcc4416582e3a6221fc2c6bd847b56ee9607` |
+| `operating_bridge/INTEGRATED_FILING_INDAS_1757942_13112026085007_WEB.xml` | POLYPLEX Q2 FY27 consolidated: Q2 other income 43.59 Cr, H1 FY27 67.82 Cr (quarters 69.06) [X300] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1757942_13112026085007_WEB.xml | `246bcd8260dd5b0a99bf68ad62fe6e14994060c41780a13d33c316642db98811` |
+| `operating_bridge/INTEGRATED_FILING_INDAS_1499085_31072025042102_WEB.xml` | Swiggy (SWIGGY) Q1 FY26 standalone results: PBT before exceptional items -991 Cr [X300 prior-year mixed basis] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1499085_31072025042102_WEB.xml | `7ad5c45c27e2a834c44cb390878a2e05ff3354d1389d6e400dad3997303e3162` |
+| `operating_bridge/INTEGRATED_FILING_INDAS_1561841_30102025063455_WEB.xml` | SWIGGY Q2 FY26 standalone: Q2 -881 Cr, H1 FY26 -1,872 Cr (= Q1 + Q2, the original basis) [X300] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1561841_30102025063455_WEB.xml | `85c5670747913e8dc5bc2ffd8ffa6a7a09b2c604a481ada11304078c88092616` |
+| `operating_bridge/INTEGRATED_FILING_INDAS_1614516_30012026041413_WEB.xml` | SWIGGY Q3 FY26 standalone: Q3 -886 Cr, 9M -2,758 Cr [X300] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1614516_30012026041413_WEB.xml | `ff45dd12386221263a3d505609f09728543078e71acee4fc3d3b94f114d3d32a` |
+| `operating_bridge/INTEGRATED_FILING_INDAS_1665216_09052026120920_WEB.xml` | SWIGGY Q4 FY26 standalone: Q4 279 Cr, FY26 436 Cr on the continuing basis (quarters -2,479 Cr): FY restated, H1 FY26 not [X300] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1665216_09052026120920_WEB.xml | `91cf2d1de71eb615e6d87bb5bc1c7b1ee1f95d97e56b251eaadadb4f10c3f0e2` |
+| `operating_bridge/INTEGRATED_FILING_INDAS_1705249_30072026050331_WEB.xml` | SWIGGY Q1 FY27 standalone: 350 Cr [X300] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1705249_30072026050331_WEB.xml | `1da2df2ea1dbb87ea6fe760c47f47cd21d299f21da03b6d17bdc4746390e7c4b` |
+| `operating_bridge/INTEGRATED_FILING_INDAS_1744174_22102026064058_WEB.xml` | SWIGGY Q2 FY27 standalone: Q2 287 Cr, H1 FY27 637 Cr [X300] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1744174_22102026064058_WEB.xml | `6b9ecaf33b10611f0ca3514c9020430605bf63ff73d0a01595791f24b0ab8bf4` |
+
+## QE2: rule X301 (X106 guarded-tag bridge only on one basis); copied 2026-11-18 from the local vault blob, gunzipped, sha256 verified
+
+Read by `tests/test_x301_guarded_bridge_one_basis.py` (with the SWIGGY files of the QE section above). Kept in
+`operating_bridge/` so the end-to-end fixture glob (`xbrl/*.xml`) and its pinned counts are unchanged. Patanjali Foods
+(PATANJALI) standalone results, FY26 and H1 FY27 (LevelOfRounding: lakhs).
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `operating_bridge/INTEGRATED_FILING_INDAS_1513074_14082025053356_WEB.xml` | PATANJALI Q1 FY26 standalone results: revenue 8,899.71 Cr [X301] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1513074_14082025053356_WEB.xml | `e3e016926d789d643cff7412794fbf41cb8b8e3146051c849eb2d589913facd2` |
+| `operating_bridge/INTEGRATED_FILING_INDAS_1562673_31102025052557_WEB.xml` | PATANJALI Q2 FY26 standalone: Q2 revenue 9,798.84 Cr, H1 FY26 18,564.86 Cr (Q1 + Q2 = 18,698.55: the prior-year YTD breaks the identity) [X301] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1562673_31102025052557_WEB.xml | `e296f343c3e55e308aaeb9b7cda51e6b1ffa7a76d48670cbca98cb81385a423e` |
+| `operating_bridge/INTEGRATED_FILING_INDAS_1623623_11022026072616_WEB.xml` | PATANJALI Q3 FY26 standalone: Q3 10,483.71 Cr, 9M 29,013.98 Cr (quarters 29,182.26; NEXT_YTD_AGREES) [X301] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1623623_11022026072616_WEB.xml | `64b91826bbbfdb3639bbe9fc699e5b67dd7c3fc1fc18374c37f105bf71f33b5e` |
+| `operating_bridge/INTEGRATED_FILING_INDAS_1678022_30052026094755_WEB.xml` | PATANJALI Q4 FY26 standalone (re-sent results, same figures as the first): Q4 11,155.60 Cr, FY26 40,169.58 Cr (quarters 40,337.81, within 0.5 %: holds) [X301] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1678022_30052026094755_WEB.xml | `4b003f1cc8bd222d5e13a8bbd5ce3799ba9b5343d8331d3b059667a9a552649b` |
+| `operating_bridge/INTEGRATED_FILING_INDAS_1715092_14082026083859_WEB.xml` | PATANJALI Q1 FY27 standalone: revenue 11,337.45 Cr [X301] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1715092_14082026083859_WEB.xml | `ee764b0850ad9c7dc8ab4f94c22acd8a15e588acfaaa3554069f7b9758a3b885` |
+| `operating_bridge/INTEGRATED_FILING_INDAS_1758226_14112026020725_WEB.xml` | PATANJALI Q2 FY27 standalone: H1 FY27 revenue 22,660.03 Cr [X301] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1758226_14112026020725_WEB.xml | `cb26c4ab5ae6224e1ad531824cc63b00cc0261ce19c4bf4a8ac32f0a05af1dfa` |
+
+## QF4: RESTATED sub-classes CASH_EQUIVALENTS_RECLASSIFIED (X306) and FX_EFFECT_RECLASSIFIED (X307); copied 2026-11-18 from the local vault blob, gunzipped, sha256 verified
+
+Read by `tests/test_x306_x307_cash_flow_reclassified.py`. Kept in `annual_restated/` so the end-to-end fixture glob
+(`xbrl/*.xml`) and its pinned counts are unchanged.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `annual_restated/INTEGRATED_FILING_INDAS_1447925_22052025091528_WEB.xml` | Vindhya Telelinks Q4 FY25 standalone results: FY25 net cash flow -57.16 Cr, closing cash and cash equivalents 95.44 Cr, total assets 4,079.00 Cr (the stored side) [X306] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1447925_22052025091528_WEB.xml | `2e6c6344c4c89b09c1bcf040636b5cb7602b50c9d1db7e2a557fdfbf02801020` |
+| `annual_restated/AR_XBRL_VINDHYATEL_01092026190709.xml` | Vindhya Telelinks FY26 standalone annual: FY25 cash and cash equivalents 85.01 Cr (other bank balances 30.02 -> 40.46 Cr) and net cash flow -67.60 Cr, total assets / equity / PAT unchanged [X306] | https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_VINDHYATEL_01092026190709.xml | `32a3c120c9869e8a41fa5437a9ac1bc03b751b8983e938f9de5657613f0b4abe` |
+| `annual_restated/INTEGRATED_FILING_INDAS_1424269_24042025081042_WEB.xml` | Kirloskar Pneumatic Q4 FY25 consolidated results: FY25 net cash flow 13.63 Cr, effect of exchange rate changes 0.22 Cr, after it 13.85 Cr (the stored side) [X307] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1424269_24042025081042_WEB.xml | `922512ab95a8b9a872686fbf50ed00fa42d5dbc04ff1c8ad253706111c2f6fce` |
+| `annual_restated/AR_XBRL_KIRLPNU_19082026192059.xml` | Kirloskar Pneumatic FY26 consolidated annual: FY25 net cash flow 14.07 Cr, exchange difference -0.22 Cr, after it 13.85 Cr [X307] | https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_KIRLPNU_19082026192059.xml | `22b205d7dc05876d41f63557bb14a3fdcc237c0e26996b2a82b946b7544f9b4b` |
+
+## QU: rights entitlements kept out of the Rs 500 Cr universe (X311); copied 2026-11-18 from the local vault blob (stored uncompressed), sha256 verified
+
+Read by `tests/test_x311_universe_rights_entitlements.py`. The bhavcopy also joins the X140 characterisation glob
+(`bhavcopy/BhavCopy_NSE_CM_*.csv.zip`): UPL-RE `INE628A20010` beside UPL `INE628A01036`, markers agree.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `pr_zip/PR061224.zip` | PR zip of 06-Dec-2024 (a Friday, week end): UPL-RE, series BE, Category Permitted, Issue Size 93,680,642 x 190.25 = Market Cap Rs 17,822,742,140.50 (>= Rs 500 Cr: admitted by rule U1-P); UPL EQ Listed Rs 422,329,389,208.65 [X311] | https://nsearchives.nseindia.com/archives/equities/bhavcopy/pr/PR061224.zip | `d01ea415887c77a22ed606bf7a5d3c96fcaf486851060d881d61e994df921124` |
+| `bhavcopy/BhavCopy_NSE_CM_0_0_0_20241206_F_0000.csv.zip` | UDiFF bhavcopy of 06-Dec-2024: identity of UPL-RE (`INE628A20010`, BE) and UPL (`INE628A01036`, EQ) for the PR zip of the same day [X311] | https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20241206_F_0000.csv.zip | `ae4eff2154d4260cbb7fa8946554eb67ae7270c5a1e62fb8cbbf8cceca1c9ed8` |
+
+## QB9: BSE NBFC results as plain XML instances (X313; blobs of the bse-fetch runner ledger r14 of 2026-11-18, copied unmodified, sha256 verified = ledger blob)
+
+Read by `tests/test_x313_bse_nbfc_xml.py`. Kept in `bse/` so the end-to-end fixture glob (`xbrl/*.xml`) and its
+pinned counts are unchanged.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `bse/Integrated_Finance_NBFC_530245_1482026171926_IFNBFC.xml` | X313: Aryaman Financial Services (530245, Permitted, INE032E01017) Q1 FY27 standalone, plain XML `<!--IFNBFC V2.1 (26-06-2026)-->`, IntegratedFinance_NBFC 2026-01-31, LevelOfRounding Lakhs (smallest IFNBFC file of the ledger) | `https://www.bseindia.com/XBRLFILES/IFNBFCDuplicateUploadDocument/Integrated_Finance_NBFC_530245_1482026171926_IFNBFC.xml` | `4a28c54bfccf34b12ffbd362da1e816e4a914273fff9a489793d9e61fd2f9d8e` |
+| `bse/Integrated_Finance_NBFC_530245_1482026172036_IFNBFC.xml` | X313: the same company and quarter, consolidated | `https://www.bseindia.com/XBRLFILES/IFNBFCDuplicateUploadDocument/Integrated_Finance_NBFC_530245_1482026172036_IFNBFC.xml` | `bab83ddd5dbe2fac7336ebb2cd6350bd76d597ac35a265b9635ecab7426edbe8` |
+| `bse/bse_Corp_FinanceResult_ng_new_530245_flagdur6_20261118.json` | X313: the scrip's results listing (FlagDur 6) naming both files (`XMLName` / `Consol_XMLName`, `Fld_CreateDate` 2026-08-14T17:19:26.623 for JQ2026-2027) | `https://api.bseindia.com/BseIndiaAPI/api/Corp_FinanceResult_ng_new/w?SCRIP_CD=530245&FlagDur=6&HFQ=&ISUBGROUP_CODE=&segment=C` | `fbd32a3d88eaea319cc714e388381cd38473333d21a8691c3b728a33e87bc116` |
+
+## QY3: rules NBFC_NET_LINE_SIDE (X314) and YTD_COPIES_PRIOR_YEAR (X315); copied 2026-11-19 from the local vault blob (gunzipped, or stored uncompressed), sha256 verified
+
+Read by `tests/test_x314_x315_ytd_presentation_rules.py`. Kept in `nbfc_net_line/` and `ytd_copy/` so the
+end-to-end fixture glob (`xbrl/*.xml`) and its pinned counts are unchanged.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `nbfc_net_line/Integrated_Finance_NBFC_543766_3172026221822_IFNBFC.xml` | Ashika Credit Capital (BSE 543766, Permitted) Q1 FY27 consolidated, IFNBFC plain XML, Lakhs: revenue 1,686,885,000, net loss on fair value changes 406,000 (in expenses) [X314] | https://www.bseindia.com/XBRLFILES/IFNBFCDuplicateUploadDocument/Integrated_Finance_NBFC_543766_3172026221822_IFNBFC.xml | `b6759dd18f13424518391e92a964993257e192c0386b016db221dc29d41e2fb5` |
+| `nbfc_net_line/Integrated_Finance_NBFC_543766_31102026181525_IFNBFC.xml` | the same, Q2 / H1 FY27: Q2 revenue 634,293,000 with a net loss on fair value changes of 19,963,000 in expenses; H1 revenue 2,300,809,000 with a net gain of 1,272,402,000 and no loss line (H1 = Q1 + Q2 - 20,369,000) [X314] | https://www.bseindia.com/XBRLFILES/IFNBFCDuplicateUploadDocument/Integrated_Finance_NBFC_543766_31102026181525_IFNBFC.xml | `3d7b0a98af4412ab37d154512c5cc138637a060c20665c6ea80dee0f7c7fbee2` |
+| `nbfc_net_line/INTEGRATED_FILING_NBFC_INDAS_1694707_16072026105712_WEB.xml` | PNB Gilts (NSE) Q1 FY27 standalone: revenue 4,545,599,000, net gain on fair value changes 182,320,000 [X314] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_NBFC_INDAS_1694707_16072026105712_WEB.xml | `f1880a28bdf6ab15aa324c518ee66f9a943318af9a538034c3df989b2a646d1c` |
+| `nbfc_net_line/INTEGRATED_FILING_NBFC_INDAS_1737076_13102026051135_WEB.xml` | the same, Q2 / H1 FY27: Q2 net loss on fair value changes 177,075,000 in expenses, H1 a net gain of 5,246,000; H1 revenue 8,731,680,000 = Q1 + Q2 (4,363,156,000) - 177,075,000 [X314] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_NBFC_INDAS_1737076_13102026051135_WEB.xml | `9d8951edaa6a5e87d7aa2a53c9a9df57e4733bad9532a804fc48d55079158bcb` |
+| `ytd_copy/Integrated_Finance_Ind_As_526173_16620251264_IFIndAs.html` | Andrew Yule (BSE 526173, Permitted) Q4 FY25 consolidated inline XBRL: FY25 revenue 3,117,097,000, total income 3,752,739,000, PBT -285,057,000, PAT -28,382,000 [X315] | https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_526173_16620251264_IFIndAs.html | `f14a5cf0e6767fdbc8b0370f80469e735348aed7b5297ae2037e61a85f2d42fb` |
+| `ytd_copy/Integrated_Finance_Ind_As_526173_148202518736_IFIndAs.html` | the same, Q1 FY26 consolidated [X315] | https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_526173_148202518736_IFIndAs.html | `3c9eb27d8ecfc2f839c25a39c57772883c2024bff48ec4dccddf9ac30ae5e32f` |
+| `ytd_copy/Integrated_Finance_Ind_As_526173_13112025185648_IFIndAs.html` | the same, Q2 / H1 FY26 consolidated (H1 = Q1 + Q2) [X315] | https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_526173_13112025185648_IFIndAs.html | `8ca49e8998e61d1c33f3b2f255c5ad2f3d167d10e2286ebd7f69cbdacc6d1f57` |
+| `ytd_copy/Integrated_Finance_Ind_As_526173_1122026181616_IFIndAs.html` | the same, Q3 FY26 consolidated: the Apr-Dec 2025 context carries the FY25 column to the rupee (revenue, total income, total expenses 4,037,796,000, PBT, PAT) [X315] | https://www.bseindia.com/XBRLFILES/IFIndasDuplicateUploadDocument/Integrated_Finance_Ind_As_526173_1122026181616_IFIndAs.html | `7db19c7f5de7a49f69e7f3e6703592bf345e74be77b483cc1457934e96d1fc5d` |
+
+## QA2: attribution rules X317 (X214 amended: OCI-shaped owners with NCI 0) and X318 (OWNERS_ZERO_NCI_WITHIN_ROUNDING); copied 2026-11-19 from the local vault blob (stored uncompressed), sha256 verified
+
+Read by `tests/test_qa2_attribution.py`. Kept in `xbrl_qa2/` so the end-to-end fixture glob (`xbrl/*.xml`) and its
+pinned counts are unchanged.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `xbrl_qa2/INTEGRATED_FILING_INDAS_1509540_12082025042301_WEB.xml` | Indo Borax & Chemicals Q1 FY26 consolidated, Lakhs: owners 10,744,000 = OCI 10,744,000, NCI 0, TCI owners 10,744,000, TCI NCI 0, PAT 102,041,000, basic EPS 3.18 [X317] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1509540_12082025042301_WEB.xml | `2955411ced594292d64481007074bdfac8c2c161b86fad9a1a0a069cfa17ec37` |
+| `xbrl_qa2/INTEGRATED_FILING_INDAS_1674219_27052026063304_WEB.xml` | DCX Systems Q4 FY26 consolidated, Millions: owners = OCI (Q4 306,340,000; FY 1,201,580,000), NCI 0, no TCI split, PAT -3,020,000 / -77,110,000, EPS -0.03 / -0.69 [X317] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1674219_27052026063304_WEB.xml | `4bb31ba30a52ce56def98eb721a187e27e7d81bb544a32bb3713d979b0a1eca3` |
+| `xbrl_qa2/INTEGRATED_FILING_NBFC_INDAS_1424341_24042025111452_WEB.xml` | Prime Securities Q4 FY25 consolidated (NBFC Ind AS), Lakhs: owners 0 (TCI split 0 / 0), NCI 300,000 (Q4 and FY), PAT 8,000,000 / 383,000,000 [X318] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_NBFC_INDAS_1424341_24042025111452_WEB.xml | `66afcf3f2e6d91a9f471d0ac14492184bdb4b84d3bde1d21292fe51bd006780b` |
+| `xbrl_qa2/INTEGRATED_FILING_INDAS_1451463_26052025071700_WEB.xml` | Goldiam International Q4 FY25 consolidated, Lakhs: owners 0, NCI -592,000 (Q4) / -780,000 (FY), beyond the 300,000 tolerance; stays withheld (X86, not X318) | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1451463_26052025071700_WEB.xml | `2b3916d811bba188144ac3cabeea544454268bf3bfc64c07fab5a4caf9b58a21` |
+
+## QE: identity rule X320 / repair X321 (BCG BZ -> BE after a suspension) and universe rule X323 (series switch ahead of the bhavcopy); copied 2026-11-19 from the local vault blob (stored uncompressed), sha256 verified
+
+Read by `tests/test_x320_x321_reopen_by_isin.py` and `tests/test_x323_series_switch_ahead.py`. Kept in `identity/` and
+`series_switch/` so the `bhavcopy/` and `pr_zip/` globs and their pinned counts are unchanged.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `identity/BhavCopy_NSE_CM_0_0_0_20241230_F_0000.csv.zip` | BCG (Brightcom Group) INE425B01027 in BZ, FinInstrmId 23580, open 10.31 close 10.25: its last bar before the suspension [X320] | https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20241230_F_0000.csv.zip | `d0ef4f2ed0a910d65273da37a0794bd66f978352cfcd9a9939e7c4b7204cbf66` |
+| `identity/BhavCopy_NSE_CM_0_0_0_20250714_F_0000.csv.zip` | BCG back in BE with a new FinInstrmId 8841, same ISIN, open 21.80 [X320, X321] | https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20250714_F_0000.csv.zip | `79c31432479a16ec493c351dd928b51b67912b9020be74872c34e91ef987cbc1` |
+| `series_switch/BhavCopy_NSE_CM_0_0_0_20261029_F_0000.csv.zip` | GFLLIMITED, KAMAHOLD, MAHSCOOTER, NSIL, PILANIINVS, TVSHLTD, ELCIDIN, KICL in EQ (their last EQ bar) [X323] | https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20261029_F_0000.csv.zip | `715d25908016922815de203654ea5ef0c22cb32175b315814789f7f42aba5516` |
+| `series_switch/BhavCopy_NSE_CM_0_0_0_20261102_F_0000.csv.zip` | KAMAHOLD, MAHSCOOTER, TVSHLTD in BE [X323] | https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20261102_F_0000.csv.zip | `52dbeb12f276c70a5f2d30a719e539b925189360da4709bc37916b970c1ca6e4` |
+| `series_switch/BhavCopy_NSE_CM_0_0_0_20261103_F_0000.csv.zip` | GFLLIMITED, NSIL, PILANIINVS in BE (KICL only from 9 Nov, ELCIDIN no bar) [X323] | https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20261103_F_0000.csv.zip | `ab9edd9caa3f2b51f1e15d783e5a1092eac6029928ee03cbdd17844a25e8141d` |
+| `series_switch/PR301026.zip` | PR-zip mcap file of week end Fri 30 Oct 2026: the eight symbols above already in series BE [X323] | https://nsearchives.nseindia.com/archives/equities/bhavcopy/pr/PR301026.zip | `a744f678ca14a6f632b59c5f33278d0170a8316957d85b65dea9094b9281833a` |
+## QG: IGAAP_CORP, SME-listed companies' results on SEBI's non-Ind AS template (X330-X334); copied 2026-11-19 from the local vault blob (gunzipped), sha256 verified
+
+Read by `tests/test_x330_igaap_corp.py`. Kept in `igaap_corp/` so the end-to-end fixture glob (`xbrl/*.xml`) and its
+pinned counts are unchanged. Every file: namespace `IntegratedFinance_OtherThanBank`, TypeOfCompany `SME`,
+LevelOfRounding `Lakhs`.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `igaap_corp/INTEGRATED_FILING_NONINDAS_1509526_12082025041915_WEB.xml` | Viviana Power Tech Q1 FY26 standalone (2025-01-31 taxonomy, quarterly): revenue 207,813,000, total income 214,221,000, PBT 27,049,000, PAT 20,878,000, EPS 3.33, face value 10 [X330, X331] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_NONINDAS_1509526_12082025041915_WEB.xml | `f4e77433e41f76075035e8fe8f6ebf182f618935de1c04e60ff8659e6a944f74` |
+| `igaap_corp/INTEGRATED_FILING_NONINDAS_1509532_12082025042000_WEB.xml` | the same, consolidated: profit before minority 31,607,000 + share of associates 1,049,000 + minority 0 = profit for the period 32,656,000 [X331, X332] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_NONINDAS_1509532_12082025042000_WEB.xml | `f9054c8333ac95610294cd2c40e1302f4432366941cd6116805b2592b86bdda8` |
+| `igaap_corp/INTEGRATED_FILING_NONINDAS_1650266_13042026110130_WEB.xml` | Parin Enterprises H2 FY26 consolidated (2026-01-31 taxonomy, half-yearly; H2 and audited FY contexts): extraordinary items -1,800,000 / -3,600,000 added to PBT; minority -5,154,000 / -10,335,000 added to give owners 37,964,000 / 62,915,000 (EPS 3.41 / 5.66 x 11,118,000 shares); shareholders' funds 751,690,000 + minority 17,342,000 [X331, X332] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_NONINDAS_1650266_13042026110130_WEB.xml | `ec93d83ebf9f96732224bb767c0706602345c136231aab90874a999c410d3fd6` |
+| `igaap_corp/INTEGRATED_FILING_NONINDAS_1573202_13112025120518_WEB.xml` | Le Merite Exports H1 FY26 consolidated: minority +288,000 (minority's share of a loss) added to give owners 85,161,000 vs PAT before minority 84,873,000; EPS 3.50 x 24,360,000 = 85,260,000 [X332] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_NONINDAS_1573202_13112025120518_WEB.xml | `5c7503bd97906bbe177a2e7ad1b146b7ccf22f8eee240235cb9b9e00470ab9f0` |
+| `igaap_corp/INTEGRATED_FILING_NONINDAS_1575526_14112025065604_WEB.xml` | Globe International Carriers Q2 FY26 standalone of 14 Nov 2025: every amount and the EPS 1e5x too large (EPS 61,000 on face value 10, PAT 1,818,800,000,000) [X333] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_NONINDAS_1575526_14112025065604_WEB.xml | `90e86c8f309b563cdbf237695d72f75e894199523940593093a572d0ff382439` |
+| `igaap_corp/INTEGRATED_FILING_NONINDAS_1601469_15012026024456_WEB.xml` | the same company and period, re-filed 15 Jan 2026: EPS 0.61, PAT 18,189,000, paid-up 279,886,000; quarter and H1 contexts [X333] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_NONINDAS_1601469_15012026024456_WEB.xml | `8ab4f4588ad6ad8d4412c437c67a85171d5f567567dcc3f0cc1ee85614a1c912` |
+
+## QF5: X335 withheld NCI as filed, X336 ISIN one character off, X337 long first period, X338 pre-cutoff comparative ignored; copied 2026-11-19 from the local vault blob (gunzipped), sha256 verified
+
+Read by `tests/test_qf5_withheld_nci_first_period_isin.py`. Kept in `xbrl_qf5/` so the end-to-end fixture glob
+(`xbrl/*.xml`) and its pinned counts are unchanged.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `xbrl_qf5/INTEGRATED_FILING_INDAS_1625647_13022026080434_WEB.xml` | FCL (Fineotex Chemical) Q3 FY26 consolidated: 9M owners 771,438,000 + NCI 40,765,000 vs PAT 791,648,000 (X86 withheld); Q3 reconciles (263,475,000 + 37,682,000 = 301,157,000), so the NCI element also serves Q3 [X335] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1625647_13022026080434_WEB.xml | `e8b2a674e1e79def611979a389498ebc704fd5d56286125f960414660df9b269` |
+| `xbrl_qf5/AR_XBRL_BLUSPRING_16012026154522.xml` | Bluspring Enterprises' first annual report (standalone): declared 2024-02-11..2025-03-31 (14 months from incorporation) and a carve-out comparative 2023-04-01..2024-02-10; revenue 23,223,750,000, PAT -824,780,000, total assets 13,081,990,000 [X337, X152] | https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_BLUSPRING_16012026154522.xml | `487900b249b186ee1872c24091d77f4b9239ebdb48863381ad58e5e66b5fd0f4` |
+| `xbrl_qf5/AR_XBRL_TRANSRAILL_07012026120651.xml` | Transrail Lighting FY25 annual report (standalone): comparative declared 2023-01-04..2024-03-31 for context D_01042023_31032024 (day and month swapped); FY25 PAT 3,343,400,000 [X338] | https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_TRANSRAILL_07012026120651.xml | `4661f79acb37f82f68d2acb972aa0208e92399c95e7695e7df11d3d0af014e0f` |
+| `xbrl_qf5/INTEGRATED_FILING_INDAS_1619130_05022026045616_WEB.xml` | J. Kumar Infraprojects Q3 FY26 results: ISIN INE576101022 (digit 1 for the letter I of INE576I01022), Symbol JKIL, company "J.KUMAR INFRAPROJECTS LIMITED" [X336] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1619130_05022026045616_WEB.xml | `0bb0f2af74d12ccc5dd31546951c74e790ebfbc5198e8060456ce42d9fee8cac` |
+| `xbrl_qf5/INTEGRATED_FILING_INDAS_1677615_30052026054952_WEB.xml` | Andhra Sugars Q4 FY26 results: ISIN INE715N01021 (N for the B of INE715B01021), Symbol ANDHRSUGAR, company "THE ANDHRA SUGARS LIMITED" [X336] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1677615_30052026054952_WEB.xml | `1265b0f45bb283d3c4758e8633c26da61ec10a65b6ae4e95ab8ac2436b847dea` |
+
+## Reg. 30 regulatory actions and restructuring (X360; fetched 2026-11-24 from the archive links of the vaulted announcements RSS)
+
+| file | what it proves | source URL | sha256 |
+|---|---|---|---|
+| `events_x360/AIATOP_1042_WebXMLFile_20261119_184853217.xml` | X360: D S Kulkarni Developers: exchanges' fine Rs 6,96,200 (E12) | `https://nsearchives.nseindia.com/corporate/xbrl/AIATOP_1042_WebXMLFile_20261119_184853217.xml` | `3c6a46cc6c0d7d680941213cd6d1e952209aba27cbb9651f028e9343cc58feb7` |
+| `events_x360/AIATOP_19759_WebXMLFile_20261113_171940576.xml` | X360: One Mobikwik: fine of Rs 9,00,000 (Imposition of fine or penalty, E12) | `https://nsearchives.nseindia.com/corporate/xbrl/AIATOP_19759_WebXMLFile_20261113_171940576.xml` | `770c69188228fa2e79fb3c59d4214539b597c567a6b93e3b9dcc27133748b85d` |
+| `events_x360/AIATOP_25794_WebXMLFile_20261119_200300649.xml` | X360: Om Freight: action initiated (Search or seizure), ActionsInitiated record (E12) | `https://nsearchives.nseindia.com/corporate/xbrl/AIATOP_25794_WebXMLFile_20261119_200300649.xml` | `06e36eedc8006db6c0c9504e1942a4be9f01fb8a664a33c2e648d5b15c6c9414` |
+| `events_x360/AIATOP_753_WebXMLFile_20261113_152634093.xml` | X360: Styrenix: Any other similar action(s), no amount (E12) | `https://nsearchives.nseindia.com/corporate/xbrl/AIATOP_753_WebXMLFile_20261113_152634093.xml` | `209db61497c6f60b6c7c898348b078c46e79aab69ea8c0bb80c823780de19dbe` |
+| `events_x360/REG30_Restructuring_1224_WebXMLFile_20261120_145330703.xml` | X360: Ipca Laboratories: sale or disposal of a unit (E13) | `https://nsearchives.nseindia.com/corporate/xbrl/REG30_Restructuring_1224_WebXMLFile_20261120_145330703.xml` | `62845dc4f577649f001cb2af9c67a545cdecc350f951d6024b10b405b6fcb33d` |
+| `events_x360/REG30_Restructuring_19784_WebXMLFile_20261119_192832871.xml` | X360: Paytm: Update filing without an event type (E13) | `https://nsearchives.nseindia.com/corporate/xbrl/REG30_Restructuring_19784_WebXMLFile_20261119_192832871.xml` | `5f1a9c9bd1e8df66c0e14f7a266f1c433ff6accb6db45697f2dd4f4feb9bc1f0` |
+| `events_x360/REG30_Restructuring_19784_WebXMLFile_20261119_193423456.xml` | X360: Paytm: acquisition of CardUp, cash Rs 162 Cr (E13) | `https://nsearchives.nseindia.com/corporate/xbrl/REG30_Restructuring_19784_WebXMLFile_20261119_193423456.xml` | `267ccef593a6ded452bee61ef864c38622a681802884a7d0d38c71c7a40c6883` |
+| `events_x360/REG30_Restructuring_21609_WebXMLFile_20261123_215959359.xml` | X360: SecMark: to-be-incorporated company, cash Rs 1 lakh (E13) | `https://nsearchives.nseindia.com/corporate/xbrl/REG30_Restructuring_21609_WebXMLFile_20261123_215959359.xml` | `fb10a20936e84173f913d39fcee7dd01a428c46c1cdc006448ae1476d821af90` |
+
+## Screener documentation (fetched 2026-11-24)
+
+| file | what it proves | source URL | sha256 |
+|---|---|---|---|
+| `screener_docs/Quarterly-PE.html` | A1.12: Screener defines Price to Quarterly Earnings as "Current price/(EPS latest quarter *4)" (S24) | `https://www.screener.in/docs/changelog/Quarterly-PE/` | `cc868e154d51cb71d2429e4eefe008736ab55b723d8d26e2781f5903258aa91f` |

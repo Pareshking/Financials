@@ -874,3 +874,22 @@ Read by `tests/test_qf5_withheld_nci_first_period_isin.py`. Kept in `xbrl_qf5/` 
 | `xbrl_qf5/AR_XBRL_TRANSRAILL_07012026120651.xml` | Transrail Lighting FY25 annual report (standalone): comparative declared 2023-01-04..2024-03-31 for context D_01042023_31032024 (day and month swapped); FY25 PAT 3,343,400,000 [X338] | https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_TRANSRAILL_07012026120651.xml | `4661f79acb37f82f68d2acb972aa0208e92399c95e7695e7df11d3d0af014e0f` |
 | `xbrl_qf5/INTEGRATED_FILING_INDAS_1619130_05022026045616_WEB.xml` | J. Kumar Infraprojects Q3 FY26 results: ISIN INE576101022 (digit 1 for the letter I of INE576I01022), Symbol JKIL, company "J.KUMAR INFRAPROJECTS LIMITED" [X336] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1619130_05022026045616_WEB.xml | `0bb0f2af74d12ccc5dd31546951c74e790ebfbc5198e8060456ce42d9fee8cac` |
 | `xbrl_qf5/INTEGRATED_FILING_INDAS_1677615_30052026054952_WEB.xml` | Andhra Sugars Q4 FY26 results: ISIN INE715N01021 (N for the B of INE715B01021), Symbol ANDHRSUGAR, company "THE ANDHRA SUGARS LIMITED" [X336] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1677615_30052026054952_WEB.xml | `1265b0f45bb283d3c4758e8633c26da61ec10a65b6ae4e95ab8ac2436b847dea` |
+
+## Reg. 30 regulatory actions and restructuring (X360; fetched 2026-11-24 from the archive links of the vaulted announcements RSS)
+
+| file | what it proves | source URL | sha256 |
+|---|---|---|---|
+| `events_x360/AIATOP_1042_WebXMLFile_20261119_184853217.xml` | X360: D S Kulkarni Developers: exchanges' fine Rs 6,96,200 (E12) | `https://nsearchives.nseindia.com/corporate/xbrl/AIATOP_1042_WebXMLFile_20261119_184853217.xml` | `3c6a46cc6c0d7d680941213cd6d1e952209aba27cbb9651f028e9343cc58feb7` |
+| `events_x360/AIATOP_19759_WebXMLFile_20261113_171940576.xml` | X360: One Mobikwik: fine of Rs 9,00,000 (Imposition of fine or penalty, E12) | `https://nsearchives.nseindia.com/corporate/xbrl/AIATOP_19759_WebXMLFile_20261113_171940576.xml` | `770c69188228fa2e79fb3c59d4214539b597c567a6b93e3b9dcc27133748b85d` |
+| `events_x360/AIATOP_25794_WebXMLFile_20261119_200300649.xml` | X360: Om Freight: action initiated (Search or seizure), ActionsInitiated record (E12) | `https://nsearchives.nseindia.com/corporate/xbrl/AIATOP_25794_WebXMLFile_20261119_200300649.xml` | `06e36eedc8006db6c0c9504e1942a4be9f01fb8a664a33c2e648d5b15c6c9414` |
+| `events_x360/AIATOP_753_WebXMLFile_20261113_152634093.xml` | X360: Styrenix: Any other similar action(s), no amount (E12) | `https://nsearchives.nseindia.com/corporate/xbrl/AIATOP_753_WebXMLFile_20261113_152634093.xml` | `209db61497c6f60b6c7c898348b078c46e79aab69ea8c0bb80c823780de19dbe` |
+| `events_x360/REG30_Restructuring_1224_WebXMLFile_20261120_145330703.xml` | X360: Ipca Laboratories: sale or disposal of a unit (E13) | `https://nsearchives.nseindia.com/corporate/xbrl/REG30_Restructuring_1224_WebXMLFile_20261120_145330703.xml` | `62845dc4f577649f001cb2af9c67a545cdecc350f951d6024b10b405b6fcb33d` |
+| `events_x360/REG30_Restructuring_19784_WebXMLFile_20261119_192832871.xml` | X360: Paytm: Update filing without an event type (E13) | `https://nsearchives.nseindia.com/corporate/xbrl/REG30_Restructuring_19784_WebXMLFile_20261119_192832871.xml` | `5f1a9c9bd1e8df66c0e14f7a266f1c433ff6accb6db45697f2dd4f4feb9bc1f0` |
+| `events_x360/REG30_Restructuring_19784_WebXMLFile_20261119_193423456.xml` | X360: Paytm: acquisition of CardUp, cash Rs 162 Cr (E13) | `https://nsearchives.nseindia.com/corporate/xbrl/REG30_Restructuring_19784_WebXMLFile_20261119_193423456.xml` | `267ccef593a6ded452bee61ef864c38622a681802884a7d0d38c71c7a40c6883` |
+| `events_x360/REG30_Restructuring_21609_WebXMLFile_20261123_215959359.xml` | X360: SecMark: to-be-incorporated company, cash Rs 1 lakh (E13) | `https://nsearchives.nseindia.com/corporate/xbrl/REG30_Restructuring_21609_WebXMLFile_20261123_215959359.xml` | `fb10a20936e84173f913d39fcee7dd01a428c46c1cdc006448ae1476d821af90` |
+
+## Screener documentation (fetched 2026-11-24)
+
+| file | what it proves | source URL | sha256 |
+|---|---|---|---|
+| `screener_docs/Quarterly-PE.html` | A1.12: Screener defines Price to Quarterly Earnings as "Current price/(EPS latest quarter *4)" (S24) | `https://www.screener.in/docs/changelog/Quarterly-PE/` | `cc868e154d51cb71d2429e4eefe008736ab55b723d8d26e2781f5903258aa91f` |

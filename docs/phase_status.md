@@ -104,11 +104,14 @@ the full line-by-line audit of the PDF is `docs/master_backlog.md`; ratios are i
    the half-year ending on the period end (X160; `disclosure_start` / `disclosure_months`, parser `reg23-2`), but a
    few filers put financial-year-to-date amounts in Q4 with nothing in the filing to say so (X161), so the rows still
    feed no ratio or feature; a view would need a cross-filing check (Q4 opening vs Q2 closing balances) first.
-5. **Penalty amounts (G118): BLOCKED** on an E12 content fixture (`penalties_90d` stays NULL). Reg. 30 acquisition
-   events as a second G276 input: no acquisition event type is parsed and no such fixture is committed (G276 itself is
-   built from the business-combination cash outflow, C26).
+5. **DONE (2026-11-24, X360)** penalty amounts (G118) and Reg. 30 acquisition events (second G276 input): AIATOP and
+   REG30_Restructuring XBRL parsed (E12, E13). Their 90-day columns, like every Reg. 30 window column, are NULL until
+   the announcements-RSS capture covers a whole window (X361, first 2027-02-11); before X361 they were a false 0 on
+   history. Credit ratings (G98) and merger schemes stay PDF-only in the RSS (checked 2026-11-24, 11 snapshots): no
+   XBRL family exists for them.
 6. **Filed ISCR / DSCR (catalogue B1.24): BLOCKED** on an evidence row: the filed values are implausible (C26).
-7. **Price to quarterly earnings (catalogue A1.12): BLOCKED** on Screener's definition (UNVERIFIED).
+7. **DONE (2026-11-24, S24)** price to quarterly earnings (A1.12): Screener's change log defines it as current price /
+   (EPS latest quarter x 4); DSL `price to quarterly earning` / `quarterly pe`.
 
 Not built by decision or evidence: order book to sales (G115, CONFLICTS_WITH_EVIDENCE: no order-book element in
 `docs/tag_registry.yaml` or any committed fixture; only per-order Reg. 30 amounts, already `order_value_90d`); "Is

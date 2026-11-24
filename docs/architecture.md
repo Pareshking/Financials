@@ -584,8 +584,9 @@ Ratios still read only curated tags; line items are for statements, sub-rows and
 | `piotroski_f` | Piotroski F-score 0..9 for the latest 12-month FY in the row's scope; year-end total assets (C23); NULL without a post-cutoff prior FY |
 | `beneish_m` | Beneish 8-variable M-score (SG&A proxy = `OtherExpenses`); NULL without a post-cutoff prior FY |
 | `capex_to_depreciation`, `cwip_to_gross_block`, `rote`, `rnd_and_royalty_intensity`, `contingent_liabilities_to_net_worth`, `annual_fy_end` | FY ratios from the Reg. 34 notes (PPE schedule X71, notes X73) |
-| `order_wins_90d`, `order_value_90d`, `kmp_resignations_90d`, `auditor_resignations_90d`, `fraud_or_default_90d` | Reg. 30 events visible at the as-of and disclosed in the 90 days to it (`corporate_events`) |
-| `penalties_90d` | NULL: no penalty / regulatory-action filing observed (UNVERIFIED, E7) |
+| `order_wins_90d`, `order_value_90d`, `kmp_resignations_90d`, `auditor_resignations_90d`, `fraud_or_default_90d` | Reg. 30 events visible at the as-of and disclosed in the 90 days to it (`corporate_events`); every Reg. 30 window column is NULL until the window lies inside the announcements-RSS capture (X361), and a lower bound inside it |
+| `penalties_90d`, `penalty_amount_90d`, `regulatory_actions_90d` | Reg. 30 sub-para 20 (AIATOP, E12, X360): fines imposed (count, sum of `AmountOfFineOrPenalty`), every action taken or initiated |
+| `acquisitions_90d`, `acquisition_value_90d` | Reg. 30 restructuring (E13, X360): acquisitions and to-be-incorporated companies, sum of cash consideration |
 | `roce_screener`, `debtor_days`, `inventory_turnover`, `working_capital` | Screener export formulas (S22) on our Screener-style statement rows, latest FY; kept beside our own `roce` (operating EBIT over closing capital) |
 | `roe_screener` | Screener website ROE (X195, X227): last FY owners' profit × 2 / (opening + closing owners' equity), every profile; NULL unless both balance sheets are filed and positive; kept beside `roe` (TTM, closing equity, C16) |
 | `inventory_days`, `days_payable`, `cash_conversion_cycle`, `working_capital_days` | closing balance / (Sales / 365); cycle = debtor + inventory − payable days; working-capital days on (CA − cash − current investments − CL) (S23: matches the website on TCS; CCC does not) |

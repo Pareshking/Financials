@@ -141,7 +141,7 @@ def test_event_counts_are_point_in_time(events_market):
     assert (bel["order_wins_90d"], bel["order_value_90d"]) == (1, Decimal("6190000000.00"))
     assert cms["kmp_resignations_90d"] == 1 and cms["auditor_resignations_90d"] == 0
     assert srp["auditor_resignations_90d"] == 2 and srp["kmp_resignations_90d"] == 0
-    assert all(v["penalties_90d"] is None for v in after.values())  # no verified penalty source [E7]
+    assert all(v["penalties_90d"] == 0 for v in after.values())  # none of these filings is a penalty (X360, E12)
     later = _event_counts(m.con, date(2027, 3, 1), ist_to_utc(date(2027, 3, 1), time(0, 0)))
     assert later == {}  # 90-day window has passed
     assert set(EVENT_COLUMNS) <= set(bel)
@@ -164,13 +164,13 @@ def test_fraud_disclosure_counts_for_an_in_universe_symbol(events_market, rss):
     assert counts["fraud_or_default_90d"] == 1 and counts["kmp_resignations_90d"] == 1
 
 
-def test_regulatory_action_filings_are_listed_but_not_parsed_yet(rss):
+def test_regulatory_action_filings_are_listed_and_fetched(rss):
     """E12: penalties / regulatory actions are Reg. 30 Para B sub-para 20 ("Action(s) taken or orders passed"),
-    filed as `AIATOP_<id>_WebXMLFile_<ts>.xml` (One Mobikwik, Styrenix on 13 Nov 2026). No such file is a fixture
-    yet, so the family is not fetched (EVENT_PREFIXES) or parsed, and `penalties_90d` stays NULL, never 0."""
+    filed as `AIATOP_<id>_WebXMLFile_<ts>.xml` (One Mobikwik, Styrenix on 13 Nov 2026). Since X360 (fixtures in
+    tests/fixtures/events_x360, tests/test_x360_regulatory_actions.py) the family is fetched and parsed."""
     from financials.fetch.jobs import EVENT_PREFIXES
 
     aiatop = sorted(n for n in rss if n.startswith("AIATOP_"))
     assert aiatop == ["AIATOP_19759_WebXMLFile_20261113_171940576.xml", "AIATOP_753_WebXMLFile_20261113_152634093.xml"]
-    assert not any(n.startswith(EVENT_PREFIXES) for n in aiatop)
+    assert all(n.startswith(EVENT_PREFIXES) for n in aiatop)
     assert all("orders passed" in rss[n].subject for n in aiatop)

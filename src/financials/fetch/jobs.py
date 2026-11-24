@@ -98,7 +98,14 @@ def results_listing_url(symbol: str, page: int = 1) -> str:
 
 ANNOUNCEMENTS_RSS = "https://nsearchives.nseindia.com/content/RSS/Online_announcements.xml"
 # XBRL file-name prefixes of the parsed Reg. 30 families [E2]
-EVENT_PREFIXES = ("REG30_PARA_B_", "CIM_", "ALTERATION_OF_CAPITAL_AND_FUND_RAISING_", "ANN_FRAUD_")
+EVENT_PREFIXES = (
+    "REG30_PARA_B_",
+    "CIM_",
+    "ALTERATION_OF_CAPITAL_AND_FUND_RAISING_",
+    "ANN_FRAUD_",
+    "AIATOP_",
+    "REG30_Restructuring_",
+)  # X360
 RSS_ATTEMPTS = 3  # X350: a cut-short announcements RSS is asked again (3 answers in all)
 RSS_RETRY_WAIT = 10.0  # seconds before asking again (on top of the host's spacing)
 

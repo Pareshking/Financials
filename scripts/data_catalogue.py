@@ -221,6 +221,14 @@ FAMILIES: tuple[Family, ...] = (
         ("F31",),
         document=True,
     ),
+    Family(
+        "Screener documentation page",
+        (r"screener_docs/[A-Za-z0-9_-]+\.html",),
+        "REFERENCE",
+        "Screener's own definition of a ratio (A1.12 Price to Quarterly Earnings, S24).",
+        (),
+        document=True,
+    ),
     # ── NSE corporate data (APIs, archives) ──────────────────────────────────────────────────────────────────────
     Family(
         "NSE corporate actions API",
@@ -405,9 +413,13 @@ FAMILIES: tuple[Family, ...] = (
     ),
     Family(
         "NSE Reg. 30 structured event XBRL",
-        (r"events/[A-Z0-9_]+_\d+_WebXMLFile_\d{8}_\d+\.xml",),
+        (
+            r"events/[A-Z0-9_]+_\d+_WebXMLFile_\d{8}_\d+\.xml",
+            r"events_x360/[A-Za-z0-9_]+_\d+_WebXMLFile_\d{8}_\d+\.xml",
+        ),
         "INGESTED",
-        "Reg. 30 events (orders, capital changes, resignations, fraud / default, litigation).",
+        "Reg. 30 events (orders, capital changes, resignations, fraud / default, litigation; regulatory actions and "
+        "fines, acquisitions / incorporations / disposals since X360).",
         ("F21",),
         ("corporate_events", "disclosure_facts"),
         "financials.parsers.reg30_events:parse_reg30_event",

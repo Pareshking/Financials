@@ -328,7 +328,7 @@ feeds:
     phase: 2
     verification_status: VERIFIED
     evidence: [A3, A4, E1, E2, E3, E4, E5, E6, E7]
-    notes: "fetch-events: Para B (orders, litigation), changes in management, allotments, fraud/default parsed; other families vaulted raw. Penalty / regulatory-action filings are Para B sub-para 20 AIATOP_*.xml (E12): listed in the RSS, contents not yet inspected, so not fetched or parsed; penalties_90d NULL."
+    notes: "fetch-events: Para B (orders, litigation), changes in management, allotments, fraud/default parsed; regulatory actions (AIATOP_*.xml, Para B sub-para 20, E12) and restructuring (REG30_Restructuring_*.xml, E13) parsed since X360; other families vaulted raw. The RSS lists only the current day: event history starts at the first capture (2026-11-14) and 90-day columns are NULL until a whole window is captured (X361)."
 
   - feed_id: F22
     name: Credit rating disclosures and Reg. 50/52/57 debt XBRL

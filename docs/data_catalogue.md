@@ -4,7 +4,7 @@
 
 What every committed fixture file contains (every zip member too), which feed it belongs to, whether the pipeline ingests it, and which open owner requirement (`docs/owner_requirements.md`) its columns could serve. Check here before saying data is unavailable. Feeds: `docs/data_sources.md`; XBRL elements: `docs/tag_registry.yaml`; sha256 and source URLs: `tests/fixtures/MANIFEST.md`.
 
-442 fixture files (548 entries counting zip members) in 46 families; 0 unclassified (the generator fails on a file that matches no family).
+451 fixture files (557 entries counting zip members) in 47 families; 0 unclassified (the generator fails on a file that matches no family).
 
 Status: **INGESTED** parsed into the named table(s) by the named parser (checked against the code by this script); **DISCOVERY_ONLY** vaulted (blob + `filings` row) and parsed for links / broadcast times only; no table of its own; **VAULTED_RAW** fetched and vaulted (blob + `filings` row) but never parsed; **NOT_INGESTED** nothing fetches, stages or promotes it (a parser may exist; see the note); **REFERENCE** documentation or test metadata, not a data feed.
 
@@ -29,6 +29,7 @@ Status: **INGESTED** parsed into the named table(s) by the named parser (checked
 | [NSE PR zip: tt top 25 by traded value](#nse-pr-zip-tt-top-25-by-traded-value) | `pr_zip/PR011024.zip!Tt011024.csv` | F31 | NOT_INGESTED | — | none identified |
 | [NSE PR zip: PE_ symbol P/E (2024 zips only)](#nse-pr-zip-pe_-symbol-pe-2024-zips-only) | `pr_zip/PR011024.zip!PE_011024.csv` | F31 | NOT_INGESTED | — | none identified |
 | [NSE PR zip: readme](#nse-pr-zip-readme) | `pr_zip/PR011024.zip!Readme.txt` | F31 | REFERENCE | — | none identified |
+| [Screener documentation page](#screener-documentation-page) | `screener_docs/Quarterly-PE.html` | — | REFERENCE | — | none identified |
 | [NSE corporate actions API](#nse-corporate-actions-api) | `corp_actions/nse_corporateActions_equities_15-09-2025_17-10-2025.json` | F03 | INGESTED | corp_actions, quarantine_queue | none identified |
 | [NSE corporate actions RSS](#nse-corporate-actions-rss) | `corp_actions/RSS_Corporate_action_20261113.xml` | F03 | NOT_INGESTED | — | none identified |
 | [NSE holiday master](#nse-holiday-master) | `calendar/nse_holiday-master_trading_20261113.json` | F04 | INGESTED | trading_calendar | none identified |
@@ -499,6 +500,22 @@ Columns: `SYMBOL`, `SYMBOL P/E`, `ADJUSTED P/E`
 | `pr_zip/PR300926.zip!readme.txt` | TXT in ZIP | 55 lines | member of the PR zip of trade date 2026-09-30 |
 | `series_switch/PR301026.zip!readme.txt` | TXT in ZIP | 55 lines | member of the PR zip of trade date 2026-10-30 |
 
+## Screener documentation page
+
+| Field | Value |
+|---|---|
+| Content | Screener's own definition of a ratio (A1.12 Price to Quarterly Earnings, S24). |
+| Source | — |
+| Status | REFERENCE |
+| Tables | — |
+| Parser | — |
+| Could serve | none identified |
+| Files | 1 |
+
+| File | Format | Rows | Description |
+|---|---|---|---|
+| `screener_docs/Quarterly-PE.html` | HTML | 13,191 bytes | A1.12: Screener defines Price to Quarterly Earnings as "Current price/(EPS latest quarter *4)" (S24) |
+
 ## NSE corporate actions API
 
 | Field | Value |
@@ -876,19 +893,20 @@ XBRL instances: elements are not listed here; see `docs/tag_registry.yaml`.
 
 | Field | Value |
 |---|---|
-| Content | Reg. 30 events (orders, capital changes, resignations, fraud / default, litigation). |
+| Content | Reg. 30 events (orders, capital changes, resignations, fraud / default, litigation; regulatory actions and fines, acquisitions / incorporations / disposals since X360). |
 | Source | F21 (Reg. 30 structured event XBRL and announcements RSS) |
 | Status | INGESTED |
 | Tables | `corporate_events`, `disclosure_facts` |
 | Parser | `financials.parsers.reg30_events:parse_reg30_event` |
 | Could serve | none identified |
-| Files | 9 |
+| Files | 17 |
 
 XBRL instances: elements are not listed here; see `docs/tag_registry.yaml`.
 
 | Directory | Files | Formats |
 |---|---|---|
 | `events/` | 9 | XML 9 |
+| `events_x360/` | 8 | XML 8 |
 
 ## BSE equity UDiFF bhavcopy
 
@@ -1135,4 +1153,4 @@ Columns (1 of 2 files): object: Table (list of 3); record: HFQ, HFQDISPLAY, Regi
 
 | File | Format | Rows | Description |
 |---|---|---|---|
-| `MANIFEST.md` | Markdown | 876 lines | — |
+| `MANIFEST.md` | Markdown | 895 lines | — |

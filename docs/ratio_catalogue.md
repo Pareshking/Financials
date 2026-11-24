@@ -75,7 +75,7 @@ context) and Reg. 34 FY25/FY26 comparatives. Due dates assumed: Q1-Q3 results wi
 | A1.9 | ★ Earnings yield | valuation | TTM ebit / EV (Greenblatt form; Screener's exact formula UNVERIFIED) | BUILT | `earnings_yield` (batch D, features_gems: TTM `ebit` / `enterprise_value`, NULL if EV <= 0 or lender); DSL `earnings yield` |
 | A1.10 | ★ Dividend yield (G169) | valuation | TTM cash dividends per share (ex-date in last 365 days) / close | BUILT | `dividend_yield_pct`; `corp_actions` DIVIDEND `cash_per_share` |
 | A1.11 | ★ PEG Ratio (G168) | valuation | PE / (3Y EPS CAGR × 100) | BUILT | `peg` (batch D) = `pe_core` / (100 x core profit growth): the latest quarter's YoY now, TTM-on-TTM once 8 quarters exist (hidden_gems.md principle 6, catalogue G168). Screener's 3Y EPS-CAGR form is `PE / EPS growth 3Years` in the DSL once FY28 exists (~May 2028) |
-| A1.12 | Price to Quarterly Earning | valuation | mcap / (4 × latest quarter continuing owners' profit) (definition UNVERIFIED) | BUILDABLE NOW | `FactBook.quarter(continuing_owners)` |
+| A1.12 | Price to Quarterly Earning | valuation | close / (4 × EPS latest quarter), Screener's definition (S24) | BUILT | DSL `price to quarterly earning`, `quarterly pe` over `eps_latest_quarter` |
 | A1.13 | Book value (per share) | per-share | owners' equity / shares | BUILT | `book_value_per_share` (owners' equity, fallback total equity / `shares`); DSL `book value` now per share, `net worth` = total equity in Rs Cr (batch A) |
 | A1.14 | ★ EPS | per-share | TTM owners' profit / current shares | BUILT | `eps_ttm` (+ `eps_continuing_ttm`) |
 | A1.15 | Number of equity shares | per-share | Reg. 31 total (else paid-up / FV) | BUILT | `shares` (DSL `shares`, `number of equity shares`) |
@@ -436,7 +436,7 @@ Owner-PDF items carry their G-number. Arch 10.2 rule: forensic scores stay separ
 | B8.5 | Days to next ex-date; dividend / bonus / split in last 365 days | corp action | `corp_actions` ex_date, action_type | BUILT | `days_to_next_ex_date`, `next_ex_date_action`, `dividend_365d`, `bonus_365d`, `split_365d` (batch I; the next ex-date only from listings visible at the as-of) |
 | B8.6 | Days since last result; results-season flag | dates | `filing_meta.visible_from_ts` | BUILT | DSL `Days since last result` (alias over `last_result_date`; the results-season flag is not built; batch G) |
 | B8.7 | Reg. 30 red-flag columns (G117) | Reg. 30 | separate counts, never summed | BUILT | `rf_auditor_resignation_90d`, `rf_kmp_resignations_90d`, `rf_fraud_or_default_90d`, `rf_litigation_90d`, `rf_audit_qualified`, `rf_pledge_increase_qoq` (batch G); penalties stay NULL (E12 UNVERIFIED) |
-| B8.8 | Penalties / regulatory actions 90d (G118) | Reg. 30 | | NEW FREE SOURCE | `penalties_90d` column exists but NULL: E12 contents UNVERIFIED |
+| B8.8 | Penalties / regulatory actions 90d (G118) | Reg. 30 | | BUILT | `penalties_90d`, `penalty_amount_90d`, `regulatory_actions_90d` (X360, E12); NULL until the RSS capture covers the window (X361) |
 | B8.9 | Credit-rating action flag (G98) | credit | | NEW FREE SOURCE | F22 UNVERIFIED |
 | B8.10 | Upcoming board meeting / results date (G193) | calendar | | NEEDS PARSER | `PRIOR_INTIMATION` vaulted raw (E2), not parsed |
 | B8.11 | Order-book-to-sales (G115) | Reg. 30 | | NOT POSSIBLE | no order-book element in any committed fixture (G115 note); revisit only if one appears |

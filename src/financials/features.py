@@ -98,7 +98,7 @@ from financials.timeutil import ist_to_utc, utc_now
 # Reader version of materialised rows. Bump it whenever features.py, fundamentals.py (or another file pinned by
 # tests/test_incremental_materialize.py) changes any output: `materialize --incremental` refuses days built by another
 # version, because only a full run then reproduces the history.
-FEATURES_VERSION = "2026.11.24-24C"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
+FEATURES_VERSION = "2026.11.24-24D"  # -2: X106 restatement TTM bridge + flag, X107 PDF corrections
 # -21A: core profit (fundamentals._core) quantized to the paisa (Arrow decimal256 on the expanded universe)
 # -21B: gate G4 compares only securities present on the previous day (rule G4_NEW_ENTRANT; output unchanged)
 # -21C: X173 YTD copies of a quarter withheld (TTM sums the quarters); X194 roce_screener needs positive capital
@@ -114,6 +114,8 @@ FEATURES_VERSION = "2026.11.24-24C"  # -2: X106 restatement TTM bridge + flag, X
 # -21M: X325 show and flag (owner decision V): stated values shown with dq_flags / dq_suspect instead of NULL
 # -21N: SP2 batched full materialize (20-day publish), dirty markers from the change date; same rows
 # -24C: price-band circuit days from the PR-zip bh file (features_bands.py, X359): 20-session hit / lock counts
+# -24D: X360 penalties / regulatory actions / acquisitions from AIATOP and REG30_Restructuring XBRL; X361 every Reg. 30
+#   90-day column NULL until its window lies inside the RSS capture (was a false 0 on history)
 # -3: QoQ sales / profit growth, NPM, interest coverage, OPM same quarter last year, dividend yield / payout,
 #     promoter holding QoQ change (owner_requirements items 1, 3, 4)
 # -4A: period P&L family (features_pl: quarter / fiscal-year lines, quarter YoY growth, result dates, history-gated
@@ -525,25 +527,34 @@ def shareholding_columns(shp: dict) -> dict:
 
 EVENT_COLUMNS = (
     "order_wins_90d", "order_value_90d", "kmp_resignations_90d", "auditor_resignations_90d", "fraud_or_default_90d",
-    "penalties_90d",
+    "penalties_90d", "penalty_amount_90d", "regulatory_actions_90d", "acquisitions_90d", "acquisition_value_90d",
 )  # fmt: skip
+EVENT_SUMS = ("order_value_90d", "penalty_amount_90d", "acquisition_value_90d")  # NULL (not 0) when nothing to sum
 
 
 def _event_counts(con, as_of: date, as_of_ts: datetime, entities=None) -> dict[str, dict]:
-    """Reg. 30 events [E3-E7] visible at the as-of and disclosed (DateOfReport) in the 90 days to as-of; one batched
-    query. The disclosure date, not the effective date: a resignation effective next month is news today [E5].
+    """Reg. 30 events [E3-E7, E12, E13] visible at the as-of and disclosed (DateOfReport) in the 90 days to as-of; one
+    batched query. The disclosure date, not the effective date: a resignation effective next month is news today [E5].
     KMP resignations: Key Managerial Personnel or directors leaving by resignation; auditors are counted apart.
-    penalties_90d stays NULL: no penalty / regulatory-action filing has been observed (UNVERIFIED [E7])."""
+    X360: penalties = actions taken of type "Imposition of fine or penalty", their fines summed; regulatory actions =
+    every action taken or initiated (sub-para 20); acquisitions = acquisitions and "to be incorporated" companies,
+    cash consideration summed. A byte-identical re-send is one event (event_id from the blob) [E4].
+    Raw counts: the caller applies the RSS-capture gate (X361, features_extra.event_window_complete)."""
     only, only_p = entity_filter("entity_id", entities)
+    pen = "event_type = 'REGULATORY_ACTION' AND event_subtype = 'Imposition of fine or penalty'"
+    acq = "event_type IN ('ACQUISITION', 'INCORPORATION')"
     rows = con.execute(
-        """SELECT entity_id,
+        f"""SELECT entity_id,
                   count(*) FILTER (WHERE event_type = 'ORDER_WIN'),
                   sum(amount_inr) FILTER (WHERE event_type = 'ORDER_WIN'),
                   count(*) FILTER (WHERE event_type = 'MANAGEMENT_CHANGE' AND cessation_category = 'Resignation'
                                    AND (person_category = 'Key Managerial Personnel'
                                         OR person_category ILIKE 'Director%')),
                   count(*) FILTER (WHERE event_type = 'AUDITOR_CHANGE' AND cessation_category = 'Resignation'),
-                  count(*) FILTER (WHERE event_type = 'FRAUD_OR_DEFAULT')
+                  count(*) FILTER (WHERE event_type = 'FRAUD_OR_DEFAULT'),
+                  count(*) FILTER (WHERE {pen}), sum(amount_inr) FILTER (WHERE {pen}),
+                  count(*) FILTER (WHERE event_type IN ('REGULATORY_ACTION', 'REGULATORY_ACTION_INITIATED')),
+                  count(*) FILTER (WHERE {acq}), sum(amount_inr) FILTER (WHERE {acq})
            FROM corporate_events
            WHERE visible_from_ts <= ? AND report_date > ? AND report_date <= ?"""
         + only
@@ -551,10 +562,8 @@ def _event_counts(con, as_of: date, as_of_ts: datetime, entities=None) -> dict[s
         [as_of_ts, as_of - timedelta(days=90), as_of, *only_p],
     ).fetchall()
     return {
-        ent: {"order_wins_90d": wins, "order_value_90d": value, "kmp_resignations_90d": kmp,
-              "auditor_resignations_90d": aud, "fraud_or_default_90d": fraud, "penalties_90d": None}
-        for ent, wins, value, kmp, aud, fraud in rows
-    }  # fmt: skip
+        r[0]: {c: (v if c in EVENT_SUMS else v or 0) for c, v in zip(EVENT_COLUMNS, r[1:], strict=True)} for r in rows
+    }
 
 
 @by_visibility  # read once per visibility interval of an incremental run (run_memo)
@@ -718,7 +727,10 @@ def compute_rows(
     shp_all, paid_up, quarter_end = _preload(con, as_of_ts, entities)
     issues = issue_sizes(con, as_of, exchange, entities)  # rule SHARES_REG31_OUTLIER [X221]
     dividends = _dividends(con, as_of, knowledge, as_of_ts, secs)
-    events = _event_counts(con, as_of, as_of_ts, entities)
+    events = (  # X361: None = the 90-day window is not inside the RSS capture
+        _event_counts(con, as_of, as_of_ts, entities)
+        if features_extra.event_window_complete(con, as_of, as_of_ts) else None
+    )  # fmt: skip
     findings = open_findings(con, as_of_ts, entities)  # X325 OPEN_FINDING flags
     kpis = supplemental_kpi_columns(con, as_of_ts, entities)
     run_cache = prices.fundamentals if prices is not None else None
@@ -777,10 +789,12 @@ def _rows(con, as_of, as_of_ts, universe, bars, factors, frozen, nifty, shp_all,
             "as_of_date": as_of, "security_id": sec, "entity_id": ent, "symbol": symbol, "series": series,
             "price_date": price_date, "close": close, "in_nifty500": sec in nifty,
         }  # fmt: skip
-        # No event visible in the window = 0 (an absence of filings), except penalties (no verified source).
+        # No event visible in a captured window = 0 (an absence of filings); sums stay NULL; an uncaptured window
+        # is NULL in every column (X361).
         row.update(
-            events.get(ent) or {**dict.fromkeys(EVENT_COLUMNS, 0), "order_value_90d": None, "penalties_90d": None}
-        )
+            dict.fromkeys(EVENT_COLUMNS) if events is None
+            else events.get(ent) or {c: None if c in EVENT_SUMS else 0 for c in EVENT_COLUMNS}
+        )  # fmt: skip
         row.update(prices.momentum(sec, as_of) if prices else _momentum(b, factors.get(sec, []), frozen.get(sec)))
         row.update(_delivery(b))
 

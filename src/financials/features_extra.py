@@ -449,8 +449,24 @@ def volume_medians(con, as_of: date, exchange: str = "NSE", securities=None) -> 
     }
 
 
+EVENT_WINDOW_DAYS = 90
+
+
+def event_window_complete(con, as_of: date, as_of_ts: datetime) -> bool:
+    """X361 (rule EVENT_WINDOW_COVERAGE): Reg. 30 events come only from the announcements RSS, which holds the current
+    day; the capture starts at the first vaulted RSS snapshot. A 90-day count whose window starts before that day
+    would count an unobserved stretch as "no events" (a false 0), so every Reg. 30 window column is NULL until the
+    whole window lies inside the capture (CLAUDE.md invariant 14). Inside it a day the RSS was not captured is still
+    missed: the counts are lower bounds (docs/references.md E1)."""
+    (start,) = con.execute(
+        "SELECT min(fetched_at) FROM filings WHERE category = 'ANNOUNCEMENTS_RSS' AND fetched_at <= ?", [as_of_ts]
+    ).fetchone()
+    return start is not None and as_of - timedelta(days=EVENT_WINDOW_DAYS - 1) >= start.date()
+
+
 def event_inputs(con, as_of: date, as_of_ts: datetime, entities=None) -> dict[str, dict]:
-    """Reg. 30 counts in the 90 days to as-of (disclosure date, as features._event_counts). One query."""
+    """Reg. 30 counts in the 90 days to as-of (disclosure date, as features._event_counts). One query. Raw counts:
+    add_columns applies the RSS-capture gate (X361)."""
     only, only_p = entity_filter("entity_id", entities)
     out: dict[str, dict] = defaultdict(dict)
     for ent, lit, allot, fund in con.execute(
@@ -540,16 +556,17 @@ def flow_columns(row: dict, flow: dict | None, volume_median: float | None, fact
     return out
 
 
-def event_columns(row: dict, ev: dict | None, flows: dict) -> dict:
+def event_columns(row: dict, ev: dict | None, flows: dict, complete: bool = True) -> dict:
     ev = ev or {}
-    out = {k: ev.get(k, 0) for k in ("litigations_90d", "allotments_90d", "fund_raising_events_90d")}
+    out = {k: ev.get(k, 0) if complete else None for k in ("litigations_90d", "allotments_90d",
+                                                          "fund_raising_events_90d")}  # fmt: skip
     kmp = row.get("kmp_resignations_90d")
     out |= {
         "rf_auditor_resignation_90d": None if row.get("auditor_resignations_90d") is None
         else row["auditor_resignations_90d"] > 0,
         "rf_kmp_resignations_90d": None if kmp is None else kmp >= KMP_EXODUS_MIN,
         "rf_fraud_or_default_90d": None if row.get("fraud_or_default_90d") is None else row["fraud_or_default_90d"] > 0,
-        "rf_litigation_90d": out["litigations_90d"] > 0,
+        "rf_litigation_90d": None if out["litigations_90d"] is None else out["litigations_90d"] > 0,
         "rf_audit_qualified": features_audit.modified_opinion(row),
         "rf_pledge_increase_qoq": None if flows.get("promoter_pledge_change_qoq_pp") is None
         else flows["promoter_pledge_change_qoq_pp"] > 0,
@@ -605,7 +622,7 @@ def raw_columns(row: dict, fund: dict, x: dict) -> dict:
 
 
 def row_columns(row: dict, fund: dict | None, extras: dict | None, kpis, flow, volume_median, events, factors,
-                as_of: date) -> dict:  # fmt: skip
+                as_of: date, events_complete: bool = True) -> dict:  # fmt: skip
     """All columns of this module for one security row (row = the row built so far, batches A-D included)."""
     out = dict.fromkeys(EXTRA_COLUMNS)
     fund = fund or {}
@@ -618,7 +635,7 @@ def row_columns(row: dict, fund: dict | None, extras: dict | None, kpis, flow, v
         out["net_cash_to_market_cap"] = float(-nd / mcap)
     out.update(valuation_columns(row, kpis))
     out.update(flow_columns(row, flow, volume_median, factors, as_of))
-    out.update(event_columns(row, events, out))
+    out.update(event_columns(row, events, out, events_complete))
     out.update(raw_columns(row, fund, x))
     if row.get("valuation_archetype") in FINANCIAL_ARCHETYPES:
         out.update(dict.fromkeys(INDUSTRIAL_ONLY))
@@ -637,12 +654,13 @@ def add_columns(con, rows: list[dict], as_of: date, as_of_ts: datetime, fundamen
     kpis = kpi_inputs(con, as_of_ts, entities)
     flows = shareholding_flow_inputs(con, as_of_ts, entities)
     volumes = volume_medians(con, as_of, exchange, secs)
-    events = event_inputs(con, as_of, as_of_ts, entities)
+    complete = event_window_complete(con, as_of, as_of_ts)  # X361
+    events = event_inputs(con, as_of, as_of_ts, entities) if complete else {}
     for row in rows:
         ent, sec = row["entity_id"], row["security_id"]
         fund = fundamentals.get(ent) or {}
         row.update(row_columns(row, fund, fund.get("_extra"), kpis.get(ent), flows.get(ent), volumes.get(sec),
-                               events.get(ent), factors.get(sec, []), as_of))  # fmt: skip
+                               events.get(ent), factors.get(sec, []), as_of, complete))  # fmt: skip
 
 
 def dsl_aliases() -> dict[str, tuple[str, str]]:

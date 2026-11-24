@@ -1,12 +1,18 @@
-# Handover (2026-11-23)
+# Handover (updated 2026-11-24)
 
 Read this first in a new session, then `CLAUDE.md`, `docs/phase_status.md`, `docs/owner_requirements.md`.
 
 ## 1. The database is not in git (read before anything else)
 
 `data/` is gitignored and lives only in the container of session `session_016X4g5asrdYPvsJKyYVNYma`:
-`data/market.duckdb` 5.5 GB, `data/vault/` 2.8 GB (the raw source of truth). A new cloud session starts from a fresh
-clone **without them**. There is no off-container backup yet (owner 2026-11-21: "No R2 set up right now").
+`data/market.duckdb` 5.3 GB, `data/vault/` 3.0 GB (the raw source of truth). A new cloud session starts from a fresh
+clone **without them**.
+
+**Backup of 2026-11-24 (sent to the owner as chat files, kept off this container):** the `export-bundle` (657 MB in two
+parts, restore tested: 55 of 55 tables identical) and the 10,619 vault blobs that cannot be fetched again
+(listings, masters, RSS, corp-action and quote snapshots, BSE API answers; 21 MB), with `RESTORE.md`. The rest of the
+vault (results / shareholding XBRL, bhavcopies, PR zips, BSE attachments) is still on the exchanges' archives. The
+backup is a point in time: re-export after material changes (`export-bundle --out ... --max-total-mb 2000`).
 
 Ways forward, in order of preference:
 1. **Back up first:** owner adds R2 credentials in the environment settings (not GitHub, never in chat):
@@ -21,15 +27,17 @@ Ways forward, in order of preference:
 
 ## 2. State at handover
 
-- Branch `ccr-49d50339-exd8gh`, draft PR #5, CI green at 06049a5 (plus this note).
-- Parser 0.10.12, features `2026.11.21-21N` (pinned hash in `tests/test_incremental_materialize.py`).
+- Branch `ccr-49d50339-exd8gh`, PR #5.
+- Parser 0.10.12, features `2026.11.24-24D` (pinned hash in `tests/test_incremental_materialize.py`).
 - **Phases 1-2 declared done** (owner condition: a clean weekly run; 21 Nov: 750 open findings, 0 UNCLASSIFIED).
-  Only one clean week so far; 28 Nov is the second.
+  28 Nov is the second clean week.
 - Exchange rates (X354, measured): NSE archive 12 req/s, NSE API 2 req/s with 3 in flight, BSE 2-3 s.
-- Universe 2,066 members (rule U1). Open findings 759 after 23 Nov's daily run.
+- Universe 2,066 members (rule U1).
 - Run long CLI jobs through `scripts/promote_capped.py` (DuckDB memory capped at 6 GB; the container has ~8 GB).
 - Tests: `pytest -n 4 --deselect tests/test_benchmarks.py && pytest tests/test_benchmarks.py` (~10 min). Do not pipe
   pytest into `tail` in a gated `&&` chain: the pipe hides its exit code.
+- Reg. 30 event columns are NULL until 2027-02-11 (X361): the RSS capture started 2026-11-14 and is the only
+  event source. Keep both daily runs (18:53 and 23:37 IST) fetching the RSS: a day not captured is lost.
 
 ## 3. Scheduled tasks bound to the OLD session
 
@@ -46,15 +54,14 @@ If the data moves to a new session: disable these, recreate them bound to the ne
 
 ## 4. Open work (no owner decision needed unless marked)
 
-1. **Rights 5:9 (ex 2026-11-18):** quarantined `UNPARSED_PURPOSE` "no rule for 'RIGHTS 5:9'"; that company's adjusted
-   prices from 18 Nov are not adjusted for the rights bonus element. Needs the real corp-action file as a fixture,
-   then a named rule and test (evidence rules 1-2).
-2. 23 Nov daily: 8 `UNKNOWN_ISIN` Reg. 30 events, 2 `UNEXPLAINED_GAP` on penny stocks (+11.7%, +16.3%): triage.
-3. Task #24: root-cause + named rules for the expanded-universe quarantine; #25: statements and ratios vs industry
-   practice for new members.
-4. Optional: slim PK/ART indexes (DB 5.5 GB = ~1.8 GB data + ~3.3 GB indexes; target ~2.5 GB).
-5. **Owner decision:** R2 backup (section 1); then read the tracker's stored Parquet (`R2_TRACKER_BUCKET`).
-6. Phase 3: start from `docs/phase3_reuse_map.md` (owner's NSE-BSE-Insider-Tracker already has MF portfolios,
+1. Task #25: statements and ratios vs industry practice for new members (**owner**: which practice / reference).
+2. Optional: slim PK/ART indexes (DB 5.3 GB = ~1.8 GB data + ~3.3 GB indexes; target ~2.5 GB).
+3. **Owner decision:** off-container storage for automatic backups (R2 or another); until then, manual exports.
+4. **Owner decision:** bid-ask history (G207) needs a daily quote-API call per member (~2,066 a day from the runner).
+5. **Owner decision:** share classes (G275 / G336) need series E1 admitted to the universe.
+6. Blocked on evidence: merger / scheme ratios and credit ratings are PDF-only in the RSS (no XBRL family); filed
+   ISCR / DSCR values are implausible (C26).
+7. Phase 3: start from `docs/phase3_reuse_map.md` (owner's NSE-BSE-Insider-Tracker already has MF portfolios,
    PIT/SAST, deals, flows, buybacks, surveillance). Import its pure parsers; keep this repo's evidence rules.
 
 ## 5. Standing rules (owner)

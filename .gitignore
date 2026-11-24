@@ -13,3 +13,4 @@ __pycache__/
 
 # Third-party exports used locally for parity review (never commit)
 *.xlsx
+backup_out/

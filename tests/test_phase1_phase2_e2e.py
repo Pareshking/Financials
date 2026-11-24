@@ -205,7 +205,9 @@ def test_materialised_universe_spans_every_archetype_and_screens_run(unified):
     assert syms("GNPA > 0") >= {"HDFCBANK", "PNB"}  # private + PSU banks
     assert syms("Solvency ratio > 0") >= {"HDFCLIFE", "SBILIFE", "ICICIGI"}  # life + general insurers
     assert syms("Promoter holding > 0 AND Market Cap > 0") >= {"ELIN", "JSWSTEEL"}  # Reg. 31
-    assert syms("Order wins 90d > 0") == {"BEL", "JSWINFRA", "APTECHT"}  # Reg. 30, visible 13 Nov
+    # Reg. 30 order wins visible 13 Nov are stored, but no 90-day window is inside an RSS capture here (X361): NULL
+    assert m.con.execute("SELECT count(*) FROM corporate_events WHERE event_type = 'ORDER_WIN'").fetchone()[0] >= 3
+    assert syms("Order wins 90d >= 0") == set()
     assert len(index_members(m.con, "NIFTY 500", date(2026, 11, 12))) >= 495  # PIT membership from the snapshot
 
 

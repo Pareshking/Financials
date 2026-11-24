@@ -557,7 +557,11 @@ CREATE TABLE IF NOT EXISTS features_daily (
     kmp_resignations_90d INTEGER,            -- KMP / director cessations by resignation [E5]
     auditor_resignations_90d INTEGER,        -- auditor cessations by resignation [E5]
     fraud_or_default_90d INTEGER,            -- fraud / default disclosures [E7]
-    penalties_90d       INTEGER,             -- NULL: no penalty / regulatory-action event observed (UNVERIFIED) [E7]
+    penalties_90d       INTEGER,             -- fines / penalties imposed (AIATOP, X360) [E12]; NULL outside the RSS capture (X361)
+    penalty_amount_90d  DECIMAL(24,2),       -- sum of their AmountOfFineOrPenalty (rupees) [E12]
+    regulatory_actions_90d INTEGER,          -- every action taken or initiated, sub-para 20 [E12]
+    acquisitions_90d    INTEGER,             -- Reg. 30 acquisitions + to-be-incorporated companies [E13]
+    acquisition_value_90d DECIMAL(24,2),     -- sum of their cash consideration (rupees) [E13]
     vnb_margin          DOUBLE,              -- supplemental_kpis (life insurers), latest period visible at as-of
     embedded_value      DECIMAL(24,2),       -- supplemental_kpis, rupees
     ape_growth          DOUBLE,              -- supplemental_kpis
@@ -1341,7 +1345,11 @@ CREATE TABLE IF NOT EXISTS screener_features (
     kmp_resignations_90d INTEGER,            -- KMP / director cessations by resignation [E5]
     auditor_resignations_90d INTEGER,        -- auditor cessations by resignation [E5]
     fraud_or_default_90d INTEGER,            -- fraud / default disclosures [E7]
-    penalties_90d       INTEGER,             -- NULL: no penalty / regulatory-action event observed (UNVERIFIED) [E7]
+    penalties_90d       INTEGER,             -- fines / penalties imposed (AIATOP, X360) [E12]; NULL outside the RSS capture (X361)
+    penalty_amount_90d  DECIMAL(24,2),       -- sum of their AmountOfFineOrPenalty (rupees) [E12]
+    regulatory_actions_90d INTEGER,          -- every action taken or initiated, sub-para 20 [E12]
+    acquisitions_90d    INTEGER,             -- Reg. 30 acquisitions + to-be-incorporated companies [E13]
+    acquisition_value_90d DECIMAL(24,2),     -- sum of their cash consideration (rupees) [E13]
     roce_screener       DOUBLE,              -- Screener export: (PBT + Interest) x 2 / (opening + closing capital) [S22]
     debtor_days         DOUBLE,              -- Screener export: closing debtors / (sales / 365) [S22]
     inventory_turnover  DOUBLE,              -- Screener export: sales / closing inventory [S22]
@@ -2347,7 +2355,8 @@ SELECT d.as_of_date, d.security_id, d.entity_id, d.symbol, d.series, d.price_dat
        e.esop_adj_fcf, e.liquid_cash, d.promoter_holding_pct, d.promoter_pledge_pct, d.promoter_encumbered_pct, d.fii_holding_pct,
        d.fpi_holding_pct, d.dii_holding_pct, d.public_holding_pct, d.non_promoter_non_public_pct, d.fii_dii_qoq_change_pct, e.capex_to_depreciation,
        e.cwip_to_gross_block, e.rote, e.rnd_and_royalty_intensity, e.contingent_liabilities_to_net_worth, e.annual_fy_end, d.order_wins_90d,
-       d.order_value_90d, d.kmp_resignations_90d, d.auditor_resignations_90d, d.fraud_or_default_90d, d.penalties_90d, e.roce_screener,
+       d.order_value_90d, d.kmp_resignations_90d, d.auditor_resignations_90d, d.fraud_or_default_90d, d.penalties_90d,
+       d.penalty_amount_90d, d.regulatory_actions_90d, d.acquisitions_90d, d.acquisition_value_90d, e.roce_screener,
        e.debtor_days, e.inventory_turnover, e.working_capital, e.inventory_days, e.days_payable, e.cash_conversion_cycle,
        e.working_capital_days, d.vnb_margin, d.embedded_value, d.ape_growth, d.gov, d.take_rate,
        d.contribution_margin, d.nrr, d.cac_payback, e.sales_growth_qoq_pct, e.profit_growth_qoq_pct, e.npm_pct,

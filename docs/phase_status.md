@@ -5,7 +5,7 @@ finding carries a stated cause; first clean week 21 Nov 2026, `docs/open_finding
 G93 listed side, G214, scheduling (the cloud session's daily / late / weekly tasks, `docs/handover.md` §3; the GitHub
 nightly workflows are manual only), exchange rates (X354), rights without a price (X355), rights at or above market
 (X356), `restage --open-findings` for corporate actions (X357). What remains is **blocked on evidence, not on work**:
-the "Phase 2 pending" items below (item 4 done 24 Nov, X358) each need a real source file this engine does not have (rule 1 of the
+the "Phase 2 pending" items below (item 1 closed by decision and item 4 done, 24 Nov) each need a real source file this engine does not have (rule 1 of the
 evidence rules), plus the share classes (G275 / G336, out of scope by decision 2026-11-21). They move only when a
 source appears. Open findings (767 on 24 Nov) are filed-data problems with a stated cause, not unbuilt features.
 
@@ -85,7 +85,7 @@ the full line-by-line audit of the PDF is `docs/master_backlog.md`; ratios are i
   `parsers/reg23_rpt.py`, promoted with each results filing and by `backfill-rpt`; data only, see blocked item 4).
 
 **Phase 2 pending (2026-11-16): only blocked items remain, each with its evidence**
-1. **Reg. 76 share-capital reconciliation (G93): BLOCKED.** No machine-readable NSE source: probes A15 (2026-11-15:
+1. **Reg. 76 share-capital reconciliation (G93): CLOSED by owner decision 2026-11-24** ("Demat vs physical not required"; the listed side is built, X133 / X114). Was: **BLOCKED.** No machine-readable NSE source: probes A15 (2026-11-15:
    vault ledger, announcements RSS, TCS announcements API) found none; BSE answers 403 (A1); F09 UNVERIFIED. Stand-ins
    built: Reg. 31 x paid-up (X103) and the Reg. 34 year-end share counts (X114).
 2. **Automatic merger detection and automatic entitlement / COA ratios: BLOCKED.** No merger purpose in the

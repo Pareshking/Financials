@@ -686,4 +686,11 @@ My 19:31 (2026-11-17) recommendations, unanswered, applied:
   regroupings); "figures regrouped wherever necessary" alone is never a cause. Decision E unchanged: no value changes.
 - **Rules to build (owner 2026-11-25):** restated-table acceptance, cash-equivalents boundary change, NSE annual-reports
   PDF endpoint in the source register and CLI, and rejection of downloads shorter than their Content-Length.
+- **Results-PDF pass (PDF1):** 98 RESULTS_PDF findings ACCEPTED where both reads print the XBRL value ("filed as
+  printed"); 35 PDF corrections recorded in `fact_corrections` (X107, owner "Apply all 35" 2026-11-25: two agreeing
+  reads, RapidOCR + OCRia on scans or text layer + RapidOCR on digital pages, plus an eye check of each page), findings
+  CORRECTED; 203 stay open (147 unreadable, 35 no PDF, 2 truncated, rest rejected by the eye check or decision E).
+- **Rules built (RULES25):** X363 CASH_EQUIVALENTS_BOUNDARY (7 findings closed by rule), X364
+  RESTATEMENT_RECONCILED_IN_FILING (matches 7 already accepted, 0 open), X365 annual-report PDF feed F37
+  (`fetch-annual-reports`, raw only), X362 cut-short downloads rejected.
 - **OCRia-1 (4B):** test after the results-PDF pass, only as a tie-breaker on pages where the two readers disagreed.

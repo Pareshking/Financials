@@ -53,7 +53,7 @@ class FakeNse:
         if url == annual_report_listing_url("AEGISVOPAK"):
             return Response(200, LISTING.read_bytes())
         if url in (FY26, FY25):
-            return Response(200, b"%PDF-1.7 stand-in for " + url.encode())
+            return Response(200, b"%PDF-1.7 stand-in for " + url.encode() + b"\n%%EOF\n")  # complete: X362
         return Response(404, b"")
 
 

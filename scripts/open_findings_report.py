@@ -691,6 +691,11 @@ def classify(con) -> list[dict]:
             elif months == 12 and y["eq_value"] is not None and (y["eq_ytd"] or y["eq_q"]):
                 cause = "YTD_FY_AUDITED_EQUIV_AGREES_YTD" if y["eq_ytd"] else "YTD_FY_AUDITED_EQUIV_AGREES_QUARTERS"
                 evidence += f"; annual equivalent {y['eq_value']:.0f}"
+            elif months == 12 and y["eq_value"] is not None:
+                # the equivalent line was compared and agrees with neither side (e.g. JLHL FY26: the audit added an
+                # exceptional item the Q4 FY column does not carry): the same verdict as a stored tag agreeing neither
+                cause = "YTD_FY_AUDITED_AGREES_NEITHER"
+                evidence += f"; annual equivalent {y['eq_value']:.0f}"
             elif months == 12 and y["n_annual"] and d.get("tag") == "pbt_incl_jv":
                 cause = "YTD_FY_ANNUAL_NO_PBT_INCL_JV"
             elif y["copy"]:

@@ -663,3 +663,19 @@ My 19:31 (2026-11-17) recommendations, unanswered, applied:
 - **Reg. 76 (owner 2026-11-24, "Demat vs physical not required"):** G93 closes on the listed-share checks already built (NSE Issue Size from the PR-zip mcap file vs Reg. 31, X133; Reg. 34 year-end counts, X114); no Reg. 76 source is needed.
 - **Weekly sweep runs `audit-annual` (owner 2026-11-21 "Add"):** after promote and the incremental materialize, so new annual prior-year findings get their X312 class the same day. A week is clean only when `docs/open_findings.md` shows UNCLASSIFIED 0 (first clean week 21 Nov 2026: 750 open, 0 unclassified).
 - **Phase 3 reference (owner 2026-11-21):** many Phase 3 feeds (F&O, AMFI MF portfolios, PIT / SAST insider trading, bulk / block deals, BRSR, governance, RBI macro, backtester) are already built in the owner's repo `Pareshking/NSE-BSE-Insider-Tracker`. Reuse it (import, not copy) before building any Phase 3 feed here.
+
+## Owner decisions (2026-11-25, "Settle open items")
+
+- **Rule-settled findings closed:** 15 ACCEPT-class findings (8 CC_PAIDUP_OUTLIER, X221; 7 YTD breaks where the audited
+  annual agrees with the Q4 FY column, X309) resolved ACCEPTED with the rule in the note.
+- **Indian GAAP annual reports (TX_NON_INDAS_ANNUAL_MEMBER, 20 filings, 14 members): left out of scope.** No
+  AR_XBRL_NI parser; the members' quarterly results still parse (X330); the vault blobs stay.
+- **Small breaks accepted as filed (8):** YTD vs quarters under 1% (X260), prior-year regroupings whose compared totals
+  agree (X236 pattern), and JLHL FY26 standalone (the audited annual governs, X309; the audit added an exceptional item).
+- **Identity (3):** BAHETI's filed BSE code 123456 is a placeholder, stored 545019 kept (X111); AHLWEST's two annual
+  reports filed before its re-listing rows attached to its security by OVERRIDE (re-promoted).
+- **PDF pass, results and annual PDFs:** read the PDFs of the RESULTS_PDF and ANNUAL_PDF findings with two OCR engines
+  (RapidOCR + OCRia, bake-off 2026-11-24) and compare with the XBRL. Disagreements are flagged, never auto-corrected
+  (decision V); a correction still goes through `fact_corrections` with its own evidence (X107).
+- **Owners' profit where owners + NCI != PAT (34 ATTRIBUTION_WITHHELD):** the owner chose "show filed, flagged". Held
+  open pending confirmation: X325 already shows owners = PAT - NCI as filed, flagged (`dq_flags`), not blank.

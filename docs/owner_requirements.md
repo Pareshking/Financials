@@ -677,5 +677,13 @@ My 19:31 (2026-11-17) recommendations, unanswered, applied:
 - **PDF pass, results and annual PDFs:** read the PDFs of the RESULTS_PDF and ANNUAL_PDF findings with two OCR engines
   (RapidOCR + OCRia, bake-off 2026-11-24) and compare with the XBRL. Disagreements are flagged, never auto-corrected
   (decision V); a correction still goes through `fact_corrections` with its own evidence (X107).
-- **Owners' profit where owners + NCI != PAT (34 ATTRIBUTION_WITHHELD):** the owner chose "show filed, flagged". Held
-  open pending confirmation: X325 already shows owners = PAT - NCI as filed, flagged (`dq_flags`), not blank.
+- **Owners' profit where owners + NCI != PAT (34 ATTRIBUTION_WITHHELD): keep X325** (owner 2026-11-25, after a first
+  answer "show filed, flagged" that rested on a wrong premise: the values were never blank). Screens show owners =
+  PAT - NCI as filed with the attribution dq flag; the filed owners figure stays as `asfiled_`. The 34 findings are
+  resolved ACCEPTED with that note.
+- **Annual-report PDF pass (PDF2):** 57 of 142 ANNUAL_PDF findings ACCEPTED where the report prints the cause (35
+  common-control mergers, 8 Ind AS 8 errors, 6 share counts, 3 other schemes, 3 discontinued operations, 2
+  regroupings); "figures regrouped wherever necessary" alone is never a cause. Decision E unchanged: no value changes.
+- **Rules to build (owner 2026-11-25):** restated-table acceptance, cash-equivalents boundary change, NSE annual-reports
+  PDF endpoint in the source register and CLI, and rejection of downloads shorter than their Content-Length.
+- **OCRia-1 (4B):** test after the results-PDF pass, only as a tie-breaker on pages where the two readers disagreed.

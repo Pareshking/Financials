@@ -21,6 +21,22 @@ from urllib.parse import urlsplit
 
 DEFAULT_USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) financials-research/0.1 (personal, non-commercial)"
 RETRY_STATUSES = frozenset({403, 429, 500, 502, 503, 504})
+INCOMPLETE_ATTEMPTS = 2  # X362: a cut-short 200 body is fetched twice at most (the archive may serve it so)
+PDF_TAIL = 2048  # X362: a complete PDF ends with %%EOF (ISO 32000-1 7.5.5), possibly followed by line ends
+
+
+def incomplete_body(r: Response) -> str | None:
+    """X362: why a 200 body is not the whole file, or None. A body shorter than its Content-Length (an unencoded
+    transfer), or a PDF without %%EOF in its last bytes: LXCHEM_29102025203318_Outcome.pdf is served with
+    Content-Length 587,322 equal to its body and no %%EOF, so only the PDF check catches it; all 195 complete results
+    PDFs of the 2026-11-25 pass end with %%EOF."""
+    headers = {k.lower(): v for k, v in r.headers.items()}
+    declared = headers.get("content-length")
+    if declared and declared.isdigit() and "content-encoding" not in headers and int(declared) != len(r.body):
+        return f"body {len(r.body)} bytes, Content-Length {declared}"
+    if r.body.startswith(b"%PDF-") and b"%%EOF" not in r.body[-PDF_TAIL:]:
+        return f"PDF without %%EOF ({len(r.body)} bytes): truncated"
+    return None
 
 
 class FetchError(RuntimeError):
@@ -139,12 +155,20 @@ class PoliteFetcher:
                 last_status, message = None, str(exc)
             else:
                 if r.status == 200:
-                    return r.body
-                if r.status == 404 and allow_404:
+                    problem = incomplete_body(r)
+                    if problem is None:
+                        return r.body
+                    # X362: a cut-short body is retried once; a file the archive itself serves cut short (Content-Length
+                    # equal to the short body) stays cut short, so it ends as a FetchError, never as a good blob
+                    last_status, message = r.status, problem
+                    if attempt >= INCOMPLETE_ATTEMPTS:
+                        break
+                elif r.status == 404 and allow_404:
                     return None
-                last_status, message = r.status, "HTTP error"
-                if r.status not in RETRY_STATUSES:
-                    break
+                else:
+                    last_status, message = r.status, "HTTP error"
+                    if r.status not in RETRY_STATUSES:
+                        break
             if attempt < self.max_attempts:
                 delay = self.base_backoff * 2 ** (attempt - 1)
                 self.sleep(delay * (0.5 + self.rng.random()))

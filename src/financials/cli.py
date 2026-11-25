@@ -28,7 +28,7 @@ from financials.promoter import (
     close_wrong_template_duplicates,
     promote,
 )
-from financials.scope import MIN_TRADE_DATE
+from financials.scope import MIN_PERIOD_END_DATE, MIN_TRADE_DATE
 from financials.staging import read_manifest
 from financials.staging_clean import clean_staging
 from financials.timeutil import utc_now, utc_to_ist_date
@@ -158,6 +158,12 @@ def build_parser() -> argparse.ArgumentParser:
     fa = sub.add_parser("fetch-annual", help="Reg. 34 annual report XBRL (FY ending 2025 onwards)")
     fa.add_argument("symbols", nargs="*")
     fa.add_argument("--universe", choices=UNIVERSES)
+    far = sub.add_parser("fetch-annual-reports",
+                         help="annual report PDFs (X365): vaulted and promoted raw only, nothing parsed")  # fmt: skip
+    far.add_argument("--symbols", nargs="+", default=[])
+    far.add_argument("--universe", choices=UNIVERSES)
+    far.add_argument("--min-to-year", type=int, default=MIN_PERIOD_END_DATE.year,
+                     help="fiscal years ending in or after this (default: C9 cutoff); a PDF is 5-30 MB")  # fmt: skip
     fr = sub.add_parser("fetch-results", help="results XBRL by URL, or by symbol through the A7 listing")
     fr.add_argument("url", nargs="?")
     fr.add_argument("--symbols", nargs="+", default=[])
@@ -572,7 +578,7 @@ def main(argv: Sequence[str] | None = None, *, transport: Transport | None = Non
         con = connect(db_path)
         try:
             con.execute("BEGIN")
-            r = audit_annual_checks(con)
+            r = audit_annual_checks(con, vault=Vault(vault_dir))  # X364 reads the annual blobs
             con.execute("COMMIT")
         finally:
             con.close()
@@ -992,6 +998,11 @@ def run_fetch(args, jobs: Jobs, db_path: Path, out) -> tuple[list[Path], list[st
         staged += jobs.reg30_events(limit=args.limit)
     elif args.cmd == "fetch-annual":
         staged, errors = jobs.discover(_symbols(args, db_path, args.symbols), ["annual"], events=False)
+    elif args.cmd == "fetch-annual-reports":
+        syms = _symbols(args, db_path, args.symbols)
+        if not syms:
+            raise SystemExit("error: fetch-annual-reports needs --symbols or --universe")
+        staged, errors = jobs.annual_report_pdfs_many(syms, min_to_year=args.min_to_year)
     elif args.cmd == "fetch-results":
         if args.url:
             src = "API_FIELD" if args.broadcast_utc else "UNKNOWN"

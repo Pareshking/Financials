@@ -13,10 +13,18 @@
   values in the comparison. X306-X307: a CASH_FLOW_RESTATED finding whose net cash flow moved only because the
   comparative's cash and cash equivalents were redefined (CASH_EQUIVALENTS_RECLASSIFIED) or because the exchange
   difference on cash moved into or out of the net change (FX_EFFECT_RECLASSIFIED) is a reclassification too.
+  X363: so is one whose investing cash flow and net change moved by the same amount, operating and financing cash
+  flows and the balance-sheet totals unchanged, and the year-end cash balance moved (CASH_EQUIVALENTS_BOUNDARY: the
+  cash-equivalents boundary was redefined at both ends of the year, the movement of the moved balances is now
+  investing).
   X312: `audit-annual` records the owner-accepted classes as resolved ACCEPTED when it writes them (rule
   PRIOR_YEAR_ACCEPTED_CLASS), and a re-keyed RESTATED finding whose differing totals are those of an earlier ACCEPTED
   finding of the same filing inherits that acceptance (rule PRIOR_YEAR_ACCEPTANCE_CARRIED); see
   `prior_year_resolutions`. Nothing is suppressed: the finding is written and stays visible.
+  X364: `audit-annual` also resolves ACCEPTED an open BOTTOM_LINE_RESTATED finding whose annual XBRL prints the
+  restatement itself: a filed text block that says the comparatives were restated prints, for every differing
+  bottom line (PAT, total equity), both the stored and the restated amount (rule RESTATEMENT_RECONCILED_IN_FILING,
+  `restatement_reconciliation`; the vault blob is read, nothing is parsed into canonical tables).
 - G79 [X111]: the BSE scrip code stated inside a results filing (`ScripCode`, X7; from disclosure_facts) fills
   `security_identifier_history.bse_scrip_code` of the NSE identifier rows that match the filing's own ISIN and
   symbol. A different code already on such a row is an IDENTIFIER / BSE_SCRIP_CODE_CONFLICT finding; nothing is
@@ -30,8 +38,10 @@ The promoter (single writer) owns the transaction; these helpers return findings
 
 from __future__ import annotations
 
+import html
+import re
 from datetime import date, datetime, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from financials.db import version_key
 from financials.money import ROUNDING_UNITS, rounding_only_tolerance
@@ -52,6 +62,7 @@ BOTTOM_LINES = ("pat", "total_equity", "net_cash_flow")
 DISCONTINUED_PROFIT_TAG = "pat_discontinued"
 RESTATED_ACCEPTABLE = frozenset({
     "RECLASSIFIED", "DISCONTINUED_REPRESENTED", "CASH_EQUIVALENTS_RECLASSIFIED", "FX_EFFECT_RECLASSIFIED",
+    "CASH_EQUIVALENTS_BOUNDARY",
 })  # fmt: skip
 # X306: the cash balances a cash-flow statement reconciles to (the statement's own closing cash, else the balance
 # sheet's cash and cash equivalents); X307: the net change after the exchange difference on cash.
@@ -166,6 +177,14 @@ def prior_year_class(differences: list[dict], context: dict | None = None) -> di
         else `cash_and_equivalents`) differs by the same amount within the two lines' tolerances: the comparative's
         cash and cash equivalents were redefined (deposits, overdrafts or restricted balances moved in or out), no
         amount was restated.
+      - CASH_EQUIVALENTS_BOUNDARY (X363): PAT, total equity and total assets agree, operating and financing cash
+        flows were compared and agree, investing cash flow and net cash flow differ by the same amount within the two
+        lines' tolerances (the net change after the exchange difference too, where compared), and the prior year-end
+        cash balance differs (by another amount than the net change, else X306): the cash-equivalents boundary was
+        redefined at both the opening and the closing date (deposits, liquid funds or other bank balances moved out of
+        or into cash), so the movement of the moved balances became an investing flow; no amount was restated
+        (WELENT FY26 S: FY25 CFI -16.23 -> 1.64 Cr, net change 190.51 -> 208.39 Cr, closing cash in the cash-flow
+        statement 895.17 -> 433.73 Cr = the balance-sheet cash and cash equivalents both filings state).
       - CASH_FLOW_RESTATED: PAT and total equity agree, net cash flow differs or was not compared.
       - BOTTOM_LINE_RESTATED: PAT or total equity differs or was not compared (merger, Ind AS 8 correction, ...)."""
     scale = sorted({d["tag"] for d in differences if _is_scale(Decimal(d["annual"]), Decimal(d["stored"]))})
@@ -214,7 +233,29 @@ def _cash_flow_subclass(differences: list[dict], compared: set, differ: set) -> 
             slack = Decimal(net.get("tolerance") or 0) + Decimal(cash.get("tolerance") or 0)
             if abs(Decimal(cash["annual"]) - Decimal(cash["stored"]) - moved) <= slack:
                 return "CASH_EQUIVALENTS_RECLASSIFIED"
-    return "CASH_FLOW_RESTATED"
+    return _boundary_subclass(by_tag, compared, differ, end)
+
+
+def _boundary_subclass(by_tag: dict[str, list[dict]], compared: set, differ: set, end: str | None) -> str:
+    """X363 CASH_EQUIVALENTS_BOUNDARY (see `prior_year_class`); the caller proved PAT, total equity and total
+    assets agree and the net cash flow differs, and that X306 does not hold."""
+    if any(t not in compared or t in differ for t in ("cfo", "cff")) or "cfi" not in differ:
+        return "CASH_FLOW_RESTATED"
+    cfi = by_tag["cfi"][-1]
+    if (cfi.get("period") or [None, None])[1] != end:
+        return "CASH_FLOW_RESTATED"
+    moved = Decimal(cfi["annual"]) - Decimal(cfi["stored"])
+    nets = [by_tag["net_cash_flow"][-1]]
+    if NET_CASH_AFTER_FX in compared:  # it differs (else X307 already settled the finding): by the same amount
+        nets += by_tag.get(NET_CASH_AFTER_FX, [])[-1:]
+    for net in nets:
+        slack = Decimal(net.get("tolerance") or 0) + Decimal(cfi.get("tolerance") or 0)
+        if (net.get("period") or [None, None])[1] != end or abs(
+            Decimal(net["annual"]) - Decimal(net["stored"]) - moved
+        ) > slack:
+            return "CASH_FLOW_RESTATED"
+    cash_moved = any((c.get("period") or [None, None])[1] == end for t in CASH_BALANCE_TAGS for c in by_tag.get(t, ()))
+    return "CASH_EQUIVALENTS_BOUNDARY" if cash_moved else "CASH_FLOW_RESTATED"
 
 
 def filed_scrip_code(con, filing_id: str) -> str | None:
@@ -310,6 +351,7 @@ CARRIED_RULE = "PRIOR_YEAR_ACCEPTANCE_CARRIED"
 _SUBCLASS_REF = {  # sub-class: (its rule, the review that accepted it)
     "RECLASSIFIED": ("X233", "X236"), "DISCONTINUED_REPRESENTED": ("X234", "X236"),
     "CASH_EQUIVALENTS_RECLASSIFIED": ("X306", "QF4, as X233"), "FX_EFFECT_RECLASSIFIED": ("X307", "QF4, as X233"),
+    "CASH_EQUIVALENTS_BOUNDARY": ("X363", "owner decision 2026-11-25, as X306"),
 }  # fmt: skip
 assert set(_SUBCLASS_REF) == RESTATED_ACCEPTABLE
 # X312 carry-forward: the lines whose amounts must be the same for a case-by-case acceptance to carry forward (the
@@ -395,3 +437,59 @@ def prior_year_resolutions(findings: list[tuple[str, str, dict, dict]], accepted
         if note:
             out[qid] = note
     return out
+
+
+# X364 rule RESTATEMENT_RECONCILED_IN_FILING (owner decision 2026-11-25, RULES25): the annual XBRL's own text blocks.
+RECONCILED_RULE = "RESTATEMENT_RECONCILED_IN_FILING"
+_RESTATED_WORD = re.compile(r"\b(?:restated|restatement)\b", re.I)
+_HTML_TAG = re.compile(r"<[^>]*>")
+_AMOUNT = re.compile(r"(?<![\d.])\d[\d,]*\.\d{2}(?![\d.])")  # a printed amount with two decimals
+# the units a note prints amounts in (crore, lakh, million), each read to the two decimals it prints
+_PRINT_UNITS = (("crore", Decimal(10) ** 7), ("lakh", Decimal(10) ** 5), ("million", Decimal(10) ** 6))
+_CENT = Decimal("0.01")
+
+
+def _printed_amounts(text: str) -> set[Decimal]:
+    """The two-decimal amounts printed in a text block (HTML tags, also tags written as entities, removed; commas
+    of either grouping dropped; the sign or brackets ignored)."""
+    plain = _HTML_TAG.sub(" ", html.unescape(_HTML_TAG.sub(" ", text)))
+    return {Decimal(m.group().replace(",", "")) for m in _AMOUNT.finditer(plain)}
+
+
+def restatement_reconciliation(xbrl: bytes, differences: list[dict], compared: set) -> dict | None:
+    """X364 rule RESTATEMENT_RECONCILED_IN_FILING: the evidence that the annual filing `xbrl` states its own
+    restatement of the bottom lines of one BOTTOM_LINE_RESTATED finding, else None. Proof: PAT and total equity were
+    both compared, at least one differs, and one text fact of the filing both says "restated" / "restatement" and
+    prints, for every differing one, the stored amount and the annual amount in one unit (crore, lakh or million, to
+    the two decimals printed): the "reported / restated" reconciliation that a common-control amalgamation (Ind AS
+    103 Appendix C), a measurement-period adjustment or an Ind AS 8 correction prints. A bottom line not compared
+    proves nothing, so the rule does not apply. Pure: bytes in, evidence out."""
+    from financials.parsers.xbrl import parse_instance
+
+    if not all(t in compared for t in ("pat", "total_equity")):
+        return None
+    lines = [d for d in differences if d["tag"] in ("pat", "total_equity")]
+    if not lines:
+        return None
+    for f in parse_instance(xbrl).facts:
+        if f.is_numeric or len(f.value_text) < 40 or not _RESTATED_WORD.search(f.value_text):
+            continue
+        printed = _printed_amounts(f.value_text)
+        for unit, div in _PRINT_UNITS:
+            pairs = [tuple((abs(Decimal(d[k])) / div).quantize(_CENT, ROUND_HALF_UP) for k in ("stored", "annual"))
+                     for d in lines]  # fmt: skip
+            if all(s != a and s in printed and a in printed for s, a in pairs):  # equal when printed: no proof
+                lines_out = {d["tag"]: [str(s), str(a)] for d, (s, a) in zip(lines, pairs, strict=True)}
+                return {"element": f.name, "context": f.context_id, "unit": unit, "lines": lines_out}
+    return None
+
+
+def reconciled_note(evidence: dict) -> str:
+    """X364: the resolution note of a finding `restatement_reconciliation` settles."""
+    lines = "; ".join(f"{t} stored {s} -> annual {a}" for t, (s, a) in sorted(evidence["lines"].items()))
+    return (
+        f"Rule X364 {RECONCILED_RULE} (owner decision 2026-11-25): the annual XBRL text block {evidence['element']} "
+        f"({evidence['context']}) says the comparatives were restated and prints both amounts of every differing "
+        f"bottom line (Rs {evidence['unit']}: {lines}); decision E / X106: quarters stay as first published. "
+        "Recorded by audit-annual, the check keeps running."
+    )

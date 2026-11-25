@@ -1121,10 +1121,16 @@ def stage_raw_only(
     source_url: str,
     fetched_at: datetime,
     exchange: str = "NSE",
+    broadcast_ts: datetime | None = None,
+    broadcast_ts_source: str = "UNKNOWN",
+    stated_symbol: str | None = None,
 ) -> Path:
-    """Vault a download that feeds another job (e.g. the shareholding master JSON) so it stays evidence."""
+    """Vault a download that feeds another job (e.g. the shareholding master JSON) so it stays evidence. A file the
+    pipeline keeps but never parses (X365: an annual report PDF) can carry its listed broadcast time and symbol."""
     blob = vault.put(data, ext=ext, media_type=media_type, fetched_at=fetched_at)
-    filing = make_filing(blob, exchange=exchange, category=category, source_url=source_url, fetched_at=fetched_at)
+    filing = make_filing(blob, exchange=exchange, category=category, source_url=source_url, fetched_at=fetched_at,
+                         broadcast_ts=broadcast_ts, broadcast_ts_source=broadcast_ts_source,
+                         stated_symbol=stated_symbol)  # fmt: skip
     return write_stage(
         stage_root, "raw_only", filing.filing_id, {"blobs": [_blob_row(blob)], "filings": [_filing_row(filing)]}
     )

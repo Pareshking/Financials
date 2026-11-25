@@ -2,7 +2,7 @@
 
 <!-- GENERATED from config/data_sources.yaml by `python -m financials.sources --write`. Do not edit. -->
 
-34 feeds: 17 VERIFIED, 9 OBSERVED, 6 UNVERIFIED, 2 PLANNED. Status meanings and runtime labels are defined in `config/data_sources.yaml`; evidence IDs point to `docs/references.md`.
+35 feeds: 18 VERIFIED, 9 OBSERVED, 6 UNVERIFIED, 2 PLANNED. Status meanings and runtime labels are defined in `config/data_sources.yaml`; evidence IDs point to `docs/references.md`.
 
 | ID | Feed | Phase | Status | Runtime | Evidence |
 |---|---|---|---|---|---|
@@ -40,6 +40,7 @@
 | F34 | BSE equity UDiFF bhavcopy | 1 | VERIFIED | CONTAINER_DIRECT | X165, A16 |
 | F35 | BSE list of securities (ListofScripData, per BSE group) | 1 | VERIFIED | GITHUB_RUNNER | X169, A17, A18 |
 | F36 | BSE announcements (+ AttachLive attachments), shareholding filings (+ inline XBRL) and results XBRL | 1 | VERIFIED | GITHUB_RUNNER | A17, A18, X166, X167, X168, X170, X247, X265 |
+| F37 | Annual report PDF (Reg. 34(1) annual report as filed, PDF; older years zip) | 2 | VERIFIED | SESSION_WARMED | A8, X365 |
 
 ## F01 — UDiFF cash-market bhavcopy
 
@@ -618,3 +619,20 @@
 | verification_status | VERIFIED |
 | evidence | A17, A18, X166, X167, X168, X170, X247, X265 |
 | notes | bse-fetch workflow (scripts/bse_fetch.py) -> import-bse -> promote. Shareholding inline XBRL is parsed into the shareholding tables (X170); announcements and PDFs are vaulted raw. strCat=Result with strScrip answered 400 (A18): ask strCat=-1 and pick Result rows by CATEGORYNAME. Results XBRL (bse_fetch.py --only results): the Corp_FinanceResult_ng_new rows' XMLName / Consol_XMLName inline files are read by the NSE results parser (parse_instance reads inline XBRL as its instance); identity by ISIN through the NSE identifier rows, else the filed ScripCode (BSE1 codes); visible from the latest of Fld_CreateDate and the file name's same-day readings. FlagDur 7 (beyond last 1 year) not answered yet. Weekly runs: --since 8 days back with --window (results and shareholding XBRL created on or after --since only, no FlagDur 7 pass) and --shard K/N over several runners, 2-3 s apart on each (X353, X354). |
+
+## F37 — Annual report PDF (Reg. 34(1) annual report as filed, PDF; older years zip)
+
+| Field | Value |
+|---|---|
+| exchange_or_agency | NSE |
+| url_or_endpoint_pattern | listing https://www.nseindia.in/api/annual-reports?index=equities&symbol=<SYM> (session warm-up); files https://nsearchives.nseindia.in/annual_reports/AR_<n>_<SYM>_<from>_<to>_<A\|U>_<bytes>_<ddmmyyyyhhmmss>.pdf (as listed in fileName) |
+| format | JSON listing (data[] with fromYr, toYr, submission_type, broadcast_dttm, disseminationDateTime, fileName, attFileSize); files PDF (zip for older years) |
+| cadence | Annual (post-AGM), plus revised submissions |
+| fetch_runtime | SESSION_WARMED |
+| join_keys | requested symbol, fromYr / toYr |
+| target_tables | filings (category ANNUAL_REPORT_PDF / ANNUAL_REPORT_PDF_LISTING), blobs |
+| unlocked_metrics | evidence for prior-year restatements and other annual findings (read by a person, PDF2); nothing parsed |
+| phase | 2 |
+| verification_status | VERIFIED |
+| evidence | A8, X365 |
+| notes | fetch-annual-reports --symbols S... or --universe U [--min-to-year Y] (X365). Answered from the cloud container after the standard session warm-up (financials.fetch.jobs.WARMUP); whether the warm-up is needed was not probed. The listing and every listed file of a fiscal year ending in or after Y (default 2025, C9) are vaulted and promoted raw only; nothing is parsed into canonical tables and the pipeline reads no PDF. A vaulted file is never downloaded again (the URL is an immutable archive prefix). Files are kept at the URL as listed (host nsearchives.nseindia.in): that the .com alias serves /annual_reports/ is UNVERIFIED. PDF2 (2026-11-25) downloaded 113 FY26 reports from this host with no 403 / 429; a report is 5-30 MB, so a whole-universe run needs disk for ~2,000 files per year. |

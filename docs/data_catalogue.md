@@ -4,7 +4,7 @@
 
 What every committed fixture file contains (every zip member too), which feed it belongs to, whether the pipeline ingests it, and which open owner requirement (`docs/owner_requirements.md`) its columns could serve. Check here before saying data is unavailable. Feeds: `docs/data_sources.md`; XBRL elements: `docs/tag_registry.yaml`; sha256 and source URLs: `tests/fixtures/MANIFEST.md`.
 
-451 fixture files (557 entries counting zip members) in 47 families; 0 unclassified (the generator fails on a file that matches no family).
+456 fixture files (562 entries counting zip members) in 48 families; 0 unclassified (the generator fails on a file that matches no family).
 
 Status: **INGESTED** parsed into the named table(s) by the named parser (checked against the code by this script); **DISCOVERY_ONLY** vaulted (blob + `filings` row) and parsed for links / broadcast times only; no table of its own; **VAULTED_RAW** fetched and vaulted (blob + `filings` row) but never parsed; **NOT_INGESTED** nothing fetches, stages or promotes it (a parser may exist; see the note); **REFERENCE** documentation or test metadata, not a data feed.
 
@@ -40,6 +40,7 @@ Status: **INGESTED** parsed into the named table(s) by the named parser (checked
 | [NSE quote API industry classification](#nse-quote-api-industry-classification) | `classification/GetQuoteApi_getSymbolData_HDFCBANK.json` | F30 | INGESTED | raw_quote_classification, entity_classification_history | G207 (DONE), G140 (DOCUMENTED_PLANNED), G141 (DOCUMENTED_PLANNED), G129 (MISSING) |
 | [NSE Integrated Filing listing API](#nse-integrated-filing-listing-api) | `discovery/nse_integrated-filing-results_equities_ABBOTINDIA_20261117.json` | F06 | INGESTED | raw_results_listing | none identified |
 | [NSE annual report XBRL listing API](#nse-annual-report-xbrl-listing-api) | `annual/nse_annual-reports-xbrl_TCS_20261113.json` | F07 | DISCOVERY_ONLY | — | none identified |
+| [NSE annual report PDF listing API](#nse-annual-report-pdf-listing-api) | `annual/nse_annual-reports_AEGISVOPAK_20261125.json` | F37 | DISCOVERY_ONLY | — | none identified |
 | [NSE shareholding master API](#nse-shareholding-master-api) | `discovery/nse_corporate-share-holdings-master_equities_ABBOTINDIA_20261117.json` | F08 | DISCOVERY_ONLY | — | none identified |
 | [NSE announcements RSS (Online_announcements)](#nse-announcements-rss-online_announcements) | `events/nse_Online_announcements_20261113.xml` | F21 | DISCOVERY_ONLY | — | none identified |
 | [NSE Integrated Filing results XBRL (Reg. 33)](#nse-integrated-filing-results-xbrl-reg-33) | `annual_checks/INTEGRATED_FILING_INDAS_1426806_28042025073334_WEB.xml` | F06, F10 | INGESTED | filing_meta, fact_observations, segment_observations, reg23_related_party_transactions, disclosure_facts, audit_opinions | none identified |
@@ -759,6 +760,24 @@ Columns (5 of 6 files): object: data (list of 0); record: data
 | `discovery/nse_annual-reports-xbrl_equities_HAWKINCOOK_20261117.json` | JSON | data: 0 | X166: Reg. 34 annual XBRL listing of a `Permitted` security (HAWKINCOOK) |
 | `discovery/nse_annual-reports-xbrl_equities_MCX_20261117.json` | JSON | data: 0 | X166: Reg. 34 annual XBRL listing of a `Permitted` security (MCX) |
 
+## NSE annual report PDF listing API
+
+| Field | Value |
+|---|---|
+| Content | Annual report PDF rows of one symbol: fiscal year, submission, broadcast / dissemination time, PDF link (nsearchives.nseindia.in/annual_reports/). The PDFs are vaulted raw by fetch-annual-reports (X365), never parsed. |
+| Source | F37 (Annual report PDF (Reg. 34(1) annual report as filed, PDF; older years zip)) |
+| Status | DISCOVERY_ONLY |
+| Tables | — |
+| Parser | `financials.parsers.annual_report_pdf:parse_annual_report_listing` |
+| Could serve | none identified |
+| Files | 1 |
+
+Columns: object: data (list of 2); record: companyName, fromYr, toYr, submission_type, broadcast_dttm, disseminationDateTime, timeTaken, fileName, attFileSize
+
+| File | Format | Rows | Description |
+|---|---|---|---|
+| `annual/nse_annual-reports_AEGISVOPAK_20261125.json` | JSON | data: 2 | NSE annual report PDF listing of AEGISVOPAK: two rows (FY 2025-26, FY 2024-25), fileName = full nsearchives.nseindia.in/annual_reports/ PDF URL [X365] |
+
 ## NSE shareholding master API
 
 | Field | Value |
@@ -812,14 +831,14 @@ Columns: root `rss`; item: title, link, description, pubDate
 | Tables | `filing_meta`, `fact_observations`, `segment_observations`, `reg23_related_party_transactions`, `disclosure_facts`, `audit_opinions` |
 | Parser | `financials.parsers.integrated:parse_integrated_results` |
 | Could serve | none identified |
-| Files | 206 |
+| Files | 208 |
 
 XBRL instances: elements are not listed here; see `docs/tag_registry.yaml`.
 
 | Directory | Files | Formats |
 |---|---|---|
 | `annual_checks/` | 1 | XML 1 |
-| `annual_restated/` | 4 | XML 4 |
+| `annual_restated/` | 6 | XML 6 |
 | `bse/` | 2 | XML 2 |
 | `fixed_assets/` | 4 | XML 4 |
 | `igaap_corp/` | 6 | XML 6 |
@@ -850,14 +869,14 @@ XBRL instances: elements are not listed here; see `docs/tag_registry.yaml`.
 | Tables | `filing_meta`, `fact_observations`, `group_structure`, `related_party_transactions`, `disclosure_facts`, `audit_opinions` |
 | Parser | `financials.parsers.reg34_annual:parse_reg34_annual` |
 | Could serve | none identified |
-| Files | 46 |
+| Files | 48 |
 
 XBRL instances: elements are not listed here; see `docs/tag_registry.yaml`.
 
 | Directory | Files | Formats |
 |---|---|---|
 | `annual_checks/` | 1 | XML 1 |
-| `annual_restated/` | 4 | XML 4 |
+| `annual_restated/` | 6 | XML 6 |
 | `fixed_assets/` | 2 | XML 2 |
 | `level_slip_annual/` | 1 | XML 1 |
 | `rpt_half_year/` | 3 | XML 3 |
@@ -1153,4 +1172,4 @@ Columns (1 of 2 files): object: Table (list of 3); record: HFQ, HFQDISPLAY, Regi
 
 | File | Format | Rows | Description |
 |---|---|---|---|
-| `MANIFEST.md` | Markdown | 895 lines | — |
+| `MANIFEST.md` | Markdown | 911 lines | — |

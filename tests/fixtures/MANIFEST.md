@@ -893,3 +893,19 @@ Read by `tests/test_qf5_withheld_nci_first_period_isin.py`. Kept in `xbrl_qf5/` 
 | file | what it proves | source URL | sha256 |
 |---|---|---|---|
 | `screener_docs/Quarterly-PE.html` | A1.12: Screener defines Price to Quarterly Earnings as "Current price/(EPS latest quarter *4)" (S24) | `https://www.screener.in/docs/changelog/Quarterly-PE/` | `cc868e154d51cb71d2429e4eefe008736ab55b723d8d26e2781f5903258aa91f` |
+
+## RULES25: cash-equivalents boundary (X363), restatement printed in the annual XBRL (X364), annual report PDF listing (X365)
+
+XBRL files copied 2026-11-25 from the local vault blob, gunzipped, sha256 verified (equal to the blob's sha256). Read by
+`tests/test_x363_cash_equivalents_boundary.py` and `tests/test_x364_restatement_reconciled.py`; kept in
+`annual_restated/` so the end-to-end fixture glob (`xbrl/*.xml`) and its pinned counts are unchanged. The listing JSON is
+one answer of the API (session warm-up, then one request, 2026-11-25 17:19:54 UTC), saved byte for byte; read by
+`tests/test_x365_annual_report_pdfs.py`.
+
+| File | Why | Source URL | SHA-256 |
+|---|---|---|---|
+| `annual_restated/INTEGRATED_FILING_INDAS_1440595_15052025094344_WEB.xml` | Welspun Enterprises Q4 FY25 standalone results: FY25 CFI -16.23 Cr, net change 190.51 Cr, cash-flow closing cash 895.17 Cr (opening 704.66 Cr) while its balance sheet states cash and cash equivalents of 433.73 Cr (the stored side) [X363] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1440595_15052025094344_WEB.xml | `6ec1f1d21a0214163da06aa7eef32c626e78f179b96a2335598b1ccd545faf80` |
+| `annual_restated/AR_XBRL_WELENT_18092026113802.xml` | Welspun Enterprises FY26 standalone annual: FY25 cash flows restated to the balance-sheet cash (opening 225.34, closing 433.73 Cr), CFI 1.64 Cr, net change 208.39 Cr, CFO / CFF / PAT / equity / total assets unchanged [X363] | https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_WELENT_18092026113802.xml | `be372fe13e2fde8186444444978dcd6544a2f144debc81100edb11f4dc5ae1bc` |
+| `annual_restated/INTEGRATED_FILING_INDAS_1441327_16052025054934_WEB.xml` | Shankara Building Products Q4 FY25 consolidated results: FY25 PAT 77.40 Cr, total equity 867.80 Cr (the stored side) [X364] | https://nsearchives.nseindia.com/corporate/xbrl/INTEGRATED_FILING_INDAS_1441327_16052025054934_WEB.xml | `b132bd3e3df1984f0954b95c5ef79aa77f05f363162af62c32977653f01f2bdc` |
+| `annual_restated/AR_XBRL_SHANKARA_09082026020807.xml` | Shankara Building Products FY26 consolidated annual: FY25 restated for a demerger (PAT 0.79 Cr, equity 410.96 Cr); text block DisclosureOfReclassificationsOrChangesInPresentationExplanatory prints the "As at 31-03-2025 ... (Restated)" table with both amounts [X364] | https://nsearchives.nseindia.com/corporate/xbrl/AR_XBRL_SHANKARA_09082026020807.xml | `318ae458d16e6c9c8e45e15f9bc64a517e97a0218f62898ad3309003a3e8094e` |
+| `annual/nse_annual-reports_AEGISVOPAK_20261125.json` | NSE annual report PDF listing of AEGISVOPAK: two rows (FY 2025-26, FY 2024-25), fileName = full nsearchives.nseindia.in/annual_reports/ PDF URL [X365] | https://www.nseindia.in/api/annual-reports?index=equities&symbol=AEGISVOPAK | `f3ea8a50b95736b6fc6dd1af28e196a60b37a5ec6f92fa4c82e2122b36aa6b89` |

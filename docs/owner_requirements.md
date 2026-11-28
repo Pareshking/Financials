@@ -60,7 +60,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G296 | Review: price table needs exchange and series columns *(owner)* | DONE | ohlcv PK (security_id, exchange, series, trade_date) |
 | G306 | Review: DVR shares get INE ISINs; only partly-paid get IN9 *(owner)* | CONFLICTS_WITH_EVIDENCE | P17, R10: partly-paid are IN9 + series E1 (true); DVRs carry IN9 (JISLDVREQS, FELDVR) or INE (GATECHDVR) ISINs; tests/test_share_class_fixture_facts.py |
 | G313 | Review: insurer and new-gen KPIs (VNB, EV, APE, platform KPIs) are not in XBRL *(owner)* | DONE | X62; supplemental_kpis; tests/test_supplemental_kpis.py |
-| G336 | Share classes COMMON / DVR / PARTLY_PAID with voting-rights ratio and face value | OUT_OF_SCOPE_BY_DECISION | owner 2026-11-19 "Ignore DVR"; partly-paid series E1 stays outside the universe (P17) |
+| G336 | Share classes COMMON / DVR / PARTLY_PAID with voting-rights ratio and face value | OUT_OF_SCOPE_BY_DECISION | owner 2026-11-19 "Ignore DVR"; partly-paid series E1 stays outside the universe (P17); confirmed 2026-11-24 ("Drop them") |
 
 ## Taxonomy/profile (17)
 
@@ -163,7 +163,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G203 | YoY sales-growth acceleration (current YoY - prior-quarter YoY) | DONE | growth_acceleration_pp (quarter form: sales YoY latest - preceding quarter); TTM form waits for 9 quarters (C9); batch D; tests/test_features_gems.py |
 | G204 | Operating-margin expansion vs the same quarter last year | DONE | opm_change_yoy_pp (quarter OPM - same quarter last year, NULL for lenders); batch D; tests/test_features_gems.py |
 | G205 | Sector earnings breadth during results season | DONE | `industry_earnings_breadth` (+ `_n`): share of the NSE industry's companies reporting its latest quarter with core profit YoY > 0, >= 3 companies, refresh step over the stored day (batch I, features_more.py); tests/test_features_more.py |
-| G207 | Liquidity: 20D median traded value; bid-ask / circuit-lock days | MISSING | 20D median traded value built (turnover_median_20d; tests/test_features_price.py); circuit days built 2026-11-24 from the PR-zip price-band file (band_hit_days_20d, upper_circuit_days_20d, lower_circuit_days_20d; X359; tests/test_x359_price_bands.py). Still missing: bid-ask, which exists only as a fetch-time snapshot in the quote API (orderBook, docs/data_catalogue.md), with no daily history |
+| G207 | Liquidity: 20D median traded value; bid-ask / circuit-lock days | DONE | 20D median traded value built (turnover_median_20d; tests/test_features_price.py); circuit days built 2026-11-24 from the PR-zip price-band file (band_hit_days_20d, upper_circuit_days_20d, lower_circuit_days_20d; X359; tests/test_x359_price_bands.py). Still missing: bid-ask, which exists only as a fetch-time snapshot in the quote API (orderBook, docs/data_catalogue.md), with no daily history; bid-ask DROPPED by owner decision 2026-11-24 ("Drop them": only a live quote-API snapshot exists) |
 | G208 | Market regime / breadth: % of Nifty 500 above 50/200 DMA, 52W high/low ratio, advance-decline | DONE | market_breadth table, one row per materialised day from the in_nifty500 rows (arch 10.7); tests/test_features_price.py |
 | G214 | 20-30 distinctive ratios for all companies *(owner)* | DONE | arch 10 catalogue built (batches B-J, gems, forensic scores; Piotroski / Beneish filled where two annuals exist). Not built by evidence rule: Screener "Price to Quarterly Earning" (definition UNVERIFIED), filed ISCR / DSCR (implausible filed values) |
 | G215 | Incremental ROIC (3Y/5Y) | DONE | incremental_roic_1y (on now, FY26 vs FY25), incremental_roic_3y / _5y (history-gated: FY28 ~May 2028 / FY30); ΔNOPAT / Δ invested capital, NULL when ΔIC <= 0; features_bs; tests/test_balance_sheet_cash_flow_family.py |
@@ -218,7 +218,7 @@ Source column in the gap table: OWNER_PROMPT 54, ASSISTANT_SUGGESTION 289. Rows 
 | G266 | ARPU and MTU growth | DONE | batch G: KPI names arpu (INR), mtu (COUNT) in parsers/kpis.py; arpu, mtu, arpu_ / mtu_ / gov_growth_yoy_pct; tests/test_features_extra.py |
 | G269 | Insurance archetype metrics: P/EV, VNB margin, combined ratio | DONE | combined_ratio (X66), vnb_margin, embedded_value (supplemental); tests/test_batch6_insurers.py. P/EV itself not built |
 | G270 | P/EV for life insurers | DONE | batch G: price_to_embedded_value; tests/test_features_extra.py |
-| G275 | Dual-ISIN securities (partly paid, DVR): sum market cap over all linked ISINs | OUT_OF_SCOPE_BY_DECISION | owner 2026-11-19 "Ignore DVR": each listed security keeps its own market cap |
+| G275 | Dual-ISIN securities (partly paid, DVR): sum market cap over all linked ISINs | OUT_OF_SCOPE_BY_DECISION | owner 2026-11-19 "Ignore DVR": each listed security keeps its own market cap; confirmed 2026-11-24 ("Drop them") |
 | G276 | Organic vs inorganic perimeter flag (business-combination outflows, acquisition filings) | DONE | C26; `inorganic_growth_flag` from the business-combination cash outflow (features_extra.py, batch G); tests/test_features_extra.py (test_business_combination_outflows_and_the_inorganic_flag, test_inorganic_flag_is_three_valued). Reg. 30 acquisition events are parsed since X360 (`acquisitions_90d`, `acquisition_value_90d`, E13) but are not an input to the flag |
 | G278 | Standalone-to-consolidated profit leakage | DONE | `profit_leakage_pct`, `profit_leakage_latest_quarter_pct`, `standalone_pat_ttm` (features_extra.py, batch G); tests/test_features_extra.py (test_reliance_profit_leakage_latest_quarter, test_ttm_profit_leakage) |
 | G314 | Review: forensic scores have different scales; never sum; Altman not for financials *(owner)* | DONE | arch 10.2 |
@@ -663,3 +663,34 @@ My 19:31 (2026-11-17) recommendations, unanswered, applied:
 - **Reg. 76 (owner 2026-11-24, "Demat vs physical not required"):** G93 closes on the listed-share checks already built (NSE Issue Size from the PR-zip mcap file vs Reg. 31, X133; Reg. 34 year-end counts, X114); no Reg. 76 source is needed.
 - **Weekly sweep runs `audit-annual` (owner 2026-11-21 "Add"):** after promote and the incremental materialize, so new annual prior-year findings get their X312 class the same day. A week is clean only when `docs/open_findings.md` shows UNCLASSIFIED 0 (first clean week 21 Nov 2026: 750 open, 0 unclassified).
 - **Phase 3 reference (owner 2026-11-21):** many Phase 3 feeds (F&O, AMFI MF portfolios, PIT / SAST insider trading, bulk / block deals, BRSR, governance, RBI macro, backtester) are already built in the owner's repo `Pareshking/NSE-BSE-Insider-Tracker`. Reuse it (import, not copy) before building any Phase 3 feed here.
+
+## Owner decisions (2026-11-25, "Settle open items")
+
+- **Rule-settled findings closed:** 15 ACCEPT-class findings (8 CC_PAIDUP_OUTLIER, X221; 7 YTD breaks where the audited
+  annual agrees with the Q4 FY column, X309) resolved ACCEPTED with the rule in the note.
+- **Indian GAAP annual reports (TX_NON_INDAS_ANNUAL_MEMBER, 20 filings, 14 members): left out of scope.** No
+  AR_XBRL_NI parser; the members' quarterly results still parse (X330); the vault blobs stay.
+- **Small breaks accepted as filed (8):** YTD vs quarters under 1% (X260), prior-year regroupings whose compared totals
+  agree (X236 pattern), and JLHL FY26 standalone (the audited annual governs, X309; the audit added an exceptional item).
+- **Identity (3):** BAHETI's filed BSE code 123456 is a placeholder, stored 545019 kept (X111); AHLWEST's two annual
+  reports filed before its re-listing rows attached to its security by OVERRIDE (re-promoted).
+- **PDF pass, results and annual PDFs:** read the PDFs of the RESULTS_PDF and ANNUAL_PDF findings with two OCR engines
+  (RapidOCR + OCRia, bake-off 2026-11-24) and compare with the XBRL. Disagreements are flagged, never auto-corrected
+  (decision V); a correction still goes through `fact_corrections` with its own evidence (X107).
+- **Owners' profit where owners + NCI != PAT (34 ATTRIBUTION_WITHHELD): keep X325** (owner 2026-11-25, after a first
+  answer "show filed, flagged" that rested on a wrong premise: the values were never blank). Screens show owners =
+  PAT - NCI as filed with the attribution dq flag; the filed owners figure stays as `asfiled_`. The 34 findings are
+  resolved ACCEPTED with that note.
+- **Annual-report PDF pass (PDF2):** 57 of 142 ANNUAL_PDF findings ACCEPTED where the report prints the cause (35
+  common-control mergers, 8 Ind AS 8 errors, 6 share counts, 3 other schemes, 3 discontinued operations, 2
+  regroupings); "figures regrouped wherever necessary" alone is never a cause. Decision E unchanged: no value changes.
+- **Rules to build (owner 2026-11-25):** restated-table acceptance, cash-equivalents boundary change, NSE annual-reports
+  PDF endpoint in the source register and CLI, and rejection of downloads shorter than their Content-Length.
+- **Results-PDF pass (PDF1):** 98 RESULTS_PDF findings ACCEPTED where both reads print the XBRL value ("filed as
+  printed"); 35 PDF corrections recorded in `fact_corrections` (X107, owner "Apply all 35" 2026-11-25: two agreeing
+  reads, RapidOCR + OCRia on scans or text layer + RapidOCR on digital pages, plus an eye check of each page), findings
+  CORRECTED; 203 stay open (147 unreadable, 35 no PDF, 2 truncated, rest rejected by the eye check or decision E).
+- **Rules built (RULES25):** X363 CASH_EQUIVALENTS_BOUNDARY (7 findings closed by rule), X364
+  RESTATEMENT_RECONCILED_IN_FILING (matches 7 already accepted, 0 open), X365 annual-report PDF feed F37
+  (`fetch-annual-reports`, raw only), X362 cut-short downloads rejected.
+- **OCRia-1 (4B):** test after the results-PDF pass, only as a tie-breaker on pages where the two readers disagreed.

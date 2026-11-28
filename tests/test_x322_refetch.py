@@ -19,7 +19,8 @@ class Seq:
 
     def get(self, url, headers, timeout):
         self.calls += 1
-        return Response(200, self.bodies.pop(0), {"content-length": "0"})
+        body = self.bodies.pop(0)  # served with its own length (0 for the empty file, as observed); X362 checks it
+        return Response(200, body, {"content-length": str(len(body))})
 
 
 def test_vaulted_file_is_not_downloaded_again_unless_refetch_is_asked(tmp_path):

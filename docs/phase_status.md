@@ -91,13 +91,9 @@ the full line-by-line audit of the PDF is `docs/master_backlog.md`; ratios are i
 2. **Automatic merger detection and automatic entitlement / COA ratios: BLOCKED.** No merger purpose in the
    corp-action feed and no delisting-circular fixture (CA14); ratios and COA percentages are published only in PDFs
    (R7, R15 UNVERIFIED). Admin entries with an evidence URL until a source is verified.
-3. **Share classes (G275, G336): BLOCKED.** The classes exist in the committed bhavcopies (P17: partly-paid = `IN9` +
-   series E1, e.g. OLAPP; DVR in EQ / BZ with `IN9` or `INE` ISINs: JISLDVREQS, FELDVR, GATECHDVR; each shares the
-   issuer code with its ordinary share, so G306 / R10 are corrected). Not built because (a) partly-paid trade only in
-   series E1, outside the v1 universe (needs an owner decision to admit E1), (b) summing market cap needs the share
-   count per class, and whether Reg. 31 counts DVR shares with the ordinary shares is unverified: no DVR issuer is in
-   the Nifty 500 and no such pattern is committed or in the vault, (c) no fixture states a DVR voting-rights ratio or
-   face value.
+3. **Share classes (G275, G336): DROPPED by owner decision** (2026-11-19 "Ignore DVR", confirmed 2026-11-24 "Drop
+   them"): each listed security keeps its own market cap; partly-paid series E1 stays outside the universe (P17).
+   Bid-ask (G207) dropped the same day: only a live quote-API snapshot exists.
 4. **DONE (2026-11-24, X358)** half-yearly RPT view: the cross-filing balance check (`rpt-periods`,
    `reg23_period_basis`) settles each filing's window, and `rpt_half_year` sums only settled filings. History of the
    item: **A half-yearly RPT view from the Reg. 23(9) rows: period settled** (R13 resolved 2026-11-17). The amounts cover

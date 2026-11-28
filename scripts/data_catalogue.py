@@ -339,6 +339,16 @@ FAMILIES: tuple[Family, ...] = (
         parser="financials.parsers.reg34_annual:parse_annual_listing",
     ),
     Family(
+        "NSE annual report PDF listing API",
+        (r"annual/nse_annual-reports_[A-Z]+_\d{8}\.json",),
+        "DISCOVERY_ONLY",
+        "Annual report PDF rows of one symbol: fiscal year, submission, broadcast / dissemination time, PDF link "
+        "(nsearchives.nseindia.in/annual_reports/). The PDFs are vaulted raw by fetch-annual-reports (X365), never "
+        "parsed.",
+        ("F37",),
+        parser="financials.parsers.annual_report_pdf:parse_annual_report_listing",
+    ),
+    Family(
         "NSE shareholding master API",
         (
             r"(?:shareholding|discovery)/nse_corporate-share-holdings-master_"

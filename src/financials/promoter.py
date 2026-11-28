@@ -1984,7 +1984,7 @@ def close_resolved_share_findings(con) -> int:
 ANNUAL_RECHECK_NOTE = "annual re-check [X180]: "
 
 
-def audit_annual_checks(con, entity_ids=None) -> dict[str, int]:
+def audit_annual_checks(con, entity_ids=None, vault=None) -> dict[str, int]:
     """X180: re-run the two Reg. 34 annual checks (G328 prior-year columns [X110, X182]; G93 year-end share counts
     [X114, X181]) for every promoted annual filing on the data now stored. Both run only at promotion, so their
     outcome depended on what had been promoted before (an FY26 annual promoted before the FY25 annual or the FY-end
@@ -1995,7 +1995,9 @@ def audit_annual_checks(con, entity_ids=None) -> dict[str, int]:
     the same reason and filing that the re-run no longer produces is closed FIXED_BY_RULE. Returns counts.
     `entity_ids`: re-run only those entities' annuals (X235: after rule X201 rescaled one of their filings).
     X312: in the same write, open findings of an owner-accepted class, or with the same totals as an earlier
-    ACCEPTED finding of the filing, are resolved ACCEPTED (`accept_prior_year_findings`); they stay visible."""
+    ACCEPTED finding of the filing, are resolved ACCEPTED (`accept_prior_year_findings`); they stay visible.
+    X364: with a `vault`, so are the open BOTTOM_LINE_RESTATED findings whose annual XBRL text block prints the
+    restatement (`accept_reconciled_restatements`)."""
     from financials import filing_checks as fc
     from financials.share_capital import REASON as SHARE_REASON
     from financials.share_capital import annual_share_disagreements
@@ -2037,6 +2039,7 @@ def audit_annual_checks(con, entity_ids=None) -> dict[str, int]:
          [m[0] for m in metas], keep],
     ).fetchall()  # fmt: skip
     accepted = accept_prior_year_findings(con, prior)  # X312, after the insert: also an unchanged open finding
+    accepted["accepted_reconciled"] = accept_reconciled_restatements(con, prior, vault) if vault is not None else 0
     open_now = dict(con.execute(
         "SELECT reason_code, count(*) FROM quarantine_queue WHERE resolved_at IS NULL AND reason_code IN (?, ?) "
         "GROUP BY 1", [fc.PRIOR_YEAR_REASON, SHARE_REASON]).fetchall())  # fmt: skip
@@ -2070,6 +2073,39 @@ def accept_prior_year_findings(con, findings: list[tuple[str, str, dict, dict]])
         ).fetchall()
     carried = sum(1 for (n,) in done if fc.CARRIED_RULE in n)
     return {"accepted_by_class": len(done) - carried, "accepted_carried": carried}
+
+
+def accept_reconciled_restatements(con, findings: list[tuple[str, str, dict, dict]], vault) -> int:
+    """X364 rule RESTATEMENT_RECONCILED_IN_FILING: resolve ACCEPTED, in one batched write, the open
+    BOTTOM_LINE_RESTATED findings among `findings` (id, filing_id, details, comparison context) whose annual XBRL
+    (the vault blob, sha256 verified) prints the restatement (`filing_checks.restatement_reconciliation`). One read
+    of the open ids and blob paths; only those blobs are read. A finding already resolved is kept as it is."""
+    from financials import filing_checks as fc
+
+    todo = [f for f in findings if f[2].get("subclass") == "BOTTOM_LINE_RESTATED"]
+    if not todo:
+        return 0
+    rows = {q: (path, sha) for q, path, sha in con.execute(
+        "SELECT q.quarantine_id, b.storage_path, b.sha256 FROM quarantine_queue q JOIN filings f USING (filing_id) "
+        "JOIN blobs b ON b.sha256 = f.sha256 WHERE q.quarantine_id IN (SELECT unnest(?)) AND q.resolved_at IS NULL",
+        [[q for q, *_ in todo]]).fetchall()}  # fmt: skip
+    notes = {}
+    for qid, _fid, det, ctx in todo:
+        if qid not in rows:
+            continue
+        evidence = fc.restatement_reconciliation(
+            vault.read_path(*rows[qid]), det.get("differences", []), ctx.get("compared", set())
+        )
+        if evidence:
+            notes[qid] = fc.reconciled_note(evidence)
+    if not notes:
+        return 0
+    return len(con.execute(
+        "UPDATE quarantine_queue AS q SET resolved_at = $1, resolution = 'ACCEPTED', resolution_note = v.note "
+        "FROM (SELECT unnest($2) AS id, unnest($3) AS note) AS v WHERE q.quarantine_id = v.id "
+        "AND q.resolved_at IS NULL RETURNING q.quarantine_id",
+        [utc_now(), list(notes), list(notes.values())],
+    ).fetchall())  # fmt: skip
 
 
 def close_resolved_annual_share_findings(con) -> int:

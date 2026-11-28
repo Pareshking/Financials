@@ -96,6 +96,27 @@ def test_a_truncated_body_is_retried_like_a_network_error():
         fetcher(Flaky(99), FakeClock(), max_attempts=2).get("https://a.example/x")
 
 
+def test_x362_a_cut_short_body_is_fetched_twice_then_rejected():
+    """X362: LXCHEM_29102025203318_Outcome.pdf is served with HTTP 200 and Content-Length equal to its 587,322-byte
+    body,
+    but has no %%EOF: the archive serves it cut short. Retried once, then a FetchError, never a good blob. Synthetic
+    bytes (no exchange file is added): a complete PDF ends with %%EOF (ISO 32000-1 7.5.5; 195 of 195 results PDFs)."""
+    cut = b"%PDF-1.7\n1 0 obj << >> stream\n" + b"\x00" * 64
+    t = FakeTransport({"https://a.example/cut.pdf": Response(200, cut, {"Content-Length": str(len(cut))})})
+    with pytest.raises(FetchError) as e:
+        fetcher(t, FakeClock()).get("https://a.example/cut.pdf")
+    assert e.value.status == 200 and "%%EOF" in str(e.value) and len(t.calls) == 2
+    whole = cut + b"\nendstream endobj\ntrailer << >>\n%%EOF\r\n"
+    t = FakeTransport({"https://a.example/x.pdf": [Response(200, cut), Response(200, whole)]})
+    assert fetcher(t, FakeClock()).get("https://a.example/x.pdf") == whole  # a cut on the wire heals on the retry
+    short = Response(200, b"0123", {"content-length": "10"})
+    t = FakeTransport({"https://a.example/s": short})
+    with pytest.raises(FetchError, match="Content-Length 10"):
+        fetcher(t, FakeClock()).get("https://a.example/s")
+    gz = Response(200, b"0123", {"Content-Length": "10", "Content-Encoding": "gzip"})  # length of the encoded body
+    assert fetcher(FakeTransport({"https://a.example/g": gz}), FakeClock()).get("https://a.example/g") == b"0123"
+
+
 def test_gives_up_and_does_not_retry_client_errors():
     clock = FakeClock()
     t = FakeTransport({"https://a.example/x": Response(403, b"")})

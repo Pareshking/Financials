@@ -48,9 +48,12 @@ API = "https://www.nseindia.in/api"
 JSON = "application/json"
 WARMUP = {"www.nseindia.in": "https://www.nseindia.in/"}  # session cookies for the API host [A1]
 CORP_ACTION_CHUNK_DAYS = 30  # the API answer was verified on a one-month window [P12]
+# X365: annual report PDFs, kept at the URL the listing gives (the .in host; the .com alias is UNVERIFIED for them)
+ANNUAL_REPORTS_ARCHIVE = "https://nsearchives.nseindia.in/annual_reports/"
 IMMUTABLE_PREFIXES = (f"{ARCHIVE}/content/cm/BhavCopy_", f"{ARCHIVE}/products/content/sec_bhavdata_full_",
                       f"{ARCHIVE}/corporate/xbrl/", f"{ARCHIVE}/content/indices/ind_close_all_",
-                      f"{ARCHIVE}/archives/equities/bhavcopy/pr/")  # fmt: skip
+                      f"{ARCHIVE}/archives/equities/bhavcopy/pr/", ANNUAL_REPORTS_ARCHIVE)  # fmt: skip
+ANNUAL_REPORT_MEDIA = {"pdf": "application/pdf", "zip": "application/zip"}
 EQUITY_MASTER_URL = f"{ARCHIVE}/content/equities/EQUITY_L.csv"  # [IDX10]
 NOT_FOUND_SETTLE_DAYS = 2  # a 404 counts as final only when observed this long after the requested date [P11]
 
@@ -112,6 +115,11 @@ RSS_RETRY_WAIT = 10.0  # seconds before asking again (on top of the host's spaci
 
 def annual_listing_url(symbol: str) -> str:
     return f"{API}/annual-reports-xbrl?index=equities&symbol={_sym(symbol)}"
+
+
+def annual_report_listing_url(symbol: str) -> str:
+    """X365: the annual report PDFs of one symbol [A8]."""
+    return f"{API}/annual-reports?index=equities&symbol={_sym(symbol)}"
 
 
 def quote_url(symbol: str, series: str = "EQ") -> str:
@@ -403,6 +411,43 @@ class Jobs:
                 )
             )  # fmt: skip
         return out
+
+    def annual_report_pdfs(self, symbol: str, *, min_to_year: int = 2025) -> list[Path]:
+        """X365 `fetch-annual-reports`: the `annual-reports` listing [A8] (vaulted, category
+        ANNUAL_REPORT_PDF_LISTING), then every listed file of a fiscal year ending in or after `min_to_year` (C9),
+        vaulted and staged raw only (category ANNUAL_REPORT_PDF, the listed broadcast time, the asked symbol). Nothing
+        is parsed into canonical tables. A vaulted file is never downloaded again; one request at a time."""
+        from financials.parsers.annual_report_pdf import parse_annual_report_listing
+
+        url = annual_report_listing_url(symbol)
+        listing = self._get(url, accept=JSON)
+        entries = parse_annual_report_listing(listing)  # before vaulting: an answer that is not a listing is not kept
+        out = [] if self._promoted_answer(url, listing) else [
+            stage_raw_only(self.vault, self.stage_root, data=listing, ext="json", media_type=JSON,
+                           category="ANNUAL_REPORT_PDF_LISTING", source_url=url, fetched_at=utc_now())]  # fmt: skip
+        for e in entries:
+            if e.to_year < min_to_year or self._before_since(e.broadcast_ts_ist):
+                continue
+            if self.is_done(e.file_url, "raw_only") or (data := self._file(e.file_url)) is None:
+                continue
+            out.append(stage_raw_only(
+                self.vault, self.stage_root, data=data, ext=e.ext,
+                media_type=ANNUAL_REPORT_MEDIA.get(e.ext, "application/octet-stream"), category="ANNUAL_REPORT_PDF",
+                source_url=e.file_url, fetched_at=utc_now(),
+                broadcast_ts=e.broadcast_ts_ist.astimezone(UTC).replace(tzinfo=None), broadcast_ts_source="API_FIELD",
+                stated_symbol=symbol,
+            ))  # fmt: skip
+        return out
+
+    def annual_report_pdfs_many(self, symbols: Iterable[str], *, min_to_year: int = 2025):
+        """X365: `annual_report_pdfs` per symbol; a failure on one symbol is reported and the rest continues."""
+        staged, errors = [], []
+        for sym in symbols:
+            try:
+                staged += self.annual_report_pdfs(sym, min_to_year=min_to_year)
+            except (FetchError, ParseError) as exc:
+                errors.append(f"{sym} annual report PDFs: {exc}")
+        return staged, errors + self.errors
 
     def results(self, symbol: str) -> list[Path]:
         """Integrated Filing results [A7]: listing JSON (vaulted), then every Financials row with a period end in
